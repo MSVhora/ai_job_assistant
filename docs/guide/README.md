@@ -21,6 +21,7 @@ A self-hosted, single-user, **BYOK** (bring-your-own-key) web app:
 The app is being built issue by issue (see [the v1 plan](../plans/v1-implementation-plan.md)).
 Each guide marks what is **live now** vs **planned**:
 
-- Live: stack scaffold, health check (`GET /api/health`)
-- In progress: resume upload + text extraction ([issue #2 plan](../plans/v1-issue-002-resume-upload.md))
-- Planned: LLM profile extraction, review UI, gap-fill, job sources, matching
+- Live: stack scaffold, health check (`GET /api/health`), resume upload + text extraction
+  ([issue #2](../plans/v1-issue-002-resume-upload.md)), LLM profile extraction to a reviewable
+  draft ([issue #3](../plans/v1-issue-003-llm-extraction.md))
+- Planned: review UI, gap-fill, job sources, matching

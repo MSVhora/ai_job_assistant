@@ -51,15 +51,19 @@ See the full walkthrough in [guide 02](guide/02-upload-and-profile.md):
 ```mermaid
 sequenceDiagram
     participant B as Browser
-    participant A as POST /api/resume
-    participant S as Resume service
+    participant A as FastAPI
+    participant G as Gemini (LiteLLM)
     participant D as Postgres
 
-    B->>A: PDF / DOCX (multipart)
-    A->>S: validate + save + extract
-    S->>D: candidate + resume row (draft text only)
-    S-->>B: extracted text — profile NOT saved yet
-    Note over B,D: then (issues #3–#5): LLM extraction → human review<br/>→ gap-fill → saved profile with revision audit
+    B->>A: POST /api/resume — PDF / DOCX (multipart)
+    A->>D: candidate + resume row (draft text only)
+    A-->>B: extracted text
+    B->>A: POST /api/resume/{id}/extract
+    A->>G: resume text + JSON schema → profile JSON
+    Note over A,G: prompt-instructed JSON — pydantic-validated<br/>with one repair round-trip on failure
+    A->>D: stamp parse_version + persist draft_profile (parse artifact)
+    A-->>B: draft profile — NOT a saved profile
+    Note over B,D: then (issues #4–#5): human review → gap-fill<br/>→ saved profile with revision audit
 ```
 
 ![profile-pipeline-sequence diagram](./assets/profile-pipeline-sequence.svg)
@@ -107,7 +111,7 @@ erDiagram
 
     candidate {
         uuid id PK
-        jsonb structured_profile "contact, headline, skills, experience, education, prefs"
+        jsonb structured_profile "contact, headline, skills, experience, projects, education, certifications, extra sections, prefs"
         jsonb preferences "weights, filters, target title/location"
         jsonb completeness "present/missing fields — drives gap-fill"
         timestamptz created_at
@@ -124,7 +128,8 @@ erDiagram
         text extracted_text "stored at parse time (issue #2)"
         integer page_count "PDF only"
         timestamptz parsed_at
-        text parse_version "text_v1 now; LLM model+prompt version from issue #3"
+        text parse_version "text_v1 at upload; model+prompt version after extraction (issue #3)"
+        jsonb draft_profile "AI-extracted draft — parse artifact, not a saved profile (issue #3)"
         timestamptz created_at
     }
 

@@ -8,7 +8,7 @@ See [docs/plans/v1-implementation-plan.md](docs/plans/v1-implementation-plan.md)
 
 - **[User guide](docs/guide/README.md)** — step-by-step: setup, profile pipeline, job discovery
 - **[Architecture](docs/architecture.md)** — diagrams (flow, sequence, ER schema) and layering rules
-- **Plans** — [v1 plan](docs/plans/v1-implementation-plan.md) · [issue #2: resume upload + parsing](docs/plans/v1-issue-002-resume-upload.md) · [UI implementation](docs/plans/v1-ui-implementation-plan.md)
+- **Plans** — [v1 plan](docs/plans/v1-implementation-plan.md) · [issue #2: resume upload + parsing](docs/plans/v1-issue-002-resume-upload.md) · [issue #3: LLM structured extraction](docs/plans/v1-issue-003-llm-extraction.md) · [UI implementation](docs/plans/v1-ui-implementation-plan.md)
 
 Diagrams are Mermaid blocks in the docs, kept in sync with rendered SVG copies in
 `docs/assets/`. After editing any diagram, re-render:

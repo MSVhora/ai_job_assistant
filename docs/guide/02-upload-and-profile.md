@@ -1,7 +1,8 @@
 # 2 — Upload & Profile Review
 
-**Status: planned** — resume upload + text extraction lands with
-[issue #2](../plans/v1-issue-002-resume-upload.md); LLM extraction (#3), review UI (#4) and
+**Status: partially shipped** — resume upload + text extraction
+([issue #2](../plans/v1-issue-002-resume-upload.md)) and LLM extraction to a reviewable draft
+([issue #3](../plans/v1-issue-003-llm-extraction.md)) are live; the review UI (#4) and
 gap-fill (#5) follow. This guide describes the finished v1 pipeline.
 
 ## The idea
@@ -22,7 +23,7 @@ flowchart TD
     C --> D{"Readable text found?"}
     D -- "no" --> D1["Error 422: scanned/image PDFs not supported"]
     D1 --> A
-    D -- "yes" --> E["AI drafts a structured profile<br/>(not saved yet)"]
+    D -- "yes" --> E["AI drafts a structured profile<br/>(re-runnable draft,<br/>not a saved profile yet)"]
     E --> F["Review and edit every field<br/>AI-extracted fields highlighted"]
     F --> G{"Important fields missing?"}
     G -- "yes" --> H["Gap-fill chat asks only about<br/>the missing fields"]
@@ -44,6 +45,8 @@ sequenceDiagram
     participant R as POST /api/resume
     participant S as Resume service
     participant X as Text extraction<br/>(pdfplumber / python-docx)
+    participant E as POST /api/resume/{id}/extract
+    participant L as Gemini via LiteLLM
     participant D as Postgres
 
     U->>B: select PDF / DOCX file
@@ -60,6 +63,11 @@ sequenceDiagram
         S->>D: store resume metadata + text
         S-->>B: draft extracted text
     end
+    B->>E: extract structured profile
+    E->>L: resume text + JSON schema (prompt-instructed)
+    L-->>E: profile JSON (pydantic-validated,<br/>one repair round-trip if invalid)
+    E->>D: stamp parse_version, persist draft_profile on the resume row
+    E-->>B: draft profile — still not a saved profile
 ```
 
 ![upload-sequence diagram](../assets/upload-sequence.svg)
@@ -70,13 +78,17 @@ Key guarantees baked into the design:
   `.pdf` gets rejected (415)
 - **The file on disk is never named after your file** — it gets a UUID; your original
   filename is stored as metadata only
-- **A "draft" is not a profile** — nothing from the resume is persisted as a profile until
-  you review it
+- **A "draft" is not a profile** — the AI draft (`draft_profile`) lives on the resume row as
+  a re-runnable parse artifact; nothing becomes your profile until you review and save it
+- **Extraction failures never corrupt anything** — the model output is validated against a
+  strict schema (with one automatic repair round-trip); a failed extraction leaves the
+  resume row exactly as it was
 
 ## Step-by-step (once the pipeline is live)
 
 1. **Upload** — pick a standard single-column PDF or DOCX (up to 10 MB). Multi-column or
-   image-only resumes parse poorly or fail with a clear message.
+   image-only resumes parse poorly or fail with a clear message. The AI draft is generated
+   right after upload; if it misses something, extraction can simply be re-run.
 2. **Review the draft** — the AI-extracted profile appears as an editable form with
    AI-extracted fields highlighted. Fix anything wrong; each correction is saved to the
    `profile_revision` audit trail.

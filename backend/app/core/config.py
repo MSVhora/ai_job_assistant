@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     gemini_api_key: str | None = None
     llm_model: str = "gemini/gemini-2.5-flash"
     embedding_model: str = "gemini/text-embedding-004"
+    extraction_max_chars: int = 20_000
 
     adzuna_app_id: str | None = None
     adzuna_app_key: str | None = None

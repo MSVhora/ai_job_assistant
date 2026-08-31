@@ -26,5 +26,25 @@ class TextExtractionError(DomainError):
     default_detail = "no readable text found in file"
 
 
+class ResumeNotFoundError(DomainError):
+    status_code = 404
+    default_detail = "resume not found"
+
+
+class ResumeTextUnavailableError(DomainError):
+    status_code = 409
+    default_detail = "resume has no extracted text to parse"
+
+
+class LLMNotConfiguredError(DomainError):
+    status_code = 503
+    default_detail = "LLM provider is not configured"
+
+
+class LLMExtractionError(DomainError):
+    status_code = 502
+    default_detail = "profile extraction failed"
+
+
 async def domain_error_handler(_: Request, exc: DomainError) -> JSONResponse:
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})

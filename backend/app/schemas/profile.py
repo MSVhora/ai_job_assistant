@@ -1,6 +1,10 @@
+import uuid
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
+
+RevisionSourceLiteral = Literal["ai_extraction", "manual_edit", "gap_fill", "reupload_merge"]
 
 
 class SourceLink(BaseModel):
@@ -99,3 +103,24 @@ class StructuredProfile(BaseModel):
                 "or extra section entry"
             )
         return self
+
+
+class RevisionSummary(BaseModel):
+    id: uuid.UUID
+    source: RevisionSourceLiteral
+    created_at: datetime
+
+
+class ProfileResponse(BaseModel):
+    candidate_id: uuid.UUID
+    structured_profile: StructuredProfile
+    updated_at: datetime
+    last_revision: RevisionSummary | None = None
+
+
+class ProfileUpdateRequest(BaseModel):
+    structured_profile: StructuredProfile
+    source_resume_id: uuid.UUID | None = Field(
+        default=None,
+        description="resume whose AI draft this save is reviewed from",
+    )

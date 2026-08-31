@@ -39,5 +39,5 @@ async def clean_tables(migrated_database: None) -> None:
     await engine.dispose()
     yield
     async with engine.begin() as conn:
-        await conn.execute(text("truncate table resume, candidate"))
+        await conn.execute(text("truncate table profile_revision, resume, candidate cascade"))
     await engine.dispose()

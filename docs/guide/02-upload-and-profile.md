@@ -1,9 +1,10 @@
 # 2 — Upload & Profile Review
 
-**Status: partially shipped** — resume upload + text extraction
-([issue #2](../plans/v1-issue-002-resume-upload.md)) and LLM extraction to a reviewable draft
-([issue #3](../plans/v1-issue-003-llm-extraction.md)) are live; the review UI (#4) and
-gap-fill (#5) follow. This guide describes the finished v1 pipeline.
+**Status: mostly shipped** — resume upload + text extraction
+([issue #2](../plans/v1-issue-002-resume-upload.md)), LLM extraction to a reviewable draft
+([issue #3](../plans/v1-issue-003-llm-extraction.md)), and the review/edit UI with the
+`profile_revision` audit trail ([issue #4](../plans/v1-issue-004-profile-persistence-review-ui.md))
+are live; conversational gap-fill (#5) follows. This guide describes the finished v1 pipeline.
 
 ## The idea
 
@@ -89,14 +90,35 @@ Key guarantees baked into the design:
 1. **Upload** — pick a standard single-column PDF or DOCX (up to 10 MB). Multi-column or
    image-only resumes parse poorly or fail with a clear message. The AI draft is generated
    right after upload; if it misses something, extraction can simply be re-run.
-2. **Review the draft** — the AI-extracted profile appears as an editable form with
-   AI-extracted fields highlighted. Fix anything wrong; each correction is saved to the
-   `profile_revision` audit trail.
-3. **Fill the gaps** — the app asks conversational questions *only* about genuinely missing
-   fields (typically: target location, salary band, seniority, work authorization, remote
-   preference). Answers merge into the profile, also recorded as revisions.
-4. **Done** — the saved profile drives job discovery and matching. You can re-upload a newer
-   resume later; changes go through a merge/diff review instead of silently overwriting.
+2. **Review the draft** *(live)* — the AI-extracted profile opens as an editable form with
+   AI-extracted fields highlighted. Fix anything wrong; saving records your corrections in
+   the `profile_revision` audit trail.
+3. **Fill the gaps** *(#5, upcoming)* — the app asks conversational questions *only* about
+   genuinely missing fields (typically: target location, salary band, seniority, work
+   authorization, remote preference). Answers merge into the profile, also recorded as
+   revisions.
+4. **Done** — the saved profile drives job discovery and matching. Re-uploading a newer
+   resume opens a merge/diff review; nothing is overwritten until you explicitly save the
+   merge.
+
+## How saving works (the API behind the UI)
+
+- `GET /api/profile` returns the saved profile — `404` until the first save, which the UI
+  shows as an empty state pointing back to upload
+- `PATCH /api/profile` is an upsert: the first save writes the reviewed draft; every later
+  save replaces the whole profile and writes one `profile_revision` row with a field-level
+  diff (`{path: {old, new}}`, dotted paths for scalars, whole-list diffs for arrays)
+- The revision `source` is decided by the server, never the client:
+  - `ai_extraction` — the first save from a reviewed draft (the AI baseline; when you
+    corrected fields during first review, an additional `manual_edit` row records exactly
+    what you changed)
+  - `manual_edit` — a normal edit save
+  - `reupload_merge` — a save after the re-upload merge review
+  - `gap_fill` — reserved for the conversational gap-fill flow (#5)
+- `GET /api/resume/{id}/draft` returns the AI draft for a resume without re-running
+  extraction (no token cost) — this is what makes the review UI refresh-safe
+- No-change saves still record a revision row with an empty diff — the audit trail shows
+  every save attempt, not only the ones that changed something
 
 ## Privacy
 

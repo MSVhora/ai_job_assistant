@@ -63,7 +63,10 @@ sequenceDiagram
     Note over A,G: prompt-instructed JSON — pydantic-validated<br/>with one repair round-trip on failure
     A->>D: stamp parse_version + persist draft_profile (parse artifact)
     A-->>B: draft profile — NOT a saved profile
-    Note over B,D: then (issues #4–#5): human review → gap-fill<br/>→ saved profile with revision audit
+    B->>A: PATCH /api/profile — reviewed profile (upsert)
+    A->>D: save structured_profile + profile_revision diff rows
+    A-->>B: saved profile with revision audit (issue #4)
+    Note over B,D: next (issue #5): conversational gap-fill for missing fields
 ```
 
 ![profile-pipeline-sequence diagram](./assets/profile-pipeline-sequence.svg)
@@ -111,9 +114,7 @@ erDiagram
 
     candidate {
         uuid id PK
-        jsonb structured_profile "contact, headline, skills, experience, projects, education, certifications, extra sections, prefs"
-        jsonb preferences "weights, filters, target title/location"
-        jsonb completeness "present/missing fields — drives gap-fill"
+        jsonb structured_profile "contact, headline, skills, experience, projects, education, certifications, extra sections, embedded preferences — saved only after human review"
         timestamptz created_at
         timestamptz updated_at
     }
@@ -173,6 +174,11 @@ erDiagram
 ```
 
 ![database-schema-er diagram](./assets/database-schema-er.svg)
+
+Deferred from plan §4 (issue #4 locked decision): the separate `preferences` (weights) and
+`completeness` jsonb columns. Preferences extracted from the resume stay inside
+`structured_profile`; the priority-weight column lands with the matching work that consumes
+it, and gap-fill (#5) derives completeness from the profile instead of storing it.
 
 Schema conventions and index rules (FK columns indexed, `(source, external_id)` unique,
 `match(candidate_id, final_score DESC)` for the dashboard query, embedding dimension pinned

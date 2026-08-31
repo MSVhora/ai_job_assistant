@@ -31,6 +31,16 @@ class ResumeNotFoundError(DomainError):
     default_detail = "resume not found"
 
 
+class ProfileNotFoundError(DomainError):
+    status_code = 404
+    default_detail = "no saved profile yet"
+
+
+class ResumeDraftUnavailableError(DomainError):
+    status_code = 409
+    default_detail = "resume has no extracted draft profile"
+
+
 class ResumeTextUnavailableError(DomainError):
     status_code = 409
     default_detail = "resume has no extracted text to parse"

@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.deps import get_db
 from app.schemas.resume import DraftProfileResponse, ResumeUploadResponse
-from app.services import profile_extraction, resume_service
+from app.services import profile_extraction, profile_service, resume_service
 
 router = APIRouter(prefix="/api", tags=["resume"])
 
@@ -25,3 +25,11 @@ async def extract_resume(
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> DraftProfileResponse:
     return await profile_extraction.extract_resume_profile(session, resume_id)
+
+
+@router.get("/resume/{resume_id}/draft", response_model=DraftProfileResponse)
+async def get_resume_draft(
+    resume_id: uuid.UUID,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> DraftProfileResponse:
+    return await profile_service.get_resume_draft(session, resume_id)

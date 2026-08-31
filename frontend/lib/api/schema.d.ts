@@ -38,14 +38,179 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/resume/{resume_id}/extract": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Extract Resume */
+        post: operations["extract_resume_api_resume__resume_id__extract_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/resume/{resume_id}/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Resume Draft */
+        get: operations["get_resume_draft_api_resume__resume_id__draft_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Profile */
+        get: operations["get_profile_api_profile_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Profile */
+        patch: operations["update_profile_api_profile_patch"];
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AwardItem */
+        AwardItem: {
+            /** Title */
+            title: string;
+            /** Issuer */
+            issuer?: string | null;
+            /**
+             * Issued Date
+             * @description verbatim as written on the resume
+             */
+            issued_date?: string | null;
+        };
         /** Body_upload_resume_api_resume_post */
         Body_upload_resume_api_resume_post: {
             /** File */
             file: string;
+        };
+        /** CertificationItem */
+        CertificationItem: {
+            /** Name */
+            name: string;
+            /** Issuer */
+            issuer?: string | null;
+            /** Issued Date */
+            issued_date?: string | null;
+        };
+        /** ContactInfo */
+        ContactInfo: {
+            /** Full Name */
+            full_name: string;
+            /** Email */
+            email?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /** Location */
+            location?: string | null;
+            /**
+             * Links
+             * @default []
+             */
+            links: components["schemas"]["SourceLink"][];
+        };
+        /** DraftProfileResponse */
+        DraftProfileResponse: {
+            /**
+             * Resume Id
+             * Format: uuid
+             */
+            resume_id: string;
+            /**
+             * Candidate Id
+             * Format: uuid
+             */
+            candidate_id: string;
+            draft_profile: components["schemas"]["StructuredProfile"];
+            /** Parse Version */
+            parse_version: string;
+            /**
+             * Parsed At
+             * Format: date-time
+             */
+            parsed_at: string;
+        };
+        /** EducationItem */
+        EducationItem: {
+            /** Institution */
+            institution?: string | null;
+            /** Degree */
+            degree?: string | null;
+            /** Field */
+            field?: string | null;
+            /** Start Date */
+            start_date?: string | null;
+            /** End Date */
+            end_date?: string | null;
+        };
+        /** ExperienceItem */
+        ExperienceItem: {
+            /** Company */
+            company?: string | null;
+            /** Title */
+            title?: string | null;
+            /** Location */
+            location?: string | null;
+            /**
+             * Start Date
+             * @description verbatim as written on the resume
+             */
+            start_date?: string | null;
+            /**
+             * End Date
+             * @description verbatim as written on the resume
+             */
+            end_date?: string | null;
+            /**
+             * Is Current
+             * @default false
+             */
+            is_current: boolean;
+            /**
+             * Bullets
+             * @default []
+             */
+            bullets: string[];
+        };
+        /** ExtraSection */
+        ExtraSection: {
+            /**
+             * Title
+             * @description original resume section title: Awards, Publications, Languages, Volunteer, ...
+             */
+            title: string;
+            /**
+             * Entries
+             * @description one entry per line/bullet, verbatim
+             */
+            entries: string[];
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -60,6 +225,76 @@ export interface components {
             database: boolean;
             /** Llm Configured */
             llm_configured: boolean;
+        };
+        /** Preferences */
+        Preferences: {
+            /** Target Title */
+            target_title?: string | null;
+            /** Target Location */
+            target_location?: string | null;
+            /** Remote Preference */
+            remote_preference?: ("remote" | "hybrid" | "onsite" | "flexible") | null;
+            /** Salary Min */
+            salary_min?: number | null;
+            /** Salary Max */
+            salary_max?: number | null;
+            /** Currency */
+            currency?: string | null;
+        };
+        /** ProfileResponse */
+        ProfileResponse: {
+            /**
+             * Candidate Id
+             * Format: uuid
+             */
+            candidate_id: string;
+            structured_profile: components["schemas"]["StructuredProfile"];
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            last_revision?: components["schemas"]["RevisionSummary"] | null;
+        };
+        /** ProfileUpdateRequest */
+        ProfileUpdateRequest: {
+            structured_profile: components["schemas"]["StructuredProfile"];
+            /**
+             * Source Resume Id
+             * @description resume whose AI draft this save is reviewed from
+             */
+            source_resume_id?: string | null;
+        };
+        /** ProjectItem */
+        ProjectItem: {
+            /** Name */
+            name: string;
+            /** Role */
+            role?: string | null;
+            /** Url */
+            url?: string | null;
+            /**
+             * Start Date
+             * @description verbatim as written on the resume
+             */
+            start_date?: string | null;
+            /**
+             * End Date
+             * @description verbatim as written on the resume
+             */
+            end_date?: string | null;
+            /** Description */
+            description?: string | null;
+            /**
+             * Bullets
+             * @default []
+             */
+            bullets: string[];
+            /**
+             * Technologies
+             * @default []
+             */
+            technologies: string[];
         };
         /** ResumeUploadResponse */
         ResumeUploadResponse: {
@@ -90,6 +325,78 @@ export interface components {
             parsed_at: string;
             /** Parse Version */
             parse_version: string;
+        };
+        /** RevisionSummary */
+        RevisionSummary: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "ai_extraction" | "manual_edit" | "gap_fill" | "reupload_merge";
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** SourceLink */
+        SourceLink: {
+            /**
+             * Label
+             * @description e.g. LinkedIn, GitHub, portfolio
+             */
+            label?: string | null;
+            /** Url */
+            url: string;
+        };
+        /** StructuredProfile */
+        StructuredProfile: {
+            contact: components["schemas"]["ContactInfo"];
+            /** Headline */
+            headline?: string | null;
+            /** Summary */
+            summary?: string | null;
+            /**
+             * Skills
+             * @default []
+             */
+            skills: string[];
+            /**
+             * Experience
+             * @default []
+             */
+            experience: components["schemas"]["ExperienceItem"][];
+            /**
+             * Projects
+             * @default []
+             */
+            projects: components["schemas"]["ProjectItem"][];
+            /**
+             * Education
+             * @default []
+             */
+            education: components["schemas"]["EducationItem"][];
+            /**
+             * Certifications
+             * @default []
+             */
+            certifications: components["schemas"]["CertificationItem"][];
+            /**
+             * Awards
+             * @default []
+             */
+            awards: components["schemas"]["AwardItem"][];
+            /**
+             * Extra Sections
+             * @default []
+             */
+            extra_sections: components["schemas"]["ExtraSection"][];
+            preferences?: components["schemas"]["Preferences"] | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -153,6 +460,121 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ResumeUploadResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    extract_resume_api_resume__resume_id__extract_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resume_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftProfileResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_resume_draft_api_resume__resume_id__draft_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resume_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftProfileResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_profile_api_profile_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileResponse"];
+                };
+            };
+        };
+    };
+    update_profile_api_profile_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProfileUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileResponse"];
                 };
             };
             /** @description Validation Error */

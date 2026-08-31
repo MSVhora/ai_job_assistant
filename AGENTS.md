@@ -54,6 +54,7 @@ docs/plans/         # versioned implementation plans
 - Model changes: migration generated, reviewed, and included in the same change.
 - New external dep: justified in the response (prefer stdlib / what the stack already uses).
 - Setup or behavior changed: `.env.example` / README updated.
+- Docs kept in sync: if the change alters user-facing behavior, the API surface, the DB schema, or the architecture, update the relevant guide (`docs/guide/`), `docs/architecture.md`, and any affected diagram in the same change, then re-run `node scripts/render-diagrams.mjs` so the rendered SVG assets match. New issue plans state their doc impact.
 
 ## Commands
 
@@ -67,6 +68,7 @@ docs/plans/         # versioned implementation plans
 | Frontend dev | `npm run dev` (in `frontend/`) |
 | Frontend lint/build | `npm run lint` / `npm run build` (in `frontend/`) |
 | Full stack | `docker compose up -d` |
+| Re-render doc diagrams | `node scripts/render-diagrams.mjs` (repo root; needs `@mermaid-js/mermaid-cli`) |
 
 ## Code style
 

@@ -4,6 +4,19 @@ Self-hosted, single-user, BYOK (bring-your-own-key) web app: upload a resume →
 
 See [docs/plans/v1-implementation-plan.md](docs/plans/v1-implementation-plan.md) for scope and the [coding standards](docs/instructions/) enforced in this repo.
 
+## Documentation
+
+- **[User guide](docs/guide/README.md)** — step-by-step: setup, profile pipeline, job discovery
+- **[Architecture](docs/architecture.md)** — diagrams (flow, sequence, ER schema) and layering rules
+- **Plans** — [v1 plan](docs/plans/v1-implementation-plan.md) · [issue #2: resume upload + parsing](docs/plans/v1-issue-002-resume-upload.md)
+
+Diagrams are Mermaid blocks in the docs, kept in sync with rendered SVG copies in
+`docs/assets/`. After editing any diagram, re-render:
+
+```bash
+node scripts/render-diagrams.mjs   # needs @mermaid-js/mermaid-cli
+```
+
 ## Stack
 
 FastAPI (Python 3.12) · Next.js (TypeScript) · Postgres + pgvector · LiteLLM (Gemini Flash default) · Docker Compose

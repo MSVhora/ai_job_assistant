@@ -1,6 +1,6 @@
 # Issue #4 — Profile Persistence + Review/Edit UI + Revision Audit
 
-**Status:** Planned
+**Status:** Done (2026-09-01)
 **Tracks:** GitHub issue #4 (Day 3, Week 1)
 **Plan of record:** [v1-implementation-plan.md](v1-implementation-plan.md) §4, §6, §7, §8
 **Depends on:** Issue #2 (upload + text extraction — done), Issue #3 (LLM draft extraction — done)

@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -8,6 +9,9 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/ai_job_assistant"
     cors_origins: list[str] = ["http://localhost:3000"]
+
+    uploads_dir: Path = Path("./data/uploads")
+    resume_max_upload_mb: int = 10
 
     gemini_api_key: str | None = None
     llm_model: str = "gemini/gemini-2.5-flash"

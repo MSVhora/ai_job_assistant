@@ -24,6 +24,7 @@ services:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-ai_job_assistant}
     volumes:
       - ./backend/app:/app/app
+      - uploads:/app/data/uploads
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     ports:
       - "8000:8000"
@@ -46,3 +47,4 @@ services:
 
 volumes:
   pgdata:
+  uploads:

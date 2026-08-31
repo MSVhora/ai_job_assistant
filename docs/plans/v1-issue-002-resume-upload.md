@@ -1,6 +1,6 @@
 # Issue #2 — Resume Upload + Text Extraction (PDF/DOCX)
 
-**Status:** Planned (not started)
+**Status:** Done (2026-08-31)
 **Tracks:** GitHub issue #2 (Day 1–2, Week 1)
 **Plan of record:** [v1-implementation-plan.md](v1-implementation-plan.md) §4, §6, §8
 **Depends on:** Issue #1 (scaffold — done)

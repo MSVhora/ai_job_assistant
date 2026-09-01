@@ -11,7 +11,7 @@ from app.core.errors import (
     domain_error_handler,
     request_validation_error_handler,
 )
-from app.routers import health, profile, resume
+from app.routers import health, jobs, profile, resume
 
 logging.basicConfig(level=logging.INFO)
 
@@ -29,6 +29,7 @@ def create_app() -> FastAPI:
     application.include_router(health.router)
     application.include_router(resume.router)
     application.include_router(profile.router)
+    application.include_router(jobs.router)
     application.add_exception_handler(DomainError, domain_error_handler)
     application.add_exception_handler(RequestValidationError, request_validation_error_handler)
     application.add_middleware(DbCommitMiddleware)

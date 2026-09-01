@@ -127,6 +127,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/jobs/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start Job Search */
+        post: operations["start_job_search_api_jobs_search_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/jobs/searches/{search_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Job Search Status */
+        get: operations["get_job_search_status_api_jobs_searches__search_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Sources */
+        get: operations["list_sources_api_sources_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -167,6 +218,11 @@ export interface components {
             phone?: string | null;
             /** Location */
             location?: string | null;
+            /**
+             * Country
+             * @description ISO 3166-1 alpha-2 code (lowercase), e.g. 'de', 'in', 'us'
+             */
+            country?: string | null;
             /**
              * Links
              * @default []
@@ -312,6 +368,67 @@ export interface components {
             database: boolean;
             /** Llm Configured */
             llm_configured: boolean;
+        };
+        /** JobSearchRequest */
+        JobSearchRequest: {
+            /** Query */
+            query: string;
+            /** Location */
+            location?: string | null;
+            /** Country */
+            country: string;
+            /**
+             * Results Wanted
+             * @default 50
+             */
+            results_wanted: number;
+            /** Sources */
+            sources?: string[] | null;
+        };
+        /** JobSearchStartResponse */
+        JobSearchStartResponse: {
+            /**
+             * Search Id
+             * Format: uuid
+             */
+            search_id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "running" | "succeeded" | "partial" | "failed";
+        };
+        /** JobSearchStatusResponse */
+        JobSearchStatusResponse: {
+            /**
+             * Search Id
+             * Format: uuid
+             */
+            search_id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "running" | "succeeded" | "partial" | "failed";
+            /** Query */
+            query: {
+                [key: string]: unknown;
+            };
+            /**
+             * Results
+             * @default []
+             */
+            results: components["schemas"]["SourceOutcome"][];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /** Preferences */
         Preferences: {
@@ -505,6 +622,17 @@ export interface components {
              */
             created_at: string;
         };
+        /** SourceInfoResponse */
+        SourceInfoResponse: {
+            /** Name */
+            name: string;
+            /** Is Official Api */
+            is_official_api: boolean;
+            /** Disclosure Required */
+            disclosure_required: boolean;
+            /** Is Configured */
+            is_configured: boolean;
+        };
         /** SourceLink */
         SourceLink: {
             /**
@@ -514,6 +642,23 @@ export interface components {
             label?: string | null;
             /** Url */
             url: string;
+        };
+        /** SourceOutcome */
+        SourceOutcome: {
+            /** Source */
+            source: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "failed" | "skipped";
+            /**
+             * Count
+             * @default 0
+             */
+            count: number;
+            /** Warning */
+            warning?: string | null;
         };
         /** StructuredProfile */
         StructuredProfile: {
@@ -895,6 +1040,90 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_job_search_api_jobs_search_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JobSearchRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSearchStartResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_job_search_status_api_jobs_searches__search_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                search_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSearchStatusResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sources_api_sources_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceInfoResponse"][];
                 };
             };
         };

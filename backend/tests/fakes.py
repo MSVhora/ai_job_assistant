@@ -4,11 +4,19 @@ from typing import Any
 
 import litellm
 
+from app.adapters.job_sources.base import (
+    ConnectorError,
+    JobPostingData,
+    JobSearchQuery,
+    RawJobPosting,
+)
+
 VALID_PROFILE: dict[str, Any] = {
     "contact": {
         "full_name": "Jane Doe",
         "email": "jane@example.com",
         "location": "Berlin",
+        "country": "de",
         "links": [
             {"url": "https://www.linkedin.com/in/janedoe", "label": None},
             {"url": "https://github.com/janedoe", "label": None},
@@ -75,3 +83,48 @@ def install_acompletion(monkeypatch: Any, handler: Callable[..., object]) -> lis
 
     monkeypatch.setattr(litellm, "acompletion", _spy)
     return calls
+
+
+def fake_posting(external_id: str, **overrides: Any) -> JobPostingData:
+    defaults: dict[str, Any] = {
+        "external_id": external_id,
+        "title": f"Job {external_id}",
+        "raw_payload": {"id": external_id},
+    }
+    return JobPostingData(**{**defaults, **overrides})
+
+
+class FakeJobSource:
+    def __init__(
+        self,
+        name: str = "fake",
+        *,
+        configured: bool = True,
+        postings: list[JobPostingData] | None = None,
+        error: Exception | None = None,
+    ) -> None:
+        self.name = name
+        self.is_official_api = False
+        self.disclosure_required = False
+        self._configured = configured
+        self._postings = postings or []
+        self._error = error
+        self.queries: list[JobSearchQuery] = []
+
+    def is_configured(self) -> bool:
+        return self._configured
+
+    async def search(self, query: JobSearchQuery) -> list[RawJobPosting]:
+        self.queries.append(query)
+        if self._error is not None:
+            raise self._error
+        return [
+            RawJobPosting(external_id=posting.external_id, payload=posting.raw_payload)
+            for posting in self._postings
+        ]
+
+    def normalize(self, raw: RawJobPosting) -> JobPostingData:
+        for posting in self._postings:
+            if posting.external_id == raw.external_id:
+                return posting
+        raise ConnectorError(f"un-mappable posting {raw.external_id}")

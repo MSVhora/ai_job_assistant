@@ -37,7 +37,7 @@ async def insert_resume_with_draft(draft: dict[str, Any] | None) -> dict[str, st
             size_bytes=1,
             extracted_text="resume text",
             draft_profile=draft,
-            parse_version="gemini/gemini-2.5-flash+profile_prompt_v4" if draft else "text_v1",
+            parse_version="gemini/gemini-2.5-flash+profile_prompt_v5" if draft else "text_v1",
             parsed_at=datetime.now(UTC) if draft else None,
         )
         session.add(resume)
@@ -288,7 +288,7 @@ async def test_draft_endpoint_returns_persisted_draft(client: AsyncClient) -> No
     assert body["resume_id"] == inserted["resume_id"]
     assert body["candidate_id"] == inserted["candidate_id"]
     assert body["draft_profile"]["contact"]["full_name"] == "Jane Doe"
-    assert body["parse_version"] == "gemini/gemini-2.5-flash+profile_prompt_v4"
+    assert body["parse_version"] == "gemini/gemini-2.5-flash+profile_prompt_v5"
     assert body["parsed_at"] is not None
 
 

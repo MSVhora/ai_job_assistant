@@ -1,13 +1,21 @@
 # 3 — Job Discovery & Matching
 
-**Status: planned** — lands in Week 2 of v1 (issues #6–#11). This guide describes the
-finished v1 behaviour.
+**Status: partially live** — job search, Adzuna ingestion, and de-duplication work today
+(issue #7). Embeddings, hard filters, ranking, and the "why this matches" rationale land
+with the matching issues (#8–#11); those sections below describe the finished v1 behaviour.
 
 ## The idea
 
 You search once; the app fans out to multiple job sources, normalizes and de-duplicates the
 results, then ranks them against your saved profile — with a plain-language "why this
 matches" on the best ones.
+
+## Search is always explicit
+
+A search only starts when **you** submit one — nothing runs automatically, not on page
+load, not when a profile is completed. The exact query that will be sent is shown and
+editable before you submit; after the run, its status endpoint echoes the stored query so
+you can always see what was searched.
 
 ## The flow
 
@@ -31,6 +39,11 @@ flowchart LR
 ![job-discovery-flow diagram](../assets/job-discovery-flow.svg)
 
 A failing source never breaks the search — it is skipped with a warning surfaced in the UI.
+
+Today (issue #7): `POST /api/jobs/search` starts a background run, `GET
+/api/jobs/searches/{id}` reports its status with per-source results/warnings, and postings
+are de-duplicated per `(source, external_id)` — a re-search refreshes the stored postings
+instead of duplicating them.
 
 ## What happens on a search (behind the scenes)
 

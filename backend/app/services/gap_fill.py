@@ -40,6 +40,7 @@ _MAX_PROMPT_CHARS = 24_000
 
 _FIELD_LABELS: dict[str, str] = {
     "contact.location": "Current location",
+    "contact.country": "Country",
     "preferences.target_location": "Target location",
     "preferences.remote_preference": "Remote preference",
     "preferences.salary_band": "Salary band",
@@ -49,6 +50,10 @@ _FIELD_LABELS: dict[str, str] = {
 
 _FIELD_DESCRIPTIONS: dict[str, str] = {
     "contact.location": "the city/region the user works from",
+    "contact.country": (
+        "the ISO 3166-1 alpha-2 country code (lowercase, e.g. 'in', 'de', 'us') of the "
+        "country the user will work from"
+    ),
     "preferences.target_location": (
         "where they want their next job to be (city, country, or 'remote anywhere')"
     ),
@@ -76,6 +81,7 @@ _APPLIED_LABELS: dict[str, str] = {
 
 class GapFillAnswers(BaseModel):
     contact_location: str | None = Field(default=None, max_length=200)
+    contact_country: str | None = Field(default=None, max_length=2, pattern=r"^[A-Za-z]{2}$")
     target_location: str | None = Field(default=None, max_length=200)
     remote_preference: RemotePreference | None = None
     salary_min: float | None = Field(default=None, ge=0)
@@ -84,13 +90,20 @@ class GapFillAnswers(BaseModel):
     seniority: SeniorityLevel | None = None
     work_authorization: str | None = Field(default=None, max_length=200)
 
-    @field_validator("contact_location", "target_location", "work_authorization", mode="after")
+    @field_validator(
+        "contact_location", "contact_country", "target_location", "work_authorization", mode="after"
+    )
     @classmethod
     def _blank_to_none(cls, value: str | None) -> str | None:
         if value is None:
             return None
         trimmed = value.strip()
         return trimmed or None
+
+    @field_validator("contact_country", mode="after")
+    @classmethod
+    def _lowercase_country(cls, value: str | None) -> str | None:
+        return value.lower() if value else value
 
 
 class GapFillTurn(BaseModel):
@@ -111,6 +124,8 @@ def missing_fields(profile: StructuredProfile) -> list[GapFillField]:
     missing: list[GapFillField] = []
     if _blank(profile.contact.location):
         missing.append(_field("contact.location"))
+    if _blank(profile.contact.country):
+        missing.append(_field("contact.country"))
     if prefs is None or _blank(prefs.target_location):
         missing.append(_field("preferences.target_location"))
     if prefs is None or prefs.remote_preference is None:
@@ -127,6 +142,7 @@ def missing_fields(profile: StructuredProfile) -> list[GapFillField]:
 def _context_profile(profile: StructuredProfile) -> dict[str, Any]:
     context: dict[str, Any] = {
         "contact.location": profile.contact.location,
+        "contact.country": profile.contact.country,
         "headline": profile.headline,
     }
     if profile.preferences is not None:
@@ -204,6 +220,10 @@ def _apply_answers(
     if "contact.location" in missing_keys and answers.contact_location is not None:
         profile.contact.location = answers.contact_location
         record("contact.location", answers.contact_location)
+
+    if "contact.country" in missing_keys and answers.contact_country is not None:
+        profile.contact.country = answers.contact_country
+        record("contact.country", answers.contact_country)
 
     if prefs is None:
         return applied

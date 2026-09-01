@@ -9,9 +9,10 @@
 - A **Gemini API key** — the default LLM provider. Free tier works:
   create one at [Google AI Studio](https://aistudio.google.com/apikey)
 
-Later (job discovery) you can optionally add an [Adzuna](https://developer.adzuna.com/) key
-(free) and an [Apify](https://apify.com) token (paid usage) — nothing else is needed for the
-profile pipeline.
+For job discovery, add an [Adzuna](https://developer.adzuna.com/) key pair (free) — with
+`ADZUNA_APP_ID` and `ADZUNA_APP_KEY` set, job search is available (see
+[job discovery](03-job-discovery-and-matching.md)). An [Apify](https://apify.com) token
+(paid usage) will enable the scraper-based sources in an upcoming issue.
 
 ## Step 1 — Clone and configure
 

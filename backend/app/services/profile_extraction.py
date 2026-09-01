@@ -20,7 +20,7 @@ from app.schemas.resume import DraftProfileResponse
 
 logger = logging.getLogger(__name__)
 
-PROFILE_PROMPT_VERSION = "profile_prompt_v4"
+PROFILE_PROMPT_VERSION = "profile_prompt_v5"
 
 EXTRACTION_SYSTEM = (
     "You extract structured data from resumes. Rules: "
@@ -29,6 +29,8 @@ EXTRACTION_SYSTEM = (
     "copy dates verbatim as written (e.g. 'Mar 2021', '2019 - Present'); "
     "set is_current only for the candidate's present role; "
     "deduplicate skills case-insensitively keeping the first written form; "
+    "set contact.country to the ISO 3166-1 alpha-2 code (lowercase, e.g. 'de', 'in', 'us') "
+    "of the candidate's location only when the text makes it unambiguous; "
     "map each resume section to its matching schema field (Experience, Education, Skills, "
     "Certifications, Awards, Projects) and put every other section - Publications, Languages, "
     "Volunteer work, Interests, Patents, Courses, References, or anything else - into "

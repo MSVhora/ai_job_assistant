@@ -1,0 +1,40 @@
+{
+  "count": 3,
+  "results": [
+    {
+      "id": "5862011801",
+      "title": "Software &amp; Data Engineer <p>(m/f/d)</p>",
+      "redirect_url": "https://www.adzuna.de/land/ad/5862011801",
+      "company": {"display_name": "Markant Gruppe", "__CLASS__": "Adzuna::API::Response::Company"},
+      "location": {
+        "display_name": "Offenburg, Ortenaukreis",
+        "__CLASS__": "Adzuna::API::Response::Location"
+      },
+      "description": "<p>Lead the <b>data platform</b> team.</p><ul><li>SQL</li><li>Python</li></ul>",
+      "contract_time": "full_time",
+      "salary_min": 60000.0,
+      "salary_max": 80000.0,
+      "salary_is_predicted": "0",
+      "created": "2026-08-30T10:22:10Z",
+      "__CLASS__": "Adzuna::API::Response::Job"
+    },
+    {
+      "id": "5861903807",
+      "title": "Backend Engineer",
+      "redirect_url": "https://www.adzuna.de/land/ad/5861903807",
+      "company": {"display_name": "STRATEC SE"},
+      "location": {"display_name": "Birkenfeld, Birkenfeld (Kreis)"},
+      "description": "Build in-house analysis systems for life science partners.",
+      "contract_type": "contract",
+      "created": "2026-08-30T06:40:50Z",
+      "__CLASS__": "Adzuna::API::Response::Job"
+    },
+    {
+      "id": "5860000001",
+      "redirect_url": "https://www.adzuna.de/land/ad/5860000001",
+      "created": "2026-08-29T09:00:00Z",
+      "__CLASS__": "Adzuna::API::Response::Job"
+    }
+  ],
+  "__CLASS__": "Adzuna::API::Response::JobSearchResults"
+}

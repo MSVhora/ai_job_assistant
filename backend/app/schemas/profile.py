@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 RevisionSourceLiteral = Literal["ai_extraction", "manual_edit", "gap_fill", "reupload_merge"]
 
@@ -32,7 +32,21 @@ class ContactInfo(BaseModel):
     email: str | None = None
     phone: str | None = None
     location: str | None = None
+    country: str | None = Field(
+        default=None,
+        description="ISO 3166-1 alpha-2 code (lowercase), e.g. 'de', 'in', 'us'",
+        max_length=2,
+        pattern=r"^[A-Za-z]{2}$",
+    )
     links: list[SourceLink] = []
+
+    @field_validator("country", mode="after")
+    @classmethod
+    def _normalize_country(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip().lower()
+        return normalized or None
 
 
 class ExperienceItem(BaseModel):

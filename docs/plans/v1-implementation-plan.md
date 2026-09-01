@@ -90,15 +90,20 @@ profile_revision                     -- audit: AI extraction vs human fixes (sho
 ├── diff (jsonb)                     -- field-level {field: {old, new}}
 ├── created_at
 
+job_search                            -- background ingestion run (added by issue #7)
+├── id (uuid, pk), status
+├── query (jsonb), results (jsonb)    -- validated request + per-source outcomes/warnings
+├── created_at, updated_at
+
 job_posting
 ├── id (uuid, pk)
 ├── source ('adzuna' | 'apify_google_jobs' | 'apify_indeed' | ...)
 ├── external_id                      -- dedupe key: (source, external_id) unique
-├── title, company, location, job_type, remote_type
+├── title, company, url, location, job_type, remote_type
 ├── description (text), posted_at, salary_min, salary_max, currency
 ├── raw_payload (jsonb)              -- original source data for debugging/re-mapping
-├── embedding (vector)               -- computed on ingest
-├── fetched_at, search_query_id (fk, nullable)
+├── embedding (vector)               -- computed on ingest; column lands with issue #9 (dim pinned)
+├── fetched_at, job_search_id (fk, nullable)
 
 match
 ├── id (uuid, pk), candidate_id (fk), job_posting_id (fk)
@@ -158,6 +163,7 @@ sources:
 | GET | `/api/sources` | Available sources + `is_official_api` + disclosure text |
 | POST | `/api/sources/{name}/enable` | Enable; body must include `acknowledged_disclosure: true` for scraping sources |
 | POST | `/api/jobs/search` | `{query, filters, sources[], seed: "profile"\|"manual"}` → ingestion run (background) |
+| GET | `/api/jobs/searches/{id}` | Ingestion run status + per-source results/warnings + echoed query (issue #7) |
 | GET | `/api/matches` | Ranked matches + rationale; filter/sort params |
 
 ---

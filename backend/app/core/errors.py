@@ -62,6 +62,21 @@ class LLMGapFillError(DomainError):
     default_detail = "gap-fill turn failed"
 
 
+class NoJobSourcesConfiguredError(DomainError):
+    status_code = 400
+    default_detail = "no job sources are configured for the selected search"
+
+
+class UnknownJobSourceError(DomainError):
+    status_code = 400
+    default_detail = "unknown job source"
+
+
+class JobSearchNotFoundError(DomainError):
+    status_code = 404
+    default_detail = "job search not found"
+
+
 async def domain_error_handler(_: Request, exc: DomainError) -> JSONResponse:
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 

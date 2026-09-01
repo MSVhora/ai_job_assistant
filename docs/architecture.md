@@ -100,18 +100,26 @@ sequenceDiagram
 
     B->>A: POST /api/jobs/search
     A-->>B: background run accepted
+    A->>D: job_search row (status + per-source outcomes)
     A->>C: query enabled sources
     C-->>A: raw postings (failures skip + warn)
-    A->>A: normalize + dedupe (source, external_id)
+    A->>A: normalize + dedupe (source, external_id) — upsert refresh
     A->>G: embed descriptions
     A->>D: upsert postings + embeddings
     A->>D: hard filters + cosine → top N
     A->>G: re-rank top N + rationale
     A->>D: store matches
+    B->>A: GET /api/jobs/searches/{id} → run status + warnings
     B->>A: GET /api/matches → ranked + "why this matches"
 ```
 
 ![search-matching-sequence diagram](./assets/search-matching-sequence.svg)
+
+Search runs start **only** from an explicit `POST /api/jobs/search` — never automatically —
+and are tracked in `job_search` (status + per-source `{source, status, count, warning}`
+outcomes, queryable via `GET /api/jobs/searches/{id}`). A failing source is a run warning,
+never an error. Background runs open fresh sessions from `session_factory` and commit
+explicitly, since they outlive the request scope.
 
 ## Database schema (v1, ER diagram)
 
@@ -125,6 +133,7 @@ erDiagram
     candidate ||--o{ profile : "tracks"
     profile ||--o{ profile_revision : "audit trail"
     candidate ||--o{ match : "ranked against"
+    job_search ||--o{ job_posting : "ingestion runs"
     job_posting ||--o{ match : "produces"
 
     candidate {
@@ -166,24 +175,34 @@ erDiagram
         timestamptz created_at
     }
 
+    job_search {
+        uuid id PK
+        text status "pending | running | succeeded | partial | failed"
+        jsonb query "validated search request (issue #7)"
+        jsonb results "per-source {source, status, count, warning?}"
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
     job_posting {
         uuid id PK
         text source "adzuna | apify_google_jobs | apify_indeed | ..."
         text external_id "unique together with source — dedupe key"
         text title
         text company
+        text url "posting click-through link"
         text location
-        text job_type
-        text remote_type
+        text job_type "native enum, nullable"
+        text remote_type "native enum, nullable"
         text description
         timestamptz posted_at
-        integer salary_min
-        integer salary_max
+        numeric salary_min
+        numeric salary_max
         text currency
         jsonb raw_payload "original source data for debugging/re-mapping"
-        vector embedding "pgvector, dim 768 (text-embedding-004)"
+        vector embedding "pgvector, dim 768 (text-embedding-004) — lands with issue #9"
         timestamptz fetched_at
-        uuid search_query_id FK "nullable; search_query table lands with ingestion (issue #7)"
+        uuid job_search_id FK "nullable; last run that returned this posting"
     }
 
     match {

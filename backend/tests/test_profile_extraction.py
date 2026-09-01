@@ -45,7 +45,7 @@ def docx_bytes() -> bytes:
 
 async def upload_resume(client: AsyncClient) -> dict:
     response = await client.post(
-        "/api/resume", files={"file": ("resume.docx", io.BytesIO(docx_bytes()), DOCX_MIME)}
+        "/api/resumes", files={"file": ("resume.docx", io.BytesIO(docx_bytes()), DOCX_MIME)}
     )
     assert response.status_code == 201
     return response.json()
@@ -57,7 +57,7 @@ async def test_extract_returns_draft_and_persists_parse_artifact(
     uploaded = await upload_resume(client)
     calls = install_acompletion(monkeypatch, lambda **kw: llm_response(json.dumps(VALID_PROFILE)))
 
-    response = await client.post(f"/api/resume/{uploaded['resume_id']}/extract")
+    response = await client.post(f"/api/resumes/{uploaded['resume_id']}/extract")
 
     assert response.status_code == 200
     body = response.json()
@@ -96,12 +96,12 @@ async def test_reextract_overwrites_draft(
 ) -> None:
     uploaded = await upload_resume(client)
     install_acompletion(monkeypatch, lambda **kw: llm_response(json.dumps(VALID_PROFILE)))
-    first = await client.post(f"/api/resume/{uploaded['resume_id']}/extract")
+    first = await client.post(f"/api/resumes/{uploaded['resume_id']}/extract")
     assert first.status_code == 200
 
     updated = {**VALID_PROFILE, "headline": "Principal Analyst"}
     install_acompletion(monkeypatch, lambda **kw: llm_response(json.dumps(updated)))
-    second = await client.post(f"/api/resume/{uploaded['resume_id']}/extract")
+    second = await client.post(f"/api/resumes/{uploaded['resume_id']}/extract")
 
     assert second.status_code == 200
     assert second.json()["draft_profile"]["headline"] == "Principal Analyst"
@@ -112,7 +112,7 @@ async def test_unknown_resume_returns_404(
 ) -> None:
     install_acompletion(monkeypatch, lambda **kw: llm_response(json.dumps(VALID_PROFILE)))
 
-    response = await client.post(f"/api/resume/{uuid.uuid4()}/extract")
+    response = await client.post(f"/api/resumes/{uuid.uuid4()}/extract")
 
     assert response.status_code == 404
 
@@ -138,7 +138,7 @@ async def test_resume_without_text_returns_409(
         await session.commit()
     install_acompletion(monkeypatch, lambda **kw: llm_response(json.dumps(VALID_PROFILE)))
 
-    response = await client.post(f"/api/resume/{resume_id}/extract")
+    response = await client.post(f"/api/resumes/{resume_id}/extract")
 
     assert response.status_code == 409
 
@@ -149,7 +149,7 @@ async def test_repair_exhausted_returns_502_and_leaves_row_untouched(
     uploaded = await upload_resume(client)
     install_acompletion(monkeypatch, lambda **kw: llm_response(json.dumps({"skills": ["SQL"]})))
 
-    response = await client.post(f"/api/resume/{uploaded['resume_id']}/extract")
+    response = await client.post(f"/api/resumes/{uploaded['resume_id']}/extract")
 
     assert response.status_code == 502
     assert response.json()["detail"] == "profile extraction failed"
@@ -170,6 +170,6 @@ async def test_unconfigured_llm_returns_503(
     monkeypatch.setattr("app.services.profile_extraction.is_llm_configured", not_configured)
     uploaded = await upload_resume(client)
 
-    response = await client.post(f"/api/resume/{uploaded['resume_id']}/extract")
+    response = await client.post(f"/api/resumes/{uploaded['resume_id']}/extract")
 
     assert response.status_code == 503

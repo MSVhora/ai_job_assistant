@@ -24,3 +24,16 @@ class DraftProfileResponse(BaseModel):
     draft_profile: StructuredProfile
     parse_version: str
     parsed_at: datetime
+
+
+class ResumeSummaryResponse(BaseModel):
+    resume_id: uuid.UUID
+    original_filename: str
+    content_type: str
+    size_bytes: int
+    page_count: int | None
+    created_at: datetime
+    parsed_at: datetime | None
+    parse_version: str | None
+    has_draft: bool
+    source_profile_names: list[str]

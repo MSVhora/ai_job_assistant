@@ -63,10 +63,10 @@ sequenceDiagram
     Note over A,G: prompt-instructed JSON — pydantic-validated<br/>with one repair round-trip on failure
     A->>D: stamp parse_version + persist draft_profile (parse artifact)
     A-->>B: draft profile — NOT a saved profile
-    B->>A: PATCH /api/profile — reviewed profile (upsert)
-    A->>D: save structured_profile + profile_revision diff rows
+    B->>A: PATCH /api/profiles/{id} — reviewed profile (content save)
+    A->>D: save profile.structured_profile + profile_revision diff rows
     A-->>B: saved profile with revision audit (issue #4)
-    Note over B,D: next (issue #5): conversational gap-fill for missing fields
+    Note over B,D: a draft can also be saved as an additional profile (multi-profile,<br/>issue #6); gap-fill for missing fields follows (issue #5)
 ```
 
 ![profile-pipeline-sequence diagram](./assets/profile-pipeline-sequence.svg)
@@ -108,13 +108,23 @@ Source of truth: `backend/app/models/` + Alembic migrations. See
 ```mermaid
 erDiagram
     candidate ||--o{ resume : "uploads"
-    candidate ||--o{ profile_revision : "audit trail"
+    candidate ||--o{ profile : "tracks"
+    profile ||--o{ profile_revision : "audit trail"
     candidate ||--o{ match : "ranked against"
     job_posting ||--o{ match : "produces"
 
     candidate {
         uuid id PK
-        jsonb structured_profile "contact, headline, skills, experience, projects, education, certifications, extra sections, embedded preferences — saved only after human review"
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    profile {
+        uuid id PK
+        uuid candidate_id FK
+        text name "track name, e.g. Senior Android Developer"
+        jsonb structured_profile "contact, headline, skills, experience, projects, education, certifications, extra sections, embedded preferences"
+        uuid source_resume_id FK "resume whose draft seeded this profile (provenance)"
         timestamptz created_at
         timestamptz updated_at
     }
@@ -136,7 +146,7 @@ erDiagram
 
     profile_revision {
         uuid id PK
-        uuid candidate_id FK
+        uuid profile_id FK "revisions belong to a profile, not the candidate"
         text source "ai_extraction | manual_edit | gap_fill | reupload_merge"
         jsonb diff "field-level {field: {old, new}}"
         timestamptz created_at
@@ -176,9 +186,12 @@ erDiagram
 ![database-schema-er diagram](./assets/database-schema-er.svg)
 
 Deferred from plan §4 (issue #4 locked decision): the separate `preferences` (weights) and
-`completeness` jsonb columns. Preferences extracted from the resume stay inside
-`structured_profile`; the priority-weight column lands with the matching work that consumes
-it, and gap-fill (#5) derives completeness from the profile instead of storing it.
+`completeness` jsonb columns. Preferences extracted from the resume stay inside the
+profile's `structured_profile`; the priority-weight column lands with the matching work
+that consumes it, and gap-fill (#5) derives completeness from the profile instead of
+storing it. Multi-profile moved the opposite way — from v2 into v1 (issue #6, owner
+decision 2026-09-01): `profile` is now the home of `structured_profile` and the revision
+audit.
 
 Schema conventions and index rules (FK columns indexed, `(source, external_id)` unique,
 `match(candidate_id, final_score DESC)` for the dashboard query, embedding dimension pinned

@@ -35,7 +35,7 @@ def docx_bytes() -> bytes:
 
 async def test_upload_docx_persists_metadata_and_returns_text(client: AsyncClient) -> None:
     response = await client.post(
-        "/api/resume",
+        "/api/resumes",
         files={"file": ("jane_resume.docx", io.BytesIO(docx_bytes()), DOCX_MIME)},
     )
 
@@ -61,7 +61,7 @@ async def test_upload_docx_persists_metadata_and_returns_text(client: AsyncClien
 async def test_upload_pdf_returns_page_count(client: AsyncClient) -> None:
     data = (FIXTURES / "two_page_resume.pdf").read_bytes()
     response = await client.post(
-        "/api/resume", files={"file": ("two_page.pdf", io.BytesIO(data), "application/pdf")}
+        "/api/resumes", files={"file": ("two_page.pdf", io.BytesIO(data), "application/pdf")}
     )
 
     assert response.status_code == 201
@@ -72,11 +72,11 @@ async def test_upload_pdf_returns_page_count(client: AsyncClient) -> None:
 
 async def test_second_upload_reuses_single_candidate(client: AsyncClient) -> None:
     docx_response = await client.post(
-        "/api/resume", files={"file": ("a.docx", io.BytesIO(docx_bytes()), DOCX_MIME)}
+        "/api/resumes", files={"file": ("a.docx", io.BytesIO(docx_bytes()), DOCX_MIME)}
     )
     pdf_data = (FIXTURES / "single_column_resume.pdf").read_bytes()
     pdf_response = await client.post(
-        "/api/resume", files={"file": ("b.pdf", io.BytesIO(pdf_data), "application/pdf")}
+        "/api/resumes", files={"file": ("b.pdf", io.BytesIO(pdf_data), "application/pdf")}
     )
 
     assert docx_response.status_code == 201
@@ -87,7 +87,7 @@ async def test_second_upload_reuses_single_candidate(client: AsyncClient) -> Non
 async def test_oversized_upload_rejected_with_413(client: AsyncClient) -> None:
     oversized = b"%PDF-1.4\n" + b"0" * (10 * 1024 * 1024 + 1)
     response = await client.post(
-        "/api/resume", files={"file": ("big.pdf", io.BytesIO(oversized), "application/pdf")}
+        "/api/resumes", files={"file": ("big.pdf", io.BytesIO(oversized), "application/pdf")}
     )
 
     assert response.status_code == 413
@@ -96,7 +96,7 @@ async def test_oversized_upload_rejected_with_413(client: AsyncClient) -> None:
 
 async def test_unsupported_type_rejected_with_415(client: AsyncClient) -> None:
     response = await client.post(
-        "/api/resume",
+        "/api/resumes",
         files={"file": ("notes.txt", io.BytesIO(b"plain text"), "text/plain")},
     )
 
@@ -106,7 +106,7 @@ async def test_unsupported_type_rejected_with_415(client: AsyncClient) -> None:
 
 async def test_extension_magic_mismatch_rejected_with_415(client: AsyncClient) -> None:
     response = await client.post(
-        "/api/resume",
+        "/api/resumes",
         files={"file": ("fake.pdf", io.BytesIO(b"PK\x03\x04 not a pdf"), "application/pdf")},
     )
 
@@ -116,7 +116,7 @@ async def test_extension_magic_mismatch_rejected_with_415(client: AsyncClient) -
 async def test_pdf_without_text_rejected_with_422(client: AsyncClient) -> None:
     data = (FIXTURES / "empty_resume.pdf").read_bytes()
     response = await client.post(
-        "/api/resume", files={"file": ("scanned.pdf", io.BytesIO(data), "application/pdf")}
+        "/api/resumes", files={"file": ("scanned.pdf", io.BytesIO(data), "application/pdf")}
     )
 
     assert response.status_code == 422

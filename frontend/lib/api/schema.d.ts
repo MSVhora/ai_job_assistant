@@ -21,24 +21,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/resume": {
+    "/api/resumes": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** List Resumes */
+        get: operations["list_resumes_api_resumes_get"];
         put?: never;
         /** Upload Resume */
-        post: operations["upload_resume_api_resume_post"];
+        post: operations["upload_resume_api_resumes_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/resume/{resume_id}/extract": {
+    "/api/resumes/{resume_id}/extract": {
         parameters: {
             query?: never;
             header?: never;
@@ -48,14 +49,14 @@ export interface paths {
         get?: never;
         put?: never;
         /** Extract Resume */
-        post: operations["extract_resume_api_resume__resume_id__extract_post"];
+        post: operations["extract_resume_api_resumes__resume_id__extract_post"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/api/resume/{resume_id}/draft": {
+    "/api/resumes/{resume_id}/draft": {
         parameters: {
             query?: never;
             header?: never;
@@ -63,7 +64,7 @@ export interface paths {
             cookie?: never;
         };
         /** Get Resume Draft */
-        get: operations["get_resume_draft_api_resume__resume_id__draft_get"];
+        get: operations["get_resume_draft_api_resumes__resume_id__draft_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -72,7 +73,25 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/profile": {
+    "/api/profiles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Profiles */
+        get: operations["list_profiles_api_profiles_get"];
+        put?: never;
+        /** Create Profile */
+        post: operations["create_profile_api_profiles_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/profiles/{profile_id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -80,14 +99,15 @@ export interface paths {
             cookie?: never;
         };
         /** Get Profile */
-        get: operations["get_profile_api_profile_get"];
+        get: operations["get_profile_api_profiles__profile_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /** Delete Profile */
+        delete: operations["delete_profile_api_profiles__profile_id__delete"];
         options?: never;
         head?: never;
         /** Update Profile */
-        patch: operations["update_profile_api_profile_patch"];
+        patch: operations["update_profile_api_profiles__profile_id__patch"];
         trace?: never;
     };
 }
@@ -106,8 +126,8 @@ export interface components {
              */
             issued_date?: string | null;
         };
-        /** Body_upload_resume_api_resume_post */
-        Body_upload_resume_api_resume_post: {
+        /** Body_upload_resume_api_resumes_post */
+        Body_upload_resume_api_resumes_post: {
             /** File */
             file: string;
         };
@@ -241,14 +261,31 @@ export interface components {
             /** Currency */
             currency?: string | null;
         };
+        /** ProfileCreate */
+        ProfileCreate: {
+            /** Name */
+            name: string;
+            structured_profile: components["schemas"]["StructuredProfile"];
+            /**
+             * Source Resume Id
+             * @description resume whose AI draft this profile is created from
+             */
+            source_resume_id?: string | null;
+        };
         /** ProfileResponse */
         ProfileResponse: {
             /**
-             * Candidate Id
+             * Profile Id
              * Format: uuid
              */
-            candidate_id: string;
+            profile_id: string;
+            /** Name */
+            name: string;
             structured_profile: components["schemas"]["StructuredProfile"];
+            /** Source Resume Id */
+            source_resume_id: string | null;
+            /** Source Resume Filename */
+            source_resume_filename: string | null;
             /**
              * Updated At
              * Format: date-time
@@ -256,9 +293,33 @@ export interface components {
             updated_at: string;
             last_revision?: components["schemas"]["RevisionSummary"] | null;
         };
-        /** ProfileUpdateRequest */
-        ProfileUpdateRequest: {
-            structured_profile: components["schemas"]["StructuredProfile"];
+        /** ProfileSummary */
+        ProfileSummary: {
+            /**
+             * Profile Id
+             * Format: uuid
+             */
+            profile_id: string;
+            /** Name */
+            name: string;
+            /** Source Resume Filename */
+            source_resume_filename: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** ProfileUpdate */
+        ProfileUpdate: {
+            /** Name */
+            name?: string | null;
+            structured_profile?: components["schemas"]["StructuredProfile"] | null;
             /**
              * Source Resume Id
              * @description resume whose AI draft this save is reviewed from
@@ -295,6 +356,35 @@ export interface components {
              * @default []
              */
             technologies: string[];
+        };
+        /** ResumeSummaryResponse */
+        ResumeSummaryResponse: {
+            /**
+             * Resume Id
+             * Format: uuid
+             */
+            resume_id: string;
+            /** Original Filename */
+            original_filename: string;
+            /** Content Type */
+            content_type: string;
+            /** Size Bytes */
+            size_bytes: number;
+            /** Page Count */
+            page_count: number | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Parsed At */
+            parsed_at: string | null;
+            /** Parse Version */
+            parse_version: string | null;
+            /** Has Draft */
+            has_draft: boolean;
+            /** Source Profile Names */
+            source_profile_names: string[];
         };
         /** ResumeUploadResponse */
         ResumeUploadResponse: {
@@ -440,7 +530,27 @@ export interface operations {
             };
         };
     };
-    upload_resume_api_resume_post: {
+    list_resumes_api_resumes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumeSummaryResponse"][];
+                };
+            };
+        };
+    };
+    upload_resume_api_resumes_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -449,7 +559,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "multipart/form-data": components["schemas"]["Body_upload_resume_api_resume_post"];
+                "multipart/form-data": components["schemas"]["Body_upload_resume_api_resumes_post"];
             };
         };
         responses: {
@@ -473,7 +583,7 @@ export interface operations {
             };
         };
     };
-    extract_resume_api_resume__resume_id__extract_post: {
+    extract_resume_api_resumes__resume_id__extract_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -504,7 +614,7 @@ export interface operations {
             };
         };
     };
-    get_resume_draft_api_resume__resume_id__draft_get: {
+    get_resume_draft_api_resumes__resume_id__draft_get: {
         parameters: {
             query?: never;
             header?: never;
@@ -535,11 +645,66 @@ export interface operations {
             };
         };
     };
-    get_profile_api_profile_get: {
+    list_profiles_api_profiles_get: {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileSummary"][];
+                };
+            };
+        };
+    };
+    create_profile_api_profiles_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProfileCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_profile_api_profiles__profile_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: string;
+            };
             cookie?: never;
         };
         requestBody?: never;
@@ -553,18 +718,58 @@ export interface operations {
                     "application/json": components["schemas"]["ProfileResponse"];
                 };
             };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
         };
     };
-    update_profile_api_profile_patch: {
+    delete_profile_api_profiles__profile_id__delete: {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                profile_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_profile_api_profiles__profile_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: string;
+            };
             cookie?: never;
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ProfileUpdateRequest"];
+                "application/json": components["schemas"]["ProfileUpdate"];
             };
         };
         responses: {

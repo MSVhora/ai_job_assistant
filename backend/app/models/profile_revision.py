@@ -20,8 +20,8 @@ class ProfileRevision(Base):
     __tablename__ = "profile_revision"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
-    candidate_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("candidate.id", ondelete="RESTRICT"), index=True
+    profile_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("profile.id", ondelete="RESTRICT"), index=True
     )
     source: Mapped[RevisionSource] = mapped_column(
         Enum(RevisionSource, name="profile_revision_source", native_enum=True)

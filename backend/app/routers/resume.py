@@ -5,13 +5,13 @@ from fastapi import APIRouter, Depends, File, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.deps import get_db
-from app.schemas.resume import DraftProfileResponse, ResumeUploadResponse
+from app.schemas.resume import DraftProfileResponse, ResumeSummaryResponse, ResumeUploadResponse
 from app.services import profile_extraction, profile_service, resume_service
 
 router = APIRouter(prefix="/api", tags=["resume"])
 
 
-@router.post("/resume", response_model=ResumeUploadResponse, status_code=201)
+@router.post("/resumes", response_model=ResumeUploadResponse, status_code=201)
 async def upload_resume(
     file: Annotated[UploadFile, File(...)],
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -19,7 +19,14 @@ async def upload_resume(
     return await resume_service.upload_resume(session, file)
 
 
-@router.post("/resume/{resume_id}/extract", response_model=DraftProfileResponse)
+@router.get("/resumes", response_model=list[ResumeSummaryResponse])
+async def list_resumes(
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> list[ResumeSummaryResponse]:
+    return await resume_service.list_resumes(session)
+
+
+@router.post("/resumes/{resume_id}/extract", response_model=DraftProfileResponse)
 async def extract_resume(
     resume_id: uuid.UUID,
     session: Annotated[AsyncSession, Depends(get_db)],
@@ -27,7 +34,7 @@ async def extract_resume(
     return await profile_extraction.extract_resume_profile(session, resume_id)
 
 
-@router.get("/resume/{resume_id}/draft", response_model=DraftProfileResponse)
+@router.get("/resumes/{resume_id}/draft", response_model=DraftProfileResponse)
 async def get_resume_draft(
     resume_id: uuid.UUID,
     session: Annotated[AsyncSession, Depends(get_db)],

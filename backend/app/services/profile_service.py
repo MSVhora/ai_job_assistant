@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from pydantic import ValidationError
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import (
@@ -12,10 +12,12 @@ from app.core.errors import (
     ResumeDraftUnavailableError,
     ResumeNotFoundError,
 )
-from app.models import Candidate, ProfileRevision, Resume, RevisionSource
+from app.models import Profile, ProfileRevision, Resume, RevisionSource
 from app.schemas.profile import (
+    ProfileCreate,
     ProfileResponse,
-    ProfileUpdateRequest,
+    ProfileSummary,
+    ProfileUpdate,
     RevisionSummary,
     StructuredProfile,
 )
@@ -61,16 +63,21 @@ def _next_timestamp(previous: datetime | None) -> datetime:
     return timestamp
 
 
-async def _latest_revision(
-    session: AsyncSession, candidate_id: uuid.UUID
-) -> ProfileRevision | None:
+async def _latest_revision(session: AsyncSession, profile_id: uuid.UUID) -> ProfileRevision | None:
     result = await session.execute(
         select(ProfileRevision)
-        .where(ProfileRevision.candidate_id == candidate_id)
+        .where(ProfileRevision.profile_id == profile_id)
         .order_by(ProfileRevision.created_at.desc())
         .limit(1)
     )
     return result.scalars().first()
+
+
+async def _resume_filename(session: AsyncSession, resume_id: uuid.UUID | None) -> str | None:
+    if resume_id is None:
+        return None
+    resume = await session.get(Resume, resume_id)
+    return resume.original_filename if resume else None
 
 
 def _revision_summary(revision: ProfileRevision) -> RevisionSummary:
@@ -79,30 +86,86 @@ def _revision_summary(revision: ProfileRevision) -> RevisionSummary:
     )
 
 
-def _profile_response(candidate: Candidate, revision: ProfileRevision | None) -> ProfileResponse:
-    structured_profile = StructuredProfile.model_validate(candidate.structured_profile)
+def _profile_response(
+    profile: Profile,
+    source_resume_filename: str | None,
+    revision: ProfileRevision | None,
+) -> ProfileResponse:
     return ProfileResponse(
-        candidate_id=candidate.id,
-        structured_profile=structured_profile,
-        updated_at=candidate.updated_at,
+        profile_id=profile.id,
+        name=profile.name,
+        structured_profile=StructuredProfile.model_validate(profile.structured_profile),
+        source_resume_id=profile.source_resume_id,
+        source_resume_filename=source_resume_filename,
+        updated_at=profile.updated_at,
         last_revision=_revision_summary(revision) if revision is not None else None,
     )
 
 
-async def get_profile(session: AsyncSession) -> ProfileResponse:
-    result = await session.execute(select(Candidate).limit(1))
-    candidate = result.scalars().first()
-    if candidate is None or candidate.structured_profile is None:
+async def list_profiles(session: AsyncSession) -> list[ProfileSummary]:
+    result = await session.execute(select(Profile).order_by(Profile.created_at))
+    summaries: list[ProfileSummary] = []
+    for profile in result.scalars().all():
+        filename = await _resume_filename(session, profile.source_resume_id)
+        summaries.append(
+            ProfileSummary(
+                profile_id=profile.id,
+                name=profile.name,
+                source_resume_filename=filename,
+                created_at=profile.created_at,
+                updated_at=profile.updated_at,
+            )
+        )
+    return summaries
+
+
+async def get_profile(session: AsyncSession, profile_id: uuid.UUID) -> ProfileResponse:
+    profile = await session.get(Profile, profile_id)
+    if profile is None:
         raise ProfileNotFoundError()
-    revision = await _latest_revision(session, candidate.id)
-    return _profile_response(candidate, revision)
+    filename = await _resume_filename(session, profile.source_resume_id)
+    revision = await _latest_revision(session, profile.id)
+    return _profile_response(profile, filename, revision)
 
 
-async def save_profile(session: AsyncSession, payload: ProfileUpdateRequest) -> ProfileResponse:
+def _first_save_revisions(
+    profile_id: uuid.UUID,
+    draft: dict[str, Any] | None,
+    new_profile: dict[str, Any],
+) -> list[ProfileRevision]:
+    if draft is not None:
+        revisions = [
+            ProfileRevision(
+                profile_id=profile_id,
+                source=RevisionSource.ai_extraction,
+                diff=diff_profiles(None, draft),
+                created_at=_next_timestamp(None),
+            )
+        ]
+        if new_profile != draft:
+            revisions.append(
+                ProfileRevision(
+                    profile_id=profile_id,
+                    source=RevisionSource.manual_edit,
+                    diff=diff_profiles(draft, new_profile),
+                    created_at=_next_timestamp(revisions[-1].created_at),
+                )
+            )
+        return revisions
+    return [
+        ProfileRevision(
+            profile_id=profile_id,
+            source=RevisionSource.manual_edit,
+            diff=diff_profiles(None, new_profile),
+            created_at=_next_timestamp(None),
+        )
+    ]
+
+
+async def create_profile(session: AsyncSession, payload: ProfileCreate) -> ProfileResponse:
     candidate = await get_or_create_candidate(session)
     new_profile = payload.structured_profile.model_dump(mode="json")
-
-    draft: dict[str, Any] | None = None
+    draft = None
     if payload.source_resume_id is not None:
         resume = await session.get(Resume, payload.source_resume_id)
         if resume is None or resume.candidate_id != candidate.id:
@@ -110,63 +173,81 @@ async def save_profile(session: AsyncSession, payload: ProfileUpdateRequest) -> 
         if resume.draft_profile is not None:
             draft = _normalized(resume.draft_profile)
 
-    revisions: list[ProfileRevision] = []
-    if candidate.structured_profile is None:
-        if draft is not None:
-            revisions.append(
-                ProfileRevision(
-                    candidate_id=candidate.id,
-                    source=RevisionSource.ai_extraction,
-                    diff=diff_profiles(None, draft),
-                    created_at=_next_timestamp(None),
-                )
-            )
-            if new_profile != draft:
-                revisions.append(
-                    ProfileRevision(
-                        candidate_id=candidate.id,
-                        source=RevisionSource.manual_edit,
-                        diff=diff_profiles(draft, new_profile),
-                        created_at=_next_timestamp(revisions[-1].created_at),
-                    )
-                )
-        else:
-            revisions.append(
-                ProfileRevision(
-                    candidate_id=candidate.id,
-                    source=RevisionSource.manual_edit,
-                    diff=diff_profiles(None, new_profile),
-                    created_at=_next_timestamp(None),
-                )
-            )
-    else:
-        old_profile = _normalized(candidate.structured_profile)
+    profile = Profile(
+        candidate_id=candidate.id,
+        name=payload.name.strip(),
+        structured_profile=new_profile,
+        source_resume_id=payload.source_resume_id,
+    )
+    session.add(profile)
+    await session.flush()
+
+    revisions = _first_save_revisions(profile.id, draft, new_profile)
+    session.add_all(revisions)
+    await session.flush()
+    await session.refresh(profile)
+
+    filename = await _resume_filename(session, profile.source_resume_id)
+    logger.info("profile.created profile_id=%s revisions=%d", profile.id, len(revisions))
+    return _profile_response(profile, filename, revisions[-1])
+
+
+async def save_profile(
+    session: AsyncSession, profile_id: uuid.UUID, payload: ProfileUpdate
+) -> ProfileResponse:
+    profile = await session.get(Profile, profile_id)
+    if profile is None:
+        raise ProfileNotFoundError()
+
+    renamed = payload.name is not None and payload.name.strip() != profile.name
+    if renamed:
+        profile.name = payload.name.strip()
+
+    last_revision: ProfileRevision | None = None
+    if payload.structured_profile is not None:
+        new_profile = payload.structured_profile.model_dump(mode="json")
+        if payload.source_resume_id is not None:
+            resume = await session.get(Resume, payload.source_resume_id)
+            if resume is None or resume.candidate_id != profile.candidate_id:
+                raise ResumeNotFoundError()
+            profile.source_resume_id = resume.id
+
         source = (
             RevisionSource.reupload_merge
             if payload.source_resume_id is not None
             else RevisionSource.manual_edit
         )
-        revisions.append(
-            ProfileRevision(
-                candidate_id=candidate.id,
-                source=source,
-                diff=diff_profiles(old_profile, new_profile),
-                created_at=_next_timestamp(None),
-            )
+        last_revision = ProfileRevision(
+            profile_id=profile.id,
+            source=source,
+            diff=diff_profiles(_normalized(profile.structured_profile), new_profile),
+            created_at=_next_timestamp(None),
         )
+        profile.structured_profile = new_profile
+        session.add(last_revision)
 
-    candidate.structured_profile = new_profile
-    session.add_all(revisions)
     await session.flush()
-    await session.refresh(candidate)
+    await session.refresh(profile)
 
     logger.info(
-        "profile.save candidate_id=%s revisions=%d diff_fields=%d",
-        candidate.id,
-        len(revisions),
-        sum(len(revision.diff) for revision in revisions),
+        "profile.saved profile_id=%s renamed=%s content=%s diff_fields=%s",
+        profile.id,
+        renamed,
+        payload.structured_profile is not None,
+        len(last_revision.diff) if last_revision else None,
     )
-    return _profile_response(candidate, revisions[-1])
+    filename = await _resume_filename(session, profile.source_resume_id)
+    return _profile_response(profile, filename, last_revision)
+
+
+async def delete_profile(session: AsyncSession, profile_id: uuid.UUID) -> None:
+    profile = await session.get(Profile, profile_id)
+    if profile is None:
+        raise ProfileNotFoundError()
+    await session.execute(delete(ProfileRevision).where(ProfileRevision.profile_id == profile.id))
+    await session.delete(profile)
+    await session.flush()
+    logger.info("profile.deleted profile_id=%s", profile_id)
 
 
 async def get_resume_draft(session: AsyncSession, resume_id: uuid.UUID) -> DraftProfileResponse:

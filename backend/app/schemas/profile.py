@@ -111,16 +111,37 @@ class RevisionSummary(BaseModel):
     created_at: datetime
 
 
-class ProfileResponse(BaseModel):
-    candidate_id: uuid.UUID
+class ProfileCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
     structured_profile: StructuredProfile
-    updated_at: datetime
-    last_revision: RevisionSummary | None = None
+    source_resume_id: uuid.UUID | None = Field(
+        default=None,
+        description="resume whose AI draft this profile is created from",
+    )
 
 
-class ProfileUpdateRequest(BaseModel):
-    structured_profile: StructuredProfile
+class ProfileUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=100)
+    structured_profile: StructuredProfile | None = None
     source_resume_id: uuid.UUID | None = Field(
         default=None,
         description="resume whose AI draft this save is reviewed from",
     )
+
+
+class ProfileResponse(BaseModel):
+    profile_id: uuid.UUID
+    name: str
+    structured_profile: StructuredProfile
+    source_resume_id: uuid.UUID | None
+    source_resume_filename: str | None
+    updated_at: datetime
+    last_revision: RevisionSummary | None = None
+
+
+class ProfileSummary(BaseModel):
+    profile_id: uuid.UUID
+    name: str
+    source_resume_filename: str | None
+    created_at: datetime
+    updated_at: datetime

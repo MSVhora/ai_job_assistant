@@ -11,8 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.errors import FileTooLargeError, TextExtractionError
-from app.models import Candidate, Resume
-from app.schemas.resume import ResumeUploadResponse
+from app.models import Candidate, Profile, Resume
+from app.schemas.resume import ResumeSummaryResponse, ResumeUploadResponse
 from app.services.text_extraction import SupportedKind, extract_docx, extract_pdf, sniff_file_type
 
 logger = logging.getLogger(__name__)
@@ -28,6 +28,39 @@ async def get_or_create_candidate(session: AsyncSession) -> Candidate:
         session.add(candidate)
         await session.flush()
     return candidate
+
+
+async def list_resumes(session: AsyncSession) -> list[ResumeSummaryResponse]:
+    result = await session.execute(select(Candidate).limit(1))
+    candidate = result.scalars().first()
+    if candidate is None:
+        return []
+
+    profile_rows = await session.execute(
+        select(Profile.source_resume_id, Profile.name).where(Profile.source_resume_id.is_not(None))
+    )
+    names_by_resume: dict[uuid.UUID, list[str]] = {}
+    for source_resume_id, name in profile_rows.all():
+        names_by_resume.setdefault(source_resume_id, []).append(name)
+
+    resumes = await session.execute(
+        select(Resume).where(Resume.candidate_id == candidate.id).order_by(Resume.created_at.desc())
+    )
+    return [
+        ResumeSummaryResponse(
+            resume_id=resume.id,
+            original_filename=resume.original_filename,
+            content_type=resume.content_type,
+            size_bytes=resume.size_bytes,
+            page_count=resume.page_count,
+            created_at=resume.created_at,
+            parsed_at=resume.parsed_at,
+            parse_version=resume.parse_version,
+            has_draft=resume.draft_profile is not None,
+            source_profile_names=names_by_resume.get(resume.id, []),
+        )
+        for resume in resumes.scalars().all()
+    ]
 
 
 def _extract_from_bytes(data: bytes, kind: SupportedKind) -> tuple[str, int | None]:

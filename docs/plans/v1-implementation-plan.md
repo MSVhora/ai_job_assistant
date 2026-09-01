@@ -22,7 +22,7 @@ A self-hosted, single-user, BYOK web app:
 |---|---|
 | ATS single-JD scorer (keyword + semantic + structural breakdown) | v1.1 fast-follow — highest-priority next feature |
 | Resume rewriting / health check | v1.2 |
-| Multi-profile ("Data Analyst" vs "PM" tracks) | v2 |
+| Multi-profile ("Data Analyst" vs "PM" tracks) | ~~v2~~ **moved into v1** (owner decision 2026-09-01 — see [issue #6 plan](v1-issue-006-multi-profile-resume-list.md)) |
 | Auth / multi-user | v2 |
 | Redis/Celery queue (BackgroundTasks suffice at single-user scale) | v2 |
 | JSearch, LinkedIn/Naukri actors, company career-page scraper, alerts | Phase 3+ |

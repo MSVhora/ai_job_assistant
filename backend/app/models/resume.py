@@ -30,4 +30,6 @@ class Resume(Base):
     draft_profile: Mapped[dict[str, object] | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    candidate: Mapped["Candidate"] = relationship(back_populates="resumes")
+    candidate: Mapped["Candidate"] = relationship(
+        back_populates="resumes", foreign_keys="Resume.candidate_id"
+    )

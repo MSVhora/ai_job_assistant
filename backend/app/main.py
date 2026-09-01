@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import get_settings
+from app.core.db import DbCommitMiddleware
 from app.core.errors import DomainError, domain_error_handler
 from app.routers import health, profile, resume
 
@@ -24,6 +25,7 @@ def create_app() -> FastAPI:
     application.include_router(resume.router)
     application.include_router(profile.router)
     application.add_exception_handler(DomainError, domain_error_handler)
+    application.add_middleware(DbCommitMiddleware)
     return application
 
 

@@ -16,7 +16,11 @@ Applies to everything under `backend/`.
 
 - **Response models everywhere**: every route declares `response_model`. Never return ORM objects or raw dicts.
 - **Async all the way**: `async def` routes, SQLAlchemy 2.0 async engine + `asyncpg`. No blocking calls (requests, file IO, time.sleep) inside async routes — use async libs or `BackgroundTasks`.
-- **DB session via dependency**: one `AsyncSession` per request from `deps.py`; commit on success, rollback on exception. Services receive the session; never create engines/sessions ad hoc.
+- **DB session via dependency**: one `AsyncSession` per request from `deps.py`; the
+  `DbCommitMiddleware` commits on `http.response.start` (a yield-dependency teardown runs
+  **after** the response is sent, so teardown commits race the client) and rolls back on
+  unhandled errors. Services receive the session; never create engines/sessions ad hoc and
+  never call `session.commit()` in services.
 - **Status codes**: 400 validation beyond pydantic's 422, 401 unauthenticated, 404 missing, 409 conflict/duplicate, 422 malformed input. Register central exception handlers for domain errors; no bare `except:` and no silent exception swallowing — log and re-raise or convert.
 - **Config**: only through `Settings` (`.env` backed). No `os.getenv` scattered in code. Required keys fail fast at startup.
 - **LLM calls**: only via `adapters/llm.py`, which must return token usage and route through cost estimation before any batch operation. Structured extraction must validate against a pydantic schema and retry/repair once on failure before erroring.

@@ -21,6 +21,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/setup/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Setup Check */
+        post: operations["setup_check_api_setup_check_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/resumes": {
         parameters: {
             query?: never;
@@ -172,6 +189,23 @@ export interface paths {
         get: operations["list_sources_api_sources_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sources/{name}/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Enable Source */
+        post: operations["enable_source_api_sources__name__enable_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -622,6 +656,30 @@ export interface components {
              */
             created_at: string;
         };
+        /** SetupCheckResponse */
+        SetupCheckResponse: {
+            /** Llm Configured */
+            llm_configured: boolean;
+            /** Embedding Configured */
+            embedding_configured: boolean;
+            /** Adzuna Configured */
+            adzuna_configured: boolean;
+            /** Apify Configured */
+            apify_configured: boolean;
+            /**
+             * Warnings
+             * @default []
+             */
+            warnings: string[];
+        };
+        /** SourceEnableRequest */
+        SourceEnableRequest: {
+            /**
+             * Acknowledged Disclosure
+             * @default false
+             */
+            acknowledged_disclosure: boolean;
+        };
         /** SourceInfoResponse */
         SourceInfoResponse: {
             /** Name */
@@ -632,6 +690,8 @@ export interface components {
             disclosure_required: boolean;
             /** Is Configured */
             is_configured: boolean;
+            /** Enabled */
+            enabled: boolean;
         };
         /** SourceLink */
         SourceLink: {
@@ -742,6 +802,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+        };
+    };
+    setup_check_api_setup_check_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SetupCheckResponse"];
                 };
             };
         };
@@ -1124,6 +1204,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SourceInfoResponse"][];
+                };
+            };
+        };
+    };
+    enable_source_api_sources__name__enable_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SourceEnableRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SourceInfoResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

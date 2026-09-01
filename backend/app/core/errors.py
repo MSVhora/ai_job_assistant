@@ -77,6 +77,21 @@ class JobSearchNotFoundError(DomainError):
     default_detail = "job search not found"
 
 
+class JobSourceNotFoundError(DomainError):
+    status_code = 404
+    default_detail = "job source not found"
+
+
+class DisclosureNotAcknowledgedError(DomainError):
+    status_code = 409
+    default_detail = "disclosure must be acknowledged before enabling this source"
+
+
+class JobSourceNotEnabledError(DomainError):
+    status_code = 409
+    default_detail = "job source is not enabled"
+
+
 async def domain_error_handler(_: Request, exc: DomainError) -> JSONResponse:
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
 

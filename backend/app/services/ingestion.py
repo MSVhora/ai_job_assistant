@@ -12,7 +12,9 @@ from app.adapters.job_sources import registry
 from app.adapters.job_sources.base import ConnectorError, JobPostingData, JobSearchQuery, JobSource
 from app.core.db import session_factory
 from app.core.errors import (
+    DomainError,
     JobSearchNotFoundError,
+    JobSourceNotEnabledError,
     NoJobSourcesConfiguredError,
     UnknownJobSourceError,
 )
@@ -23,19 +25,25 @@ from app.schemas.job_search import (
     JobSearchStatusResponse,
     SourceOutcome,
 )
+from app.services import sources as sources_service
 
 logger = logging.getLogger(__name__)
 
 
-def _selected_sources(payload: JobSearchRequest) -> list[JobSource]:
-    known_names = {source.name for source in registry.all_sources()}
+async def _selected_sources(session: AsyncSession, payload: JobSearchRequest) -> list[JobSource]:
     for name in payload.sources or []:
-        if name not in known_names:
+        if registry.get_source(name) is None:
             raise UnknownJobSourceError(f"unknown job source: {name}")
-    enabled = registry.enabled_sources()
-    selected = [
-        source for source in enabled if payload.sources is None or source.name in payload.sources
-    ]
+    enabled = {source.name: source for source in await sources_service.enabled_sources(session)}
+    selected: list[JobSource] = []
+    if payload.sources is None:
+        selected = list(enabled.values())
+    else:
+        for name in payload.sources:
+            source = enabled.get(name)
+            if source is None:
+                raise JobSourceNotEnabledError(f"job source is not enabled: {name}")
+            selected.append(source)
     if not selected:
         raise NoJobSourcesConfiguredError()
     return selected
@@ -44,7 +52,7 @@ def _selected_sources(payload: JobSearchRequest) -> list[JobSource]:
 async def start_search(
     session: AsyncSession, background_tasks: BackgroundTasks, payload: JobSearchRequest
 ) -> JobSearchStartResponse:
-    selected = _selected_sources(payload)
+    selected = await _selected_sources(session, payload)
     run = JobSearch(status=JobSearchStatus.pending, query=payload.model_dump(mode="json"))
     session.add(run)
     await session.flush()
@@ -65,7 +73,19 @@ async def run_search(search_id: uuid.UUID, payload: JobSearchRequest) -> None:
         run.status = JobSearchStatus.running
         await session.commit()
 
-        selected = _selected_sources(payload)
+        try:
+            selected = await _selected_sources(session, payload)
+        except DomainError as exc:
+            run.status = JobSearchStatus.failed
+            run.results = [
+                SourceOutcome(source="run", status="failed", warning=exc.detail).model_dump(
+                    mode="json"
+                )
+            ]
+            await session.commit()
+            logger.warning("ingestion.run search_id=%s selection failed: %s", search_id, exc.detail)
+            return
+
         outcomes: list[SourceOutcome] = []
         for source in selected:
             outcomes.append(await _run_source(session, source, payload, search_id))

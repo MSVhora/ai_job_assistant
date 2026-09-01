@@ -1,21 +1,23 @@
 # 3 — Job Discovery & Matching
 
-**Status: partially live** — job search, Adzuna ingestion, and de-duplication work today
-(issue #7). Embeddings, hard filters, ranking, and the "why this matches" rationale land
-with the matching issues (#8–#11); those sections below describe the finished v1 behaviour.
+**Status: partially live** — the search UI (editable query, source selection, live run
+banner), Adzuna + the LinkedIn Apify actor, and de-duplication all work today (issues #7
+and #8). Embeddings, hard filters, ranking, and the "why this matches" rationale land with
+the matching issues (#9–#11); those sections below describe the finished v1 behaviour.
 
 ## The idea
 
-You search once; the app fans out to multiple job sources, normalizes and de-duplicates the
-results, then ranks them against your saved profile — with a plain-language "why this
+You search once; the app fans out to the sources you enabled, normalizes and de-duplicates
+the results, then ranks them against your saved profile — with a plain-language "why this
 matches" on the best ones.
 
 ## Search is always explicit
 
 A search only starts when **you** submit one — nothing runs automatically, not on page
-load, not when a profile is completed. The exact query that will be sent is shown and
-editable before you submit; after the run, its status endpoint echoes the stored query so
-you can always see what was searched.
+load, not when a profile is completed. The `/jobs` page shows the exact query that will be
+sent, seeded from your profile headline and skills and **editable** before you submit; you
+also pick which enabled sources to include. After the run, its status endpoint echoes the
+stored query so you can always see what was searched.
 
 ## The flow
 
@@ -24,11 +26,9 @@ you can always see what was searched.
 flowchart LR
     P["Saved profile"] --> Q["Search query + filters"]
     Q --> C1["Adzuna<br/>(official API)"]
-    Q --> C2["Google Jobs actor<br/>(Apify scraper)"]
-    Q --> C3["Indeed actor<br/>(Apify scraper)"]
+    Q --> C2["LinkedIn actor<br/>(Apify scraper)"]
     C1 --> N["Normalize + de-duplicate<br/>(source, external_id)"]
     C2 --> N
-    C3 --> N
     N --> E["Embed job descriptions<br/>(your embedding provider)"]
     E --> F["Hard filters:<br/>location / remote / salary / type"]
     F --> V["Vector similarity ranking<br/>(pgvector cosine)"]
@@ -40,10 +40,10 @@ flowchart LR
 
 A failing source never breaks the search — it is skipped with a warning surfaced in the UI.
 
-Today (issue #7): `POST /api/jobs/search` starts a background run, `GET
-/api/jobs/searches/{id}` reports its status with per-source results/warnings, and postings
-are de-duplicated per `(source, external_id)` — a re-search refreshes the stored postings
-instead of duplicating them.
+Today (issues #7–#8): the `/jobs` page starts a background run from an editable, seeded
+query, `GET /api/jobs/searches/{id}` reports its status with per-source results/warnings
+while a live banner polls it, and postings are de-duplicated per `(source, external_id)` —
+a re-search refreshes the stored postings instead of duplicating them.
 
 ## What happens on a search (behind the scenes)
 
@@ -85,13 +85,15 @@ finishes.
 | Source | Type | Badge | Needs |
 |---|---|---|---|
 | Adzuna | Official API | "Official API" | Free Adzuna key |
-| Google Jobs actor | Third-party scraper | "Third-party scraper" | Your Apify account |
-| Indeed actor | Third-party scraper | "Third-party scraper" | Your Apify account |
+| LinkedIn jobs scraper | Third-party scraper | "Third-party scraper" | Your Apify account — paid per result (~$1 / 1,000 results) |
 
-Before a scraper-based source can be enabled you must **acknowledge its terms-of-use
-disclosure** in a modal. The badge stays visible on every job card so you always know where
-a listing came from. Scraping happens through *your* Apify account under *your* responsibility
-— the app ships a tool, not a scraping service.
+The [Setup page](../app/setup) lists every source with its badge always visible. Official
+API sources enable themselves once their keys exist; before a scraper-based source can be
+enabled you must **acknowledge its terms-of-use disclosure** in a modal. The badge stays
+visible on every job card so you always know where a listing came from. Scraping happens
+through *your* Apify account under *your* responsibility — the app ships a tool, not a
+scraping service. Adding another Apify actor later is a `connectors.yaml` entry plus a
+mapper module — no core changes.
 
 ## Reading the results
 

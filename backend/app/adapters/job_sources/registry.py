@@ -1,7 +1,20 @@
 from app.adapters.job_sources.adzuna import AdzunaJobSource
-from app.adapters.job_sources.base import JobSource
+from app.adapters.job_sources.apify import ApifyActorSource
+from app.adapters.job_sources.base import ConnectorConfigError, JobSource
+from app.adapters.job_sources.config import load_actor_configs
 
-_REGISTRY: tuple[JobSource, ...] = (AdzunaJobSource(),)
+
+def _build_registry() -> tuple[JobSource, ...]:
+    sources: tuple[JobSource, ...] = (AdzunaJobSource(),)
+    for actor_config in load_actor_configs():
+        sources += (ApifyActorSource(actor_config),)
+    names = [source.name for source in sources]
+    if len(set(names)) != len(names):
+        raise ConnectorConfigError(f"duplicate source names in registry: {names}")
+    return sources
+
+
+_REGISTRY: tuple[JobSource, ...] = _build_registry()
 
 
 def all_sources() -> tuple[JobSource, ...]:
@@ -9,8 +22,4 @@ def all_sources() -> tuple[JobSource, ...]:
 
 
 def get_source(name: str) -> JobSource | None:
-    return next((source for source in _REGISTRY if source.name == name), None)
-
-
-def enabled_sources() -> list[JobSource]:
-    return [source for source in _REGISTRY if source.is_configured()]
+    return next((source for source in all_sources() if source.name == name), None)

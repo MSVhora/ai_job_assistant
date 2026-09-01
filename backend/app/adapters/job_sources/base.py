@@ -1,5 +1,7 @@
+import html
+import re
 from collections.abc import Callable
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Protocol
 
 import httpx
@@ -10,6 +12,34 @@ from app.models import JobType, RemoteType
 
 class ConnectorError(Exception):
     pass
+
+
+class ConnectorConfigError(ConnectorError):
+    pass
+
+
+_TAG_RE = re.compile(r"<[^>]+>")
+_WS_RE = re.compile(r"\s+")
+
+
+def clean_text(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    text = _WS_RE.sub(" ", _TAG_RE.sub(" ", html.unescape(value))).strip()
+    return text or None
+
+
+def parse_datetime(value: object) -> datetime | None:
+    if isinstance(value, bool) or not isinstance(value, str | int | float):
+        return None
+    if isinstance(value, str):
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed
+    seconds = value / 1000 if value > 1e12 else value
+    return datetime.fromtimestamp(seconds, tz=UTC)
 
 
 class JobSearchQuery(BaseModel):

@@ -24,7 +24,7 @@ async def test_search_start_and_status_flow(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     source = FakeJobSource("adzuna", postings=[fake_posting("1", title="Data Engineer")])
-    monkeypatch.setattr(registry, "enabled_sources", lambda: [source])
+    monkeypatch.setattr(registry, "all_sources", lambda: (source,))
 
     response = await client.post(
         "/api/jobs/search",
@@ -51,7 +51,7 @@ async def test_search_persists_postings(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     source = FakeJobSource("adzuna", postings=[fake_posting("1"), fake_posting("2")])
-    monkeypatch.setattr(registry, "enabled_sources", lambda: [source])
+    monkeypatch.setattr(registry, "all_sources", lambda: (source,))
 
     start = (await client.post("/api/jobs/search", json={"query": "data", "country": "de"})).json()
 
@@ -64,7 +64,9 @@ async def test_search_persists_postings(
 async def test_search_without_configured_sources_returns_400(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(registry, "enabled_sources", lambda: [])
+    monkeypatch.setattr(
+        registry, "all_sources", lambda: (FakeJobSource("adzuna", configured=False),)
+    )
 
     response = await client.post("/api/jobs/search", json={"query": "data", "country": "de"})
 
@@ -82,6 +84,21 @@ async def test_search_with_unknown_source_returns_400(client: AsyncClient) -> No
     assert "unknown job source" in response.json()["detail"]
 
 
+async def test_search_with_unacknowledged_scraper_returns_409(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scraper = FakeJobSource("apify_linkedin", disclosure_required=True)
+    monkeypatch.setattr(registry, "all_sources", lambda: (scraper,))
+
+    response = await client.post(
+        "/api/jobs/search",
+        json={"query": "data", "country": "de", "sources": ["apify_linkedin"]},
+    )
+
+    assert response.status_code == 409
+    assert "not enabled" in response.json()["detail"]
+
+
 async def test_search_validates_country(client: AsyncClient) -> None:
     response = await client.post(
         "/api/jobs/search",
@@ -95,7 +112,7 @@ async def test_search_normalizes_country(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     source = FakeJobSource("adzuna", postings=[])
-    monkeypatch.setattr(registry, "enabled_sources", lambda: [source])
+    monkeypatch.setattr(registry, "all_sources", lambda: (source,))
 
     response = await client.post("/api/jobs/search", json={"query": "data", "country": "DE"})
 
@@ -109,12 +126,69 @@ async def test_get_unknown_search_returns_404(client: AsyncClient) -> None:
     assert response.status_code == 404
 
 
-async def test_list_sources_returns_adzuna_metadata(client: AsyncClient) -> None:
+async def test_list_sources_includes_state(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    adzuna = FakeJobSource("adzuna")
+    adzuna.is_official_api = True
+    scraper = FakeJobSource("apify_linkedin", disclosure_required=True)
+    monkeypatch.setattr(registry, "all_sources", lambda: (adzuna, scraper))
+
     response = await client.get("/api/sources")
 
     assert response.status_code == 200
-    sources = response.json()
-    adzuna = next(source for source in sources if source["name"] == "adzuna")
-    assert adzuna["is_official_api"] is True
-    assert adzuna["disclosure_required"] is False
-    assert isinstance(adzuna["is_configured"], bool)
+    sources = {source["name"]: source for source in response.json()}
+    assert sources["adzuna"]["is_official_api"] is True
+    assert sources["adzuna"]["disclosure_required"] is False
+    assert sources["adzuna"]["is_configured"] is True
+    assert sources["adzuna"]["enabled"] is True
+    assert sources["apify_linkedin"]["disclosure_required"] is True
+    assert sources["apify_linkedin"]["enabled"] is False
+
+
+async def test_enable_requires_acknowledgment(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scraper = FakeJobSource("apify_linkedin", disclosure_required=True)
+    monkeypatch.setattr(registry, "all_sources", lambda: (scraper,))
+
+    denied = await client.post(
+        "/api/sources/apify_linkedin/enable", json={"acknowledged_disclosure": False}
+    )
+    assert denied.status_code == 409
+
+    allowed = await client.post(
+        "/api/sources/apify_linkedin/enable", json={"acknowledged_disclosure": True}
+    )
+    assert allowed.status_code == 200
+    assert allowed.json()["enabled"] is True
+
+    again = await client.post(
+        "/api/sources/apify_linkedin/enable", json={"acknowledged_disclosure": True}
+    )
+    assert again.status_code == 200
+
+    listing = (await client.get("/api/sources")).json()
+    assert next(s for s in listing if s["name"] == "apify_linkedin")["enabled"] is True
+
+
+async def test_enable_official_api_source_is_noop(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    adzuna = FakeJobSource("adzuna")
+    monkeypatch.setattr(registry, "all_sources", lambda: (adzuna,))
+
+    response = await client.post(
+        "/api/sources/adzuna/enable", json={"acknowledged_disclosure": False}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["enabled"] is True
+
+
+async def test_enable_unknown_source_returns_404(client: AsyncClient) -> None:
+    response = await client.post(
+        "/api/sources/not_a_source/enable", json={"acknowledged_disclosure": True}
+    )
+
+    assert response.status_code == 404

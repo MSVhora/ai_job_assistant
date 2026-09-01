@@ -1,4 +1,5 @@
 import uuid
+from datetime import UTC, datetime
 
 import pytest
 from fakes import FakeJobSource, fake_posting
@@ -7,8 +8,12 @@ from sqlalchemy import select
 from app.adapters.job_sources import registry
 from app.adapters.job_sources.base import ConnectorError
 from app.core.db import session_factory
-from app.core.errors import NoJobSourcesConfiguredError, UnknownJobSourceError
-from app.models import JobPosting, JobSearch
+from app.core.errors import (
+    JobSourceNotEnabledError,
+    NoJobSourcesConfiguredError,
+    UnknownJobSourceError,
+)
+from app.models import JobPosting, JobSearch, SourceState
 from app.schemas.job_search import JobSearchRequest
 from app.services.ingestion import _selected_sources, run_search
 
@@ -18,6 +23,21 @@ pytestmark = pytest.mark.usefixtures("clean_tables")
 def payload(**overrides: object) -> JobSearchRequest:
     defaults: dict[str, object] = {"query": "python developer", "country": "de"}
     return JobSearchRequest(**{**defaults, **overrides})
+
+
+def only_sources(monkeypatch: pytest.MonkeyPatch, *sources: FakeJobSource) -> None:
+    monkeypatch.setattr(registry, "all_sources", lambda: tuple(sources))
+
+
+async def acknowledge(name: str) -> None:
+    async with session_factory() as session:
+        session.add(SourceState(source_name=name, acknowledged_at=datetime.now(UTC)))
+        await session.commit()
+
+
+async def selected(payload: JobSearchRequest) -> list[str]:
+    async with session_factory() as session:
+        return [source.name for source in await _selected_sources(session, payload)]
 
 
 async def create_run(payload: JobSearchRequest) -> uuid.UUID:
@@ -41,15 +61,11 @@ async def get_postings() -> list[JobPosting]:
         return list(result.scalars().all())
 
 
-def only_enabled(monkeypatch: pytest.MonkeyPatch, *sources: FakeJobSource) -> None:
-    monkeypatch.setattr(registry, "enabled_sources", lambda: list(sources))
-
-
 async def test_run_search_persists_and_dedupes(monkeypatch: pytest.MonkeyPatch) -> None:
     source = FakeJobSource(
         "adzuna", postings=[fake_posting("1", title="Original Title", salary_min=50000.0)]
     )
-    only_enabled(monkeypatch, source)
+    only_sources(monkeypatch, source)
 
     run_1 = await create_run(payload())
     await run_search(run_1, payload())
@@ -63,7 +79,7 @@ async def test_run_search_persists_and_dedupes(monkeypatch: pytest.MonkeyPatch) 
     refreshed = FakeJobSource(
         "adzuna", postings=[fake_posting("1", title="Refreshed Title", salary_min=65000.0)]
     )
-    only_enabled(monkeypatch, refreshed)
+    only_sources(monkeypatch, refreshed)
     run_2 = await create_run(payload())
     await run_search(run_2, payload())
 
@@ -79,7 +95,7 @@ async def test_run_search_persists_and_dedupes(monkeypatch: pytest.MonkeyPatch) 
 
 async def test_run_search_passes_query_to_connector(monkeypatch: pytest.MonkeyPatch) -> None:
     source = FakeJobSource("adzuna", postings=[fake_posting("1")])
-    only_enabled(monkeypatch, source)
+    only_sources(monkeypatch, source)
 
     run = await create_run(payload(location="Berlin", results_wanted=10))
     await run_search(run, payload(location="Berlin", results_wanted=10))
@@ -94,7 +110,7 @@ async def test_run_search_passes_query_to_connector(monkeypatch: pytest.MonkeyPa
 async def test_failing_source_degrades_to_partial(monkeypatch: pytest.MonkeyPatch) -> None:
     failing = FakeJobSource("adzuna", error=ConnectorError("rate limited"))
     healthy = FakeJobSource("other", postings=[fake_posting("2")])
-    only_enabled(monkeypatch, failing, healthy)
+    only_sources(monkeypatch, failing, healthy)
 
     run = await create_run(payload())
     await run_search(run, payload())
@@ -113,7 +129,7 @@ async def test_failing_source_degrades_to_partial(monkeypatch: pytest.MonkeyPatc
 
 async def test_all_sources_failing_marks_run_failed(monkeypatch: pytest.MonkeyPatch) -> None:
     failing = FakeJobSource("adzuna", error=ConnectorError("down"))
-    only_enabled(monkeypatch, failing)
+    only_sources(monkeypatch, failing)
 
     run = await create_run(payload())
     await run_search(run, payload())
@@ -131,7 +147,7 @@ async def test_unmappable_postings_are_skipped_with_warning(
             raise ConnectorError("no title")
 
     source = BadNormalizer("adzuna", postings=[fake_posting("1"), fake_posting("2")])
-    only_enabled(monkeypatch, source)
+    only_sources(monkeypatch, source)
 
     run = await create_run(payload())
     await run_search(run, payload())
@@ -145,28 +161,54 @@ async def test_unmappable_postings_are_skipped_with_warning(
     assert await get_postings() == []
 
 
-async def test_selected_sources_rejects_unknown_source(
+async def test_run_marks_failed_when_background_selection_fails(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    scraper = FakeJobSource("apify_linkedin", disclosure_required=True)
+    only_sources(monkeypatch, scraper)
+
+    run = await create_run(payload(sources=["apify_linkedin"]))
+    await run_search(run, payload(sources=["apify_linkedin"]))
+
+    run_row = await get_run(run)
+    assert run_row.status.value == "failed"
+    results = run_row.results
+    assert results is not None
+    assert results[0]["source"] == "run"
+    assert "not enabled" in results[0]["warning"]
+
+
+async def test_selected_sources_rejects_unknown_source() -> None:
     with pytest.raises(UnknownJobSourceError):
-        _selected_sources(payload(sources=["does_not_exist"]))
+        await selected(payload(sources=["does_not_exist"]))
 
 
 async def test_selected_sources_rejects_when_none_configured(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(registry, "enabled_sources", lambda: [])
+    only_sources(monkeypatch, FakeJobSource("adzuna", configured=False))
     with pytest.raises(NoJobSourcesConfiguredError):
-        _selected_sources(payload())
+        await selected(payload())
+
+
+async def test_selected_sources_requires_acknowledgment_for_scraper(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scraper = FakeJobSource("apify_linkedin", disclosure_required=True)
+    only_sources(monkeypatch, FakeJobSource("adzuna"), scraper)
+
+    assert await selected(payload()) == ["adzuna"]
+    with pytest.raises(JobSourceNotEnabledError):
+        await selected(payload(sources=["apify_linkedin"]))
+
+    await acknowledge("apify_linkedin")
+    assert await selected(payload()) == ["adzuna", "apify_linkedin"]
+    assert await selected(payload(sources=["apify_linkedin"])) == ["apify_linkedin"]
 
 
 async def test_selected_sources_filters_by_requested_names(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    enabled = FakeJobSource("adzuna"), FakeJobSource("other")
-    monkeypatch.setattr(registry, "enabled_sources", lambda: list(enabled))
-    monkeypatch.setattr(registry, "all_sources", lambda: tuple(enabled))
+    only_sources(monkeypatch, FakeJobSource("adzuna"), FakeJobSource("other"))
 
-    selected = _selected_sources(payload(sources=["other"]))
-
-    assert [source.name for source in selected] == ["other"]
+    assert await selected(payload(sources=["other"])) == ["other"]

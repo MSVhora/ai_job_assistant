@@ -19,7 +19,7 @@ flowchart TB
     subgraph External["External services — all BYOK, your keys"]
         LLM["Gemini via LiteLLM<br/>generation + embeddings"]
         ADZ["Adzuna API<br/>(official)"]
-        APY["Apify actors<br/>(Google Jobs, Indeed scrapers)"]
+        APY["Apify actor<br/>(LinkedIn jobs scraper,<br/>config-driven framework)"]
     end
 
     U --> W
@@ -121,6 +121,23 @@ outcomes, queryable via `GET /api/jobs/searches/{id}`). A failing source is a ru
 never an error. Background runs open fresh sessions from `session_factory` and commit
 explicitly, since they outlive the request scope.
 
+## Source enablement (issue #8)
+
+Sources come from a code-level registry plus **`connectors.yaml`**-configured Apify actors
+(`backend/app/adapters/job_sources/connectors.yaml`) — adding an actor is a YAML entry plus
+a `mappers/<source>.py` file, with no changes to matching logic. Enablement is DB-backed:
+
+- `source_state.acknowledged_at` records the per-source disclosure acknowledgment
+  (`POST /api/sources/{name}/enable` with `acknowledged_disclosure: true`; 409 without it)
+- **enabled = key configured AND (official API OR disclosure acknowledged)** — checked
+  against the DB at both request time and inside the background run (a failing re-check
+  marks the run `failed` instead of stranding it in `running`)
+- Official-API sources (Adzuna) auto-enable once their keys exist; scraping sources
+  additionally require the disclosure modal
+
+`POST /api/setup/check` reports which provider keys the backend detected plus an
+embedding-capability warning, driving the `/setup` page.
+
 ## Database schema (v1, ER diagram)
 
 Source of truth: `backend/app/models/` + Alembic migrations. See
@@ -186,7 +203,7 @@ erDiagram
 
     job_posting {
         uuid id PK
-        text source "adzuna | apify_google_jobs | apify_indeed | ..."
+        text source "adzuna | apify_linkedin | ..."
         text external_id "unique together with source — dedupe key"
         text title
         text company
@@ -213,6 +230,11 @@ erDiagram
         real final_score "post-weight/rerank"
         text rationale "LLM why-this-matches, top N only"
         timestamptz created_at
+    }
+
+    source_state {
+        text source_name PK
+        timestamptz acknowledged_at "disclosure acknowledgment — null until enabled (issue #8)"
     }
 ```
 

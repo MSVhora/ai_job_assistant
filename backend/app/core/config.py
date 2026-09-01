@@ -1,6 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -21,6 +22,15 @@ class Settings(BaseSettings):
     adzuna_app_id: str | None = None
     adzuna_app_key: str | None = None
     apify_token: str | None = None
+
+    @field_validator(
+        "gemini_api_key", "adzuna_app_id", "adzuna_app_key", "apify_token", mode="before"
+    )
+    @classmethod
+    def _blank_to_none(cls, value: object) -> object:
+        if isinstance(value, str) and value.strip() == "":
+            return None
+        return value
 
 
 @lru_cache

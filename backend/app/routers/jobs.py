@@ -4,15 +4,16 @@ from typing import Annotated
 from fastapi import APIRouter, BackgroundTasks, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.adapters.job_sources import registry
 from app.deps import get_db
 from app.schemas.job_search import (
     JobSearchRequest,
     JobSearchStartResponse,
     JobSearchStatusResponse,
+    SourceEnableRequest,
     SourceInfoResponse,
 )
 from app.services import ingestion
+from app.services import sources as sources_service
 
 router = APIRouter(prefix="/api", tags=["jobs"])
 
@@ -35,13 +36,16 @@ async def get_job_search_status(
 
 
 @router.get("/sources", response_model=list[SourceInfoResponse])
-async def list_sources() -> list[SourceInfoResponse]:
-    return [
-        SourceInfoResponse(
-            name=source.name,
-            is_official_api=source.is_official_api,
-            disclosure_required=source.disclosure_required,
-            is_configured=source.is_configured(),
-        )
-        for source in registry.all_sources()
-    ]
+async def list_sources(
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> list[SourceInfoResponse]:
+    return await sources_service.list_sources_with_state(session)
+
+
+@router.post("/sources/{name}/enable", response_model=SourceInfoResponse)
+async def enable_source(
+    name: str,
+    payload: SourceEnableRequest,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> SourceInfoResponse:
+    return await sources_service.enable_source(session, name, payload.acknowledged_disclosure)

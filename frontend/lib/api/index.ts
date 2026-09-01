@@ -12,6 +12,11 @@ export type ProfileUpdate = components["schemas"]["ProfileUpdate"];
 export type StructuredProfile = components["schemas"]["StructuredProfile"];
 export type GapFillMessage = components["schemas"]["GapFillMessage"];
 export type GapFillResponse = components["schemas"]["GapFillResponse"];
+export type SetupCheck = components["schemas"]["SetupCheckResponse"];
+export type SourceInfo = components["schemas"]["SourceInfoResponse"];
+export type JobSearchRequest = components["schemas"]["JobSearchRequest"];
+export type JobSearchStart = components["schemas"]["JobSearchStartResponse"];
+export type JobSearchStatus = components["schemas"]["JobSearchStatusResponse"];
 
 export { ApiError, ExtractionFailedError, apiFetch } from "./client";
 
@@ -89,4 +94,33 @@ export async function gapFillTurn(
     method: "POST",
     body: JSON.stringify({ messages }),
   });
+}
+
+export async function getSetupCheck(): Promise<SetupCheck> {
+  return apiFetch<SetupCheck>("/api/setup/check", { method: "POST" });
+}
+
+export async function listSources(): Promise<SourceInfo[]> {
+  return apiFetch<SourceInfo[]>("/api/sources");
+}
+
+export async function enableSource(
+  name: string,
+  acknowledgedDisclosure: boolean,
+): Promise<SourceInfo> {
+  return apiFetch<SourceInfo>(`/api/sources/${encodeURIComponent(name)}/enable`, {
+    method: "POST",
+    body: JSON.stringify({ acknowledged_disclosure: acknowledgedDisclosure }),
+  });
+}
+
+export async function startJobSearch(payload: JobSearchRequest): Promise<JobSearchStart> {
+  return apiFetch<JobSearchStart>("/api/jobs/search", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getJobSearchStatus(searchId: string): Promise<JobSearchStatus> {
+  return apiFetch<JobSearchStatus>(`/api/jobs/searches/${encodeURIComponent(searchId)}`);
 }

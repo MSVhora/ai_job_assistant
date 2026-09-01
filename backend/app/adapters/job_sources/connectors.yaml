@@ -1,0 +1,12 @@
+sources:
+  - name: apify_linkedin
+    type: apify_actor
+    actor_id: hKByXkMQaC5Qt9UMN
+    external_id_field: id
+    input:
+      keywords: "{query}"
+      location: "{location}"
+      limitPerSource: "{results_wanted}"
+      datePosted: anyTime
+      autoConvertToAiSearch: true
+      scrapeCompany: false

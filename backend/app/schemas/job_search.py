@@ -54,3 +54,8 @@ class SourceInfoResponse(BaseModel):
     is_official_api: bool
     disclosure_required: bool
     is_configured: bool
+    enabled: bool
+
+
+class SourceEnableRequest(BaseModel):
+    acknowledged_disclosure: bool = False

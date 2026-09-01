@@ -1,9 +1,6 @@
 import asyncio
-import html
 import logging
-import re
 import time
-from datetime import datetime
 from typing import Any
 
 import httpx
@@ -15,6 +12,8 @@ from app.adapters.job_sources.base import (
     JobPostingData,
     JobSearchQuery,
     RawJobPosting,
+    clean_text,
+    parse_datetime,
 )
 from app.core.config import get_settings
 from app.models import JobType
@@ -27,9 +26,6 @@ _RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 504})
 _RETRY_DELAY_S = 1.0
 _MAX_RESULTS_PER_PAGE = 50
 
-_TAG_RE = re.compile(r"<[^>]+>")
-_WS_RE = re.compile(r"\s+")
-
 _CONTRACT_TIME_MAP: dict[str, JobType] = {
     "full_time": JobType.full_time,
     "part_time": JobType.part_time,
@@ -41,26 +37,10 @@ _CONTRACT_TYPE_MAP: dict[str, JobType] = {
 }
 
 
-def _clean_text(value: object) -> str | None:
-    if not isinstance(value, str):
-        return None
-    text = html.unescape(_WS_RE.sub(" ", _TAG_RE.sub(" ", value))).strip()
-    return text or None
-
-
 def _clean_salary(value: object) -> float | None:
     if isinstance(value, bool) or not isinstance(value, int | float):
         return None
     return float(value) if value >= 0 else None
-
-
-def _parse_posted_at(value: object) -> datetime | None:
-    if not isinstance(value, str):
-        return None
-    try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError:
-        return None
 
 
 def _job_type(payload: dict[str, Any]) -> JobType | None:
@@ -127,7 +107,7 @@ class AdzunaJobSource:
 
     def normalize(self, raw: RawJobPosting) -> JobPostingData:
         payload = raw.payload
-        title = _clean_text(payload.get("title"))
+        title = clean_text(payload.get("title"))
         if title is None:
             raise ConnectorError("adzuna posting has no title")
         company = payload.get("company")
@@ -136,16 +116,16 @@ class AdzunaJobSource:
             return JobPostingData(
                 external_id=raw.external_id,
                 title=title,
-                company=_clean_text(
+                company=clean_text(
                     company.get("display_name") if isinstance(company, dict) else company
                 ),
-                url=_clean_text(payload.get("redirect_url")),
-                location=_clean_text(
+                url=clean_text(payload.get("redirect_url")),
+                location=clean_text(
                     location.get("display_name") if isinstance(location, dict) else location
                 ),
                 job_type=_job_type(payload),
-                description=_clean_text(payload.get("description")),
-                posted_at=_parse_posted_at(payload.get("created")),
+                description=clean_text(payload.get("description")),
+                posted_at=parse_datetime(payload.get("created")),
                 salary_min=_clean_salary(payload.get("salary_min")),
                 salary_max=_clean_salary(payload.get("salary_max")),
                 raw_payload=payload,

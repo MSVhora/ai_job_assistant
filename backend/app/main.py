@@ -11,7 +11,7 @@ from app.core.errors import (
     domain_error_handler,
     request_validation_error_handler,
 )
-from app.routers import health, jobs, profile, resume
+from app.routers import health, jobs, profile, resume, setup
 
 logging.basicConfig(level=logging.INFO)
 
@@ -27,6 +27,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
     application.include_router(health.router)
+    application.include_router(setup.router)
     application.include_router(resume.router)
     application.include_router(profile.router)
     application.include_router(jobs.router)

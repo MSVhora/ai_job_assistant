@@ -4,6 +4,7 @@ from app.models.job_search import JobSearch, JobSearchStatus
 from app.models.profile import Profile
 from app.models.profile_revision import ProfileRevision, RevisionSource
 from app.models.resume import Resume
+from app.models.source_state import SourceState
 
 __all__ = [
     "Candidate",
@@ -16,4 +17,5 @@ __all__ = [
     "RemoteType",
     "Resume",
     "RevisionSource",
+    "SourceState",
 ]

@@ -12,7 +12,9 @@
 For job discovery, add an [Adzuna](https://developer.adzuna.com/) key pair (free) — with
 `ADZUNA_APP_ID` and `ADZUNA_APP_KEY` set, job search is available (see
 [job discovery](03-job-discovery-and-matching.md)). An [Apify](https://apify.com) token
-(paid usage) will enable the scraper-based sources in an upcoming issue.
+enables the scraper-based source (a LinkedIn jobs-scraper actor that is **paid per result**
+on your Apify plan); enabling it also requires acknowledging a disclosure in the app's
+Setup page.
 
 ## Step 1 — Clone and configure
 

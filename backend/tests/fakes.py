@@ -100,12 +100,13 @@ class FakeJobSource:
         name: str = "fake",
         *,
         configured: bool = True,
+        disclosure_required: bool = False,
         postings: list[JobPostingData] | None = None,
         error: Exception | None = None,
     ) -> None:
         self.name = name
         self.is_official_api = False
-        self.disclosure_required = False
+        self.disclosure_required = disclosure_required
         self._configured = configured
         self._postings = postings or []
         self._error = error

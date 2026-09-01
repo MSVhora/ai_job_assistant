@@ -14,7 +14,7 @@ A self-hosted, single-user, BYOK web app:
 
 ### In scope
 1. **Profile pipeline** — resume upload/parse → structured profile via LLM → human review/edit → conversational gap-filling → persistent profile with revision audit trail.
-2. **Job discovery** — Adzuna (official API) + 2 Apify actors (Google Jobs, Indeed) behind a `JobSource` plugin interface. New actors added via **config + mapper, not core code**. Scraping-based sources show a ToS disclosure and require per-source acknowledgment before enabling.
+2. **Job discovery** — Adzuna (official API) + Apify actor(s) behind a `JobSource` plugin interface. New actors added via **config + mapper, not core code**. v1 ships the LinkedIn jobs-scraper actor (owner decision 2026-09-01, [issue #8 plan](v1-issue-008-apify-connectors-disclosure.md); the original Google Jobs/Indeed picks are deferred). Scraping-based sources show a ToS disclosure and require per-source acknowledgment before enabling.
 3. **Matching** — pgvector cosine similarity + hard filters (location/remote/salary/type) + LLM re-rank of top N with rationale + priority weighting (role-fit vs. company-fit).
 
 ### Explicitly out of scope (deferred)
@@ -25,7 +25,7 @@ A self-hosted, single-user, BYOK web app:
 | Multi-profile ("Data Analyst" vs "PM" tracks) | ~~v2~~ **moved into v1** (owner decision 2026-09-01 — see [issue #6 plan](v1-issue-006-multi-profile-resume-list.md)) |
 | Auth / multi-user | v2 |
 | Redis/Celery queue (BackgroundTasks suffice at single-user scale) | v2 |
-| JSearch, LinkedIn/Naukri actors, company career-page scraper, alerts | Phase 3+ |
+| JSearch, Google Jobs/Indeed actors, company career-page scraper, alerts | Phase 3+ (the LinkedIn actor moved into v1 — owner decision 2026-09-01, see [issue #8 plan](v1-issue-008-apify-connectors-disclosure.md); further actors remain config-only additions) |
 | Auto-apply / form autofill | Never in core (Phase 4 Chrome extension, separate) |
 
 ---
@@ -40,7 +40,7 @@ A self-hosted, single-user, BYOK web app:
 | LLM abstraction | **LiteLLM** | Don't hand-roll provider adapters; swapping = config change |
 | Default LLM | **Gemini Flash** | Free tier = zero-cost demo for every forker; strong structured output |
 | Embeddings | Gemini `text-embedding-004` (via LiteLLM) | Same key as generation; note: Anthropic-only users will need a second provider for embeds — detect and warn at setup |
-| Job sources | **Adzuna + 2 Apify actors** | Adzuna proves the connector pattern with zero setup; Apify adds LinkedIn/Indeed-grade coverage under the user's own account |
+| Job sources | **Adzuna + Apify actor(s)** | Adzuna proves the connector pattern with zero setup; Apify adds marketplace-grade coverage under the user's own account (v1 actor: LinkedIn jobs scraper — owner decision 2026-09-01) |
 | Scraping posture | User runs actors under **their own Apify key**; per-source disclosure + acknowledgment in UI | Ships a tool, not a scraping service (PRD §9) |
 | Profile storage | `structured_profile` **jsonb** + `profile_revision` audit table | Field-level diffing at the app layer; normalized child tables deferred until rewriting needs per-bullet references |
 | Auth | None — single implicit user, localhost/Docker | Speed |
@@ -110,6 +110,10 @@ match
 ├── vector_score, final_score        -- pre-weight and post-weight/rerank
 ├── rationale (text)                 -- LLM "why this matches", top N only
 ├── created_at
+
+source_state                         -- added by issue #8: per-source disclosure acknowledgment
+├── source_name (text, pk)
+├── acknowledged_at (timestamptz)    -- null until the disclosure modal is confirmed
 ```
 
 ---
@@ -127,22 +131,23 @@ class JobSource(Protocol):
 Adding a new Apify actor = a YAML entry + thin mapper, no core changes:
 
 ```yaml
-# connectors.yaml
+# connectors.yaml — apify_actor entries only; native-API connectors stay code-level
 sources:
-  - name: adzuna
-    type: native_api
-    disclosure: none
-  - name: apify_google_jobs
+  - name: apify_linkedin
     type: apify_actor
-    actor_id: <chosen from Apify Store at build time>
-    input_mapping: { keywords: "{query}", location: "{location}" }
-    output_path: dataset.items
+    actor_id: hKByXkMQaC5Qt9UMN      # curious_coder/linkedin-jobs-scraper (v1, issue #8)
+    external_id_field: id
+    input:
+      keywords: "{query}"
+      location: "{location}"
+      limitPerSource: "{results_wanted}"
     disclosure: required
-  - name: apify_indeed
-    type: apify_actor
-    actor_id: <chosen at build time>
-    disclosure: required
+  # more actors later: add an entry + mappers/<source>.py — no core changes
 ```
+
+(The §5 sketch originally listed `adzuna` as a YAML entry too; issue #8 kept native-API
+connectors at code level — only `apify_actor` entries are config-driven. Recorded in the
+[issue #8 plan](v1-issue-008-apify-connectors-disclosure.md).)
 
 **Apify runner contract:** start run → poll until `SUCCEEDED` → fetch dataset items → per-actor mapper → normalized `JobPosting`. Actor failures degrade gracefully (source skipped, warning surfaced in UI), never break the whole search.
 
@@ -206,7 +211,7 @@ sources:
 - From a clean clone: fill `.env`, `docker compose up`, upload a standard single-column resume → editable profile in <30s on the free Gemini tier.
 - User can correct every AI-extracted field; every correction is recorded in `profile_revision`.
 - Gap-fill asks only about genuinely missing fields.
-- All 3 sources return normalized postings; dedupe across sources works; a new Apify actor can be added via `connectors.yaml` + mapper without touching matching logic.
+- Both v1 sources return normalized postings; dedupe across sources works; a new Apify actor can be added via `connectors.yaml` + mapper without touching matching logic.
 - Ranked matches with a "why this matches" rationale for at least the top 10.
 - Scraping sources cannot be enabled without acknowledging the ToS disclosure; badge visible on every card.
 - No resume content ever leaves the deployment except to the user's own configured LLM/Apify providers.

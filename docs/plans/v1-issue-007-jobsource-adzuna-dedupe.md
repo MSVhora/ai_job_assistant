@@ -1,6 +1,6 @@
 # Issue #7 — JobSource Interface + Adzuna Adapter + Dedupe
 
-**Status:** Planned
+**Status:** Done (2026-09-01)
 **Tracks:** GitHub issue #7 (Day 6, Week 2 — first ingestion issue)
 **Plan of record:** [v1-implementation-plan.md](v1-implementation-plan.md) §4 (data model), §5 (connector interface), §8 Day 6
 **Depends on:** Issues #1–#6 (done). pgvector extension already exists (`0001`); embeddings land in #9.

@@ -44,6 +44,10 @@ This starts three services:
 | `api` | http://localhost:8000 | FastAPI backend (interactive docs at `/docs`) |
 | `db` | localhost:5432 | Postgres 16 + pgvector |
 
+Both app containers bind-mount their source (`backend/app`, and the frontend's
+`app`/`components`/`hooks`/`lib`/`public`), so code edits hot-reload without a rebuild —
+only dependency or Dockerfile changes need `docker compose up -d --build`.
+
 ## Step 3 — Apply database migrations
 
 From the repo root, using the API container:
@@ -80,6 +84,7 @@ Engineer") that you review, edit, and later match separately. See the next guide
 |---|---|
 | `database:false` in health | The `db` container isn't ready yet or port 5432 is taken by another Postgres — `docker compose ps`, stop the conflicting service, retry |
 | Port 3000/8000 already in use | Stop the other process or change the port mapping in `docker-compose.yml` |
+| Frontend shows stale UI after code changes | The `web` container is missing the live source mounts (or predates them) — `docker compose up -d --build web`, then hard-refresh the browser |
 | `llm_configured:false` | `GEMINI_API_KEY` missing in `.env`; restart `api` after editing |
 | Frontend can't reach API | `NEXT_PUBLIC_API_BASE_URL` should be `http://localhost:8000` |
 

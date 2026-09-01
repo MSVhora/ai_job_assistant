@@ -38,7 +38,11 @@ services:
       - path: .env
         required: false
     volumes:
-      - ./frontend/src:/app/src
+      - ./frontend/app:/app/app
+      - ./frontend/components:/app/components
+      - ./frontend/hooks:/app/hooks
+      - ./frontend/lib:/app/lib
+      - ./frontend/public:/app/public
     command: npm run dev
     ports:
       - "3000:3000"

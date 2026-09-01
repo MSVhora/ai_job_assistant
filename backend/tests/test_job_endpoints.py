@@ -39,9 +39,13 @@ async def test_search_start_and_status_flow(
     assert status["status"] == "succeeded"
     assert status["query"] == {
         "query": "python developer",
+        "source_queries": None,
         "location": "Berlin",
         "country": "de",
         "results_wanted": 50,
+        "salary_min": None,
+        "salary_max": None,
+        "salary_currency": None,
         "sources": None,
     }
     assert status["results"] == [{"source": "adzuna", "status": "ok", "count": 1, "warning": None}]
@@ -84,6 +88,52 @@ async def test_search_with_unknown_source_returns_400(client: AsyncClient) -> No
     assert "unknown job source" in response.json()["detail"]
 
 
+async def test_search_requires_effective_query_per_source(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(registry, "all_sources", lambda: (FakeJobSource("adzuna"),))
+
+    response = await client.post("/api/jobs/search", json={"country": "de", "sources": ["adzuna"]})
+
+    assert response.status_code == 400
+    assert "no search query" in response.json()["detail"]
+
+
+async def test_search_accepts_per_source_specs_and_salary(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = FakeJobSource("adzuna", postings=[fake_posting("1")])
+    monkeypatch.setattr(registry, "all_sources", lambda: (source,))
+
+    response = await client.post(
+        "/api/jobs/search",
+        json={
+            "country": "in",
+            "location": "Bangalore",
+            "sources": ["adzuna"],
+            "source_queries": {
+                "adzuna": {"title": "Senior Android Engineer", "skills": ["Kotlin"]}
+            },
+            "salary_min": 5000000,
+        },
+    )
+
+    assert response.status_code == 202
+    query = source.queries[0]
+    assert query.title_phrase == "Senior Android Engineer"
+    assert query.salary_min == 5000000
+    assert query.location == "Bangalore"
+
+
+async def test_search_rejects_inverted_salary_range(client: AsyncClient) -> None:
+    response = await client.post(
+        "/api/jobs/search",
+        json={"query": "data", "country": "de", "salary_min": 100, "salary_max": 50},
+    )
+
+    assert response.status_code == 422
+
+
 async def test_search_with_unacknowledged_scraper_returns_409(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -124,6 +174,30 @@ async def test_get_unknown_search_returns_404(client: AsyncClient) -> None:
     response = await client.get(f"/api/jobs/searches/{uuid.uuid4()}")
 
     assert response.status_code == 404
+
+
+async def test_search_postings_endpoint(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    source = FakeJobSource(
+        "adzuna",
+        postings=[
+            fake_posting("1", title="Engineer A", salary_min=100.0, currency="EUR"),
+            fake_posting("2", title="Engineer B"),
+        ],
+    )
+    monkeypatch.setattr(registry, "all_sources", lambda: (source,))
+
+    start = (await client.post("/api/jobs/search", json={"query": "data", "country": "de"})).json()
+
+    postings = (await client.get(f"/api/jobs/searches/{start['search_id']}/postings")).json()
+    assert [posting["title"] for posting in postings] == ["Engineer A", "Engineer B"]
+    assert postings[0]["source"] == "adzuna"
+    assert postings[0]["salary_min"] == 100.0
+    assert postings[0]["currency"] == "EUR"
+
+    missing = await client.get(f"/api/jobs/searches/{uuid.uuid4()}/postings")
+    assert missing.status_code == 404
 
 
 async def test_list_sources_includes_state(

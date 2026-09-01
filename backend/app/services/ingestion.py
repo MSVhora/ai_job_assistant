@@ -5,29 +5,46 @@ from datetime import UTC, datetime
 
 from fastapi import BackgroundTasks
 from pydantic import ValidationError
+from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.job_sources import registry
-from app.adapters.job_sources.base import ConnectorError, JobPostingData, JobSearchQuery, JobSource
+from app.adapters.job_sources.base import ConnectorError, JobPostingData, JobSource
 from app.core.db import session_factory
 from app.core.errors import (
     DomainError,
     JobSearchNotFoundError,
     JobSourceNotEnabledError,
+    MissingSearchQueryError,
     NoJobSourcesConfiguredError,
     UnknownJobSourceError,
 )
 from app.models import JobPosting, JobSearch, JobSearchStatus
 from app.schemas.job_search import (
+    JobPostingSummary,
     JobSearchRequest,
     JobSearchStartResponse,
     JobSearchStatusResponse,
     SourceOutcome,
 )
+from app.services import query_rendering
 from app.services import sources as sources_service
 
 logger = logging.getLogger(__name__)
+
+
+def _validate_queries(payload: JobSearchRequest, selected: list[JobSource]) -> None:
+    for name in payload.source_queries or {}:
+        if registry.get_source(name) is None:
+            raise UnknownJobSourceError(f"unknown job source: {name}")
+    for source in selected:
+        spec = (payload.source_queries or {}).get(source.name)
+        if spec is not None and spec.has_content():
+            continue
+        if payload.query:
+            continue
+        raise MissingSearchQueryError(f"no search query for source: {source.name}")
 
 
 async def _selected_sources(session: AsyncSession, payload: JobSearchRequest) -> list[JobSource]:
@@ -53,6 +70,7 @@ async def start_search(
     session: AsyncSession, background_tasks: BackgroundTasks, payload: JobSearchRequest
 ) -> JobSearchStartResponse:
     selected = await _selected_sources(session, payload)
+    _validate_queries(payload, selected)
     run = JobSearch(status=JobSearchStatus.pending, query=payload.model_dump(mode="json"))
     session.add(run)
     await session.flush()
@@ -75,6 +93,7 @@ async def run_search(search_id: uuid.UUID, payload: JobSearchRequest) -> None:
 
         try:
             selected = await _selected_sources(session, payload)
+            _validate_queries(payload, selected)
         except DomainError as exc:
             run.status = JobSearchStatus.failed
             run.results = [
@@ -113,11 +132,11 @@ async def _run_source(
     session: AsyncSession, source: JobSource, payload: JobSearchRequest, search_id: uuid.UUID
 ) -> SourceOutcome:
     source_started = time.monotonic()
-    query = JobSearchQuery(
-        query=payload.query,
-        location=payload.location,
-        country=payload.country,
-        results_wanted=payload.results_wanted,
+    query = query_rendering.build_connector_query(
+        source.name,
+        (payload.source_queries or {}).get(source.name),
+        payload.query,
+        payload,
     )
     try:
         raw_postings = await source.search(query)
@@ -209,3 +228,31 @@ async def get_search_status(session: AsyncSession, search_id: uuid.UUID) -> JobS
         created_at=run.created_at,
         updated_at=run.updated_at,
     )
+
+
+async def get_search_postings(
+    session: AsyncSession, search_id: uuid.UUID
+) -> list[JobPostingSummary]:
+    run = await session.get(JobSearch, search_id)
+    if run is None:
+        raise JobSearchNotFoundError()
+    result = await session.execute(
+        select(JobPosting)
+        .where(JobPosting.job_search_id == search_id)
+        .order_by(JobPosting.posted_at.desc().nulls_last(), JobPosting.title)
+    )
+    return [
+        JobPostingSummary(
+            id=posting.id,
+            source=posting.source,
+            title=posting.title,
+            company=posting.company,
+            url=posting.url,
+            location=posting.location,
+            posted_at=posting.posted_at,
+            salary_min=float(posting.salary_min) if posting.salary_min is not None else None,
+            salary_max=float(posting.salary_max) if posting.salary_max is not None else None,
+            currency=posting.currency,
+        )
+        for posting in result.scalars().all()
+    ]

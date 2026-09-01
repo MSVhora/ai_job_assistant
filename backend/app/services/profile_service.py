@@ -22,6 +22,7 @@ from app.schemas.profile import (
     StructuredProfile,
 )
 from app.schemas.resume import DraftProfileResponse
+from app.services import query_builder
 from app.services.resume_service import get_or_create_candidate
 
 logger = logging.getLogger(__name__)
@@ -95,6 +96,7 @@ def _profile_response(
         profile_id=profile.id,
         name=profile.name,
         structured_profile=StructuredProfile.model_validate(profile.structured_profile),
+        search_queries=query_builder.parse_stored(profile.search_queries),
         source_resume_id=profile.source_resume_id,
         source_resume_filename=source_resume_filename,
         updated_at=profile.updated_at,
@@ -166,17 +168,20 @@ async def create_profile(session: AsyncSession, payload: ProfileCreate) -> Profi
     candidate = await get_or_create_candidate(session)
     new_profile = payload.structured_profile.model_dump(mode="json")
     draft = None
+    draft_queries: dict[str, Any] | None = None
     if payload.source_resume_id is not None:
         resume = await session.get(Resume, payload.source_resume_id)
         if resume is None or resume.candidate_id != candidate.id:
             raise ResumeNotFoundError()
         if resume.draft_profile is not None:
             draft = _normalized(resume.draft_profile)
+        draft_queries = resume.search_queries
 
     profile = Profile(
         candidate_id=candidate.id,
         name=payload.name.strip(),
         structured_profile=new_profile,
+        search_queries=draft_queries,
         source_resume_id=payload.source_resume_id,
     )
     session.add(profile)
@@ -262,4 +267,5 @@ async def get_resume_draft(session: AsyncSession, resume_id: uuid.UUID) -> Draft
         draft_profile=StructuredProfile.model_validate(resume.draft_profile),
         parse_version=resume.parse_version,
         parsed_at=resume.parsed_at,
+        search_queries=query_builder.parse_stored(resume.search_queries),
     )

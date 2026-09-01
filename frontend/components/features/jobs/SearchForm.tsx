@@ -2,79 +2,23 @@
 
 import { useEffect } from "react";
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
-import { useController, useForm } from "react-hook-form";
-import { z } from "zod";
+import { FormProvider, useController, useForm } from "react-hook-form";
 
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { SearchQueriesCard } from "@/components/features/jobs/SearchQueriesCard";
 import { useProfile } from "@/hooks/use-profiles";
 import { useStartJobSearch } from "@/hooks/use-job-search";
-import type { JobSearchRequest, SourceInfo, StructuredProfile } from "@/lib/api";
+import type { SourceInfo } from "@/lib/api";
 
+import {
+  emptyQueryFields,
+  searchFormSchema,
+  seedSpec,
+  toSearchRequest,
+  type SearchFormValues,
+} from "./search-form-schema";
 import { SourceMultiSelect } from "./SourceMultiSelect";
-
-const MAX_SEED_SKILLS = 2;
-
-const TOKEN_SPLIT = /[^a-z0-9+#.]+/;
-
-function keywordLike(skill: string): boolean {
-  const trimmed = skill.trim();
-  return (
-    trimmed.length >= 2 &&
-    trimmed.length <= 24 &&
-    trimmed.split(/\s+/).length <= 3 &&
-    !/[|&/]/.test(trimmed)
-  );
-}
-
-function tokens(value: string): string[] {
-  return value.toLowerCase().split(TOKEN_SPLIT).filter((token) => token !== "");
-}
-
-function buildSeed(profile: StructuredProfile): {
-  query: string;
-  location: string;
-  country: string;
-} {
-  const rawRole = profile.preferences?.target_title || profile.headline || "";
-  const role = rawRole.split("|")[0].trim() || rawRole.trim();
-  const picked: string[] = [];
-  for (const skill of profile.skills) {
-    if (picked.length >= MAX_SEED_SKILLS) break;
-    const trimmed = skill.trim();
-    if (!keywordLike(trimmed)) continue;
-    const known = new Set(tokens([role, ...picked].join(" ")));
-    if (tokens(trimmed).some((token) => known.has(token))) continue;
-    picked.push(trimmed);
-  }
-  return {
-    query: [role, ...picked].filter((part) => part !== "").join(" "),
-    location: profile.preferences?.target_location || profile.contact.location || "",
-    country: profile.contact.country || "",
-  };
-}
-
-const searchFormSchema = z.object({
-  query: z
-    .string()
-    .trim()
-    .min(1, "Describe what you are looking for")
-    .max(200, "Keep the query under 200 characters"),
-  location: z.string().max(200, "Keep the location under 200 characters"),
-  country: z
-    .string()
-    .trim()
-    .toLowerCase()
-    .regex(/^[a-z]{2}$/, "Two-letter country code, e.g. de"),
-  results_wanted: z.coerce
-    .number()
-    .int("Whole number only")
-    .min(1, "At least 1 result")
-    .max(50, "Up to 50 results per search"),
-  sources: z.array(z.string()).min(1, "Pick at least one source"),
-});
-
-type SearchFormValues = z.infer<typeof searchFormSchema>;
 
 export function SearchForm({
   sources,
@@ -87,15 +31,16 @@ export function SearchForm({
 }) {
   const profile = useProfile(profileId);
   const start = useStartJobSearch();
-
-  const seed = profile.data ? buildSeed(profile.data.structured_profile) : null;
+  const structured = profile.data?.structured_profile ?? null;
+  const seed = structured !== null ? seedSpec(structured) : null;
 
   const form = useForm<SearchFormValues>({
     resolver: standardSchemaResolver(searchFormSchema),
     defaultValues: {
-      query: "",
+      queries: Object.fromEntries(sources.map((source) => [source.name, emptyQueryFields()])),
       location: "",
       country: "",
+      minSalary: "",
       results_wanted: 50,
       sources: sources.map((source) => source.name),
     },
@@ -105,62 +50,105 @@ export function SearchForm({
   const selectedSources = (sourcesField.field.value as string[]) ?? [];
 
   useEffect(() => {
-    if (seed !== null) {
-      form.setValue("query", seed.query, { shouldValidate: false });
-      form.setValue("location", seed.location, { shouldValidate: false });
-      form.setValue("country", seed.country, { shouldValidate: false });
+    if (structured === null) return;
+    const preferences = structured.preferences;
+    form.setValue("location", preferences?.target_location || structured.contact.location || "", {
+      shouldValidate: false,
+    });
+    form.setValue("country", structured.contact.country || "", { shouldValidate: false });
+    form.setValue(
+      "minSalary",
+      preferences?.salary_min !== undefined && preferences?.salary_min !== null
+        ? String(preferences.salary_min)
+        : "",
+      { shouldValidate: false },
+    );
+    const queries: Record<string, { title: string; skills: string; exclude: string }> = {};
+    for (const source of sources) {
+      const stored = profile.data?.search_queries?.queries[source.name];
+      const seeded = seed ?? { title: "", skills: [] };
+      queries[source.name] = {
+        title: stored?.title ?? seeded.title,
+        skills: (stored?.skills ?? seeded.skills).join(", "),
+        exclude: (stored?.exclude ?? []).join(", "),
+      };
     }
-    // Re-seed whenever the selected profile changes; never validate mid-seed.
+    form.setValue("queries", queries, { shouldValidate: false });
+    // Re-seed on profile switch and after a regenerate refreshes stored queries.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profileId, seed?.query, seed?.location, seed?.country]);
+  }, [profileId, profile.data?.updated_at, profile.data?.search_queries?.generated_at]);
 
   const submit = form.handleSubmit((values) => {
-    const payload: JobSearchRequest = {
-      query: values.query,
-      location: values.location.trim() === "" ? null : values.location.trim(),
-      country: values.country,
-      results_wanted: values.results_wanted,
-      sources: values.sources,
-    };
+    const { payload, missing } = toSearchRequest(
+      values,
+      sources,
+      structured?.preferences?.currency ?? null,
+    );
+    if (missing.length > 0) {
+      form.setError("root", { message: `Add a title or skills for: ${missing.join(", ")}` });
+      return;
+    }
+    form.clearErrors("root");
     start.mutate(payload, { onSuccess: (data) => onStarted(data.search_id) });
   });
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
-      <Field
-        label="Search query"
-        htmlFor="job-query"
-        error={form.formState.errors.query?.message}
-        hint={
-          profile.data
-            ? `Seeded from profile "${profile.data.name}" (target title or headline + top matching skills) — edit freely.`
-            : "Seeding needs a saved profile; enter a query manually or create one under Profile."
-        }
-      >
-        <Input id="job-query" {...form.register("query")} placeholder="data analyst sql" />
-      </Field>
+      <FormProvider {...form}>
+        <SearchQueriesCard
+          sources={sources.map((source) => ({
+            name: source.name,
+            is_official_api: source.is_official_api,
+            supports_exclusions: source.supports_exclusions,
+          }))}
+          profileId={profileId}
+          structuredProfile={structured}
+          storedQueries={profile.data?.search_queries ?? null}
+          updatedAt={profile.data?.updated_at}
+        />
+      </FormProvider>
       <div className="grid gap-4 sm:grid-cols-3">
         <Field
           label="Location (optional)"
           htmlFor="job-location"
           error={form.formState.errors.location?.message}
         >
-          <Input id="job-location" {...form.register("location")} placeholder="Berlin" />
+          <Input id="job-location" {...form.register("location")} placeholder="Bangalore" />
         </Field>
         <Field
           label="Country code"
           htmlFor="job-country"
           error={form.formState.errors.country?.message}
-          hint="Two letters, e.g. de — required by the search API."
+          hint="Two letters, e.g. in — required by the search API."
         >
           <Input
             id="job-country"
             {...form.register("country")}
-            placeholder="de"
+            placeholder="in"
             maxLength={2}
             aria-invalid={form.formState.errors.country ? true : undefined}
           />
         </Field>
+        <Field
+          label="Minimum salary (optional)"
+          htmlFor="job-min-salary"
+          error={form.formState.errors.minSalary?.message}
+          hint={
+            structured?.preferences?.currency
+              ? `Used as a filter where supported (currency hint: ${structured.preferences.currency}).`
+              : "Used as a filter where supported."
+          }
+        >
+          <Input
+            id="job-min-salary"
+            type="number"
+            min={0}
+            {...form.register("minSalary")}
+            placeholder="5000000"
+          />
+        </Field>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-2">
         <Field
           label="Results wanted"
           htmlFor="job-results"
@@ -195,6 +183,11 @@ export function SearchForm({
         >
           {start.isPending ? "Starting run…" : "Start search"}
         </button>
+        {form.formState.errors.root && (
+          <p role="alert" className="mt-2 text-xs text-red-600 dark:text-red-400">
+            {form.formState.errors.root.message}
+          </p>
+        )}
         {start.isError && (
           <p role="alert" className="mt-2 text-xs text-red-600 dark:text-red-400">
             {start.error.message}

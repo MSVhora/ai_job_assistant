@@ -154,6 +154,50 @@ async def test_search_raises_when_not_configured(monkeypatch: pytest.MonkeyPatch
         await source.search(JobSearchQuery(query="python", country="de"))
 
 
+async def test_search_sends_structured_params_for_spec(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["url"] = str(request.url)
+        return httpx.Response(200, json=_fixture())
+
+    monkeypatch.setattr("app.adapters.job_sources.adzuna._RETRY_DELAY_S", 0)
+    source = _mock_source(monkeypatch, httpx.MockTransport(handler))
+
+    query = JobSearchQuery(
+        query="",
+        title_phrase="Senior Android Engineer",
+        skills_any=["Kotlin", "Java"],
+        exclude_any=["intern"],
+        country="in",
+        salary_min=5000000,
+    )
+    postings = await source.search(query)
+
+    params = _request_params(str(seen["url"]))
+    assert params["what_phrase"] == "Senior Android Engineer"
+    assert params["what_or"] == "Kotlin Java"
+    assert params["what_exclude"] == "intern"
+    assert params["salary_min"] == "5000000"
+    assert "what" not in params
+    assert len(postings) == 3
+
+
+async def test_search_requires_terms_when_no_query_or_title(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def handler(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json=_fixture())
+
+    monkeypatch.setattr("app.adapters.job_sources.adzuna._RETRY_DELAY_S", 0)
+    source = _mock_source(monkeypatch, httpx.MockTransport(handler))
+
+    with pytest.raises(ConnectorError, match="needs a query"):
+        await source.search(JobSearchQuery(query="", country="de"))
+
+
 def test_is_configured_reflects_settings(monkeypatch: pytest.MonkeyPatch) -> None:
     _configure(monkeypatch)
     assert AdzunaJobSource().is_configured() is True

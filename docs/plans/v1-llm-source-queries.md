@@ -1,6 +1,6 @@
 # LLM per-source search queries + structured search filters (follow-up to issue #8)
 
-**Status:** Draft v3 — for owner review (2026-09-01)
+**Status:** Done (2026-09-01)
 **GitHub issue:** to be filed by the owner
 **Plan of record:** [v1-implementation-plan.md](v1-implementation-plan.md) §6 (API surface), §10 (LLM via wrapper, rate limits)
 **Depends on:** Issue #8 (done) — sources, enablement, `/jobs` form. Builds on #3 (extraction), #5 (preferences), #6 (profiles).

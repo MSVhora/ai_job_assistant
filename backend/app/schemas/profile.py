@@ -4,6 +4,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from app.schemas.job_search import StoredSearchQueries
+
 RevisionSourceLiteral = Literal["ai_extraction", "manual_edit", "gap_fill", "reupload_merge"]
 
 RemotePreference = Literal["remote", "hybrid", "onsite", "flexible"]
@@ -164,6 +166,7 @@ class ProfileResponse(BaseModel):
     profile_id: uuid.UUID
     name: str
     structured_profile: StructuredProfile
+    search_queries: StoredSearchQueries | None = None
     source_resume_id: uuid.UUID | None
     source_resume_filename: str | None
     updated_at: datetime

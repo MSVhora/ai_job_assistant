@@ -81,6 +81,7 @@ sequenceDiagram
         A-->>B: reply, applied fields, still-missing, updated profile
     end
     Note over A: nothing missing → canned reply, no LLM call
+    Note over A,G: a second small LLM call drafts per-source<br/>search-query specs into resume.search_queries<br/>(never fails the extraction)
 ```
 
 ![profile-pipeline-sequence diagram](./assets/profile-pipeline-sequence.svg)
@@ -138,6 +139,18 @@ a `mappers/<source>.py` file, with no changes to matching logic. Enablement is D
 `POST /api/setup/check` reports which provider keys the backend detected plus an
 embedding-capability warning, driving the `/setup` page.
 
+## Per-source search queries
+
+Search queries are **profile data**: a second LLM call at extraction drafts per-source
+specs (`{title, skills, exclude}` per enabled source) into `resume.search_queries`; saving a
+profile copies them; `POST /api/profiles/{id}/search-queries` regenerates from the current
+content (temperature 0.8 + anti-repeat instruction, so Regenerate observably changes the
+result). Searches are **filter-first**: the renderer maps each spec to the source's native
+capabilities — Adzuna gets `what_phrase` + `what_or` + `what_exclude` + `salary_min`,
+LinkedIn gets a natural-language keywords line (+ salary mention; it has no exclusion or
+salary filter). `job_search.query` stores exactly what was sent, and the run status echoes
+it.
+
 ## Database schema (v1, ER diagram)
 
 Source of truth: `backend/app/models/` + Alembic migrations. See
@@ -164,6 +177,7 @@ erDiagram
         uuid candidate_id FK
         text name "track name, e.g. Senior Android Developer"
         jsonb structured_profile "contact, headline, skills, experience, projects, education, certifications, extra sections, embedded preferences"
+        jsonb search_queries "per-source query specs + generation stamp; Regenerate overwrites"
         uuid source_resume_id FK "resume whose draft seeded this profile (provenance)"
         timestamptz created_at
         timestamptz updated_at
@@ -181,6 +195,7 @@ erDiagram
         timestamptz parsed_at
         text parse_version "text_v1 at upload; model+prompt version after extraction (issue #3)"
         jsonb draft_profile "AI-extracted draft — parse artifact, not a saved profile (issue #3)"
+        jsonb search_queries "LLM-drafted per-source query specs (queries follow-up)"
         timestamptz created_at
     }
 

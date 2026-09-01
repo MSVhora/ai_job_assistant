@@ -77,12 +77,14 @@ candidate
 ├── id (uuid, pk)
 ├── structured_profile (jsonb)        -- contact, headline, skills[], experience[], education[], prefs
 ├── preferences (jsonb)               -- weights (role vs company), filters, target title/location
+├── search_queries (jsonb)            -- per-source query specs {title, skills, exclude} + generation stamp; regenerated via POST /api/profiles/{id}/search-queries
 ├── completeness (jsonb)              -- which fields present/missing (drives gap-fill)
 ├── created_at, updated_at
 
 resume
 ├── id (uuid, pk), candidate_id (fk)
 ├── file_path, parsed_at, parse_version   -- LLM model + prompt version, for reproducibility
+├── search_queries (jsonb)            -- LLM-drafted per-source query specs (landed with the queries follow-up; copied into profiles on creation)
 
 profile_revision                     -- audit: AI extraction vs human fixes (showcase-able)
 ├── id (uuid, pk), candidate_id (fk)
@@ -165,9 +167,10 @@ connectors at code level — only `apify_actor` entries are config-driven. Recor
 | GET/POST | `/api/profiles` | List profile tracks / create one from a reviewed draft (multi-profile, issue #6) |
 | GET/PATCH/DELETE | `/api/profiles/{id}` | Read/update a profile; content PATCHes write `profile_revision`; rename and delete are revision-free / cascading |
 | POST | `/api/profiles/{id}/gap-fill` | Conversational missing-field flow (location, salary band, seniority, work auth, remote pref) — issue #5 |
+| POST | `/api/profiles/{id}/search-queries` | Regenerate the profile's per-source query specs via LLM (drafted automatically at extraction; persisted on the profile) |
 | GET | `/api/sources` | Available sources + `is_official_api` + disclosure text |
 | POST | `/api/sources/{name}/enable` | Enable; body must include `acknowledged_disclosure: true` for scraping sources |
-| POST | `/api/jobs/search` | `{query, filters, sources[], seed: "profile"\|"manual"}` → ingestion run (background) |
+| POST | `/api/jobs/search` | `{query?, source_queries{source: {title, skills, exclude}}, location, country, salary_min?, sources[], results_wanted}` → ingestion run (background); each source gets its own dialect-correct query (LLM-generated specs, editable in the UI) |
 | GET | `/api/jobs/searches/{id}` | Ingestion run status + per-source results/warnings + echoed query (issue #7) |
 | GET | `/api/matches` | Ranked matches + rationale; filter/sort params |
 

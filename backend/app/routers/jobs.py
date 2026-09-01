@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.deps import get_db
 from app.schemas.job_search import (
+    JobPostingSummary,
     JobSearchRequest,
     JobSearchStartResponse,
     JobSearchStatusResponse,
@@ -33,6 +34,14 @@ async def get_job_search_status(
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> JobSearchStatusResponse:
     return await ingestion.get_search_status(session, search_id)
+
+
+@router.get("/jobs/searches/{search_id}/postings", response_model=list[JobPostingSummary])
+async def get_job_search_postings(
+    search_id: uuid.UUID,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> list[JobPostingSummary]:
+    return await ingestion.get_search_postings(session, search_id)
 
 
 @router.get("/sources", response_model=list[SourceInfoResponse])

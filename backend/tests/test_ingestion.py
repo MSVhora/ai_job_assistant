@@ -212,3 +212,86 @@ async def test_selected_sources_filters_by_requested_names(
     only_sources(monkeypatch, FakeJobSource("adzuna"), FakeJobSource("other"))
 
     assert await selected(payload(sources=["other"])) == ["other"]
+
+
+async def test_run_search_sends_per_source_specs(monkeypatch: pytest.MonkeyPatch) -> None:
+    adzuna = FakeJobSource("adzuna", postings=[fake_posting("1")])
+    scraper = FakeJobSource("apify_linkedin", postings=[fake_posting("2")])
+    only_sources(monkeypatch, adzuna, scraper)
+
+    run = await create_run(
+        payload(
+            sources=["adzuna", "apify_linkedin"],
+            source_queries={
+                "adzuna": {
+                    "title": "Senior Android Engineer",
+                    "skills": ["Kotlin"],
+                    "exclude": ["intern"],
+                },
+                "apify_linkedin": {
+                    "title": "Senior Android Engineer",
+                    "skills": ["Kotlin", "Java"],
+                },
+            },
+            salary_min=5000000,
+            location="Bangalore",
+        )
+    )
+    await run_search(
+        run,
+        payload(
+            sources=["adzuna", "apify_linkedin"],
+            source_queries={
+                "adzuna": {
+                    "title": "Senior Android Engineer",
+                    "skills": ["Kotlin"],
+                    "exclude": ["intern"],
+                },
+                "apify_linkedin": {
+                    "title": "Senior Android Engineer",
+                    "skills": ["Kotlin", "Java"],
+                },
+            },
+            salary_min=5000000,
+            location="Bangalore",
+        ),
+    )
+
+    adzuna_query = adzuna.queries[0]
+    assert adzuna_query.title_phrase == "Senior Android Engineer"
+    assert adzuna_query.skills_any == ["Kotlin"]
+    assert adzuna_query.exclude_any == ["intern"]
+    assert adzuna_query.salary_min == 5000000
+    linkedin_query = scraper.queries[0]
+    assert linkedin_query.title_phrase == "Senior Android Engineer"
+    assert linkedin_query.exclude_any == []
+
+    run_row = await get_run(run)
+    assert run_row.status.value == "succeeded"
+
+
+async def test_run_search_fails_when_no_effective_query(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    only_sources(monkeypatch, FakeJobSource("adzuna"))
+    run = await create_run(payload(query=None))
+    await run_search(run, payload(query=None))
+
+    run_row = await get_run(run)
+    assert run_row.status.value == "failed"
+    results = run_row.results
+    assert results is not None
+    assert "no search query" in results[0]["warning"]
+
+
+async def test_validate_queries_rejects_unknown_override_source(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.services.ingestion import _validate_queries
+
+    only_sources(monkeypatch, FakeJobSource("adzuna"))
+    request = payload(query="python", source_queries={"mystery": {"title": "T"}})
+    async with session_factory() as session:
+        selected = await _selected_sources(session, request)
+        with pytest.raises(UnknownJobSourceError):
+            _validate_queries(request, selected)

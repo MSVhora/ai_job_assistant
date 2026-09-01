@@ -57,10 +57,32 @@ def _default_client() -> httpx.AsyncClient:
     return httpx.AsyncClient(timeout=_TIMEOUT_S)
 
 
+def _apply_search_terms(params: dict[str, str], query: JobSearchQuery) -> None:
+    if query.title_phrase:
+        params["what_phrase"] = query.title_phrase
+        if query.skills_any:
+            params["what_or"] = " ".join(query.skills_any)
+        if query.exclude_any:
+            params["what_exclude"] = " ".join(query.exclude_any)
+        return
+    if query.query:
+        params["what"] = query.query
+        return
+    raise ConnectorError("adzuna search needs a query or a title phrase")
+
+
+def _apply_salary_filter(params: dict[str, str], query: JobSearchQuery) -> None:
+    if query.salary_min is not None:
+        params["salary_min"] = str(int(query.salary_min))
+    if query.salary_max is not None:
+        params["salary_max"] = str(int(query.salary_max))
+
+
 class AdzunaJobSource:
     name = "adzuna"
     is_official_api = True
     disclosure_required = False
+    supports_exclusions = True
 
     def __init__(self, client_factory: ClientFactory | None = None) -> None:
         self._client_factory: ClientFactory = client_factory or _default_client
@@ -77,10 +99,11 @@ class AdzunaJobSource:
         params: dict[str, str] = {
             "app_id": settings.adzuna_app_id or "",
             "app_key": settings.adzuna_app_key or "",
-            "what": query.query,
             "results_per_page": str(min(query.results_wanted, _MAX_RESULTS_PER_PAGE)),
             "content-type": "application/json",
         }
+        _apply_search_terms(params, query)
+        _apply_salary_filter(params, query)
         if query.location:
             params["where"] = query.location
         url = f"{_BASE_URL}/v1/api/jobs/{query.country}/search/1"

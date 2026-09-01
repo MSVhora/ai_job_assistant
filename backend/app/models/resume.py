@@ -28,6 +28,7 @@ class Resume(Base):
     parsed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     parse_version: Mapped[str | None]
     draft_profile: Mapped[dict[str, object] | None] = mapped_column(JSONB, nullable=True)
+    search_queries: Mapped[dict[str, object] | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     candidate: Mapped["Candidate"] = relationship(

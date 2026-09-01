@@ -51,9 +51,17 @@ async def upload_resume(client: AsyncClient) -> dict:
     return response.json()
 
 
+def disable_sources(monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = get_settings()
+    monkeypatch.setattr(settings, "adzuna_app_id", None)
+    monkeypatch.setattr(settings, "adzuna_app_key", None)
+    monkeypatch.setattr(settings, "apify_token", None)
+
+
 async def test_extract_returns_draft_and_persists_parse_artifact(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    disable_sources(monkeypatch)
     uploaded = await upload_resume(client)
     calls = install_acompletion(monkeypatch, lambda **kw: llm_response(json.dumps(VALID_PROFILE)))
 
@@ -94,6 +102,7 @@ async def test_extract_returns_draft_and_persists_parse_artifact(
 async def test_reextract_overwrites_draft(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    disable_sources(monkeypatch)
     uploaded = await upload_resume(client)
     install_acompletion(monkeypatch, lambda **kw: llm_response(json.dumps(VALID_PROFILE)))
     first = await client.post(f"/api/resumes/{uploaded['resume_id']}/extract")
@@ -190,3 +199,73 @@ async def test_transport_failure_detail_carries_cause_hint(
 
     assert response.status_code == 502
     assert "rate limited by the provider" in response.json()["detail"]
+
+
+def routed_handler(queries_payload: object):
+    def handler(**kw: object) -> object:
+        if kw.get("temperature") == 0.8:
+            return llm_response(json.dumps(queries_payload))
+        return llm_response(json.dumps(VALID_PROFILE))
+
+    return handler
+
+
+QUERIES_PAYLOAD = {
+    "queries": {
+        "adzuna": {"title": "Senior Data Analyst", "skills": ["SQL", "Python"], "exclude": []}
+    }
+}
+
+
+async def test_extract_generates_search_queries(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(get_settings(), "adzuna_app_id", "id")
+    monkeypatch.setattr(get_settings(), "adzuna_app_key", "key")
+    calls = install_acompletion(monkeypatch, routed_handler(QUERIES_PAYLOAD))
+    uploaded = await upload_resume(client)
+
+    response = await client.post(f"/api/resumes/{uploaded['resume_id']}/extract")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["search_queries"]["queries"]["adzuna"]["title"] == "Senior Data Analyst"
+    assert body["search_queries"]["prompt_version"] == "search_query_v1"
+    temperatures = [call["temperature"] for call in calls]
+    assert 0.2 in temperatures and 0.8 in temperatures
+    query_prompt = next(call for call in calls if call["temperature"] == 0.8)
+    assert "resume text" not in query_prompt["messages"][1]["content"].lower()
+    async with session_factory() as session:
+        resume = await session.get(Resume, uuid.UUID(uploaded["resume_id"]))
+    assert resume is not None
+    assert resume.search_queries is not None
+    assert resume.search_queries["queries"]["adzuna"]["title"] == "Senior Data Analyst"
+
+
+async def test_extract_survives_query_generation_failure(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(get_settings(), "adzuna_app_id", "id")
+    monkeypatch.setattr(get_settings(), "adzuna_app_key", "key")
+
+    async def no_delay(_: float) -> None:
+        return None
+
+    def handler(**kw: object) -> object:
+        if kw.get("temperature") == 0.8:
+            return ProviderError(429)
+        return llm_response(json.dumps(VALID_PROFILE))
+
+    monkeypatch.setattr("app.adapters.llm.asyncio.sleep", no_delay)
+    install_acompletion(monkeypatch, handler)
+    uploaded = await upload_resume(client)
+
+    response = await client.post(f"/api/resumes/{uploaded['resume_id']}/extract")
+
+    assert response.status_code == 200
+    assert response.json()["search_queries"] is None
+    async with session_factory() as session:
+        resume = await session.get(Resume, uuid.UUID(uploaded["resume_id"]))
+    assert resume is not None
+    assert resume.draft_profile is not None
+    assert resume.search_queries is None

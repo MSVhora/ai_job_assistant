@@ -11,12 +11,15 @@ from app.core.config import get_settings
 from app.core.errors import (
     LLMExtractionError,
     LLMNotConfiguredError,
+    LLMQueryGenerationError,
     ResumeNotFoundError,
     ResumeTextUnavailableError,
 )
 from app.models import Resume
+from app.schemas.job_search import StoredSearchQueries
 from app.schemas.profile import StructuredProfile
 from app.schemas.resume import DraftProfileResponse
+from app.services import query_builder
 
 logger = logging.getLogger(__name__)
 
@@ -102,14 +105,18 @@ async def extract_resume_profile(
     resume.draft_profile = profile.model_dump(mode="json")
     resume.parse_version = f"{settings.llm_model}+{PROFILE_PROMPT_VERSION}"
     resume.parsed_at = parsed_at
+
+    stored_queries = await _generate_draft_queries(session, resume, profile)
     await session.flush()
 
     logger.info(
-        "profile.extract resume_id=%s duration_ms=%.0f prompt_tokens=%d completion_tokens=%d",
+        "profile.extract resume_id=%s duration_ms=%.0f prompt_tokens=%d completion_tokens=%d "
+        "queries_generated=%s",
         resume_id,
         (time.monotonic() - started) * 1000,
         result.prompt_tokens,
         result.completion_tokens,
+        stored_queries is not None,
     )
     return DraftProfileResponse(
         resume_id=resume.id,
@@ -117,4 +124,23 @@ async def extract_resume_profile(
         draft_profile=profile,
         parse_version=resume.parse_version,
         parsed_at=parsed_at,
+        search_queries=stored_queries,
     )
+
+
+async def _generate_draft_queries(
+    session: AsyncSession, resume: Resume, profile: StructuredProfile
+) -> StoredSearchQueries | None:
+    """Generate per-source search queries from the draft; never fails extraction."""
+    from app.services import sources as sources_service
+
+    try:
+        enabled = await sources_service.enabled_sources(session)
+        if not enabled:
+            return None
+        stored = await query_builder.generate_queries(profile, [source.name for source in enabled])
+    except (LLMError, LLMQueryGenerationError) as exc:
+        logger.warning("draft query generation failed for resume %s: %s", resume.id, exc)
+        return None
+    resume.search_queries = query_builder.serialize(stored)
+    return stored

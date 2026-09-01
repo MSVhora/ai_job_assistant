@@ -3,6 +3,7 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
+from app.schemas.job_search import StoredSearchQueries
 from app.schemas.profile import StructuredProfile
 
 
@@ -24,6 +25,7 @@ class DraftProfileResponse(BaseModel):
     draft_profile: StructuredProfile
     parse_version: str
     parsed_at: datetime
+    search_queries: StoredSearchQueries | None = None
 
 
 class ResumeSummaryResponse(BaseModel):

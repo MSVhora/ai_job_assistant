@@ -6,13 +6,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.deps import get_db
 from app.schemas.gap_fill import GapFillRequest, GapFillResponse
+from app.schemas.job_search import SearchQueriesResponse, SearchQueryGenerateRequest
 from app.schemas.profile import (
     ProfileCreate,
     ProfileResponse,
     ProfileSummary,
     ProfileUpdate,
 )
-from app.services import gap_fill, profile_service
+from app.services import gap_fill, profile_service, query_builder
 
 router = APIRouter(prefix="/api", tags=["profile"])
 
@@ -56,6 +57,17 @@ async def gap_fill_profile(
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> GapFillResponse:
     return await gap_fill.run_gap_fill_turn(session, profile_id, payload)
+
+
+@router.post("/profiles/{profile_id}/search-queries", response_model=SearchQueriesResponse)
+async def regenerate_search_queries(
+    profile_id: uuid.UUID,
+    session: Annotated[AsyncSession, Depends(get_db)],
+    payload: SearchQueryGenerateRequest | None = None,
+) -> SearchQueriesResponse:
+    return await query_builder.regenerate_for_profile(
+        session, profile_id, payload.sources if payload else None
+    )
 
 
 @router.delete("/profiles/{profile_id}", status_code=204)

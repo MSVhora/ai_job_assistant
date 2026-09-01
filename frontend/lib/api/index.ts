@@ -17,6 +17,10 @@ export type SourceInfo = components["schemas"]["SourceInfoResponse"];
 export type JobSearchRequest = components["schemas"]["JobSearchRequest"];
 export type JobSearchStart = components["schemas"]["JobSearchStartResponse"];
 export type JobSearchStatus = components["schemas"]["JobSearchStatusResponse"];
+export type SourceQuerySpec = components["schemas"]["SourceQuerySpec"];
+export type StoredSearchQueries = components["schemas"]["StoredSearchQueries"];
+export type SearchQueriesResponse = components["schemas"]["SearchQueriesResponse"];
+export type JobPostingSummary = components["schemas"]["JobPostingSummary"];
 
 export { ApiError, ExtractionFailedError, apiFetch } from "./client";
 
@@ -123,4 +127,20 @@ export async function startJobSearch(payload: JobSearchRequest): Promise<JobSear
 
 export async function getJobSearchStatus(searchId: string): Promise<JobSearchStatus> {
   return apiFetch<JobSearchStatus>(`/api/jobs/searches/${encodeURIComponent(searchId)}`);
+}
+
+export async function getSearchPostings(searchId: string): Promise<JobPostingSummary[]> {
+  return apiFetch<JobPostingSummary[]>(
+    `/api/jobs/searches/${encodeURIComponent(searchId)}/postings`,
+  );
+}
+
+export async function regenerateSearchQueries(
+  profileId: string,
+  sources?: string[],
+): Promise<SearchQueriesResponse> {
+  return apiFetch<SearchQueriesResponse>(
+    `/api/profiles/${encodeURIComponent(profileId)}/search-queries`,
+    { method: "POST", body: JSON.stringify(sources ? { sources } : {}) },
+  );
 }

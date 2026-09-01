@@ -17,6 +17,7 @@ class Profile(Base):
     )
     name: Mapped[str]
     structured_profile: Mapped[dict[str, object]] = mapped_column(JSONB)
+    search_queries: Mapped[dict[str, object] | None] = mapped_column(JSONB, nullable=True)
     source_resume_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("resume.id", ondelete="SET NULL"), nullable=True, index=True
     )

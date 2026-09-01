@@ -62,6 +62,16 @@ class LLMGapFillError(DomainError):
     default_detail = "gap-fill turn failed"
 
 
+class LLMQueryGenerationError(DomainError):
+    status_code = 502
+    default_detail = "search query generation failed"
+
+
+class MissingSearchQueryError(DomainError):
+    status_code = 400
+    default_detail = "no search query provided for a selected source"
+
+
 class NoJobSourcesConfiguredError(DomainError):
     status_code = 400
     default_detail = "no job sources are configured for the selected search"

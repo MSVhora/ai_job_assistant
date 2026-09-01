@@ -198,6 +198,57 @@ async def test_search_times_out_when_run_never_finishes(
         await source.search(JobSearchQuery(query="x", country="us"))
 
 
+async def test_search_builds_nl_keywords_from_spec(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        if request.method == "POST" and path == "/v2/acts/hKByXkMQaC5Qt9UMN/runs":
+            seen["input"] = json.loads(request.content)
+            return httpx.Response(200, json={"data": {"id": "run-1", "status": "READY"}})
+        if request.method == "GET" and path == "/v2/actor-runs/run-1":
+            return httpx.Response(
+                200,
+                json={"data": {"id": "run-1", "status": "SUCCEEDED", "defaultDatasetId": "ds-1"}},
+            )
+        if request.method == "GET" and path == "/v2/datasets/ds-1/items":
+            return httpx.Response(200, json=[])
+        return httpx.Response(404)
+
+    source = _mock_source(monkeypatch, httpx.MockTransport(handler))
+
+    query = JobSearchQuery(
+        query="",
+        title_phrase="Senior Android Engineer",
+        skills_any=["Kotlin", "Java"],
+        exclude_any=["intern"],
+        location="Bangalore",
+        country="in",
+        salary_min=5000000,
+        salary_currency="INR",
+    )
+    postings = await source.search(query)
+
+    assert seen["input"]["keywords"] == (
+        "Senior Android Engineer with Kotlin and Java, offering INR 5000000 or more"
+    )
+    assert seen["input"]["location"] == "Bangalore"
+    assert "exclude" not in json.dumps(seen["input"])
+    assert postings == []
+
+
+async def test_search_requires_terms_when_no_query_or_title(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def handler(_: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"data": {"id": "run-1"}})
+
+    source = _mock_source(monkeypatch, httpx.MockTransport(handler))
+
+    with pytest.raises(ConnectorError, match="needs a query"):
+        await source.search(JobSearchQuery(query="", country="us"))
+
+
 async def test_search_retries_once_on_rate_limit(monkeypatch: pytest.MonkeyPatch) -> None:
     calls = {"count": 0}
 

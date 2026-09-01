@@ -4,16 +4,19 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { SearchForm } from "@/components/features/jobs/SearchForm";
+import { SearchResults } from "@/components/features/jobs/SearchResults";
 import { RunBanner } from "@/components/features/jobs/RunBanner";
 import { Card } from "@/components/ui/card";
-import { useSources } from "@/hooks/use-setup";
 import { useProfiles } from "@/hooks/use-profiles";
+import { useJobSearchStatus } from "@/hooks/use-job-search";
+import { useSources } from "@/hooks/use-setup";
 
 export function JobsPageClient() {
   const [searchId, setSearchId] = useState<string | null>(null);
   const [profileId, setProfileId] = useState<string | null>(null);
   const sources = useSources();
   const profiles = useProfiles();
+  const runStatus = useJobSearchStatus(searchId);
 
   if (sources.isPending) {
     return (
@@ -81,6 +84,7 @@ export function JobsPageClient() {
           setSearchId(null);
         }}
       />
+      <SearchResults searchId={searchId} status={runStatus.data?.status} />
     </div>
   );
 }
@@ -104,7 +108,7 @@ function ProfileSelector({
       <p className="text-sm text-gray-600 dark:text-gray-400">
         {disabled
           ? "Loading profiles…"
-          : "No profile yet — searches run without one, but a profile seeds the query. "}
+          : "No profile yet — searches run without one, but a profile seeds the queries. "}
         {!disabled &&
           profiles.length === 0 && (
             <Link
@@ -138,7 +142,7 @@ function ProfileSelector({
         ))}
       </select>
       <p className="text-xs text-gray-500 dark:text-gray-400">
-        The selected track seeds the query, location, and country below.
+        The selected track seeds the queries, location, and country below.
       </p>
     </div>
   );

@@ -43,15 +43,26 @@ def parse_datetime(value: object) -> datetime | None:
 
 
 class JobSearchQuery(BaseModel):
-    query: str
+    query: str = ""
+    title_phrase: str | None = None
+    skills_any: list[str] = Field(default_factory=list)
+    exclude_any: list[str] = Field(default_factory=list)
     location: str | None = None
     country: str
     results_wanted: int = Field(default=50, ge=1, le=50)
+    salary_min: float | None = Field(default=None, ge=0)
+    salary_max: float | None = Field(default=None, ge=0)
+    salary_currency: str | None = Field(default=None, pattern=r"^[A-Za-z]{3}$")
 
     @field_validator("country", mode="after")
     @classmethod
     def _lowercase_country(cls, value: str) -> str:
         return value.strip().lower()
+
+    @field_validator("title_phrase", mode="after")
+    @classmethod
+    def _strip_title(cls, value: str | None) -> str | None:
+        return value.strip() if value else value
 
 
 class RawJobPosting(BaseModel):
@@ -79,6 +90,7 @@ class JobSource(Protocol):
     name: str
     is_official_api: bool
     disclosure_required: bool
+    supports_exclusions: bool
 
     def is_configured(self) -> bool: ...
 

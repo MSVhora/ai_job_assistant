@@ -35,6 +35,38 @@ def _default_client() -> httpx.AsyncClient:
     return httpx.AsyncClient(timeout=_TIMEOUT_S)
 
 
+def _format_amount(value: float) -> str:
+    if float(value).is_integer():
+        return str(int(value))
+    return f"{value:f}".rstrip("0").rstrip(".")
+
+
+def _natural_keywords(query: JobSearchQuery) -> str | None:
+    """LinkedIn-style natural-language keywords from a structured spec.
+
+    Exclusions are dropped: the actor input has no exclusion field and LinkedIn's
+    AI search has no exclusion filter (capability table in the queries plan).
+    """
+    if not query.title_phrase:
+        return None
+    keywords = query.title_phrase
+    if query.skills_any:
+        keywords += f" with {' and '.join(query.skills_any)}"
+    if query.salary_min is not None:
+        currency = f" {query.salary_currency}" if query.salary_currency else ""
+        keywords += f", offering{currency} {_format_amount(query.salary_min)} or more"
+    return keywords
+
+
+def _with_effective_query(query: JobSearchQuery) -> JobSearchQuery:
+    keywords = _natural_keywords(query)
+    if keywords is None:
+        if not query.query:
+            raise ConnectorError("search needs a query or a title phrase")
+        return query
+    return query.model_copy(update={"query": keywords})
+
+
 def _load_mapper(source_name: str) -> MapperFn:
     module_name = f"app.adapters.job_sources.mappers.{source_name.removeprefix('apify_')}"
     try:
@@ -52,6 +84,7 @@ def _load_mapper(source_name: str) -> MapperFn:
 class ApifyActorSource:
     is_official_api = False
     disclosure_required = True
+    supports_exclusions = False
 
     def __init__(self, config: ActorConfig, client_factory: ClientFactory | None = None) -> None:
         self._config = config
@@ -68,13 +101,14 @@ class ApifyActorSource:
             raise ConnectorError(f"{self.name} token is not configured")
 
         started = time.perf_counter()
+        effective = _with_effective_query(query)
         async with self._client_factory() as client:
             run = await self._request_json(
                 client,
                 "POST",
                 f"/v2/acts/{self._config.actor_id}/runs",
                 token,
-                json_body=build_actor_input(self._config, query),
+                json_body=build_actor_input(self._config, effective),
             )
             run_id = run.get("id")
             if not isinstance(run_id, str) or not run_id:

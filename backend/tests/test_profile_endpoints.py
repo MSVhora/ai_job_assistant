@@ -9,7 +9,7 @@ from sqlalchemy import select
 
 from app.core.db import session_factory
 from app.main import app
-from app.models import Candidate, ProfileRevision, Resume, RevisionSource
+from app.models import Candidate, Profile, ProfileRevision, Resume, RevisionSource
 
 pytestmark = pytest.mark.usefixtures("clean_tables")
 
@@ -331,3 +331,157 @@ async def test_malformed_path_param_returns_readable_422(client: AsyncClient) ->
     detail = response.json()["detail"]
     assert isinstance(detail, str)
     assert "profile_id" in detail
+
+
+async def test_create_profile_copies_draft_search_queries(client: AsyncClient) -> None:
+
+    from fakes import VALID_PROFILE
+
+    inserted = await insert_resume_with_draft(VALID_PROFILE)
+    stored = {
+        "queries": {"adzuna": {"title": "Senior Data Analyst", "skills": ["SQL"]}},
+        "generated_at": "2026-09-01T10:00:00Z",
+        "generated_by": "gemini/gemini-2.5-flash",
+        "prompt_version": "search_query_v1",
+    }
+    async with session_factory() as session:
+        resume = await session.get(Resume, uuid.UUID(inserted["resume_id"]))
+        assert resume is not None
+        resume.search_queries = stored
+        await session.commit()
+
+    response = await create_profile(
+        client, "Data", VALID_PROFILE, source_resume_id=inserted["resume_id"]
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["search_queries"]["queries"]["adzuna"]["title"] == "Senior Data Analyst"
+    async with session_factory() as session:
+        profile = await session.get(Profile, uuid.UUID(body["profile_id"]))
+    assert profile is not None
+    assert profile.search_queries == stored
+
+
+async def test_profile_response_includes_search_queries(client: AsyncClient) -> None:
+    from fakes import VALID_PROFILE
+
+    inserted = await insert_resume_with_draft(VALID_PROFILE)
+    created = (
+        await create_profile(client, "Data", VALID_PROFILE, source_resume_id=inserted["resume_id"])
+    ).json()
+
+    fetched = await client.get(f"/api/profiles/{created['profile_id']}")
+    assert fetched.status_code == 200
+    assert fetched.json()["search_queries"] is None
+
+
+async def test_regenerate_search_queries_persists(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import json
+
+    from fakes import VALID_PROFILE, install_acompletion, llm_response
+
+    from app.core.config import get_settings
+
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    monkeypatch.setattr(get_settings(), "adzuna_app_id", "id")
+    monkeypatch.setattr(get_settings(), "adzuna_app_key", "key")
+    get_settings.cache_clear()
+
+    inserted = await insert_resume_with_draft(VALID_PROFILE)
+    created = (
+        await create_profile(client, "Data", VALID_PROFILE, source_resume_id=inserted["resume_id"])
+    ).json()
+    queries_payload = {"queries": {"adzuna": {"title": "Senior Data Analyst", "skills": ["SQL"]}}}
+    calls = install_acompletion(monkeypatch, lambda **kw: llm_response(json.dumps(queries_payload)))
+
+    response = await client.post(f"/api/profiles/{created['profile_id']}/search-queries")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["queries"]["adzuna"]["title"] == "Senior Data Analyst"
+    assert body["generated_by"] == "gemini/gemini-2.5-flash"
+    assert "Sources needing a query spec: adzuna" in calls[0]["messages"][1]["content"]
+    fetched = (await client.get(f"/api/profiles/{created['profile_id']}")).json()
+    assert fetched["search_queries"]["queries"]["adzuna"]["title"] == "Senior Data Analyst"
+
+
+async def test_regenerate_search_queries_unknown_profile_returns_404(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.core.config import get_settings
+
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    get_settings.cache_clear()
+
+    response = await client.post(f"/api/profiles/{uuid.uuid4()}/search-queries")
+
+    assert response.status_code == 404
+
+
+async def test_regenerate_search_queries_rejects_unknown_source(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from fakes import VALID_PROFILE
+
+    from app.core.config import get_settings
+
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    monkeypatch.setattr(get_settings(), "adzuna_app_id", "id")
+    monkeypatch.setattr(get_settings(), "adzuna_app_key", "key")
+    get_settings.cache_clear()
+
+    inserted = await insert_resume_with_draft(VALID_PROFILE)
+    created = (
+        await create_profile(client, "Data", VALID_PROFILE, source_resume_id=inserted["resume_id"])
+    ).json()
+
+    response = await client.post(
+        f"/api/profiles/{created['profile_id']}/search-queries",
+        json={"sources": ["apify_linkedin"]},
+    )
+
+    assert response.status_code == 400
+
+
+async def test_regenerate_failure_keeps_persisted_queries(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from fakes import VALID_PROFILE, ProviderError, install_acompletion
+
+    from app.core.config import get_settings
+
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    monkeypatch.setattr(get_settings(), "adzuna_app_id", "id")
+    monkeypatch.setattr(get_settings(), "adzuna_app_key", "key")
+
+    async def no_delay(_: float) -> None:
+        return None
+
+    monkeypatch.setattr("app.adapters.llm.asyncio.sleep", no_delay)
+    get_settings.cache_clear()
+
+    inserted = await insert_resume_with_draft(VALID_PROFILE)
+    created = (
+        await create_profile(client, "Data", VALID_PROFILE, source_resume_id=inserted["resume_id"])
+    ).json()
+    stored = {
+        "queries": {"adzuna": {"title": "Keep Me", "skills": ["SQL"]}},
+        "generated_at": "2026-09-01T10:00:00Z",
+        "generated_by": "gemini/gemini-2.5-flash",
+        "prompt_version": "search_query_v1",
+    }
+    async with session_factory() as session:
+        profile = await session.get(Profile, uuid.UUID(created["profile_id"]))
+        assert profile is not None
+        profile.search_queries = stored
+        await session.commit()
+
+    install_acompletion(monkeypatch, lambda **kw: ProviderError(429))
+    response = await client.post(f"/api/profiles/{created['profile_id']}/search-queries")
+
+    assert response.status_code == 502
+    fetched = (await client.get(f"/api/profiles/{created['profile_id']}")).json()
+    assert fetched["search_queries"]["queries"]["adzuna"]["title"] == "Keep Me"

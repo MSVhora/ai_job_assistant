@@ -82,6 +82,11 @@ export function GapFillChat({
             salary band, seniority, and work authorization. Only missing fields are asked about;
             answers are validated before anything is saved.
           </p>
+          {turn.isError && (
+            <p role="alert" className="text-sm text-red-700 dark:text-red-400">
+              {turn.error.message} Press “Start conversation” to try again.
+            </p>
+          )}
           <div>
             <Button variant="secondary" onClick={start} disabled={turn.isPending}>
               Start conversation

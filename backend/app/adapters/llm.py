@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import time
@@ -6,13 +7,36 @@ from dataclasses import dataclass
 import litellm
 from pydantic import BaseModel, ValidationError
 
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
 
 logger = logging.getLogger(__name__)
+
+_RETRYABLE_STATUS_CODES = frozenset({429, 500, 502, 503, 504})
+_TRANSPORT_RETRY_DELAY_S = 1.0
 
 
 class LLMError(Exception):
     pass
+
+
+def _is_transport_retryable(exc: Exception) -> bool:
+    status = getattr(exc, "status_code", None)
+    if isinstance(status, int) and status in _RETRYABLE_STATUS_CODES:
+        return True
+    return isinstance(exc, (litellm.exceptions.Timeout, litellm.exceptions.APIConnectionError))
+
+
+def _failure_reason(exc: Exception) -> str:
+    status = getattr(exc, "status_code", None)
+    if isinstance(exc, litellm.exceptions.RateLimitError) or status == 429:
+        return "rate limited by the provider - retry shortly"
+    if isinstance(exc, litellm.exceptions.Timeout):
+        return "request timed out"
+    if isinstance(exc, litellm.exceptions.APIConnectionError):
+        return "could not reach the provider"
+    if isinstance(status, int) and status >= 500:
+        return "provider service error - retry shortly"
+    return "provider rejected the request"
 
 
 @dataclass(frozen=True)
@@ -39,6 +63,41 @@ def is_llm_configured() -> bool:
     return get_settings().gemini_api_key is not None
 
 
+async def _completion_with_retry(
+    settings: Settings,
+    messages: list[dict[str, str]],
+    temperature: float,
+    max_tokens: int | None,
+):
+    kwargs: dict[str, object] = {
+        "model": settings.llm_model,
+        "messages": messages,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+        "api_key": settings.gemini_api_key,
+    }
+    try:
+        return await litellm.acompletion(**kwargs), 1
+    except Exception as exc:
+        reason = _failure_reason(exc)
+        if not _is_transport_retryable(exc):
+            logger.warning("llm.generate failed (%s): %s", type(exc).__name__, reason)
+            raise LLMError(f"llm generation failed: {reason}") from exc
+        logger.warning(
+            "llm.generate transient failure (%s); retrying once in %.1fs",
+            reason,
+            _TRANSPORT_RETRY_DELAY_S,
+        )
+    await asyncio.sleep(_TRANSPORT_RETRY_DELAY_S)
+    try:
+        return await litellm.acompletion(**kwargs), 2
+    except Exception as exc:
+        logger.warning(
+            "llm.generate retry failed (%s): %s", type(exc).__name__, _failure_reason(exc)
+        )
+        raise LLMError(f"llm generation failed: {_failure_reason(exc)}") from exc
+
+
 async def generate(
     prompt: str,
     *,
@@ -53,22 +112,14 @@ async def generate(
     messages.append({"role": "user", "content": prompt})
 
     start = time.perf_counter()
-    try:
-        response = await litellm.acompletion(
-            model=settings.llm_model,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            api_key=settings.gemini_api_key,
-        )
-    except Exception as exc:
-        raise LLMError(f"llm generation failed: {exc}") from exc
+    response, attempts = await _completion_with_retry(settings, messages, temperature, max_tokens)
 
     duration_ms = (time.perf_counter() - start) * 1000
     usage = response.usage
     logger.info(
-        "llm.generate model=%s duration_ms=%.0f prompt_tokens=%s completion_tokens=%s",
+        "llm.generate model=%s attempts=%d duration_ms=%.0f prompt_tokens=%s completion_tokens=%s",
         settings.llm_model,
+        attempts,
         duration_ms,
         usage.prompt_tokens,
         usage.completion_tokens,

@@ -9,6 +9,7 @@ import { useProfiles } from "@/hooks/use-profiles";
 import { useResumeDraft } from "@/hooks/use-resume-draft";
 
 import { MergeMode } from "./MergeMode";
+import { DraftErrorCard } from "./DraftErrorCard";
 import { ProfileEditor } from "./ProfileEditor";
 import { TargetChooser } from "./TargetChooser";
 
@@ -47,14 +48,11 @@ export function ProfilePageClient() {
     }
     if (draftQuery.isError) {
       return (
-        <Card title="Could not load the extracted draft">
-          <p role="alert" className="mb-3 text-sm text-red-700 dark:text-red-400">
-            {draftQuery.error.message}
-          </p>
-          <Button variant="secondary" onClick={() => void draftQuery.refetch()}>
-            Retry
-          </Button>
-        </Card>
+        <DraftErrorCard
+          resumeId={resumeId}
+          error={draftQuery.error}
+          onResolved={() => void draftQuery.refetch()}
+        />
       );
     }
     const profiles = profilesQuery.data;

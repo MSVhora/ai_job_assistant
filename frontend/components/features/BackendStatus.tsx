@@ -1,13 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 
+import { Button } from "@/components/ui/button";
 import { getHealth, type HealthResponse } from "@/lib/api";
-
-type Status =
-  | { kind: "loading" }
-  | { kind: "error"; message: string }
-  | { kind: "ready"; data: HealthResponse };
 
 const badgeStyles =
   "inline-flex items-center gap-2 rounded-full border px-3 py-1 text-sm font-medium";
@@ -28,58 +24,32 @@ function Badge({ ok, label }: { ok: boolean; label: string }) {
 }
 
 export function BackendStatus() {
-  const [status, setStatus] = useState<Status>({ kind: "loading" });
-  const [attempt, setAttempt] = useState(0);
-
-  useEffect(() => {
-    let active = true;
-    getHealth()
-      .then((data) => {
-        if (active) {
-          setStatus({ kind: "ready", data });
-        }
-      })
-      .catch((cause: unknown) => {
-        if (active) {
-          setStatus({
-            kind: "error",
-            message: cause instanceof Error ? cause.message : "Unknown error",
-          });
-        }
-      });
-    return () => {
-      active = false;
-    };
-  }, [attempt]);
-
-  const retry = useCallback(() => {
-    setStatus({ kind: "loading" });
-    setAttempt((value) => value + 1);
-  }, []);
+  const healthQuery = useQuery<HealthResponse>({
+    queryKey: ["health"],
+    queryFn: getHealth,
+    refetchInterval: 30_000,
+    meta: { silent: true },
+  });
 
   return (
     <div aria-live="polite" className="flex flex-col items-center gap-4">
-      {status.kind === "loading" && (
+      {healthQuery.isPending && (
         <div className="h-8 w-64 animate-pulse rounded-full bg-gray-200 dark:bg-gray-800" />
       )}
-      {status.kind === "error" && (
+      {healthQuery.isError && (
         <div className="flex flex-col items-center gap-3">
           <p className="text-sm text-red-700 dark:text-red-400">
-            Could not reach the API: {status.message}
+            Could not reach the API: {healthQuery.error.message}
           </p>
-          <button
-            type="button"
-            onClick={retry}
-            className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:border-gray-700 dark:hover:bg-gray-800"
-          >
+          <Button variant="secondary" onClick={() => void healthQuery.refetch()}>
             Retry
-          </button>
+          </Button>
         </div>
       )}
-      {status.kind === "ready" && (
+      {healthQuery.isSuccess && (
         <div className="flex flex-wrap justify-center gap-3">
-          <Badge ok={status.data.database} label="Database" />
-          <Badge ok={status.data.llm_configured} label="LLM key" />
+          <Badge ok={healthQuery.data.database} label="Database" />
+          <Badge ok={healthQuery.data.llm_configured} label="LLM key" />
         </div>
       )}
     </div>

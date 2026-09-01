@@ -10,7 +10,6 @@ import { useDeleteProfile, useProfiles } from "@/hooks/use-profiles";
 
 export function ProfilesSection() {
   const profilesQuery = useProfiles();
-  const deleteProfile = useDeleteProfile();
 
   if (profilesQuery.isPending) {
     return (
@@ -58,7 +57,6 @@ export function ProfilesSection() {
             name={profile.name}
             updatedLabel={new Date(profile.updated_at).toLocaleString()}
             sourceLabel={profile.source_resume_filename ? `from ${profile.source_resume_filename}` : null}
-            deleting={deleteProfile.isPending && deleteProfile.variables === profile.profile_id}
           />
         ))}
       </ul>
@@ -71,13 +69,11 @@ function ProfileRow({
   name,
   updatedLabel,
   sourceLabel,
-  deleting,
 }: {
   profileId: string;
   name: string;
   updatedLabel: string;
   sourceLabel: string | null;
-  deleting: boolean;
 }) {
   const [confirming, setConfirming] = useState(false);
   const deleteProfile = useDeleteProfile();
@@ -96,27 +92,34 @@ function ProfileRow({
           {sourceLabel ? ` · ${sourceLabel}` : ""}
         </span>
       </div>
-      <div className="flex items-center gap-2">
-        <Badge variant="neutral">profile</Badge>
-        {confirming ? (
-          <>
-            <Button
-              variant="danger"
-              className="px-2 py-1"
-              disabled={deleting}
-              onClick={() => deleteProfile.mutate(profileId)}
-            >
-              {deleting ? "Deleting…" : "Confirm delete"}
-            </Button>
-            <Button variant="secondary" className="px-2 py-1" onClick={() => setConfirming(false)}>
-              Cancel
-            </Button>
-          </>
-        ) : (
-          <Button variant="secondary" className="px-2 py-1" onClick={() => setConfirming(true)}>
-            Delete
-          </Button>
+      <div className="flex flex-col items-end gap-1">
+        {confirming && deleteProfile.isError && (
+          <p role="alert" className="max-w-xs text-right text-sm text-red-700 dark:text-red-400">
+            {deleteProfile.error.message}
+          </p>
         )}
+        <div className="flex items-center gap-2">
+          <Badge variant="neutral">profile</Badge>
+          {confirming ? (
+            <>
+              <Button
+                variant="danger"
+                className="px-2 py-1"
+                disabled={deleteProfile.isPending}
+                onClick={() => deleteProfile.mutate(profileId, { onSuccess: () => setConfirming(false) })}
+              >
+                {deleteProfile.isPending ? "Deleting…" : "Confirm delete"}
+              </Button>
+              <Button variant="secondary" className="px-2 py-1" onClick={() => setConfirming(false)}>
+                Cancel
+              </Button>
+            </>
+          ) : (
+            <Button variant="secondary" className="px-2 py-1" onClick={() => setConfirming(true)}>
+              Delete
+            </Button>
+          )}
+        </div>
       </div>
     </li>
   );

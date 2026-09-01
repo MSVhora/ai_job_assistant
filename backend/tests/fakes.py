@@ -57,6 +57,12 @@ def llm_response(
     )
 
 
+class ProviderError(Exception):
+    def __init__(self, status_code: int) -> None:
+        super().__init__(f"provider error {status_code}")
+        self.status_code = status_code
+
+
 def install_acompletion(monkeypatch: Any, handler: Callable[..., object]) -> list[dict[str, Any]]:
     calls: list[dict[str, Any]] = []
 

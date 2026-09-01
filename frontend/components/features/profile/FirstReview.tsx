@@ -53,7 +53,7 @@ export function FirstReview({ draft }: { draft: DraftProfileResponse }) {
       <Field
         label="Profile name"
         htmlFor="profile-name"
-        error={nameError ?? createProfile.error?.message}
+        error={nameError ?? undefined}
         hint="One career can seed several profiles — e.g. a native-Android track and a broader SWE track."
       >
         <Input

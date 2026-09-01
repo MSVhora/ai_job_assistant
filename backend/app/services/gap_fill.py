@@ -248,7 +248,7 @@ async def _llm_turn(
         result = await parse_structured(prompt, schema=GapFillTurn, system=GAP_FILL_SYSTEM)
     except LLMError as exc:
         logger.warning("gap_fill llm turn failed: %s", exc)
-        raise LLMGapFillError() from exc
+        raise LLMGapFillError(str(exc)) from exc
     return result.data
 
 

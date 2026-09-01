@@ -15,7 +15,7 @@ import {
   type ProfileFormValues,
 } from "@/lib/profile-schema";
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
-import type { ProfileResponse } from "@/lib/api";
+import type { GapFillResponse, ProfileResponse } from "@/lib/api";
 
 import { GapFillChat } from "./GapFillChat";
 import { ProfileReviewForm } from "./ProfileReviewForm";
@@ -60,6 +60,42 @@ function EditorBody({ profile }: { profile: ProfileResponse }) {
     defaultValues: toFormValues(profile.structured_profile),
     mode: "onBlur",
   });
+
+  const applyGapFill = (data: GapFillResponse) => {
+    const values = toFormValues(data.structured_profile);
+    const touched = new Set(data.applied_fields.map((field) => field.field));
+    const current = form.getValues();
+    const next: ProfileFormValues = {
+      ...current,
+      contact: { ...current.contact },
+      preferences: { ...current.preferences },
+    };
+    if (touched.has("contact.location")) {
+      next.contact.location = values.contact.location;
+    }
+    if (touched.has("preferences.target_location")) {
+      next.preferences.target_location = values.preferences.target_location;
+    }
+    if (touched.has("preferences.remote_preference")) {
+      next.preferences.remote_preference = values.preferences.remote_preference;
+    }
+    if (touched.has("preferences.salary_min")) {
+      next.preferences.salary_min = values.preferences.salary_min;
+    }
+    if (touched.has("preferences.salary_max")) {
+      next.preferences.salary_max = values.preferences.salary_max;
+    }
+    if (touched.has("preferences.currency")) {
+      next.preferences.currency = values.preferences.currency;
+    }
+    if (touched.has("preferences.seniority")) {
+      next.preferences.seniority = values.preferences.seniority;
+    }
+    if (touched.has("preferences.work_authorization")) {
+      next.preferences.work_authorization = values.preferences.work_authorization;
+    }
+    form.reset(next);
+  };
 
   return (
     <div className="flex flex-col gap-4">
@@ -123,10 +159,7 @@ function EditorBody({ profile }: { profile: ProfileResponse }) {
         )}
       </div>
 
-      <GapFillChat
-        profileId={profile.profile_id}
-        onApplied={(data) => form.reset(toFormValues(data.structured_profile))}
-      />
+      <GapFillChat profileId={profile.profile_id} onApplied={applyGapFill} />
       <FormProvider {...form}>
         <ProfileReviewForm
           highlightAi={false}

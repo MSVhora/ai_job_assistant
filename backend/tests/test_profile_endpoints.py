@@ -322,3 +322,12 @@ async def test_malformed_create_returns_422(client: AsyncClient) -> None:
     }
     response = await create_profile(client, "Empty", empty_content)
     assert response.status_code == 422
+
+
+async def test_malformed_path_param_returns_readable_422(client: AsyncClient) -> None:
+    response = await client.patch("/api/profiles/not-a-uuid", json={"name": "X"})
+
+    assert response.status_code == 422
+    detail = response.json()["detail"]
+    assert isinstance(detail, str)
+    assert "profile_id" in detail

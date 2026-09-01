@@ -1,4 +1,4 @@
-import { apiFetch } from "./client";
+import { ApiError, ExtractionFailedError, apiFetch } from "./client";
 import type { components } from "./schema";
 
 export type HealthResponse = components["schemas"]["HealthResponse"];
@@ -13,7 +13,8 @@ export type StructuredProfile = components["schemas"]["StructuredProfile"];
 export type GapFillMessage = components["schemas"]["GapFillMessage"];
 export type GapFillResponse = components["schemas"]["GapFillResponse"];
 
-export { ApiError, apiFetch } from "./client";
+export { ApiError, ExtractionFailedError, apiFetch } from "./client";
+
 
 export async function getHealth(): Promise<HealthResponse> {
   return apiFetch<HealthResponse>("/api/health");
@@ -22,11 +23,25 @@ export async function getHealth(): Promise<HealthResponse> {
 export async function uploadResume(file: File): Promise<ResumeUploadResponse> {
   const body = new FormData();
   body.append("file", file);
-  return apiFetch<ResumeUploadResponse>("/api/resumes", { method: "POST", body });
+  return apiFetch<ResumeUploadResponse>("/api/resumes", {
+    method: "POST",
+    body,
+    timeoutMs: 120_000,
+  });
 }
 
 export async function extractResume(resumeId: string): Promise<DraftProfileResponse> {
-  return apiFetch<DraftProfileResponse>(`/api/resumes/${resumeId}/extract`, { method: "POST" });
+  try {
+    return await apiFetch<DraftProfileResponse>(`/api/resumes/${resumeId}/extract`, {
+      method: "POST",
+      timeoutMs: 120_000,
+    });
+  } catch (cause) {
+    if (cause instanceof ApiError && cause.status !== 404) {
+      throw new ExtractionFailedError(resumeId, cause.status, cause.message);
+    }
+    throw cause;
+  }
 }
 
 export async function listResumes(): Promise<ResumeSummaryResponse[]> {

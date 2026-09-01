@@ -1,4 +1,5 @@
 from fastapi import Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 
@@ -33,7 +34,7 @@ class ResumeNotFoundError(DomainError):
 
 class ProfileNotFoundError(DomainError):
     status_code = 404
-    default_detail = "no saved profile yet"
+    default_detail = "profile not found"
 
 
 class ResumeDraftUnavailableError(DomainError):
@@ -63,3 +64,13 @@ class LLMGapFillError(DomainError):
 
 async def domain_error_handler(_: Request, exc: DomainError) -> JSONResponse:
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
+
+async def request_validation_error_handler(_: Request, exc: RequestValidationError) -> JSONResponse:
+    parts: list[str] = []
+    for error in exc.errors()[:20]:
+        location = ".".join(str(item) for item in error["loc"] if item != "body")
+        message = str(error["msg"])
+        parts.append(f"{location}: {message}" if location else message)
+    detail = "; ".join(parts) if parts else "invalid request"
+    return JSONResponse(status_code=422, content={"detail": detail})

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { MergeDiffPanel } from "@/components/features/profile/MergeDiffPanel";
+import { DraftErrorCard } from "@/components/features/profile/DraftErrorCard";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useProfile, useUpdateProfile } from "@/hooks/use-profiles";
@@ -42,14 +43,11 @@ export function MergeMode({
 
   if (draftQuery.isError) {
     return (
-      <Card title="Could not load the extracted draft">
-        <p role="alert" className="mb-3 text-sm text-red-700 dark:text-red-400">
-          {draftQuery.error.message}
-        </p>
-        <Button variant="secondary" onClick={() => void draftQuery.refetch()}>
-          Retry
-        </Button>
-      </Card>
+      <DraftErrorCard
+        resumeId={resumeId}
+        error={draftQuery.error}
+        onResolved={() => void draftQuery.refetch()}
+      />
     );
   }
 

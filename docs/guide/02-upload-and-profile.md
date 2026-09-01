@@ -95,6 +95,31 @@ Key guarantees baked into the design:
   strict schema (with one automatic repair round-trip); a failed extraction leaves the
   resume row exactly as it was
 
+## When things fail (and how you recover)
+
+Nothing in the flow dead-ends — every failure has an explicit recovery path:
+
+- **Upload rejected** (too large / wrong type / no readable text) — a specific message at
+  the file input (413 / 415 / 422); just pick another file
+- **Upload succeeded, extraction failed** — the form shows an **"Extract again"** action
+  that re-runs extraction without re-uploading, so no duplicate resume row is created
+- **Extraction interrupted** (tab closed, backend restarted) — the resume list shows an
+  **"Extract profile"** action on rows without a draft, and opening a draft-less resume
+  shows the same action instead of a dead retry loop
+- **Provider hiccups** — transient failures (rate limit, 5xx) are retried once with a short
+  backoff inside the LLM adapter; when a failure is final, the message says why
+  ("rate limited by the provider — retry shortly", "request timed out", "failed validation
+  after repair")
+- **Invalid input** — pydantic validation errors render as readable field messages, never
+  "API error 422 on …"
+- **Failed saves lose nothing** — form state is preserved on save/create/rename failures;
+  delete-profile failures show the reason inline with the dialog still open; a failed
+  gap-fill turn puts your message back in the box; applied gap-fill answers merge into the
+  editor without discarding unsaved edits
+- **Backend down** — the home-page status badges re-check every 30 seconds, so a stopped
+  backend becomes visible on its own; other views keep retry affordances and a global toast
+  surfaces mutation failures from anywhere
+
 ## Step-by-step (once the pipeline is live)
 
 1. **Upload** *(live)* — pick a standard single-column PDF or DOCX (up to 10 MB).

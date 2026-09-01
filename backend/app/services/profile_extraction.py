@@ -93,7 +93,7 @@ async def extract_resume_profile(
         result = await parse_structured(prompt, schema=StructuredProfile, system=EXTRACTION_SYSTEM)
     except LLMError as exc:
         logger.warning("profile.extract failed for resume %s: %s", resume_id, exc)
-        raise LLMExtractionError() from exc
+        raise LLMExtractionError(str(exc)) from exc
 
     profile = _enrich_link_labels(result.data)
     parsed_at = datetime.now(UTC)

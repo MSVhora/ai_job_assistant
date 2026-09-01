@@ -4,7 +4,7 @@ import uuid
 
 import pytest
 from docx import Document
-from fakes import VALID_PROFILE, install_acompletion, llm_response
+from fakes import VALID_PROFILE, ProviderError, install_acompletion, llm_response
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import func, select
 
@@ -152,7 +152,7 @@ async def test_repair_exhausted_returns_502_and_leaves_row_untouched(
     response = await client.post(f"/api/resumes/{uploaded['resume_id']}/extract")
 
     assert response.status_code == 502
-    assert response.json()["detail"] == "profile extraction failed"
+    assert response.json()["detail"].startswith("structured output failed validation after repair")
     async with session_factory() as session:
         resume = await session.get(Resume, uuid.UUID(uploaded["resume_id"]))
     assert resume is not None
@@ -173,3 +173,20 @@ async def test_unconfigured_llm_returns_503(
     response = await client.post(f"/api/resumes/{uploaded['resume_id']}/extract")
 
     assert response.status_code == 503
+
+
+async def test_transport_failure_detail_carries_cause_hint(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async def no_delay(_: float) -> None:
+        return None
+
+    monkeypatch.setattr("app.adapters.llm.asyncio.sleep", no_delay)
+    uploaded = await upload_resume(client)
+    responses = iter([ProviderError(429), ProviderError(429)])
+    install_acompletion(monkeypatch, lambda **kw: next(responses))
+
+    response = await client.post(f"/api/resumes/{uploaded['resume_id']}/extract")
+
+    assert response.status_code == 502
+    assert "rate limited by the provider" in response.json()["detail"]

@@ -256,7 +256,7 @@ async def test_llm_failure_returns_502(
     response = await client.post(f"/api/profiles/{profile_id}/gap-fill", json={"messages": []})
 
     assert response.status_code == 502
-    assert response.json()["detail"] == "gap-fill turn failed"
+    assert response.json()["detail"] == "llm generation failed: provider rejected the request"
 
 
 async def test_message_validation_returns_422(client: AsyncClient) -> None:

@@ -39,7 +39,10 @@ Non-negotiable layering rules (enforced by the
 - `routers/` — HTTP only: parse, call a service, return a response model
 - `services/` — business logic; raise domain errors
 - `models/` — SQLAlchemy 2.0 ORM; the schema source of truth
-- `adapters/llm.py` — the **only** place that talks to an LLM provider
+- `adapters/llm.py` — the **only** place that talks to an LLM provider; it also owns
+  resilience: one transport-level retry with backoff on 429/5xx (free-tier rate limits),
+  plus the structured-output validation repair pass. Service-level errors wrap the cause
+  hint, so the client sees "rate limited" / "timed out" instead of an opaque 502
 - `JobSource` connector protocol — the **only** way a job source is added
 - Every schema change ships as an Alembic migration in the same change
 - `DbCommitMiddleware` commits each request's session **before the response reaches the

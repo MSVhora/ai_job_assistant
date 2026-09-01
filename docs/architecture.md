@@ -111,6 +111,7 @@ sequenceDiagram
     A->>G: re-rank top N + rationale
     A->>D: store matches
     B->>A: GET /api/jobs/searches/{id} → run status + warnings
+    B->>A: GET /api/jobs/searches/{id}/postings → unranked run results
     B->>A: GET /api/matches → ranked + "why this matches"
 ```
 

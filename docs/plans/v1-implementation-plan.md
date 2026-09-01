@@ -171,6 +171,7 @@ connectors at code level — only `apify_actor` entries are config-driven. Recor
 | GET | `/api/sources` | Available sources + `is_official_api` + disclosure text |
 | POST | `/api/sources/{name}/enable` | Enable; body must include `acknowledged_disclosure: true` for scraping sources |
 | POST | `/api/jobs/search` | `{query?, source_queries{source: {title, skills, exclude}}, location, country, salary_min?, sources[], results_wanted}` → ingestion run (background); each source gets its own dialect-correct query (LLM-generated specs, editable in the UI) |
+| GET | `/api/jobs/searches/{id}/postings` | The run's stored postings (unranked, newest first) for the results view |
 | GET | `/api/jobs/searches/{id}` | Ingestion run status + per-source results/warnings + echoed query (issue #7) |
 | GET | `/api/matches` | Ranked matches + rationale; filter/sort params |
 

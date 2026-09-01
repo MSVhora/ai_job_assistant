@@ -66,10 +66,12 @@ flowchart LR
 
 A failing source never breaks the search — it is skipped with a warning surfaced in the UI.
 
-Today (issues #7–#8): the `/jobs` page starts a background run from an editable, seeded
-query, `GET /api/jobs/searches/{id}` reports its status with per-source results/warnings
-while a live banner polls it, and postings are de-duplicated per `(source, external_id)` —
-a re-search refreshes the stored postings instead of duplicating them.
+Today (issues #7–#8 + the search-queries follow-up): the `/jobs` page starts a background run
+from per-source, editable queries, `GET /api/jobs/searches/{id}` reports its status with
+per-source results/warnings while a live banner polls it, the run's postings are listed
+(unranked) under the banner once it finishes, and postings are de-duplicated per
+`(source, external_id)` — a re-search refreshes the stored postings instead of duplicating
+them. Ranked matches arrive with the matching issues (#9–#11).
 
 ## What happens on a search (behind the scenes)
 

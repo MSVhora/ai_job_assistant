@@ -23,5 +23,8 @@ Each guide marks what is **live now** vs **planned**:
 
 - Live: stack scaffold, health check (`GET /api/health`), resume upload + text extraction
   ([issue #2](../plans/v1-issue-002-resume-upload.md)), LLM profile extraction to a reviewable
-  draft ([issue #3](../plans/v1-issue-003-llm-extraction.md))
-- Planned: review UI, gap-fill, job sources, matching
+  draft ([issue #3](../plans/v1-issue-003-llm-extraction.md)), profile persistence + review/edit
+  UI + revision audit ([issue #4](../plans/v1-issue-004-profile-persistence-review-ui.md)),
+  conversational gap-fill ([issue #5](../plans/v1-issue-005-gap-fill.md)), multi-profile tracks
+  + resume list ([issue #6](../plans/v1-issue-006-multi-profile-resume-list.md))
+- Planned: job sources, matching, priority weighting

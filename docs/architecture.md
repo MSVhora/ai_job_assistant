@@ -42,6 +42,9 @@ Non-negotiable layering rules (enforced by the
 - `adapters/llm.py` — the **only** place that talks to an LLM provider
 - `JobSource` connector protocol — the **only** way a job source is added
 - Every schema change ships as an Alembic migration in the same change
+- `DbCommitMiddleware` commits each request's session **before the response reaches the
+  client** — a response that returned 2xx implies durable state (fixed the upload → extract
+  race where the client read a row before its transaction committed)
 
 ## Profile pipeline (sequence)
 
@@ -66,7 +69,15 @@ sequenceDiagram
     B->>A: PATCH /api/profiles/{id} — reviewed profile (content save)
     A->>D: save profile.structured_profile + profile_revision diff rows
     A-->>B: saved profile with revision audit (issue #4)
-    Note over B,D: a draft can also be saved as an additional profile (multi-profile,<br/>issue #6); gap-fill for missing fields follows (issue #5)
+    Note over B,D: a draft can also be saved as an additional profile (multi-profile, issue #6)
+    loop gap-fill turns (issue #5)
+        B->>A: POST /api/profiles/{id}/gap-fill — conversation so far
+        A->>A: compute genuinely missing fields (server-side, deterministic)
+        A->>G: transcript + missing fields → validated answers + next question
+        A->>D: merge pydantic-validated answers + gap_fill revision row
+        A-->>B: reply, applied fields, still-missing, updated profile
+    end
+    Note over A: nothing missing → canned reply, no LLM call
 ```
 
 ![profile-pipeline-sequence diagram](./assets/profile-pipeline-sequence.svg)

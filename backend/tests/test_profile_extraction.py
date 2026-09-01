@@ -16,7 +16,7 @@ from app.models import Candidate, Resume
 pytestmark = pytest.mark.usefixtures("clean_tables")
 
 DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-EXPECTED_PARSE_VERSION = "gemini/gemini-2.5-flash+profile_prompt_v3"
+EXPECTED_PARSE_VERSION = "gemini/gemini-2.5-flash+profile_prompt_v4"
 
 
 @pytest.fixture(autouse=True)

@@ -6,6 +6,21 @@ from pydantic import BaseModel, Field, model_validator
 
 RevisionSourceLiteral = Literal["ai_extraction", "manual_edit", "gap_fill", "reupload_merge"]
 
+RemotePreference = Literal["remote", "hybrid", "onsite", "flexible"]
+
+SeniorityLevel = Literal[
+    "intern",
+    "junior",
+    "mid",
+    "senior",
+    "staff",
+    "lead",
+    "principal",
+    "manager",
+    "director",
+    "executive",
+]
+
 
 class SourceLink(BaseModel):
     label: str | None = Field(default=None, description="e.g. LinkedIn, GitHub, portfolio")
@@ -74,10 +89,12 @@ class ExtraSection(BaseModel):
 class Preferences(BaseModel):
     target_title: str | None = None
     target_location: str | None = None
-    remote_preference: Literal["remote", "hybrid", "onsite", "flexible"] | None = None
-    salary_min: float | None = None
-    salary_max: float | None = None
+    remote_preference: RemotePreference | None = None
+    salary_min: float | None = Field(default=None, ge=0)
+    salary_max: float | None = Field(default=None, ge=0)
     currency: str | None = None
+    seniority: SeniorityLevel | None = None
+    work_authorization: str | None = Field(default=None, max_length=200)
 
 
 class StructuredProfile(BaseModel):

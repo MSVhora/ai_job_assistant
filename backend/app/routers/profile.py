@@ -5,13 +5,14 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.deps import get_db
+from app.schemas.gap_fill import GapFillRequest, GapFillResponse
 from app.schemas.profile import (
     ProfileCreate,
     ProfileResponse,
     ProfileSummary,
     ProfileUpdate,
 )
-from app.services import profile_service
+from app.services import gap_fill, profile_service
 
 router = APIRouter(prefix="/api", tags=["profile"])
 
@@ -46,6 +47,15 @@ async def update_profile(
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> ProfileResponse:
     return await profile_service.save_profile(session, profile_id, payload)
+
+
+@router.post("/profiles/{profile_id}/gap-fill", response_model=GapFillResponse)
+async def gap_fill_profile(
+    profile_id: uuid.UUID,
+    payload: GapFillRequest,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> GapFillResponse:
+    return await gap_fill.run_gap_fill_turn(session, profile_id, payload)
 
 
 @router.delete("/profiles/{profile_id}", status_code=204)

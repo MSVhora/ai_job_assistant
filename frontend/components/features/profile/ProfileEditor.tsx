@@ -17,6 +17,7 @@ import {
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import type { ProfileResponse } from "@/lib/api";
 
+import { GapFillChat } from "./GapFillChat";
 import { ProfileReviewForm } from "./ProfileReviewForm";
 
 export function ProfileEditor({ profileId }: { profileId: string }) {
@@ -122,6 +123,10 @@ function EditorBody({ profile }: { profile: ProfileResponse }) {
         )}
       </div>
 
+      <GapFillChat
+        profileId={profile.profile_id}
+        onApplied={(data) => form.reset(toFormValues(data.structured_profile))}
+      />
       <FormProvider {...form}>
         <ProfileReviewForm
           highlightAi={false}

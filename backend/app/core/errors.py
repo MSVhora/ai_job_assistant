@@ -56,5 +56,10 @@ class LLMExtractionError(DomainError):
     default_detail = "profile extraction failed"
 
 
+class LLMGapFillError(DomainError):
+    status_code = 502
+    default_detail = "gap-fill turn failed"
+
+
 async def domain_error_handler(_: Request, exc: DomainError) -> JSONResponse:
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})

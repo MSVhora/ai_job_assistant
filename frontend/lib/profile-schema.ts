@@ -4,6 +4,20 @@ import type { StructuredProfile } from "@/lib/api";
 
 const remotePreference = z.enum(["", "remote", "hybrid", "onsite", "flexible"]);
 
+const seniority = z.enum([
+  "",
+  "intern",
+  "junior",
+  "mid",
+  "senior",
+  "staff",
+  "lead",
+  "principal",
+  "manager",
+  "director",
+  "executive",
+]);
+
 const numericText = z
   .string()
   .refine((value) => value.trim() === "" || Number.isFinite(Number(value.trim())), {
@@ -86,6 +100,8 @@ export const profileFormSchema = z
       salary_min: numericText,
       salary_max: numericText,
       currency: z.string(),
+      seniority: seniority,
+      work_authorization: z.string(),
     }),
   })
   .superRefine((values, ctx) => {
@@ -115,6 +131,8 @@ const defaultPreferences = {
   salary_min: "",
   salary_max: "",
   currency: "",
+  seniority: "" as (typeof seniority)["options"][number],
+  work_authorization: "",
 };
 
 export function toFormValues(profile: StructuredProfile): ProfileFormValues {
@@ -181,6 +199,9 @@ export function toFormValues(profile: StructuredProfile): ProfileFormValues {
           salary_min: profile.preferences.salary_min?.toString() ?? "",
           salary_max: profile.preferences.salary_max?.toString() ?? "",
           currency: profile.preferences.currency ?? "",
+          seniority: (profile.preferences.seniority ??
+            "") as (typeof seniority)["options"][number],
+          work_authorization: profile.preferences.work_authorization ?? "",
         }
       : { ...defaultPreferences },
   };
@@ -200,6 +221,7 @@ export function toProfilePayload(values: ProfileFormValues): StructuredProfile {
     return trimmed === "" ? null : Number(trimmed);
   };
   const remote = values.preferences.remote_preference;
+  const seniorityValue = values.preferences.seniority;
   const preferences = {
     target_title: optionalText(values.preferences.target_title),
     target_location: optionalText(values.preferences.target_location),
@@ -207,6 +229,8 @@ export function toProfilePayload(values: ProfileFormValues): StructuredProfile {
     salary_min: salary(values.preferences.salary_min),
     salary_max: salary(values.preferences.salary_max),
     currency: optionalText(values.preferences.currency),
+    seniority: seniorityValue === "" ? null : seniorityValue,
+    work_authorization: optionalText(values.preferences.work_authorization),
   };
   const hasPreferences = Object.values(preferences).some((value) => value !== null);
 

@@ -18,7 +18,7 @@ import {
   ExtraSectionsSection,
 } from "./EducationCredentials";
 import { ExperienceSection, ProjectsSection } from "./ExperienceProjects";
-import { AiExtractedBadge, SectionCard, StringListField, TextField } from "./fields";
+import { AiExtractedBadge, SectionCard, SelectField, StringListField, TextField } from "./fields";
 import { SaveStatus } from "./SaveStatus";
 
 const emptyLink = { label: "", url: "" };
@@ -28,6 +28,19 @@ const REMOTE_OPTIONS = [
   { value: "hybrid", label: "Hybrid" },
   { value: "onsite", label: "On-site" },
   { value: "flexible", label: "Flexible" },
+] as const;
+
+const SENIORITY_OPTIONS = [
+  { value: "intern", label: "Intern" },
+  { value: "junior", label: "Junior" },
+  { value: "mid", label: "Mid-level" },
+  { value: "senior", label: "Senior" },
+  { value: "staff", label: "Staff" },
+  { value: "lead", label: "Lead" },
+  { value: "principal", label: "Principal" },
+  { value: "manager", label: "Manager" },
+  { value: "director", label: "Director" },
+  { value: "executive", label: "Executive" },
 ] as const;
 
 export function ProfileReviewForm({
@@ -128,20 +141,24 @@ export function ProfileReviewForm({
         <div className="grid gap-4 sm:grid-cols-2">
           <TextField label="Target title" name="preferences.target_title" badge={aiBadge} />
           <TextField label="Target location" name="preferences.target_location" badge={aiBadge} />
-          <Field label="Remote preference" htmlFor="preferences.remote_preference" badge={aiBadge}>
-            <select
-              id="preferences.remote_preference"
-              className="w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-              {...register("preferences.remote_preference")}
-            >
-              <option value="">Not set</option>
-              {REMOTE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </Field>
+          <SelectField
+            label="Remote preference"
+            name="preferences.remote_preference"
+            options={REMOTE_OPTIONS}
+            badge={aiBadge}
+          />
+          <SelectField
+            label="Seniority"
+            name="preferences.seniority"
+            options={SENIORITY_OPTIONS}
+            badge={aiBadge}
+          />
+          <TextField
+            label="Work authorization"
+            name="preferences.work_authorization"
+            placeholder="e.g. EU citizen, H-1B needs sponsorship"
+            badge={aiBadge}
+          />
           <TextField label="Currency" name="preferences.currency" placeholder="EUR" badge={aiBadge} />
           <TextField
             label="Salary min"

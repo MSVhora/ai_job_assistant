@@ -1,12 +1,13 @@
 # 2 — Upload & Profile Review
 
-**Status: mostly shipped** — resume upload + text extraction
+**Status: shipped** — resume upload + text extraction
 ([issue #2](../plans/v1-issue-002-resume-upload.md)), LLM extraction to a reviewable draft
 ([issue #3](../plans/v1-issue-003-llm-extraction.md)), the review/edit UI with the
 `profile_revision` audit trail ([issue #4](../plans/v1-issue-004-profile-persistence-review-ui.md)),
-and multi-profile tracks with the resume list
-([issue #6](../plans/v1-issue-006-multi-profile-resume-list.md)) are live; conversational
-gap-fill (#5) follows. This guide describes the finished v1 pipeline.
+multi-profile tracks with the resume list
+([issue #6](../plans/v1-issue-006-multi-profile-resume-list.md)), and conversational gap-fill
+([issue #5](../plans/v1-issue-005-gap-fill.md)) are live. This guide describes the finished v1
+profile pipeline.
 
 ## The idea
 
@@ -104,10 +105,11 @@ Key guarantees baked into the design:
    with AI-extracted fields highlighted. You choose the destination: merge into an existing
    profile, or save as a new one (named — e.g. "Senior Android Developer" vs "Senior
    Software Engineer"). Every correction lands in that profile's `profile_revision` trail.
-3. **Fill the gaps** *(#5, upcoming)* — the app asks conversational questions *only* about
-   genuinely missing fields (typically: target location, salary band, seniority, work
-   authorization, remote preference). Answers merge into the profile, also recorded as
-   revisions.
+3. **Fill the gaps** *(live)* — on the profile page, a short chat asks *only* about genuinely
+    missing fields (typically: target location, remote preference, salary band, seniority, work
+    authorization). Answers are pydantic-validated before anything is saved, each applied turn
+    lands in `profile_revision` with source `gap_fill`, and the editor form stays in sync with
+    what the chat saved.
 4. **Done** — each profile is an independent track for job discovery and matching.
    Re-uploading a newer resume opens a merge/diff review per profile; nothing is
    overwritten until you explicitly save the merge.
@@ -132,13 +134,19 @@ Key guarantees baked into the design:
   dotted paths for scalars, whole-list diffs for arrays), a rename (`name` only → no
   revision), and merge saves (`source_resume_id` present → provenance updated)
 - `DELETE /api/profiles/{id}` removes a track and its revision trail (resumes stay)
+- `POST /api/profiles/{id}/gap-fill` runs one chat turn: the client sends the conversation so
+  far, the server decides which fields are genuinely missing (current/target location, remote
+  preference, salary band, seniority, work authorization), the LLM may only ask about and
+  extract those, answers are pydantic-validated, and applied values are merged into the profile.
+  The response carries the updated profile, what was applied, what is still missing, and the
+  revision row. A complete profile short-circuits with "nothing to ask" — no LLM call
 - The revision `source` is decided by the server, never the client:
   - `ai_extraction` — the AI baseline recorded when a profile is created from a draft
     (when you corrected fields during first review, an additional `manual_edit` row
     records exactly what you changed)
   - `manual_edit` — a normal edit save
   - `reupload_merge` — a save after the re-upload merge review
-  - `gap_fill` — reserved for the conversational gap-fill flow (#5)
+  - `gap_fill` — values you gave the conversational gap-fill chat
 - `GET /api/resumes/{id}/draft` returns the AI draft for a resume without re-running
   extraction (no token cost) — this is what makes the review UI refresh-safe
 - No-change saves still record a revision row with an empty diff — the audit trail shows

@@ -110,6 +110,23 @@ export interface paths {
         patch: operations["update_profile_api_profiles__profile_id__patch"];
         trace?: never;
     };
+    "/api/profiles/{profile_id}/gap-fill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Gap Fill Profile */
+        post: operations["gap_fill_profile_api_profiles__profile_id__gap_fill_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -232,6 +249,56 @@ export interface components {
              */
             entries: string[];
         };
+        /** GapFillAppliedField */
+        GapFillAppliedField: {
+            /** Field */
+            field: string;
+            /** Label */
+            label: string;
+            /** Value */
+            value: string;
+        };
+        /** GapFillField */
+        GapFillField: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+        };
+        /** GapFillMessage */
+        GapFillMessage: {
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "user" | "assistant";
+            /** Content */
+            content: string;
+        };
+        /** GapFillRequest */
+        GapFillRequest: {
+            /**
+             * Messages
+             * @default []
+             */
+            messages: components["schemas"]["GapFillMessage"][];
+        };
+        /** GapFillResponse */
+        GapFillResponse: {
+            /** Reply */
+            reply: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "in_progress" | "complete";
+            /** Missing Fields */
+            missing_fields: components["schemas"]["GapFillField"][];
+            /** Applied Fields */
+            applied_fields: components["schemas"]["GapFillAppliedField"][];
+            structured_profile: components["schemas"]["StructuredProfile"];
+            revision?: components["schemas"]["RevisionSummary"] | null;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -260,6 +327,10 @@ export interface components {
             salary_max?: number | null;
             /** Currency */
             currency?: string | null;
+            /** Seniority */
+            seniority?: ("intern" | "junior" | "mid" | "senior" | "staff" | "lead" | "principal" | "manager" | "director" | "executive") | null;
+            /** Work Authorization */
+            work_authorization?: string | null;
         };
         /** ProfileCreate */
         ProfileCreate: {
@@ -780,6 +851,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProfileResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    gap_fill_profile_api_profiles__profile_id__gap_fill_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GapFillRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GapFillResponse"];
                 };
             };
             /** @description Validation Error */

@@ -20,7 +20,7 @@ from app.schemas.resume import DraftProfileResponse
 
 logger = logging.getLogger(__name__)
 
-PROFILE_PROMPT_VERSION = "profile_prompt_v3"
+PROFILE_PROMPT_VERSION = "profile_prompt_v4"
 
 EXTRACTION_SYSTEM = (
     "You extract structured data from resumes. Rules: "

@@ -10,6 +10,8 @@ export type ProfileSummary = components["schemas"]["ProfileSummary"];
 export type ProfileCreate = components["schemas"]["ProfileCreate"];
 export type ProfileUpdate = components["schemas"]["ProfileUpdate"];
 export type StructuredProfile = components["schemas"]["StructuredProfile"];
+export type GapFillMessage = components["schemas"]["GapFillMessage"];
+export type GapFillResponse = components["schemas"]["GapFillResponse"];
 
 export { ApiError, apiFetch } from "./client";
 
@@ -62,4 +64,14 @@ export async function updateProfile(
 
 export async function deleteProfile(profileId: string): Promise<void> {
   await apiFetch<unknown>(`/api/profiles/${profileId}`, { method: "DELETE" });
+}
+
+export async function gapFillTurn(
+  profileId: string,
+  messages: GapFillMessage[],
+): Promise<GapFillResponse> {
+  return apiFetch<GapFillResponse>(`/api/profiles/${profileId}/gap-fill`, {
+    method: "POST",
+    body: JSON.stringify({ messages }),
+  });
 }

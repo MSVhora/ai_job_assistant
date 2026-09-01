@@ -177,3 +177,34 @@ export function TextField({
     </Field>
   );
 }
+
+const SELECT_STYLES =
+  "w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100";
+
+export function SelectField({
+  label,
+  name,
+  options,
+  error,
+  badge,
+}: {
+  label: string;
+  name: string;
+  options: readonly { value: string; label: string }[];
+  error?: string;
+  badge?: ReactNode;
+}) {
+  const { register } = useFormContext<ProfileFormValues>();
+  return (
+    <Field label={label} htmlFor={name} error={error} badge={badge}>
+      <select id={name} className={SELECT_STYLES} {...register(name as FieldPath<ProfileFormValues>)}>
+        <option value="">Not set</option>
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </Field>
+  );
+}

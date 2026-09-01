@@ -70,6 +70,10 @@ curl http://localhost:8000/api/health
 
 Then open **http://localhost:3000**.
 
+Upload a resume on the home page, then save its AI draft as one or more named profiles —
+each profile is an independent track (e.g. "Senior Android Developer" and "Senior Software
+Engineer") that you review, edit, and later match separately. See the next guide.
+
 ## Troubleshooting
 
 | Symptom | Fix |

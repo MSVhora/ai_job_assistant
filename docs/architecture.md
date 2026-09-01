@@ -55,10 +55,10 @@ sequenceDiagram
     participant G as Gemini (LiteLLM)
     participant D as Postgres
 
-    B->>A: POST /api/resume — PDF / DOCX (multipart)
+    B->>A: POST /api/resumes — PDF / DOCX (multipart)
     A->>D: candidate + resume row (draft text only)
     A-->>B: extracted text
-    B->>A: POST /api/resume/{id}/extract
+    B->>A: POST /api/resumes/{id}/extract
     A->>G: resume text + JSON schema → profile JSON
     Note over A,G: prompt-instructed JSON — pydantic-validated<br/>with one repair round-trip on failure
     A->>D: stamp parse_version + persist draft_profile (parse artifact)

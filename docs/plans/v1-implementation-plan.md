@@ -148,9 +148,13 @@ sources:
 | Method | Path | Purpose |
 |---|---|---|
 | POST | `/api/setup/check` | Which keys are configured; embedding-capable provider present? |
-| POST | `/api/resume` | Upload PDF/DOCX → parse → draft profile (not saved yet) |
-| GET/PATCH | `/api/profile` | Read/update profile; every PATCH writes a `profile_revision` |
-| POST | `/api/profile/gap-fill` | Conversational missing-field flow (location, salary band, seniority, work auth, remote pref) |
+| POST | `/api/resumes` | Upload PDF/DOCX → parse → draft profile (not saved yet) |
+| GET | `/api/resumes` | Uploaded resumes with draft status + which profiles they seeded |
+| POST | `/api/resumes/{id}/extract` | Re-run LLM extraction for a resume |
+| GET | `/api/resumes/{id}/draft` | Fetch the AI draft without re-extracting (refresh-safe review UI) |
+| GET/POST | `/api/profiles` | List profile tracks / create one from a reviewed draft (multi-profile, issue #6) |
+| GET/PATCH/DELETE | `/api/profiles/{id}` | Read/update a profile; content PATCHes write `profile_revision`; rename and delete are revision-free / cascading |
+| POST | `/api/profiles/{id}/gap-fill` | Conversational missing-field flow (location, salary band, seniority, work auth, remote pref) — issue #5 |
 | GET | `/api/sources` | Available sources + `is_official_api` + disclosure text |
 | POST | `/api/sources/{name}/enable` | Enable; body must include `acknowledged_disclosure: true` for scraping sources |
 | POST | `/api/jobs/search` | `{query, filters, sources[], seed: "profile"\|"manual"}` → ingestion run (background) |

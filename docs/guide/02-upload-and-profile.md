@@ -28,12 +28,19 @@ flowchart TD
     D1 --> A
     D -- "yes" --> E["AI drafts a structured profile<br/>(re-runnable draft,<br/>not a saved profile yet)"]
     E --> F["Review and edit every field<br/>AI-extracted fields highlighted"]
-    F --> G{"Important fields missing?"}
-    G -- "yes" --> H["Gap-fill chat asks only about<br/>the missing fields"]
-    H --> F
-    G -- "no" --> I["Save profile"]
-    F -.-> J[("Every change recorded<br/>in profile_revision")]
+    F --> G{"Where should this draft go?"}
+    G -- "save as new" --> G1["Name it — a new independent<br/>profile track (multi-profile)"]
+    G1 --> I["Save profile"]
+    G -- "merge into an existing profile" --> G2["Merge/diff review —<br/>keep current or take draft per field"]
+    G2 --> I
+    G -- "no" --> I
+    I --> K{"Important fields missing?"}
+    K -- "yes" --> H["Gap-fill chat asks only about<br/>the missing fields"]
+    H --> I
+    K -- "no" --> L["Profile ready —<br/>drives job discovery per track"]
+    F -.-> J[("Every change recorded<br/>in profile_revision — per profile")]
     I -.-> J
+    H -.-> J
 ```
 
 ![profile-pipeline-flow diagram](../assets/profile-pipeline-flow.svg)
@@ -45,10 +52,10 @@ flowchart TD
 sequenceDiagram
     actor U as User
     participant B as Browser
-    participant R as POST /api/resume
+    participant R as POST /api/resumes
     participant S as Resume service
     participant X as Text extraction<br/>(pdfplumber / python-docx)
-    participant E as POST /api/resume/{id}/extract
+    participant E as POST /api/resumes/{id}/extract
     participant L as Gemini via LiteLLM
     participant D as Postgres
 

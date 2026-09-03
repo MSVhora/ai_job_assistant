@@ -131,7 +131,10 @@ and both embeddings are per-profile; `candidate_id` stays reachable via
 amendment. The #10 build also added `role_fit`/`company_fit` sub-score columns and
 `updated_at` to the sketch above (stored so #11's slider can re-weight without an LLM
 call), the `job_search.matching` outcome column, and the `CASCADE` FK behaviour — owner
-accepted 2026-09-03.)
+accepted 2026-09-03. The #11 build then landed the deferred `preferences` jsonb column
+on `profile` — the slider's per-profile view weight (`{priority: float 0–1}`, distinct
+from the resume-derived preferences inside `structured_profile`) — owner accepted
+2026-09-03.)
 
 ---
 
@@ -181,6 +184,7 @@ connectors at code level — only `apify_actor` entries are config-driven. Recor
 | GET | `/api/resumes/{id}/draft` | Fetch the AI draft without re-extracting (refresh-safe review UI) |
 | GET/POST | `/api/profiles` | List profile tracks / create one from a reviewed draft (multi-profile, issue #6) |
 | GET/PATCH/DELETE | `/api/profiles/{id}` | Read/update a profile; content PATCHes write `profile_revision`; rename and delete are revision-free / cascading |
+| PATCH | `/api/profiles/{id}/preferences` | Store the dashboard view preference (priority weight, `{priority: 0–1}`) — revision-free, no re-scoring (issue #11) |
 | POST | `/api/profiles/{id}/gap-fill` | Conversational missing-field flow (location, salary band, seniority, work auth, remote pref) — issue #5 |
 | POST | `/api/profiles/{id}/search-queries` | Regenerate the profile's per-source query specs via LLM (drafted automatically at extraction; persisted on the profile) |
 | GET | `/api/sources` | Available sources + `is_official_api` + disclosure text |
@@ -188,7 +192,7 @@ connectors at code level — only `apify_actor` entries are config-driven. Recor
 | POST | `/api/jobs/search` | `{query?, source_queries{source: {title, skills, exclude}}, location, country, salary_min?, sources[], results_wanted}` → ingestion run (background); each source gets its own dialect-correct query (LLM-generated specs, editable in the UI) |
 | GET | `/api/jobs/searches/{id}/postings` | The run's stored postings (unranked, newest first) for the results view |
 | GET | `/api/jobs/searches/{id}` | Ingestion run status + per-source results/warnings + echoed query (issue #7) |
-| GET | `/api/matches` | Ranked matches + rationale; filter/sort params |
+| GET | `/api/matches` | Ranked matches + rationale; filter/sort params; optional `priority` re-weights role-fit vs company-fit at read time (per profile, no LLM call — issue #11) |
 
 ---
 

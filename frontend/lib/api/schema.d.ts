@@ -127,6 +127,23 @@ export interface paths {
         patch: operations["update_profile_api_profiles__profile_id__patch"];
         trace?: never;
     };
+    "/api/profiles/{profile_id}/preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Profile Preferences */
+        patch: operations["update_profile_preferences_api_profiles__profile_id__preferences_patch"];
+        trace?: never;
+    };
     "/api/profiles/{profile_id}/gap-fill": {
         parameters: {
             query?: never;
@@ -660,6 +677,7 @@ export interface components {
             name: string;
             structured_profile: components["schemas"]["StructuredProfile"];
             search_queries?: components["schemas"]["StoredSearchQueries"] | null;
+            preferences?: components["schemas"]["StoredPreferences"] | null;
             /** Source Resume Id */
             source_resume_id: string | null;
             /** Source Resume Filename */
@@ -915,6 +933,20 @@ export interface components {
             exclude?: string[] | null;
             /** Query */
             query?: string | null;
+        };
+        /**
+         * StoredPreferences
+         * @description Dashboard view preferences stored on `profile.preferences` (issue #11).
+         *
+         *     Distinct from the resume-derived `Preferences` inside `structured_profile`:
+         *     this is how the *ranking view* is weighted, not profile content.
+         */
+        StoredPreferences: {
+            /**
+             * Priority
+             * @description role-fit vs company-fit weighting (1 = role-fit only, 0 = company-fit only)
+             */
+            priority: number;
         };
         /** StoredSearchQueries */
         StoredSearchQueries: {
@@ -1301,6 +1333,41 @@ export interface operations {
             };
         };
     };
+    update_profile_preferences_api_profiles__profile_id__preferences_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StoredPreferences"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StoredPreferences"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     gap_fill_profile_api_profiles__profile_id__gap_fill_post: {
         parameters: {
             query?: never;
@@ -1529,6 +1596,8 @@ export interface operations {
                 job_type?: components["schemas"]["JobType"] | null;
                 posted_within_days?: number | null;
                 profile_id: string;
+                /** @description role-fit vs company-fit weighting (1 = role-fit only); falls back to the profile's stored preference, then the server default */
+                priority?: number | null;
                 sort?: "final_score" | "vector_score" | "posted_at";
                 limit?: number;
                 offset?: number;

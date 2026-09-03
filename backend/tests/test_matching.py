@@ -16,6 +16,7 @@ from sqlalchemy import select
 from app.core.config import Settings
 from app.core.db import session_factory
 from app.models import JobPosting, Match, Profile
+from app.schemas.matching import MatchQueryParams, MatchResponse
 from app.schemas.profile import ProfileCreate, ProfileUpdate, StructuredProfile
 from app.services import matching
 from app.services.profile_service import create_profile as create_profile_service
@@ -318,3 +319,104 @@ def test_rerank_prompt_truncates_description_and_includes_digest() -> None:
     assert "x" * 1500 in prompt
     assert "x" * 1501 not in prompt
     assert "company: Acme" in prompt
+
+
+def test_priority_weights_split_remaining_mass() -> None:
+    assert matching.priority_weights(0.0) == (pytest.approx(0.0), pytest.approx(0.6))
+    assert matching.priority_weights(1.0) == (pytest.approx(0.6), pytest.approx(0.0))
+    w_role, w_company = matching.priority_weights(matching.default_priority())
+    assert (w_role, w_company) == (pytest.approx(0.4), pytest.approx(0.2))
+    assert matching.priority_weights(5.0) == matching.priority_weights(1.0)
+    assert matching.priority_weights(-1.0) == matching.priority_weights(0.0)
+
+
+def test_default_priority_tracks_settings_weights(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        matching,
+        "get_settings",
+        lambda: Settings(
+            match_weight_vector=0.6, match_weight_role_fit=0.3, match_weight_company_fit=0.1
+        ),
+    )
+
+    assert matching.default_priority() == pytest.approx(0.75)
+    assert matching.priority_weights(matching.default_priority()) == (
+        pytest.approx(0.3),
+        pytest.approx(0.1),
+    )
+
+
+async def seed_subscored(
+    monkeypatch: pytest.MonkeyPatch, role_fit: float
+) -> tuple[uuid.UUID, list[JobPosting]]:
+    profile_id = await seed_profile()
+    postings = await seed_postings([{"embedding": fake_vector("twin")} for _ in range(2)])
+    items = [
+        {
+            "posting_id": str(postings[0].id),
+            "role_fit": role_fit,
+            "company_fit": 10.0 - role_fit,
+            "rationale": "Role leaning.",
+        },
+        {
+            "posting_id": str(postings[1].id),
+            "role_fit": 10.0 - role_fit,
+            "company_fit": role_fit,
+            "rationale": "Company leaning.",
+        },
+    ]
+    install_rerank(monkeypatch, json.dumps({"items": items}))
+    await refresh(profile_id)
+    return profile_id, postings
+
+
+async def list_ordered(profile_id: uuid.UUID, **params: Any) -> list[MatchResponse]:
+    async with session_factory() as session:
+        return await matching.list_matches(
+            session, MatchQueryParams(profile_id=profile_id, **params)
+        )
+
+
+async def test_list_matches_blends_subscores_under_custom_priority(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    profile_id, _ = await seed_subscored(monkeypatch, role_fit=9.0)
+
+    role_first = await list_ordered(profile_id, priority=1.0)
+    company_first = await list_ordered(profile_id, priority=0.0)
+
+    assert [row.job_posting.title for row in role_first] == ["Job 0", "Job 1"]
+    assert [row.job_posting.title for row in company_first] == ["Job 1", "Job 0"]
+    vector_score = role_first[0].vector_score
+    assert role_first[0].final_score == pytest.approx(0.4 * vector_score + 0.6 * 0.9, abs=1e-6)
+    assert company_first[0].final_score == pytest.approx(0.4 * vector_score + 0.6 * 0.9, abs=1e-6)
+
+
+async def test_list_matches_uses_stored_preference_and_falls_back_on_junk(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    profile_id, _ = await seed_subscored(monkeypatch, role_fit=9.0)
+
+    async with session_factory() as session:
+        profile = await session.get(Profile, profile_id)
+        assert profile is not None
+        profile.preferences = {"priority": 0.0}
+        await session.commit()
+
+    stored = await list_ordered(profile_id)
+    assert [row.job_posting.title for row in stored] == ["Job 1", "Job 0"]
+
+    async with session_factory() as session:
+        profile = await session.get(Profile, profile_id)
+        assert profile is not None
+        profile.preferences = {"priority": "junk", "future_field": 1}
+        await session.commit()
+
+    fallback = await list_ordered(profile_id)
+    assert [row.job_posting.title for row in fallback] == ["Job 0", "Job 1"]
+    for row in fallback:
+        assert row.final_score == pytest.approx(
+            0.4 * row.vector_score + 0.4 * row.role_fit / 10 + 0.2 * row.company_fit / 10, abs=1e-6
+        )

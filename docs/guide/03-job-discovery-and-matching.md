@@ -1,12 +1,12 @@
 # 3 — Job Discovery & Matching
 
-**Status: live (except the priority slider)** — the search UI (profile selector, per-source
-queries, filters, live run banner), Adzuna + the LinkedIn Apify actor, LLM-generated
-per-source queries with Regenerate, de-duplication, embeddings, the hard-filter + cosine
-ranking query, ranked matches with the LLM re-rank and "why this matches" rationale, and
-the `GET /api/matches` dashboard all work today (issues #7–#10 and the search-queries
-follow-up). The priority-weight slider (role fit ↔ company fit) lands with issue #11;
-until then the score weights are fixed in `.env` (`MATCH_WEIGHT_*`).
+**Status: live** — the search UI (profile selector, per-source queries, filters, live run
+banner), Adzuna + the LinkedIn Apify actor, LLM-generated per-source queries with
+Regenerate, de-duplication, embeddings, the hard-filter + cosine ranking query, ranked
+matches with the LLM re-rank and "why this matches" rationale, the `GET /api/matches`
+dashboard, and the priority-weight slider (role fit ↔ company fit, issue #11) all work
+today (issues #7–#11 and the search-queries follow-up). The `MATCH_WEIGHT_*` values in
+`.env` are the server defaults; the slider overrides them per profile at read time.
 
 ## The idea
 
@@ -115,9 +115,9 @@ refresh after every run.
   returns a role-fit score (0–10), a company-fit score (0–10), and a "why this matches"
   rationale. The cap is `RERANK_TOP_N` (10 by default).
 - **`final_score`** — for re-ranked postings: `0.4 × vector_score + 0.4 × role_fit/10 +
-  0.2 × company_fit/10` (weights are `MATCH_WEIGHT_VECTOR`, `MATCH_WEIGHT_ROLE_FIT`,
-  `MATCH_WEIGHT_COMPANY_FIT` in `.env` until the priority slider lands). Everything else
-  keeps `final_score = vector_score`.
+  0.2 × company_fit/10` (server defaults `MATCH_WEIGHT_VECTOR`, `MATCH_WEIGHT_ROLE_FIT`,
+  `MATCH_WEIGHT_COMPANY_FIT` in `.env`; the priority slider overrides the role/company
+  split per profile at read time). Everything else keeps `final_score = vector_score`.
 - **Repeat searches are cheap** — postings whose rationale is still valid are not sent to
   the LLM again; a search that adds nothing new to the top costs zero LLM tokens. The run
   banner shows the matching stage's outcome, including the re-rank token usage.
@@ -193,8 +193,29 @@ mapper module — no core changes.
   the ranking instead of trusting a black box; expand it on each match card
 - **Filters** — location, remote, job type, posting date, plus a sort selector (best
   match / similarity / newest); applied to the stored matches
-- **Priority slider** — *(lands with issue #11)* shift weighting between *role fit* and
-  *company fit*; until then the weights are fixed in `.env` (`MATCH_WEIGHT_*`)
+- **Priority slider** — shift weighting between *role fit* and *company fit* (see below)
+
+## The priority slider (issue #11)
+
+The slider above the filter bar re-weights the ranking between the two LLM signals:
+slide toward **role fit** to prioritise postings whose *work* matches your skills and
+seniority; slide toward **company fit** to prioritise employers that match your
+trajectory.
+
+- **Live and cheap** — moving the slider re-orders the stored matches instantly. It
+  re-weights the AI's already-stored role-fit/company-fit ratings in SQL; no LLM call,
+  no re-scoring, no token cost.
+- **Saved per profile** — the position persists per profile track (a debounced save ~
+  400 ms after you stop sliding). Reload or switch profiles and the slider comes back
+  where you left it; each track keeps its own setting.
+- **What it can't do** — postings the AI never re-ranked have no company signal, so they
+  keep their plain similarity score regardless of the slider; the slider reorders only
+  the re-ranked top N relative to each other and to unranked rows. It is a *read-time*
+  view: it never changes which postings are fetched or re-ranked, and it never writes to
+  your profile content or revision history.
+- **Server defaults still exist** — the slider's default position matches the
+  `MATCH_WEIGHT_*` values in `.env`. Changing those env values applies to new score
+  writes; the per-profile slider position (once moved) overrides them at read time.
 
 ## Privacy
 

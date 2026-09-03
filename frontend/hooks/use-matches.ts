@@ -9,6 +9,11 @@ export type MatchFilterValues = Pick<
   "location" | "remote_type" | "job_type" | "posted_within_days" | "sort"
 >;
 
+// Slider position equivalent to the server defaults (MATCH_WEIGHT_ROLE_FIT=0.4,
+// MATCH_WEIGHT_COMPANY_FIT=0.2 → 0.4/0.6). Display default only; with no stored
+// preference and no slider move, no priority is sent and the server decides.
+export const DEFAULT_PRIORITY = 2 / 3;
+
 export const DEFAULT_MATCH_FILTERS: MatchFilterValues = {
   location: undefined,
   remote_type: undefined,
@@ -19,7 +24,7 @@ export const DEFAULT_MATCH_FILTERS: MatchFilterValues = {
 
 export function useMatches(
   profileId: string | null,
-  params: Pick<MatchListParams, "limit" | "offset"> & MatchFilterValues,
+  params: Pick<MatchListParams, "limit" | "offset" | "priority"> & MatchFilterValues,
 ) {
   return useQuery({
     queryKey: ["matches", profileId, params],

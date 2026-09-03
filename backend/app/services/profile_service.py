@@ -19,7 +19,9 @@ from app.schemas.profile import (
     ProfileSummary,
     ProfileUpdate,
     RevisionSummary,
+    StoredPreferences,
     StructuredProfile,
+    parse_stored_preferences,
 )
 from app.schemas.resume import DraftProfileResponse
 from app.services import embedding, matching, query_builder
@@ -97,6 +99,7 @@ def _profile_response(
         name=profile.name,
         structured_profile=StructuredProfile.model_validate(profile.structured_profile),
         search_queries=query_builder.parse_stored(profile.search_queries),
+        preferences=parse_stored_preferences(profile.preferences),
         source_resume_id=profile.source_resume_id,
         source_resume_filename=source_resume_filename,
         updated_at=profile.updated_at,
@@ -252,6 +255,27 @@ async def save_profile(
     )
     filename = await _resume_filename(session, profile.source_resume_id)
     return _profile_response(profile, filename, last_revision)
+
+
+async def update_preferences(
+    session: AsyncSession, profile_id: uuid.UUID, payload: StoredPreferences
+) -> StoredPreferences:
+    """Persist the dashboard view preference (issue #11).
+
+    Deliberately revision-free: a slider wiggle is a view preference, not
+    profile content — no revision row, no embedding refresh, no match
+    re-scoring. Matches re-order at read time instead.
+    """
+    profile = await session.get(Profile, profile_id)
+    if profile is None:
+        raise ProfileNotFoundError()
+    profile.preferences = payload.model_dump(mode="json")
+    await session.flush()
+    await session.refresh(profile)
+    logger.info(
+        "profile.preferences_updated profile_id=%s priority=%.3f", profile.id, payload.priority
+    )
+    return parse_stored_preferences(profile.preferences) or payload
 
 
 async def delete_profile(session: AsyncSession, profile_id: uuid.UUID) -> None:

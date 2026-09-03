@@ -19,7 +19,7 @@ from app.schemas.matching import (
     RerankItem,
     RerankResult,
 )
-from app.schemas.profile import StructuredProfile
+from app.schemas.profile import StructuredProfile, parse_stored_preferences
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +28,7 @@ _MAX_RERANK_DESCRIPTION_CHARS = 1500
 _MAX_DIGEST_SUMMARY_CHARS = 400
 _MAX_DIGEST_ROLES = 8
 _FIT_SCALE = 10.0
+_PRIORITY_EPSILON = 1e-9
 
 _RERANK_SYSTEM = (
     "You score job postings against a candidate profile. "
@@ -76,6 +77,45 @@ def _apply_posting_filters[RowT](query: Select[RowT], filters: MatchFilters) -> 
 def vector_score_expression(profile_embedding: list[float]) -> ColumnElement[float]:
     distance = JobPosting.embedding.cosine_distance(profile_embedding)
     return func.least(1.0, func.greatest(1.0 - distance, 0.0))
+
+
+def priority_weights(priority: float) -> tuple[float, float]:
+    """Split the non-vector weight mass: (role_fit weight, company_fit weight).
+
+    The vector weight stays at its Settings value; the remainder splits by the
+    slider position, so `priority_weights(default_priority())` reproduces the
+    Settings defaults exactly.
+    """
+    settings = get_settings()
+    remaining = 1.0 - settings.match_weight_vector
+    clamped = max(0.0, min(1.0, priority))
+    return remaining * clamped, remaining * (1.0 - clamped)
+
+
+def default_priority() -> float:
+    """Slider position equivalent to the Settings default weights."""
+    settings = get_settings()
+    total = settings.match_weight_role_fit + settings.match_weight_company_fit
+    if total <= 0.0:
+        return 0.5
+    return settings.match_weight_role_fit / total
+
+
+def _priority_sort_expression(priority: float) -> ColumnElement[float]:
+    """Read-time blend of stored sub-scores under a custom priority (#11).
+
+    Rows without sub-scores keep their plain vector_score — the slider only
+    reorders the re-ranked top N relative to each other and to unranked rows'
+    fixed vector scores.
+    """
+    w_role, w_company = priority_weights(priority)
+    settings = get_settings()
+    blended = (
+        settings.match_weight_vector * Match.vector_score
+        + w_role * Match.role_fit / _FIT_SCALE
+        + w_company * Match.company_fit / _FIT_SCALE
+    )
+    return case((Match.role_fit.is_not(None), blended), else_=Match.vector_score)
 
 
 async def rescore_matches(
@@ -308,13 +348,28 @@ async def list_matches(session: AsyncSession, params: MatchQueryParams) -> list[
     if profile.embedding is None:
         raise ProfileNotEmbeddedError()
 
-    query: Select[tuple[Match, JobPosting]] = (
-        select(Match, JobPosting)
+    stored = parse_stored_preferences(profile.preferences)
+    priority = (
+        params.priority if params.priority is not None else (stored.priority if stored else None)
+    )
+    custom = (
+        params.sort == "final_score"
+        and priority is not None
+        and abs(priority - default_priority()) > _PRIORITY_EPSILON
+    )
+    effective = _priority_sort_expression(priority) if custom else Match.final_score
+
+    query: Select[tuple[Match, JobPosting, float]] = (
+        select(Match, JobPosting, effective.label("effective_score"))
         .join(JobPosting, Match.job_posting_id == JobPosting.id)
         .where(Match.profile_id == params.profile_id)
     )
     query = _apply_posting_filters(query, params)
-    query = query.order_by(*_SORT_ORDERS[params.sort]).limit(params.limit).offset(params.offset)
+    if custom:
+        query = query.order_by(effective.desc(), JobPosting.posted_at.desc().nulls_last())
+    else:
+        query = query.order_by(*_SORT_ORDERS[params.sort])
+    query = query.limit(params.limit).offset(params.offset)
     rows = (await session.execute(query)).all()
     return [
         MatchResponse(
@@ -323,10 +378,10 @@ async def list_matches(session: AsyncSession, params: MatchQueryParams) -> list[
             vector_score=match.vector_score,
             role_fit=match.role_fit,
             company_fit=match.company_fit,
-            final_score=match.final_score,
+            final_score=effective_score,
             rationale=match.rationale,
             created_at=match.created_at,
             updated_at=match.updated_at,
         )
-        for match, posting in rows
+        for match, posting, effective_score in rows
     ]

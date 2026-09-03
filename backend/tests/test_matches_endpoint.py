@@ -5,7 +5,12 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
-from fakes import VALID_PROFILE, fake_vector
+from fakes import (
+    VALID_PROFILE,
+    fake_vector,
+    install_acompletion,
+    llm_response,
+)
 from httpx import ASGITransport, AsyncClient
 
 from app.core.db import session_factory
@@ -111,6 +116,64 @@ def vector_scores(
 async def get_matches(client: AsyncClient, profile_id: uuid.UUID, **params: Any) -> Any:
     query = {"profile_id": str(profile_id), **{k: str(v) for k, v in params.items()}}
     return await client.get("/api/matches", params=query)
+
+
+async def seed_subscored_profile(
+    monkeypatch: pytest.MonkeyPatch,
+) -> tuple[uuid.UUID, list[JobPosting]]:
+    """Profile + two postings with identical embeddings but opposite LLM sub-scores.
+
+    Equal vector scores make the custom-priority ordering depend entirely on the
+    re-rank sub-scores: "Role Heavy" (role 9 / company 1) vs "Company Heavy"
+    (role 1 / company 9).
+    """
+    async with session_factory() as session:
+        profile = await create_profile(
+            session, ProfileCreate(name="Seeker", structured_profile=structured_profile())
+        )
+        await session.commit()
+        profile_id = profile.profile_id
+
+    async with session_factory() as session:
+        now = datetime.now(UTC)
+        postings = []
+        for index, (title, posted_at) in enumerate(
+            [("Role Heavy", now - timedelta(days=1)), ("Company Heavy", now - timedelta(days=2))]
+        ):
+            posting = JobPosting(
+                source="adzuna",
+                external_id=f"ext-{index}",
+                title=title,
+                location="Berlin",
+                posted_at=posted_at,
+                description=DESCRIPTION,
+                embedding=fake_vector("twin"),
+                raw_payload={"id": f"ext-{index}"},
+            )
+            session.add(posting)
+            postings.append(posting)
+        await session.commit()
+        for posting in postings:
+            await session.refresh(posting)
+
+        items = [
+            {
+                "posting_id": str(postings[0].id),
+                "role_fit": 9.0,
+                "company_fit": 1.0,
+                "rationale": "Role matches skills.",
+            },
+            {
+                "posting_id": str(postings[1].id),
+                "role_fit": 1.0,
+                "company_fit": 9.0,
+                "rationale": "Employer matches trajectory.",
+            },
+        ]
+        install_acompletion(monkeypatch, lambda **kw: llm_response(json.dumps({"items": items})))
+        await matching.refresh_matches_for_profile(session, profile_id)
+        await session.commit()
+    return profile_id, postings
 
 
 async def test_list_matches_ranks_and_embeds_posting(
@@ -252,3 +315,96 @@ async def test_invalid_params_return_422(client: AsyncClient) -> None:
 
     missing_profile = await client.get("/api/matches")
     assert missing_profile.status_code == 422
+
+
+async def test_custom_priority_reorders_by_subscores(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    profile_id, _ = await seed_subscored_profile(monkeypatch)
+
+    role_first = await get_matches(client, profile_id, priority=1.0)
+    company_first = await get_matches(client, profile_id, priority=0.0)
+
+    assert [row["job_posting"]["title"] for row in role_first.json()] == [
+        "Role Heavy",
+        "Company Heavy",
+    ]
+    assert [row["job_posting"]["title"] for row in company_first.json()] == [
+        "Company Heavy",
+        "Role Heavy",
+    ]
+
+
+async def test_custom_priority_response_scores_match_order_and_math(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    profile_id, _ = await seed_subscored_profile(monkeypatch)
+
+    body = (await get_matches(client, profile_id, priority=0.0)).json()
+
+    finals = [row["final_score"] for row in body]
+    assert finals == sorted(finals, reverse=True)
+    vector_score = body[0]["vector_score"]
+    assert body[0]["job_posting"]["title"] == "Company Heavy"
+    assert body[0]["final_score"] == pytest.approx(0.4 * vector_score + 0.6 * 0.9, abs=1e-6)
+    assert body[1]["final_score"] == pytest.approx(0.4 * vector_score + 0.6 * 0.1, abs=1e-6)
+    for row in body:
+        assert row["role_fit"] is not None
+        assert row["rationale"] is not None
+
+
+async def test_default_priority_matches_no_param_response(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    profile_id, _ = await seed_subscored_profile(monkeypatch)
+
+    without = (await get_matches(client, profile_id)).json()
+    explicit_default = (await get_matches(client, profile_id, priority=0.6666666667)).json()
+
+    assert [row["job_posting"]["id"] for row in without] == [
+        row["job_posting"]["id"] for row in explicit_default
+    ]
+    assert [row["final_score"] for row in without] == [
+        row["final_score"] for row in explicit_default
+    ]
+
+
+async def test_stored_preference_used_when_param_absent(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    profile_id, _ = await seed_subscored_profile(monkeypatch)
+    stored = await client.patch(f"/api/profiles/{profile_id}/preferences", json={"priority": 0.0})
+    assert stored.status_code == 200
+
+    ordered = await get_matches(client, profile_id)
+    overridden = await get_matches(client, profile_id, priority=1.0)
+
+    assert [row["job_posting"]["title"] for row in ordered.json()] == [
+        "Company Heavy",
+        "Role Heavy",
+    ]
+    assert [row["job_posting"]["title"] for row in overridden.json()] == [
+        "Role Heavy",
+        "Company Heavy",
+    ]
+
+
+async def test_sort_posted_at_ignores_priority(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    profile_id, _ = await seed_subscored_profile(monkeypatch)
+
+    response = await get_matches(client, profile_id, sort="posted_at", priority=0.0)
+
+    assert [row["job_posting"]["title"] for row in response.json()] == [
+        "Role Heavy",
+        "Company Heavy",
+    ]
+
+
+async def test_out_of_range_priority_returns_422(client: AsyncClient) -> None:
+    too_high = await get_matches(client, uuid.uuid4(), priority=1.5)
+    too_low = await get_matches(client, uuid.uuid4(), priority=-0.1)
+
+    assert too_high.status_code == 422
+    assert too_low.status_code == 422

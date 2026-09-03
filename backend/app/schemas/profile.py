@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 from app.schemas.job_search import StoredSearchQueries
 
@@ -162,11 +162,41 @@ class ProfileUpdate(BaseModel):
     )
 
 
+class StoredPreferences(BaseModel):
+    """Dashboard view preferences stored on `profile.preferences` (issue #11).
+
+    Distinct from the resume-derived `Preferences` inside `structured_profile`:
+    this is how the *ranking view* is weighted, not profile content.
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    priority: float = Field(
+        ge=0,
+        le=1,
+        description="role-fit vs company-fit weighting (1 = role-fit only, 0 = company-fit only)",
+    )
+
+
+def parse_stored_preferences(raw: object | None) -> StoredPreferences | None:
+    """Defensively parse stored preferences; junk in the JSONB falls back to None.
+
+    `None` means "no valid stored value — use the server default".
+    """
+    if raw is None:
+        return None
+    try:
+        return StoredPreferences.model_validate(raw)
+    except ValidationError:
+        return None
+
+
 class ProfileResponse(BaseModel):
     profile_id: uuid.UUID
     name: str
     structured_profile: StructuredProfile
     search_queries: StoredSearchQueries | None = None
+    preferences: StoredPreferences | None = None
     source_resume_id: uuid.UUID | None
     source_resume_filename: str | None
     updated_at: datetime

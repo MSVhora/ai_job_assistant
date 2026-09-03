@@ -179,6 +179,7 @@ erDiagram
         text name "track name, e.g. Senior Android Developer"
         jsonb structured_profile "contact, headline, skills, experience, projects, education, certifications, extra sections, embedded preferences"
         jsonb search_queries "per-source query specs + generation stamp; Regenerate overwrites"
+        jsonb preferences "dashboard view preference {priority: 0-1} — role-fit vs company-fit weighting at match read time (issue #11); distinct from resume-derived prefs inside structured_profile"
         uuid source_resume_id FK "resume whose draft seeded this profile (provenance)"
         vector embedding "pgvector, dim 768 (gemini-embedding-001, truncated via dimensions param); refreshed on every content save/gap-fill"
         timestamptz created_at
@@ -261,14 +262,18 @@ erDiagram
 
 ![database-schema-er diagram](./assets/database-schema-er.svg)
 
-Deferred from plan §4 (issue #4 locked decision): the separate `preferences` (weights) and
-`completeness` jsonb columns. Preferences extracted from the resume stay inside the
-profile's `structured_profile`; the matching work (#10) reads blend weights from
-`Settings` (`MATCH_WEIGHT_*` in `.env.example`) and stores the re-rank sub-scores on
-`match` so the priority slider (#11) can re-weight without an LLM call, and gap-fill (#5)
-derives completeness from the profile instead of storing it. Multi-profile moved the
-opposite way — from v2 into v1 (issue #6, owner decision 2026-09-01): `profile` is now the
-home of `structured_profile` and the revision audit.
+Deferred from plan §4 (issue #4 locked decision): the separate `completeness` jsonb
+column — gap-fill (#5) derives completeness from the profile instead of storing it. The
+`preferences` (weights) column deferred alongside it landed with the priority slider
+(issue #11): it holds the per-profile dashboard *view* weight
+(`{priority: float 0–1}`, role-fit vs company-fit at match read time), distinct from the
+resume-derived preferences inside `structured_profile`, and is deliberately
+revision-free. Preferences extracted from the resume stay inside the profile's
+`structured_profile`; the matching work (#10) reads blend weights from `Settings`
+(`MATCH_WEIGHT_*` in `.env.example`) and stores the re-rank sub-scores on `match` so the
+slider re-weights without an LLM call. Multi-profile moved the opposite way — from v2
+into v1 (issue #6, owner decision 2026-09-01): `profile` is now the home of
+`structured_profile` and the revision audit.
 
 Schema conventions and index rules (FK columns indexed, `(source, external_id)` unique,
 `match(profile_id, final_score DESC)` for the dashboard query, embedding dimension pinned

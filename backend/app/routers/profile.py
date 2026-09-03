@@ -12,6 +12,7 @@ from app.schemas.profile import (
     ProfileResponse,
     ProfileSummary,
     ProfileUpdate,
+    StoredPreferences,
 )
 from app.services import gap_fill, profile_service, query_builder
 
@@ -48,6 +49,15 @@ async def update_profile(
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> ProfileResponse:
     return await profile_service.save_profile(session, profile_id, payload)
+
+
+@router.patch("/profiles/{profile_id}/preferences", response_model=StoredPreferences)
+async def update_profile_preferences(
+    profile_id: uuid.UUID,
+    payload: StoredPreferences,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> StoredPreferences:
+    return await profile_service.update_preferences(session, profile_id, payload)
 
 
 @router.post("/profiles/{profile_id}/gap-fill", response_model=GapFillResponse)

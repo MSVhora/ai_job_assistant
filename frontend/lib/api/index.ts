@@ -23,6 +23,7 @@ export type SearchQueriesResponse = components["schemas"]["SearchQueriesResponse
 export type JobPostingSummary = components["schemas"]["JobPostingSummary"];
 export type MatchResponse = components["schemas"]["MatchResponse"];
 export type MatchingOutcome = components["schemas"]["MatchingOutcome"];
+export type StoredPreferences = components["schemas"]["StoredPreferences"];
 export type MatchListParams = operations["list_matches_api_matches_get"]["parameters"]["query"];
 
 export { ApiError, ExtractionFailedError, apiFetch } from "./client";
@@ -91,6 +92,16 @@ export async function updateProfile(
 
 export async function deleteProfile(profileId: string): Promise<void> {
   await apiFetch<unknown>(`/api/profiles/${profileId}`, { method: "DELETE" });
+}
+
+export async function updatePreferences(
+  profileId: string,
+  payload: StoredPreferences,
+): Promise<StoredPreferences> {
+  return apiFetch<StoredPreferences>(
+    `/api/profiles/${encodeURIComponent(profileId)}/preferences`,
+    { method: "PATCH", body: JSON.stringify(payload) },
+  );
 }
 
 export async function gapFillTurn(

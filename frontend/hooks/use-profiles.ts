@@ -7,9 +7,11 @@ import {
   deleteProfile,
   getProfile,
   listProfiles,
+  updatePreferences,
   updateProfile,
   type ProfileCreate,
   type ProfileUpdate,
+  type StoredPreferences,
 } from "@/lib/api";
 
 export function useProfiles() {
@@ -55,6 +57,17 @@ export function useDeleteProfile() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["profiles"] });
       void queryClient.invalidateQueries({ queryKey: ["resumes"] });
+    },
+  });
+}
+
+export function useUpdatePreferences() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ profileId, payload }: { profileId: string; payload: StoredPreferences }) =>
+      updatePreferences(profileId, payload),
+    onSuccess: (_data, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ["profile", variables.profileId] });
     },
   });
 }

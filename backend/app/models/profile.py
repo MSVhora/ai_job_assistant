@@ -23,6 +23,10 @@ class Profile(Base):
     # new column + backfill migration, never a silent dimension change.
     embedding: Mapped[list[float] | None] = mapped_column(Vector(768), nullable=True)
     search_queries: Mapped[dict[str, object] | None] = mapped_column(JSONB, nullable=True)
+    # Dashboard *view* preferences (match priority weighting) — distinct from the
+    # resume-derived preferences inside structured_profile. Deliberately not
+    # revision-audited (issue #11): a slider wiggle is not profile content.
+    preferences: Mapped[dict[str, object] | None] = mapped_column(JSONB, nullable=True)
     source_resume_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("resume.id", ondelete="SET NULL"), nullable=True, index=True
     )

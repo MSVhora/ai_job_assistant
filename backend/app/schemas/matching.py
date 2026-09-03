@@ -42,6 +42,15 @@ class MatchFilters(BaseModel):
 
 class MatchQueryParams(MatchFilters):
     profile_id: uuid.UUID
+    priority: float | None = Field(
+        default=None,
+        ge=0,
+        le=1,
+        description=(
+            "role-fit vs company-fit weighting (1 = role-fit only); "
+            "falls back to the profile's stored preference, then the server default"
+        ),
+    )
     sort: MatchSort = "final_score"
     limit: int = Field(default=50, ge=1, le=200)
     offset: int = Field(default=0, ge=0)

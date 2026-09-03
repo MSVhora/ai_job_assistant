@@ -40,6 +40,16 @@ alembic upgrade head
 - API: http://localhost:8000 (docs at `/docs`)
 - Health: `GET /api/health` reports database + LLM key status
 
+## How it works
+
+A first successful match takes about five minutes (details in the [user guide](docs/guide/README.md)):
+
+1. **Connect keys** — add `GEMINI_API_KEY` (and optionally Adzuna/Apify keys) to `.env`; enable sources on the **Setup** page. Scraping-based sources show a ToS disclosure you acknowledge once. [Getting started →](docs/guide/01-getting-started.md)
+2. **Upload a resume** — the AI extracts a structured profile draft; review and correct every field before saving. Corrections are recorded in a revision audit trail. [Upload & profile review →](docs/guide/02-upload-and-profile.md)
+3. **Fill the gaps** — a short conversational pass asks only about genuinely missing fields (location, salary band, seniority, work authorization, remote preference).
+4. **Search** — the LLM drafts per-source search queries from your profile; ingestion runs in the background across all enabled sources, de-duplicating as it goes. You can leave the page while it runs. [Search & sources →](docs/guide/03-job-discovery-and-matching.md)
+5. **Read ranked matches** — every posting gets a similarity score; the top N get an LLM re-rank with role-fit/company-fit ratings and a plain-language "why this matches". The priority slider re-weights role fit vs company fit live — per profile, with no extra AI cost. [Search & sources →](docs/guide/03-job-discovery-and-matching.md)
+
 ## Development
 
 | Where | Command |

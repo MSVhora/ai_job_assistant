@@ -29,5 +29,6 @@ Each guide marks what is **live now** vs **planned**:
   + resume list ([issue #6](../plans/v1-issue-006-multi-profile-resume-list.md)), job sources +
   ingestion ([issue #7](../plans/v1-issue-007-jobsource-adzuna-dedupe.md), [#8](../plans/v1-issue-008-apify-connectors-disclosure.md)),
   embeddings + hard filters ([issue #9](../plans/v1-issue-009-embeddings-pgvector-hard-filters.md)),
-  ranked matches with LLM re-rank + rationale ([issue #10](../plans/v1-issue-010-matching-rerank-rationale.md))
-- Planned: priority weighting (role-fit ↔ company-fit slider, issue #11)
+  ranked matches with LLM re-rank + rationale ([issue #10](../plans/v1-issue-010-matching-rerank-rationale.md)),
+  priority weighting (role-fit ↔ company-fit slider, issue #11)
+- Planned: seed data, rate-limit backoff polish (issue #12 buffer)

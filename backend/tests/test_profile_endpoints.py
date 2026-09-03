@@ -560,3 +560,66 @@ async def test_profile_save_survives_embedding_failure(
         profile = await session.get(Profile, uuid.UUID(response.json()["profile_id"]))
         assert profile is not None
         assert profile.embedding is None
+
+
+async def test_patch_preferences_round_trip_writes_no_revision(client: AsyncClient) -> None:
+    inserted = await insert_resume_with_draft(VALID_PROFILE)
+    created = (
+        await create_profile(client, "Data", VALID_PROFILE, source_resume_id=inserted["resume_id"])
+    ).json()
+    profile_id = created["profile_id"]
+    assert created["preferences"] is None
+    revisions_before = len(await fetch_revisions(profile_id))
+
+    response = await client.patch(
+        f"/api/profiles/{profile_id}/preferences", json={"priority": 0.25}
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"priority": 0.25}
+    fetched = (await client.get(f"/api/profiles/{profile_id}")).json()
+    assert fetched["preferences"] == {"priority": 0.25}
+    assert len(await fetch_revisions(profile_id)) == revisions_before
+
+
+async def test_patch_preferences_unknown_profile_returns_404(client: AsyncClient) -> None:
+    response = await client.patch(
+        f"/api/profiles/{uuid.uuid4()}/preferences", json={"priority": 0.5}
+    )
+
+    assert response.status_code == 404
+
+
+async def test_patch_preferences_out_of_range_returns_422(client: AsyncClient) -> None:
+    inserted = await insert_resume_with_draft(VALID_PROFILE)
+    created = (
+        await create_profile(client, "Data", VALID_PROFILE, source_resume_id=inserted["resume_id"])
+    ).json()
+
+    too_high = await client.patch(
+        f"/api/profiles/{created['profile_id']}/preferences", json={"priority": 1.5}
+    )
+    too_low = await client.patch(
+        f"/api/profiles/{created['profile_id']}/preferences", json={"priority": -0.1}
+    )
+
+    assert too_high.status_code == 422
+    assert too_low.status_code == 422
+
+
+async def test_content_save_keeps_preferences(client: AsyncClient) -> None:
+    inserted = await insert_resume_with_draft(VALID_PROFILE)
+    created = (
+        await create_profile(client, "Data", VALID_PROFILE, source_resume_id=inserted["resume_id"])
+    ).json()
+    profile_id = created["profile_id"]
+    await client.patch(f"/api/profiles/{profile_id}/preferences", json={"priority": 0.25})
+
+    saved = await client.patch(
+        f"/api/profiles/{profile_id}",
+        json={"structured_profile": with_headline(VALID_PROFILE, "Principal Data Analyst")},
+    )
+
+    assert saved.status_code == 200
+    fetched = (await client.get(f"/api/profiles/{profile_id}")).json()
+    assert fetched["preferences"] == {"priority": 0.25}

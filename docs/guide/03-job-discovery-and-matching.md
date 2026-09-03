@@ -68,12 +68,13 @@ flowchart LR
 
 A failing source never breaks the search — it is skipped with a warning surfaced in the UI.
 
-Today (issues #7–#9 + the search-queries follow-up): the `/jobs` page starts a background run
+Today (issues #7–#10 + the search-queries follow-up): the `/jobs` page starts a background run
 from per-source, editable queries, `GET /api/jobs/searches/{id}` reports its status with
 per-source results/warnings while a live banner polls it, the run's postings are listed
 (unranked) under the banner once it finishes, and postings are de-duplicated per
 `(source, external_id)` — a re-search refreshes the stored postings instead of duplicating
-them. Ranked matches arrive with the matching issues (#10–#11).
+them. Ranked matches with the "why this matches" rationale are shown below the banner and
+refresh after every run.
 
 ## How matching content is prepared (live since #9)
 
@@ -87,8 +88,8 @@ them. Ranked matches arrive with the matching issues (#10–#11).
   `backend/scripts/backfill_embeddings.py` (run inside the API container — see the script
   header; it also re-scores profiles so the matches appear immediately).
 - **Your profile is embedded on every content change** — create, manual save, re-upload
-  merge, and gap-fill answers all refresh the profile vector, so ranking (issue #10) never
-  needs to re-embed your profile per query.
+  merge, and gap-fill answers all refresh the profile vector, so ranking never needs to
+  re-embed your profile per query.
 - **Hard filters run in SQL before ranking** — location (case-insensitive substring),
   remote type, job type, and posted-within; a posting without a known posting date is
   excluded when a posted-within filter is active.

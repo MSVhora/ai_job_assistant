@@ -26,5 +26,8 @@ Each guide marks what is **live now** vs **planned**:
   draft ([issue #3](../plans/v1-issue-003-llm-extraction.md)), profile persistence + review/edit
   UI + revision audit ([issue #4](../plans/v1-issue-004-profile-persistence-review-ui.md)),
   conversational gap-fill ([issue #5](../plans/v1-issue-005-gap-fill.md)), multi-profile tracks
-  + resume list ([issue #6](../plans/v1-issue-006-multi-profile-resume-list.md))
-- Planned: job sources, matching, priority weighting
+  + resume list ([issue #6](../plans/v1-issue-006-multi-profile-resume-list.md)), job sources +
+  ingestion ([issue #7](../plans/v1-issue-007-jobsource-adzuna-dedupe.md), [#8](../plans/v1-issue-008-apify-connectors-disclosure.md)),
+  embeddings + hard filters ([issue #9](../plans/v1-issue-009-embeddings-pgvector-hard-filters.md)),
+  ranked matches with LLM re-rank + rationale ([issue #10](../plans/v1-issue-010-matching-rerank-rationale.md))
+- Planned: priority weighting (role-fit ↔ company-fit slider, issue #11)

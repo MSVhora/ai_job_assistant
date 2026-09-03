@@ -51,6 +51,14 @@ alembic upgrade head
 | `frontend/` | `npm run generate:api` (regenerate API types from backend OpenAPI; backend must be running) |
 | repo root | `docker compose up -d` |
 
+DB-backed backend tests need a **scratch** Postgres database (the suite migrates up at
+session start and downgrades to `base` at the end — never point it at your dev database):
+
+```bash
+docker exec ai_job_assistant-db-1 psql -U postgres -c "create database ai_job_assistant_test"
+cd backend && TEST_DATABASE_URL="postgresql+asyncpg://postgres:postgres@localhost:5432/ai_job_assistant_test" pytest
+```
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

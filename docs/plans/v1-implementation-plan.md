@@ -225,7 +225,7 @@ connectors at code level — only `apify_actor` entries are config-driven. Recor
 | 8 | Embeddings: profile + job descriptions → pgvector; hard filters in SQL |
 | 9 | Matching: cosine ranking + LLM re-rank of top N + rationale generation |
 | 10 | Priority-weight slider wired into ranking; README + `.env.example` docs + demo GIF |
-| Buffer | Seed data, error states, rate-limit backoff |
+| Buffer | Seed data, error states, rate-limit backoff (landed via [#12](v1-issue-012-buffer-seed-errors-backoff.md)) |
 
 ---
 

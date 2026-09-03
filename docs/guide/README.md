@@ -30,5 +30,6 @@ Each guide marks what is **live now** vs **planned**:
   ingestion ([issue #7](../plans/v1-issue-007-jobsource-adzuna-dedupe.md), [#8](../plans/v1-issue-008-apify-connectors-disclosure.md)),
   embeddings + hard filters ([issue #9](../plans/v1-issue-009-embeddings-pgvector-hard-filters.md)),
   ranked matches with LLM re-rank + rationale ([issue #10](../plans/v1-issue-010-matching-rerank-rationale.md)),
-  priority weighting (role-fit ↔ company-fit slider, issue #11)
-- Planned: seed data, rate-limit backoff polish (issue #12 buffer)
+  priority weighting (role-fit ↔ company-fit slider, issue #11),
+  rate-limit backoff on all outbound calls, a synthetic demo seed script, and audited
+  error states ([issue #12](../plans/v1-issue-012-buffer-seed-errors-backoff.md))

@@ -1,4 +1,3 @@
-import asyncio
 import json
 import logging
 import time
@@ -7,12 +6,12 @@ from dataclasses import dataclass
 import litellm
 from pydantic import BaseModel, ValidationError
 
+from app.adapters.retry import with_retry
 from app.core.config import Settings, get_settings
 
 logger = logging.getLogger(__name__)
 
 _RETRYABLE_STATUS_CODES = frozenset({429, 500, 502, 503, 504})
-_TRANSPORT_RETRY_DELAY_S = 1.0
 
 
 class LLMError(Exception):
@@ -76,26 +75,16 @@ async def _completion_with_retry(
         "max_tokens": max_tokens,
         "api_key": settings.gemini_api_key,
     }
+
+    async def _call():
+        return await litellm.acompletion(**kwargs)
+
     try:
-        return await litellm.acompletion(**kwargs), 1
+        return await with_retry("llm.generate", _call, is_retryable=_is_transport_retryable)
     except Exception as exc:
         reason = _failure_reason(exc)
-        if not _is_transport_retryable(exc):
-            logger.warning("llm.generate failed (%s): %s", type(exc).__name__, reason)
-            raise LLMError(f"llm generation failed: {reason}") from exc
-        logger.warning(
-            "llm.generate transient failure (%s); retrying once in %.1fs",
-            reason,
-            _TRANSPORT_RETRY_DELAY_S,
-        )
-    await asyncio.sleep(_TRANSPORT_RETRY_DELAY_S)
-    try:
-        return await litellm.acompletion(**kwargs), 2
-    except Exception as exc:
-        logger.warning(
-            "llm.generate retry failed (%s): %s", type(exc).__name__, _failure_reason(exc)
-        )
-        raise LLMError(f"llm generation failed: {_failure_reason(exc)}") from exc
+        logger.warning("llm.generate failed (%s): %s", type(exc).__name__, reason)
+        raise LLMError(f"llm generation failed: {reason}") from exc
 
 
 async def generate(
@@ -112,14 +101,13 @@ async def generate(
     messages.append({"role": "user", "content": prompt})
 
     start = time.perf_counter()
-    response, attempts = await _completion_with_retry(settings, messages, temperature, max_tokens)
+    response = await _completion_with_retry(settings, messages, temperature, max_tokens)
 
     duration_ms = (time.perf_counter() - start) * 1000
     usage = response.usage
     logger.info(
-        "llm.generate model=%s attempts=%d duration_ms=%.0f prompt_tokens=%s completion_tokens=%s",
+        "llm.generate model=%s duration_ms=%.0f prompt_tokens=%s completion_tokens=%s",
         settings.llm_model,
-        attempts,
         duration_ms,
         usage.prompt_tokens,
         usage.completion_tokens,
@@ -137,15 +125,21 @@ async def embed(texts: list[str]) -> EmbeddingResult:
 
     settings = get_settings()
     start = time.perf_counter()
-    try:
-        response = await litellm.aembedding(
+
+    async def _call():
+        return await litellm.aembedding(
             model=settings.embedding_model,
             input=texts,
             dimensions=settings.embedding_dimensions,
             api_key=settings.gemini_api_key,
         )
+
+    try:
+        response = await with_retry("llm.embed", _call, is_retryable=_is_transport_retryable)
     except Exception as exc:
-        raise LLMError(f"llm embedding failed: {exc}") from exc
+        reason = _failure_reason(exc)
+        logger.warning("llm.embed failed (%s): %s", type(exc).__name__, reason)
+        raise LLMError(f"llm embedding failed: {reason}") from exc
 
     duration_ms = (time.perf_counter() - start) * 1000
     usage = response.usage

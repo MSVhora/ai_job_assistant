@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     embedding_model: str = "gemini/gemini-embedding-001"
     embedding_dimensions: int = 768
     extraction_max_chars: int = 20_000
+    # Outbound retry policy shared by LLM calls and job-source HTTP calls.
+    llm_retry_attempts: int = 3
+    llm_retry_base_delay_s: float = 1.0
 
     adzuna_app_id: str | None = None
     adzuna_app_key: str | None = None

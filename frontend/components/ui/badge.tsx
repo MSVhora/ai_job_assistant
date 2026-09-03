@@ -1,6 +1,13 @@
 import type { ReactNode } from "react";
 
-type BadgeVariant = "neutral" | "success" | "warn" | "ai" | "official-api" | "third-party-scraper";
+type BadgeVariant =
+  | "neutral"
+  | "success"
+  | "warn"
+  | "danger"
+  | "ai"
+  | "official-api"
+  | "third-party-scraper";
 
 const variantStyles: Record<BadgeVariant, string> = {
   neutral:
@@ -8,6 +15,8 @@ const variantStyles: Record<BadgeVariant, string> = {
   success:
     "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
   warn: "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-300",
+  danger:
+    "border-red-300 bg-red-50 text-red-800 dark:border-red-700 dark:bg-red-950 dark:text-red-300",
   ai: "border-sky-300 bg-sky-50 text-sky-800 dark:border-sky-700 dark:bg-sky-950 dark:text-sky-300",
   "official-api":
     "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",

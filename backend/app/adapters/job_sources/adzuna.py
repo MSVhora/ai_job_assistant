@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import time
 from typing import Any
@@ -15,6 +14,7 @@ from app.adapters.job_sources.base import (
     clean_text,
     parse_datetime,
 )
+from app.adapters.retry import Transient, retry_after_header, retryable_status, with_retry
 from app.core.config import get_settings
 from app.models import JobType
 
@@ -22,8 +22,6 @@ logger = logging.getLogger(__name__)
 
 _BASE_URL = "https://api.adzuna.com"
 _TIMEOUT_S = 30.0
-_RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 504})
-_RETRY_DELAY_S = 1.0
 _MAX_RESULTS_PER_PAGE = 50
 
 _CONTRACT_TIME_MAP: dict[str, JobType] = {
@@ -157,23 +155,32 @@ class AdzunaJobSource:
             raise ConnectorError(f"adzuna posting failed normalization: {exc}") from exc
 
     async def _get_json(self, url: str, params: dict[str, str]) -> dict[str, Any]:
-        last_error: str | None = None
-        async with self._client_factory() as client:
-            for attempt in range(2):
-                try:
+        def _describe(exc: Exception) -> str:
+            return f"transport error: {exc}" if isinstance(exc, httpx.HTTPError) else str(exc)
+
+        try:
+            async with self._client_factory() as client:
+
+                async def _call() -> dict[str, Any]:
                     response = await client.get(url, params=params)
-                except httpx.HTTPError as exc:
-                    last_error = f"transport error: {exc}"
-                else:
                     if response.status_code < 400:
                         try:
-                            data: dict[str, Any] = response.json()
+                            return response.json()
                         except ValueError as exc:
                             raise ConnectorError("adzuna returned invalid JSON") from exc
-                        return data
-                    last_error = f"status {response.status_code}"
-                    if response.status_code not in _RETRYABLE_STATUS:
-                        break
-                if attempt == 0:
-                    await asyncio.sleep(_RETRY_DELAY_S)
-        raise ConnectorError(f"adzuna request failed ({last_error})")
+                    if retryable_status(response.status_code):
+                        raise Transient(
+                            f"status {response.status_code}",
+                            retry_after_s=retry_after_header(response.headers.get("retry-after")),
+                        )
+                    raise ConnectorError(f"adzuna request failed (status {response.status_code})")
+
+                return await with_retry("adzuna", _call, is_retryable=_is_retryable)
+        except ConnectorError:
+            raise
+        except (httpx.HTTPError, Transient) as exc:
+            raise ConnectorError(f"adzuna request failed ({_describe(exc)})") from exc
+
+
+def _is_retryable(exc: Exception) -> bool:
+    return isinstance(exc, (httpx.HTTPError, Transient))

@@ -13,6 +13,10 @@ from app.core.config import get_settings
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
+async def _no_delay(_: float) -> None:
+    return None
+
+
 def _fixture() -> dict[str, object]:
     return json.loads((FIXTURES / "adzuna_search_response.json").read_text())
 
@@ -93,7 +97,7 @@ async def test_search_requests_country_path_and_params(
         seen["url"] = str(request.url)
         return httpx.Response(200, json=_fixture())
 
-    monkeypatch.setattr("app.adapters.job_sources.adzuna._RETRY_DELAY_S", 0)
+    monkeypatch.setattr("app.adapters.retry.asyncio.sleep", _no_delay)
     source = _mock_source(monkeypatch, httpx.MockTransport(handler))
 
     postings = await source.search(
@@ -122,7 +126,7 @@ async def test_search_retries_once_on_rate_limit(monkeypatch: pytest.MonkeyPatch
             return httpx.Response(429)
         return httpx.Response(200, json=_fixture())
 
-    monkeypatch.setattr("app.adapters.job_sources.adzuna._RETRY_DELAY_S", 0)
+    monkeypatch.setattr("app.adapters.retry.asyncio.sleep", _no_delay)
     source = _mock_source(monkeypatch, httpx.MockTransport(handler))
 
     postings = await source.search(JobSearchQuery(query="python", country="de"))
@@ -138,7 +142,7 @@ async def test_search_does_not_retry_client_errors(monkeypatch: pytest.MonkeyPat
         calls["count"] += 1
         return httpx.Response(401)
 
-    monkeypatch.setattr("app.adapters.job_sources.adzuna._RETRY_DELAY_S", 0)
+    monkeypatch.setattr("app.adapters.retry.asyncio.sleep", _no_delay)
     source = _mock_source(monkeypatch, httpx.MockTransport(handler))
 
     with pytest.raises(ConnectorError, match="status 401"):
@@ -163,7 +167,7 @@ async def test_search_sends_structured_params_for_spec(
         seen["url"] = str(request.url)
         return httpx.Response(200, json=_fixture())
 
-    monkeypatch.setattr("app.adapters.job_sources.adzuna._RETRY_DELAY_S", 0)
+    monkeypatch.setattr("app.adapters.retry.asyncio.sleep", _no_delay)
     source = _mock_source(monkeypatch, httpx.MockTransport(handler))
 
     query = JobSearchQuery(
@@ -191,7 +195,7 @@ async def test_search_requires_terms_when_no_query_or_title(
     def handler(_: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json=_fixture())
 
-    monkeypatch.setattr("app.adapters.job_sources.adzuna._RETRY_DELAY_S", 0)
+    monkeypatch.setattr("app.adapters.retry.asyncio.sleep", _no_delay)
     source = _mock_source(monkeypatch, httpx.MockTransport(handler))
 
     with pytest.raises(ConnectorError, match="needs a query"):

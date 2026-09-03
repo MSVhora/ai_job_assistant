@@ -69,6 +69,15 @@ docker exec ai_job_assistant-db-1 psql -U postgres -c "create database ai_job_as
 cd backend && TEST_DATABASE_URL="postgresql+asyncpg://postgres:postgres@localhost:5432/ai_job_assistant_test" pytest
 ```
 
+To explore the UI without any keys or live searches, seed a synthetic demo dataset
+(profile "Jane Doe (demo)" + deterministic postings and matches, zero LLM calls):
+
+```bash
+docker cp backend/scripts/seed_demo.py ai_job_assistant-api-1:/tmp/
+docker exec ai_job_assistant-api-1 python /tmp/seed_demo.py            # seed (~30 postings)
+docker exec ai_job_assistant-api-1 python /tmp/seed_demo.py --reset    # remove demo data
+```
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

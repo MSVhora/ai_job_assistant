@@ -190,7 +190,8 @@ async def test_transport_failure_detail_carries_cause_hint(
     async def no_delay(_: float) -> None:
         return None
 
-    monkeypatch.setattr("app.adapters.llm.asyncio.sleep", no_delay)
+    monkeypatch.setattr("app.adapters.retry.asyncio.sleep", no_delay)
+    monkeypatch.setattr(get_settings(), "llm_retry_attempts", 2)
     uploaded = await upload_resume(client)
     responses = iter([ProviderError(429), ProviderError(429)])
     install_acompletion(monkeypatch, lambda **kw: next(responses))
@@ -256,7 +257,7 @@ async def test_extract_survives_query_generation_failure(
             return ProviderError(429)
         return llm_response(json.dumps(VALID_PROFILE))
 
-    monkeypatch.setattr("app.adapters.llm.asyncio.sleep", no_delay)
+    monkeypatch.setattr("app.adapters.retry.asyncio.sleep", no_delay)
     install_acompletion(monkeypatch, handler)
     uploaded = await upload_resume(client)
 

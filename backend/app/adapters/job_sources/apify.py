@@ -16,6 +16,7 @@ from app.adapters.job_sources.base import (
     RawJobPosting,
 )
 from app.adapters.job_sources.config import ActorConfig, build_actor_input
+from app.adapters.retry import Transient, retry_after_header, retryable_status, with_retry
 from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -24,8 +25,6 @@ _API_BASE = "https://api.apify.com"
 _TIMEOUT_S = 30.0
 _POLL_INTERVAL_S = 5.0
 _MAX_WAIT_S = 600.0
-_RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 504})
-_RETRY_DELAY_S = 1.0
 _TERMINAL_FAILURES = frozenset({"FAILED", "ABORTED", "TIMED-OUT"})
 
 MapperFn = Callable[[RawJobPosting], JobPostingData]
@@ -175,23 +174,34 @@ class ApifyActorSource:
         json_body: dict[str, object] | None = None,
     ) -> dict[str, Any]:
         query = {"token": token, **(params or {})}
-        last_error: str | None = None
-        for attempt in range(2):
-            try:
-                response = await client.request(
-                    method, f"{_API_BASE}{path}", params=query, json=json_body
+
+        async def _call() -> dict[str, Any]:
+            response = await client.request(
+                method, f"{_API_BASE}{path}", params=query, json=json_body
+            )
+            if response.status_code < 400:
+                return _unwrap_json(response, self.name)
+            if retryable_status(response.status_code):
+                raise Transient(
+                    f"status {response.status_code}",
+                    retry_after_s=retry_after_header(response.headers.get("retry-after")),
                 )
-            except httpx.HTTPError as exc:
-                last_error = f"transport error: {exc}"
+            raise ConnectorError(f"{self.name} request failed (status {response.status_code})")
+
+        try:
+            return await with_retry(f"{self.name}", _call, is_retryable=_is_retryable)
+        except ConnectorError:
+            raise
+        except (httpx.HTTPError, Transient) as exc:
+            if isinstance(exc, httpx.HTTPError):
+                description = f"transport error: {exc}"
             else:
-                if response.status_code < 400:
-                    return _unwrap_json(response, self.name)
-                last_error = f"status {response.status_code}"
-                if response.status_code not in _RETRYABLE_STATUS:
-                    break
-            if attempt == 0:
-                await asyncio.sleep(_RETRY_DELAY_S)
-        raise ConnectorError(f"{self.name} request failed ({last_error})")
+                description = str(exc)
+            raise ConnectorError(f"{self.name} request failed ({description})") from exc
+
+
+def _is_retryable(exc: Exception) -> bool:
+    return isinstance(exc, (httpx.HTTPError, Transient))
 
 
 def _unwrap_json(response: httpx.Response, source_name: str) -> dict[str, Any]:

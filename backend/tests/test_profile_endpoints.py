@@ -460,7 +460,7 @@ async def test_regenerate_failure_keeps_persisted_queries(
     async def no_delay(_: float) -> None:
         return None
 
-    monkeypatch.setattr("app.adapters.llm.asyncio.sleep", no_delay)
+    monkeypatch.setattr("app.adapters.retry.asyncio.sleep", no_delay)
     get_settings.cache_clear()
 
     inserted = await insert_resume_with_draft(VALID_PROFILE)

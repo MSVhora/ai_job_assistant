@@ -2,6 +2,7 @@ import pytest
 from fakes import ProviderError, install_acompletion, llm_response
 
 from app.adapters.llm import LLMError, generate
+from app.core.config import get_settings
 
 
 async def _no_delay(_: float) -> None:
@@ -10,10 +11,12 @@ async def _no_delay(_: float) -> None:
 
 @pytest.fixture(autouse=True)
 def fast_retry(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("app.adapters.llm.asyncio.sleep", _no_delay)
+    monkeypatch.setattr("app.adapters.retry.asyncio.sleep", _no_delay)
 
 
-async def test_generate_retries_once_on_rate_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_generate_retries_on_rate_limit_until_success(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     responses = iter([ProviderError(429), llm_response("ok", prompt_tokens=3, completion_tokens=2)])
     calls = install_acompletion(monkeypatch, lambda **kw: next(responses))
 
@@ -25,14 +28,17 @@ async def test_generate_retries_once_on_rate_limit(monkeypatch: pytest.MonkeyPat
     assert len(calls) == 2
 
 
-async def test_generate_gives_up_after_second_rate_limit(monkeypatch: pytest.MonkeyPatch) -> None:
-    responses = iter([ProviderError(429), ProviderError(429)])
+async def test_generate_gives_up_after_configured_attempts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(get_settings(), "llm_retry_attempts", 3)
+    responses = iter([ProviderError(429), ProviderError(429), ProviderError(429)])
     calls = install_acompletion(monkeypatch, lambda **kw: next(responses))
 
     with pytest.raises(LLMError, match="rate limited by the provider"):
         await generate("prompt")
 
-    assert len(calls) == 2
+    assert len(calls) == 3
 
 
 async def test_generate_does_not_retry_client_errors(monkeypatch: pytest.MonkeyPatch) -> None:

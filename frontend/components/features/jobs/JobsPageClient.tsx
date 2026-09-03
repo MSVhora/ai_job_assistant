@@ -11,7 +11,7 @@ import { selectStyles as SELECT_STYLES } from "@/components/features/jobs/MatchF
 import { Card } from "@/components/ui/card";
 import { useProfiles } from "@/hooks/use-profiles";
 import { useJobSearchStatus } from "@/hooks/use-job-search";
-import { useSources } from "@/hooks/use-setup";
+import { useSetupCheck, useSources } from "@/hooks/use-setup";
 
 export function JobsPageClient() {
   const [searchId, setSearchId] = useState<string | null>(null);
@@ -19,6 +19,7 @@ export function JobsPageClient() {
   const sources = useSources();
   const profiles = useProfiles();
   const runStatus = useJobSearchStatus(searchId);
+  const setup = useSetupCheck();
 
   if (sources.isPending) {
     return (
@@ -66,9 +67,49 @@ export function JobsPageClient() {
 
   const profilesList = profiles.data ?? [];
   const activeProfileId = profileId ?? profilesList[0]?.profile_id ?? null;
+  const unconfigured = sources.data.filter(
+    (source) => source.enabled && !source.is_configured,
+  );
+  const setupWarnings = setup.data?.warnings ?? [];
 
   return (
     <div className="flex flex-col gap-6">
+      {setupWarnings.length > 0 && (
+        <Card title="Provider setup incomplete">
+          <ul className="list-inside list-disc text-sm text-amber-800 dark:text-amber-300">
+            {setupWarnings.map((warning) => (
+              <li key={warning} role="alert">
+                {warning}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            Fix this before your first search —{" "}
+            <Link
+              href="/setup"
+              className="font-medium text-blue-700 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:text-blue-400"
+            >
+              go to setup
+            </Link>
+            .
+          </p>
+        </Card>
+      )}
+      {unconfigured.length > 0 && (
+        <Card title="Sources missing their API key">
+          <p role="alert" className="text-sm text-amber-800 dark:text-amber-300">
+            Enabled but unconfigured: {unconfigured.map((source) => source.name).join(", ")}.
+            Their searches will fail until the key is set in <code>.env</code> —{" "}
+            <Link
+              href="/setup"
+              className="font-medium text-blue-700 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:text-blue-400"
+            >
+              go to setup
+            </Link>
+            .
+          </p>
+        </Card>
+      )}
       <ProfileSelector
         profiles={profilesList}
         activeProfileId={activeProfileId}

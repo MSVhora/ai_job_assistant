@@ -40,6 +40,17 @@ export function SearchResults({ searchId, status }: { searchId: string | null; s
 
   const list = postings.data ?? [];
   if (list.length === 0) {
+    if (status === "failed") {
+      return (
+        <Card title="Search failed">
+          <p role="alert" className="text-sm text-red-700 dark:text-red-400">
+            The run failed before any source could return postings — see the run banner
+            above for the per-source warnings. Fix the configuration and start a new
+            search.
+          </p>
+        </Card>
+      );
+    }
     return (
       <Card title="No postings from this run">
         <p className="text-sm text-gray-700 dark:text-gray-300">

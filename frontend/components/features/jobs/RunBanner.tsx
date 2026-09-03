@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { useJobSearchStatus } from "@/hooks/use-job-search";
@@ -82,7 +84,13 @@ export function RunBanner({
                 <span className="font-medium text-gray-900 dark:text-gray-100">
                   {outcome.source}
                 </span>
-                <Badge variant={outcome.status === "ok" ? "success" : "warn"}>
+                <Badge
+                  variant={
+                    outcome.status === "ok"
+                      ? "success"
+                      : (outcome.status === "failed" ? "danger" : "warn")
+                  }
+                >
                   {outcome.status}
                 </Badge>
                 {outcome.status === "ok" && <span>{outcome.count} posting(s) stored</span>}
@@ -94,7 +102,9 @@ export function RunBanner({
             {status.data.matching && (
               <li className="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-800">
                 <span className="font-medium text-gray-900 dark:text-gray-100">matching</span>
-                <Badge variant={status.data.matching.status === "ok" ? "success" : "warn"}>
+                <Badge
+                  variant={status.data.matching.status === "ok" ? "success" : "warn"}
+                >
                   {status.data.matching.status}
                 </Badge>
                 {status.data.matching.status === "ok" && (
@@ -118,6 +128,19 @@ export function RunBanner({
               Matches are ranked against the profile — see the ranked matches below. The
               why-this-matches rationale covers the top postings; it refreshes on the next
               search after profile changes.
+            </p>
+          )}
+          {status.data.status === "failed" && (
+            <p role="alert" className="text-sm text-red-700 dark:text-red-400">
+              Every source failed — nothing was ingested. Check the per-source warnings
+              above (usually a missing or rejected API key), fix the configuration in{" "}
+              <Link
+                href="/setup"
+                className="font-medium text-blue-700 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:text-blue-400"
+              >
+                setup
+              </Link>
+              , and start a new search.
             </p>
           )}
         </div>

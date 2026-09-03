@@ -12,6 +12,11 @@ from app.core.config import get_settings
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
+
+async def _no_delay(_: float) -> None:
+    return None
+
+
 CONFIG = ActorConfig(
     name="apify_linkedin",
     actor_id="hKByXkMQaC5Qt9UMN",
@@ -263,7 +268,7 @@ async def test_search_retries_once_on_rate_limit(monkeypatch: pytest.MonkeyPatch
         )
 
     monkeypatch.setattr("app.adapters.job_sources.apify._POLL_INTERVAL_S", 0)
-    monkeypatch.setattr("app.adapters.job_sources.apify._RETRY_DELAY_S", 0)
+    monkeypatch.setattr("app.adapters.retry.asyncio.sleep", _no_delay)
     source = _mock_source(monkeypatch, httpx.MockTransport(handler))
 
     postings = await source.search(JobSearchQuery(query="x", country="us"))

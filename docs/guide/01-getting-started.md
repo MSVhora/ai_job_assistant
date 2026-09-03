@@ -77,6 +77,19 @@ curl http://localhost:8000/api/health
 
 Then open **http://localhost:3000**.
 
+### No keys yet? Seed the demo data
+
+To explore the dashboard without any providers, seed a synthetic dataset (profile
+"Jane Doe (demo)" plus deterministic postings and matches — zero LLM/Apify spend):
+
+```bash
+docker cp backend/scripts/seed_demo.py ai_job_assistant-api-1:/tmp/
+docker exec ai_job_assistant-api-1 python /tmp/seed_demo.py
+```
+
+Seeded postings carry the `demo-` external_id prefix; `python /tmp/seed_demo.py --reset`
+removes only demo data, never real search results.
+
 Upload a resume on the home page, then save its AI draft as one or more named profiles —
 each profile is an independent track (e.g. "Senior Android Developer" and "Senior Software
 Engineer") that you review, edit, and later match separately. See the next guide.

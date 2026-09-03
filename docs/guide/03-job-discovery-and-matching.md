@@ -169,6 +169,16 @@ sequenceDiagram
 Searches run in the background — you can navigate away; results appear when the run
 finishes.
 
+### Rate limits and retries
+
+Every outbound call — LLM generation, embeddings, Adzuna, Apify — retries
+automatically with exponential backoff (plus a provider-supplied `Retry-After` when
+given). Defaults (`LLM_RETRY_ATTEMPTS=3`, `LLM_RETRY_BASE_DELAY_S=1.0` in `.env`) fit the
+Gemini free tier. If a source still fails after the retries, the run degrades
+gracefully: the failed source is skipped with a warning in the run banner and the rest
+of the search continues. A hard-failed run (every source down) is shown in red in the
+banner with the per-source reasons.
+
 ## Choosing sources: official API vs third-party scraper
 
 | Source | Type | Badge | Needs |

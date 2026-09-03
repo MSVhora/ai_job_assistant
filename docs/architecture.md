@@ -180,6 +180,7 @@ erDiagram
         jsonb structured_profile "contact, headline, skills, experience, projects, education, certifications, extra sections, embedded preferences"
         jsonb search_queries "per-source query specs + generation stamp; Regenerate overwrites"
         uuid source_resume_id FK "resume whose draft seeded this profile (provenance)"
+        vector embedding "pgvector, dim 768 (text-embedding-004); refreshed on every content save/gap-fill"
         timestamptz created_at
         timestamptz updated_at
     }
@@ -233,7 +234,7 @@ erDiagram
         numeric salary_max
         text currency
         jsonb raw_payload "original source data for debugging/re-mapping"
-        vector embedding "pgvector, dim 768 (text-embedding-004) — lands with issue #9"
+        vector embedding "pgvector, dim 768 (text-embedding-004); null when the embed call failed"
         timestamptz fetched_at
         uuid job_search_id FK "nullable; last run that returned this posting"
     }

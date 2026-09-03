@@ -1,3 +1,6 @@
+import hashlib
+import math
+import random
 from collections.abc import Callable
 from types import SimpleNamespace
 from typing import Any
@@ -131,3 +134,32 @@ class FakeJobSource:
             if posting.external_id == raw.external_id:
                 return posting
         raise ConnectorError(f"un-mappable posting {raw.external_id}")
+
+
+def fake_vector(text: str, dim: int = 768) -> list[float]:
+    seed = int.from_bytes(hashlib.sha256(text.encode("utf-8")).digest()[:8], "big")
+    rng = random.Random(seed)
+    vector = [rng.uniform(-1.0, 1.0) for _ in range(dim)]
+    norm = math.sqrt(sum(value * value for value in vector)) or 1.0
+    return [value / norm for value in vector]
+
+
+def embedding_response(vectors: list[list[float]], *, prompt_tokens: int = 1) -> SimpleNamespace:
+    return SimpleNamespace(
+        data=[{"embedding": vector} for vector in vectors],
+        usage=SimpleNamespace(prompt_tokens=prompt_tokens),
+    )
+
+
+def install_aembedding(monkeypatch: Any, handler: Callable[..., object]) -> list[dict[str, Any]]:
+    calls: list[dict[str, Any]] = []
+
+    async def _spy(**kwargs: Any) -> object:
+        calls.append(kwargs)
+        result = handler(**kwargs)
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    monkeypatch.setattr(litellm, "aembedding", _spy)
+    return calls

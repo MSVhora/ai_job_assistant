@@ -76,6 +76,7 @@ A self-hosted, single-user, BYOK web app:
 candidate
 ├── id (uuid, pk)
 ├── structured_profile (jsonb)        -- contact, headline, skills[], experience[], education[], prefs
+├── embedding (vector(768))           -- issue #9: profile embedding, refreshed on every content save/gap-fill
 ├── preferences (jsonb)               -- weights (role vs company), filters, target title/location
 ├── search_queries (jsonb)            -- per-source query specs {title, skills, exclude} + generation stamp; regenerated via POST /api/profiles/{id}/search-queries
 ├── completeness (jsonb)              -- which fields present/missing (drives gap-fill)
@@ -104,11 +105,11 @@ job_posting
 ├── title, company, url, location, job_type, remote_type
 ├── description (text), posted_at, salary_min, salary_max, currency
 ├── raw_payload (jsonb)              -- original source data for debugging/re-mapping
-├── embedding (vector)               -- computed on ingest; column lands with issue #9 (dim pinned)
+├── embedding (vector)               -- computed on ingest (issue #9, dim pinned, nullable on embed failure)
 ├── fetched_at, job_search_id (fk, nullable)
 
-match
-├── id (uuid, pk), candidate_id (fk), job_posting_id (fk)
+match                                 -- keyed on profile, not candidate (owner decision 2026-09-02)
+├── id (uuid, pk), profile_id (fk), job_posting_id (fk)
 ├── vector_score, final_score        -- pre-weight and post-weight/rerank
 ├── rationale (text)                 -- LLM "why this matches", top N only
 ├── created_at
@@ -117,6 +118,14 @@ source_state                         -- added by issue #8: per-source disclosure
 ├── source_name (text, pk)
 ├── acknowledged_at (timestamptz)    -- null until the disclosure modal is confirmed
 ```
+
+(Amendment, owner decision 2026-09-02: `match` keys on `profile_id` instead of the
+`candidate_id` originally sketched — profiles are the matching unit since #6 multi-profile
+and both embeddings are per-profile; `candidate_id` stays reachable via
+`profile.candidate_id`. With the #10 implementation, the dashboard index becomes
+`match(profile_id, final_score DESC)` — superseding the `match(candidate_id, …)` example in
+`docs/instructions/database-postgres.md` — and the `architecture.md` ER gets the same
+amendment.)
 
 ---
 

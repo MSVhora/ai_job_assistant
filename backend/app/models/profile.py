@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import DateTime, ForeignKey, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -17,6 +18,9 @@ class Profile(Base):
     )
     name: Mapped[str]
     structured_profile: Mapped[dict[str, object]] = mapped_column(JSONB)
+    # Dimension pinned to Gemini text-embedding-004 (768); changing embedding models =
+    # new column + backfill migration, never a silent dimension change.
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(768), nullable=True)
     search_queries: Mapped[dict[str, object] | None] = mapped_column(JSONB, nullable=True)
     source_resume_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("resume.id", ondelete="SET NULL"), nullable=True, index=True

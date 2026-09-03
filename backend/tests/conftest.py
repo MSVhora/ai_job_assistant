@@ -1,6 +1,7 @@
 import os
 import shutil
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -46,3 +47,19 @@ async def clean_tables(migrated_database: None) -> None:
             )
         )
     await engine.dispose()
+
+
+@pytest.fixture(autouse=True)
+def fake_embedding(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
+    import litellm
+    from fakes import embedding_response, fake_vector
+
+    calls: list[dict[str, Any]] = []
+
+    async def _spy(**kwargs: Any) -> object:
+        calls.append(kwargs)
+        texts = kwargs.get("input") or []
+        return embedding_response([fake_vector(str(text)) for text in texts])
+
+    monkeypatch.setattr(litellm, "aembedding", _spy)
+    return calls

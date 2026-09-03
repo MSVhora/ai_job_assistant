@@ -3,6 +3,7 @@ import uuid
 from datetime import datetime
 from decimal import Decimal
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import DateTime, Enum, ForeignKey, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -44,6 +45,9 @@ class JobPosting(Base):
         Enum(RemoteType, name="remote_type", native_enum=True), nullable=True
     )
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Dimension pinned to Gemini text-embedding-004 (768); changing embedding models =
+    # new column + backfill migration, never a silent dimension change.
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(768), nullable=True)
     posted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, index=True
     )

@@ -19,6 +19,7 @@ from app.schemas.gap_fill import (
     RevisionSummary,
 )
 from app.schemas.profile import Preferences, RemotePreference, SeniorityLevel, StructuredProfile
+from app.services import embedding
 from app.services.profile_service import _next_timestamp, diff_profiles
 
 logger = logging.getLogger(__name__)
@@ -310,6 +311,7 @@ async def run_gap_fill_turn(
         )
         session.add(revision)
         await session.flush()
+        await embedding.refresh_profile_embedding(profile)
 
     remaining = missing_fields(updated)
     logger.info(

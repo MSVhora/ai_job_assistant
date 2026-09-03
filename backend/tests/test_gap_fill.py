@@ -276,3 +276,68 @@ async def test_message_validation_returns_422(client: AsyncClient) -> None:
     assert (
         await client.post(f"/api/profiles/{profile_id}/gap-fill", json=bad_role)
     ).status_code == 422
+
+
+async def test_applied_answers_refresh_embedding(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    profile_id = await create_profile("Bare", VALID_PROFILE)
+    install_acompletion(
+        monkeypatch,
+        lambda **kw: llm_response(
+            turn({"target_location": "Amsterdam"}, "Noted - Amsterdam it is.")
+        ),
+    )
+
+    response = await client.post(
+        f"/api/profiles/{profile_id}/gap-fill",
+        json={
+            "messages": [
+                {"role": "assistant", "content": "Where would you like to work next?"},
+                {"role": "user", "content": "Amsterdam"},
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    async with session_factory() as session:
+        profile = await session.get(Profile, uuid.UUID(profile_id))
+        assert profile is not None
+        assert profile.embedding is not None
+        assert len(profile.embedding) == 768
+
+
+async def test_gap_fill_survives_embedding_failure(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from fakes import install_aembedding
+
+    from app.adapters.llm import LLMError
+
+    profile_id = await create_profile("Bare", VALID_PROFILE)
+    install_acompletion(
+        monkeypatch,
+        lambda **kw: llm_response(turn({"target_location": "Amsterdam"}, "Noted.")),
+    )
+    install_aembedding(monkeypatch, lambda **kw: LLMError("provider down"))
+
+    response = await client.post(
+        f"/api/profiles/{profile_id}/gap-fill",
+        json={
+            "messages": [
+                {"role": "assistant", "content": "Where would you like to work next?"},
+                {"role": "user", "content": "Amsterdam"},
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["applied_fields"]
+    revisions = await fetch_revisions(profile_id)
+    assert revisions
+    async with session_factory() as session:
+        profile = await session.get(Profile, uuid.UUID(profile_id))
+        assert profile is not None
+        assert profile.embedding is None
+        assert profile.structured_profile["preferences"]["target_location"] == "Amsterdam"

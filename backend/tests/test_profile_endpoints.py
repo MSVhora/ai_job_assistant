@@ -485,3 +485,78 @@ async def test_regenerate_failure_keeps_persisted_queries(
     assert response.status_code == 502
     fetched = (await client.get(f"/api/profiles/{created['profile_id']}")).json()
     assert fetched["search_queries"]["queries"]["adzuna"]["title"] == "Keep Me"
+
+
+async def test_created_profile_is_embedded(client: AsyncClient) -> None:
+    inserted = await insert_resume_with_draft(VALID_PROFILE)
+    created = (
+        await create_profile(client, "Data", VALID_PROFILE, source_resume_id=inserted["resume_id"])
+    ).json()
+
+    async with session_factory() as session:
+        profile = await session.get(Profile, uuid.UUID(created["profile_id"]))
+        assert profile is not None
+        assert profile.embedding is not None
+        assert len(profile.embedding) == 768
+
+
+async def test_content_patch_refreshes_embedding(client: AsyncClient) -> None:
+    inserted = await insert_resume_with_draft(VALID_PROFILE)
+    created = (
+        await create_profile(client, "Data", VALID_PROFILE, source_resume_id=inserted["resume_id"])
+    ).json()
+    profile_id = uuid.UUID(created["profile_id"])
+    async with session_factory() as session:
+        profile = await session.get(Profile, profile_id)
+        assert profile is not None
+        first_embedding = profile.embedding
+    assert first_embedding is not None
+
+    response = await client.patch(
+        f"/api/profiles/{profile_id}",
+        json={"structured_profile": with_headline(VALID_PROFILE, "Principal Data Analyst")},
+    )
+
+    assert response.status_code == 200
+    async with session_factory() as session:
+        profile = await session.get(Profile, profile_id)
+        assert profile is not None
+        assert profile.embedding is not None
+        assert profile.embedding != first_embedding
+
+
+async def test_rename_only_patch_keeps_embedding(client: AsyncClient) -> None:
+    inserted = await insert_resume_with_draft(VALID_PROFILE)
+    created = (
+        await create_profile(client, "Data", VALID_PROFILE, source_resume_id=inserted["resume_id"])
+    ).json()
+    profile_id = uuid.UUID(created["profile_id"])
+
+    response = await client.patch(f"/api/profiles/{profile_id}", json={"name": "Renamed"})
+
+    assert response.status_code == 200
+    async with session_factory() as session:
+        profile = await session.get(Profile, profile_id)
+        assert profile is not None
+        assert profile.embedding is not None
+
+
+async def test_profile_save_survives_embedding_failure(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from fakes import install_aembedding
+
+    from app.adapters.llm import LLMError
+
+    install_aembedding(monkeypatch, lambda **kw: LLMError("provider down"))
+    inserted = await insert_resume_with_draft(VALID_PROFILE)
+
+    response = await create_profile(
+        client, "Data", VALID_PROFILE, source_resume_id=inserted["resume_id"]
+    )
+
+    assert response.status_code == 201
+    async with session_factory() as session:
+        profile = await session.get(Profile, uuid.UUID(response.json()["profile_id"]))
+        assert profile is not None
+        assert profile.embedding is None

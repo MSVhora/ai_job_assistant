@@ -2,9 +2,10 @@
 
 **Status: partially live** — the search UI (profile selector, per-source queries, filters,
 live run banner), Adzuna + the LinkedIn Apify actor, LLM-generated per-source queries with
-Regenerate, and de-duplication all work today (issues #7, #8 and the search-queries
-follow-up). Embeddings, hard filters, ranking, and the "why this matches" rationale land
-with the matching issues (#9–#11); those sections below describe the finished v1 behaviour.
+Regenerate, de-duplication, embeddings, and the hard-filter + cosine ranking query all work
+today (issues #7–#9 and the search-queries follow-up). The `/api/matches` endpoint, LLM
+re-rank, "why this matches" rationale, and the priority slider land with the remaining
+matching issues (#10–#11); those sections below describe the finished v1 behaviour.
 
 ## The idea
 
@@ -66,12 +67,32 @@ flowchart LR
 
 A failing source never breaks the search — it is skipped with a warning surfaced in the UI.
 
-Today (issues #7–#8 + the search-queries follow-up): the `/jobs` page starts a background run
+Today (issues #7–#9 + the search-queries follow-up): the `/jobs` page starts a background run
 from per-source, editable queries, `GET /api/jobs/searches/{id}` reports its status with
 per-source results/warnings while a live banner polls it, the run's postings are listed
 (unranked) under the banner once it finishes, and postings are de-duplicated per
 `(source, external_id)` — a re-search refreshes the stored postings instead of duplicating
-them. Ranked matches arrive with the matching issues (#9–#11).
+them. Ranked matches arrive with the matching issues (#10–#11).
+
+## How matching content is prepared (live since #9)
+
+- **Job descriptions are embedded at ingest** — every normalized posting gets a vector
+  (title + description) from your embedding provider in one batch per source. Very long
+  descriptions are truncated at 6,000 characters (the embedding model's input limit).
+  Postings whose embedding call fails are still stored — they match through filters only
+  until a re-search embeds them, and the run reports an "embeddings unavailable" warning.
+- **Your profile is embedded on every content change** — create, manual save, re-upload
+  merge, and gap-fill answers all refresh the profile vector, so ranking (issue #10) never
+  needs to re-embed your profile per query.
+- **Hard filters run in SQL before ranking** — location (case-insensitive substring),
+  remote type, job type, and posted-within; a posting without a known posting date is
+  excluded when a posted-within filter is active.
+- **Ranking is pgvector cosine distance** (`embedding <=> profile_vector`) — queryable in
+  SQL today; the match pipeline (#10) builds directly on that query.
+- **Storage facts** — embeddings live in `vector(768)` columns on `job_posting` and
+  `profile`, pinned to Gemini `text-embedding-004`. Changing embedding models requires a
+  new column + backfill migration — the dimension is never changed silently. There is no
+  ANN index (HNSW/ivfflat) yet: at single-user scale a sequential scan is fast enough.
 
 ## What happens on a search (behind the scenes)
 

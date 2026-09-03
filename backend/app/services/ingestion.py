@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.job_sources import registry
 from app.adapters.job_sources.base import ConnectorError, JobPostingData, JobSource
+from app.adapters.llm import LLMError
 from app.core.db import session_factory
 from app.core.errors import (
     DomainError,
@@ -28,7 +29,7 @@ from app.schemas.job_search import (
     JobSearchStatusResponse,
     SourceOutcome,
 )
-from app.services import query_rendering
+from app.services import embedding, query_rendering
 from app.services import sources as sources_service
 
 logger = logging.getLogger(__name__)
@@ -146,15 +147,31 @@ async def _run_source(
 
     persisted = 0
     skipped = 0
+    normalized: list[JobPostingData] = []
     for raw in raw_postings:
         try:
             data = source.normalize(raw)
         except (ConnectorError, ValidationError):
             skipped += 1
             continue
-        await _upsert_posting(session, source.name, data, search_id)
-        persisted += 1
+        normalized.append(data)
+
+    embeddings: list[list[float] | None] = [None] * len(normalized)
+    embed_warning: str | None = None
+    try:
+        embeddings = await embedding.embed_postings(normalized)
+    except LLMError as exc:
+        embed_warning = f"embeddings unavailable: {exc}"
+        logger.warning("ingestion source=%s embedding failed: %s", source.name, exc)
+
+    for data, vector in zip(normalized, embeddings, strict=True):
+        await _upsert_posting(session, source.name, data, search_id, vector)
+    persisted = len(normalized)
     await session.commit()
+
+    warning = f"{skipped} posting(s) skipped (un-mappable)" if skipped else None
+    if embed_warning:
+        warning = f"{warning}; {embed_warning}" if warning else embed_warning
 
     logger.info(
         "ingestion source=%s duration_ms=%.0f fetched=%d persisted=%d skipped=%d",
@@ -168,12 +185,16 @@ async def _run_source(
         source=source.name,
         status="ok",
         count=persisted,
-        warning=f"{skipped} posting(s) skipped (un-mappable)" if skipped else None,
+        warning=warning,
     )
 
 
 async def _upsert_posting(
-    session: AsyncSession, source_name: str, data: JobPostingData, search_id: uuid.UUID
+    session: AsyncSession,
+    source_name: str,
+    data: JobPostingData,
+    search_id: uuid.UUID,
+    embedding_vector: list[float] | None,
 ) -> None:
     stmt = pg_insert(JobPosting).values(
         source=source_name,
@@ -185,6 +206,7 @@ async def _upsert_posting(
         job_type=data.job_type,
         remote_type=data.remote_type,
         description=data.description,
+        embedding=embedding_vector,
         posted_at=data.posted_at,
         salary_min=data.salary_min,
         salary_max=data.salary_max,
@@ -203,6 +225,7 @@ async def _upsert_posting(
             "job_type": stmt.excluded.job_type,
             "remote_type": stmt.excluded.remote_type,
             "description": stmt.excluded.description,
+            "embedding": stmt.excluded.embedding,
             "posted_at": stmt.excluded.posted_at,
             "salary_min": stmt.excluded.salary_min,
             "salary_max": stmt.excluded.salary_max,

@@ -2,11 +2,12 @@ import uuid
 from datetime import UTC, datetime
 
 import pytest
-from fakes import FakeJobSource, fake_posting
+from fakes import FakeJobSource, fake_posting, install_aembedding
 from sqlalchemy import select
 
 from app.adapters.job_sources import registry
 from app.adapters.job_sources.base import ConnectorError
+from app.adapters.llm import LLMError
 from app.core.db import session_factory
 from app.core.errors import (
     JobSourceNotEnabledError,
@@ -295,3 +296,71 @@ async def test_validate_queries_rejects_unknown_override_source(
         selected = await _selected_sources(session, request)
         with pytest.raises(UnknownJobSourceError):
             _validate_queries(request, selected)
+
+
+async def test_run_search_persists_embeddings(
+    monkeypatch: pytest.MonkeyPatch, fake_embedding: list[dict[str, object]]
+) -> None:
+    source = FakeJobSource(
+        "adzuna",
+        postings=[
+            fake_posting("1", description="First description"),
+            fake_posting("2"),
+        ],
+    )
+    only_sources(monkeypatch, source)
+
+    run = await create_run(payload())
+    await run_search(run, payload())
+
+    assert len(fake_embedding) == 1
+    assert fake_embedding[0]["input"] == ["Job 1\nFirst description"]
+    postings = {posting.external_id: posting for posting in await get_postings()}
+    assert postings["1"].embedding is not None
+    assert len(postings["1"].embedding) == 768
+    assert postings["2"].embedding is None
+    run_row = await get_run(run)
+    assert run_row.status.value == "succeeded"
+
+
+async def test_embed_failure_keeps_postings_and_warns(monkeypatch: pytest.MonkeyPatch) -> None:
+    install_aembedding(monkeypatch, lambda **kw: LLMError("provider down"))
+    source = FakeJobSource("adzuna", postings=[fake_posting("1", description="First description")])
+    only_sources(monkeypatch, source)
+
+    run = await create_run(payload())
+    await run_search(run, payload())
+
+    run_row = await get_run(run)
+    assert run_row.status.value == "succeeded"
+    results = run_row.results
+    assert results is not None
+    assert results[0]["status"] == "ok"
+    assert "embeddings unavailable" in results[0]["warning"]
+    postings = await get_postings()
+    assert len(postings) == 1
+    assert postings[0].embedding is None
+
+
+async def test_reingest_refreshes_embedding(monkeypatch: pytest.MonkeyPatch) -> None:
+    only_sources(
+        monkeypatch,
+        FakeJobSource("adzuna", postings=[fake_posting("1", description="First description")]),
+    )
+    first_run = await create_run(payload())
+    await run_search(first_run, payload())
+    first_embedding = (await get_postings())[0].embedding
+
+    refreshed = FakeJobSource(
+        "adzuna", postings=[fake_posting("1", description="Completely different description")]
+    )
+    only_sources(monkeypatch, refreshed)
+    second_run = await create_run(payload())
+    await run_search(second_run, payload())
+
+    postings = await get_postings()
+    assert len(postings) == 1
+    assert postings[0].embedding is not None
+    assert postings[0].embedding != first_embedding
+    run_row = await get_run(second_run)
+    assert run_row.status.value == "succeeded"

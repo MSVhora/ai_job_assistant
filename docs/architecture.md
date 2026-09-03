@@ -40,9 +40,12 @@ Non-negotiable layering rules (enforced by the
 - `services/` — business logic; raise domain errors
 - `models/` — SQLAlchemy 2.0 ORM; the schema source of truth
 - `adapters/llm.py` — the **only** place that talks to an LLM provider; it also owns
-  resilience: one transport-level retry with backoff on 429/5xx (free-tier rate limits),
-  plus the structured-output validation repair pass. Service-level errors wrap the cause
-  hint, so the client sees "rate limited" / "timed out" instead of an opaque 502
+  resilience: the shared retry policy (`adapters/retry.py`, configurable via
+  `LLM_RETRY_*`, default 3 attempts) applies exponential backoff with jitter on
+  429/5xx/transport errors across LLM and job-source calls, honouring a provider's
+  `Retry-After` hint (free-tier rate limits), plus the structured-output validation
+  repair pass. Service-level errors wrap the cause hint, so the client sees
+  "rate limited" / "timed out" instead of an opaque 502
 - `JobSource` connector protocol — the **only** way a job source is added
 - Every schema change ships as an Alembic migration in the same change
 - `DbCommitMiddleware` commits each request's session **before the response reaches the

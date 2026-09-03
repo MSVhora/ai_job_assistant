@@ -109,8 +109,9 @@ Nothing in the flow dead-ends — every failure has an explicit recovery path:
 - **Extraction interrupted** (tab closed, backend restarted) — the resume list shows an
   **"Extract profile"** action on rows without a draft, and opening a draft-less resume
   shows the same action instead of a dead retry loop
-- **Provider hiccups** — transient failures (rate limit, 5xx) are retried once with a short
-  backoff inside the LLM adapter; when a failure is final, the message says why
+- **Provider hiccups** — transient failures (rate limit, 5xx) are retried automatically
+  with exponential backoff inside the LLM adapter (`LLM_RETRY_ATTEMPTS`, default 3; see
+  `.env.example`); when a failure is final, the message says why
   ("rate limited by the provider — retry shortly", "request timed out", "failed validation
   after repair")
 - **Invalid input** — pydantic validation errors render as readable field messages, never

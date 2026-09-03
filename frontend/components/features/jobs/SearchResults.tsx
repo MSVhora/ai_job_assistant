@@ -3,22 +3,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { isRunFinished, useSearchPostings } from "@/hooks/use-job-search";
-
-function salaryLine(
-  min: number | null | undefined,
-  max: number | null | undefined,
-  currency: string | null | undefined,
-): string | null {
-  const salaryMin = min ?? null;
-  const salaryMax = max ?? null;
-  if (salaryMin === null && salaryMax === null) return null;
-  const currencyPrefix = currency ? `${currency} ` : "";
-  if (salaryMin !== null && salaryMax !== null && salaryMin !== salaryMax) {
-    return `${currencyPrefix}${salaryMin.toLocaleString()} – ${salaryMax.toLocaleString()}`;
-  }
-  const value = (salaryMax ?? salaryMin) ?? 0;
-  return `${currencyPrefix}${value.toLocaleString()}${salaryMin !== null && salaryMax === null ? "+" : ""}`;
-}
+import { salaryLine } from "@/lib/salary";
 
 export function SearchResults({ searchId, status }: { searchId: string | null; status: string | undefined }) {
   const finished = isRunFinished(status);
@@ -75,8 +60,8 @@ export function SearchResults({ searchId, status }: { searchId: string | null; s
       }
     >
       <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
-        Unranked, as returned by the sources — ranked matches with a why-this-matches rationale
-        land with the matching release.
+        Unranked, as returned by the sources — the ranked view with the why-this-matches
+        rationale is above.
       </p>
       <ul className="flex flex-col gap-2">
         {list.map((posting) => {

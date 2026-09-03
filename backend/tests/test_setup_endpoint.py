@@ -16,7 +16,7 @@ def configure(
     monkeypatch: pytest.MonkeyPatch,
     *,
     gemini: str | None = "key",
-    embedding_model: str = "gemini/text-embedding-004",
+    embedding_model: str = "gemini/gemini-embedding-001",
     adzuna: str | None = None,
     apify: str | None = None,
 ) -> None:

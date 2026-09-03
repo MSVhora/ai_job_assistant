@@ -91,11 +91,33 @@ export function RunBanner({
                 )}
               </li>
             ))}
+            {status.data.matching && (
+              <li className="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-800">
+                <span className="font-medium text-gray-900 dark:text-gray-100">matching</span>
+                <Badge variant={status.data.matching.status === "ok" ? "success" : "warn"}>
+                  {status.data.matching.status}
+                </Badge>
+                {status.data.matching.status === "ok" && (
+                  <span>
+                    {status.data.matching.scored_count} posting(s) scored ·{" "}
+                    {status.data.matching.rationale_count} rationale(s) · rerank tokens{" "}
+                    {status.data.matching.rerank_prompt_tokens}+
+                    {status.data.matching.rerank_completion_tokens}
+                  </span>
+                )}
+                {status.data.matching.warning && (
+                  <span className="text-amber-700 dark:text-amber-400">
+                    {status.data.matching.warning}
+                  </span>
+                )}
+              </li>
+            )}
           </ul>
           {status.data.status === "succeeded" && (
             <p className="text-sm text-gray-700 dark:text-gray-300">
-              Postings are stored and de-duplicated. Ranked matches with a why-this-matches
-              rationale land in the next release — this page grows a match dashboard then.
+              Matches are ranked against the profile — see the ranked matches below. The
+              why-this-matches rationale covers the top postings; it refreshes on the next
+              search after profile changes.
             </p>
           )}
         </div>

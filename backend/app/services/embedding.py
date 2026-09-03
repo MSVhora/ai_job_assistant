@@ -4,12 +4,12 @@ from pydantic import ValidationError
 
 from app.adapters.job_sources.base import JobPostingData
 from app.adapters.llm import LLMError, embed
+from app.core.config import get_settings
 from app.models import Profile
 from app.schemas.profile import StructuredProfile
 
 logger = logging.getLogger(__name__)
 
-EMBEDDING_DIM = 768
 MAX_EMBED_CHARS = 6000
 
 
@@ -51,10 +51,11 @@ async def embed_texts(texts: list[str]) -> list[list[float]]:
     if not texts:
         return []
     result = await embed(texts)
+    expected_dim = get_settings().embedding_dimensions
     for vector in result.vectors:
-        if len(vector) != EMBEDDING_DIM:
+        if len(vector) != expected_dim:
             raise LLMError(
-                f"embedding dimension mismatch: got {len(vector)}, expected {EMBEDDING_DIM} "
+                f"embedding dimension mismatch: got {len(vector)}, expected {expected_dim} "
                 f"(embedding_model changed without a column migration?)"
             )
     return result.vectors

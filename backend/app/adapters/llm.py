@@ -141,6 +141,7 @@ async def embed(texts: list[str]) -> EmbeddingResult:
         response = await litellm.aembedding(
             model=settings.embedding_model,
             input=texts,
+            dimensions=settings.embedding_dimensions,
             api_key=settings.gemini_api_key,
         )
     except Exception as exc:

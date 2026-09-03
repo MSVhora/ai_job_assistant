@@ -14,7 +14,7 @@ from app.core.errors import (
     NoJobSourcesConfiguredError,
     UnknownJobSourceError,
 )
-from app.models import JobPosting, JobSearch, SourceState
+from app.models import JobPosting, JobSearch, Match, SourceState
 from app.schemas.job_search import JobSearchRequest
 from app.services.ingestion import _selected_sources, run_search
 
@@ -364,3 +364,126 @@ async def test_reingest_refreshes_embedding(monkeypatch: pytest.MonkeyPatch) -> 
     assert postings[0].embedding != first_embedding
     run_row = await get_run(second_run)
     assert run_row.status.value == "succeeded"
+
+
+async def seed_profile(name: str = "Seeker") -> uuid.UUID:
+    from fakes import VALID_PROFILE
+
+    from app.models import Candidate, Profile
+    from app.schemas.profile import StructuredProfile
+
+    async with session_factory() as session:
+        result = await session.execute(select(Candidate).limit(1))
+        candidate = result.scalars().first()
+        if candidate is None:
+            candidate = Candidate()
+            session.add(candidate)
+            await session.flush()
+        profile = Profile(
+            candidate_id=candidate.id,
+            name=name,
+            structured_profile=StructuredProfile.model_validate(VALID_PROFILE).model_dump(
+                mode="json"
+            ),
+        )
+        session.add(profile)
+        await session.flush()
+        from app.services.embedding import refresh_profile_embedding
+
+        await refresh_profile_embedding(profile)
+        await session.commit()
+        return profile.id
+
+
+async def get_matches(profile_id: uuid.UUID) -> list[Match]:
+    async with session_factory() as session:
+        result = await session.execute(select(Match).where(Match.profile_id == profile_id))
+        return list(result.scalars().all())
+
+
+async def test_run_search_refreshes_matches_for_latest_profile(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from fakes import install_acompletion, llm_response
+
+    profile_id = await seed_profile()
+    source = FakeJobSource("adzuna", postings=[fake_posting("1", description="Great role")])
+    only_sources(monkeypatch, source)
+    install_acompletion(
+        monkeypatch,
+        lambda **kw: llm_response('{"items": []}', prompt_tokens=9, completion_tokens=4),
+    )
+
+    run = await create_run(payload())
+    await run_search(run, payload())
+
+    run_row = await get_run(run)
+    assert run_row.status.value == "succeeded"
+    assert run_row.matching is not None
+    assert run_row.matching["status"] == "ok"
+    assert run_row.matching["scored_count"] == 1
+    assert run_row.matching["rationale_count"] == 0
+    assert run_row.matching["rerank_prompt_tokens"] == 9
+    assert run_row.matching["rerank_completion_tokens"] == 4
+    matches = await get_matches(profile_id)
+    assert len(matches) == 1
+
+
+async def test_run_search_without_profile_skips_matching(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source = FakeJobSource("adzuna", postings=[fake_posting("1")])
+    only_sources(monkeypatch, source)
+
+    run = await create_run(payload())
+    await run_search(run, payload())
+
+    run_row = await get_run(run)
+    assert run_row.status.value == "succeeded"
+    assert run_row.matching is not None
+    assert run_row.matching["status"] == "skipped"
+    assert "no profile" in run_row.matching["warning"]
+    assert await get_postings() != []
+
+
+async def test_run_search_matching_failure_degrades(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from fakes import ProviderError, install_acompletion
+
+    await seed_profile()
+    source = FakeJobSource("adzuna", postings=[fake_posting("1", description="Great role")])
+    only_sources(monkeypatch, source)
+    install_acompletion(monkeypatch, lambda **kw: ProviderError(400))
+
+    run = await create_run(payload())
+    await run_search(run, payload())
+
+    run_row = await get_run(run)
+    assert run_row.status.value == "succeeded"
+    assert run_row.matching is not None
+    assert run_row.matching["status"] == "failed"
+    assert "re-rank unavailable" in run_row.matching["warning"]
+
+
+async def test_run_search_honors_explicit_profile_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from fakes import install_acompletion, llm_response
+
+    explicit = await seed_profile("Explicit")
+    latest = await seed_profile("Latest")
+    source = FakeJobSource("adzuna", postings=[fake_posting("1", description="Great role")])
+    only_sources(monkeypatch, source)
+    install_acompletion(monkeypatch, lambda **kw: llm_response('{"items": []}', prompt_tokens=1))
+
+    run = await create_run(payload(profile_id=explicit))
+    await run_search(run, payload(profile_id=explicit))
+
+    run_row = await get_run(run)
+    assert run_row.status.value == "succeeded"
+    assert run_row.matching is not None
+    assert run_row.matching["status"] == "ok"
+    matches = await get_matches(explicit)
+    assert len(matches) == 1
+    assert await get_matches(latest) == []

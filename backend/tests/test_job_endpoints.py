@@ -39,6 +39,7 @@ async def test_search_start_and_status_flow(
     assert status["status"] == "succeeded"
     assert status["query"] == {
         "query": "python developer",
+        "profile_id": None,
         "source_queries": None,
         "location": "Berlin",
         "country": "de",

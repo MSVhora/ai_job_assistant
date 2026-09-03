@@ -39,7 +39,7 @@ A self-hosted, single-user, BYOK web app:
 | Database | **Postgres + pgvector** | Structured data + embeddings in one store |
 | LLM abstraction | **LiteLLM** | Don't hand-roll provider adapters; swapping = config change |
 | Default LLM | **Gemini Flash** | Free tier = zero-cost demo for every forker; strong structured output |
-| Embeddings | Gemini `text-embedding-004` (via LiteLLM) | Same key as generation; note: Anthropic-only users will need a second provider for embeds — detect and warn at setup |
+| Embeddings | Gemini `gemini-embedding-001` at 768 dims via `dimensions` param (owner accepted 2026-09-03; original pin `text-embedding-004` retired by Google) | Same key as generation; note: Anthropic-only users will need a second provider for embeds — detect and warn at setup |
 | Job sources | **Adzuna + Apify actor(s)** | Adzuna proves the connector pattern with zero setup; Apify adds marketplace-grade coverage under the user's own account (v1 actor: LinkedIn jobs scraper — owner decision 2026-09-01) |
 | Scraping posture | User runs actors under **their own Apify key**; per-source disclosure + acknowledgment in UI | Ships a tool, not a scraping service (PRD §9) |
 | Profile storage | `structured_profile` **jsonb** + `profile_revision` audit table | Field-level diffing at the app layer; normalized child tables deferred until rewriting needs per-bullet references |
@@ -96,6 +96,7 @@ profile_revision                     -- audit: AI extraction vs human fixes (sho
 job_search                            -- background ingestion run (added by issue #7)
 ├── id (uuid, pk), status
 ├── query (jsonb), results (jsonb)    -- validated request + per-source outcomes/warnings
+├── matching (jsonb)                  -- per-run MatchingOutcome: status, counts, rerank tokens (issue #10)
 ├── created_at, updated_at
 
 job_posting
@@ -110,9 +111,11 @@ job_posting
 
 match                                 -- keyed on profile, not candidate (owner decision 2026-09-02)
 ├── id (uuid, pk), profile_id (fk), job_posting_id (fk)
-├── vector_score, final_score        -- pre-weight and post-weight/rerank
-├── rationale (text)                 -- LLM "why this matches", top N only
-├── created_at
+├── vector_score                      -- clamped cosine similarity (1 - distance)
+├── role_fit, company_fit             -- LLM re-rank 0-10 sub-scores, null when not re-ranked
+├── final_score                       -- weighted blend when re-ranked, vector_score otherwise
+├── rationale (text)                  -- LLM "why this matches", top N only
+├── created_at, updated_at
 
 source_state                         -- added by issue #8: per-source disclosure acknowledgment
 ├── source_name (text, pk)
@@ -125,7 +128,10 @@ and both embeddings are per-profile; `candidate_id` stays reachable via
 `profile.candidate_id`. With the #10 implementation, the dashboard index becomes
 `match(profile_id, final_score DESC)` — superseding the `match(candidate_id, …)` example in
 `docs/instructions/database-postgres.md` — and the `architecture.md` ER gets the same
-amendment.)
+amendment. The #10 build also added `role_fit`/`company_fit` sub-score columns and
+`updated_at` to the sketch above (stored so #11's slider can re-weight without an LLM
+call), the `job_search.matching` outcome column, and the `CASCADE` FK behaviour — owner
+accepted 2026-09-03.)
 
 ---
 

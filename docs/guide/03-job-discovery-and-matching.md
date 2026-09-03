@@ -1,11 +1,12 @@
 # 3 — Job Discovery & Matching
 
-**Status: partially live** — the search UI (profile selector, per-source queries, filters,
-live run banner), Adzuna + the LinkedIn Apify actor, LLM-generated per-source queries with
-Regenerate, de-duplication, embeddings, and the hard-filter + cosine ranking query all work
-today (issues #7–#9 and the search-queries follow-up). The `/api/matches` endpoint, LLM
-re-rank, "why this matches" rationale, and the priority slider land with the remaining
-matching issues (#10–#11); those sections below describe the finished v1 behaviour.
+**Status: live (except the priority slider)** — the search UI (profile selector, per-source
+queries, filters, live run banner), Adzuna + the LinkedIn Apify actor, LLM-generated
+per-source queries with Regenerate, de-duplication, embeddings, the hard-filter + cosine
+ranking query, ranked matches with the LLM re-rank and "why this matches" rationale, and
+the `GET /api/matches` dashboard all work today (issues #7–#10 and the search-queries
+follow-up). The priority-weight slider (role fit ↔ company fit) lands with issue #11;
+until then the score weights are fixed in `.env` (`MATCH_WEIGHT_*`).
 
 ## The idea
 
@@ -81,18 +82,56 @@ them. Ranked matches arrive with the matching issues (#10–#11).
   descriptions are truncated at 6,000 characters (the embedding model's input limit).
   Postings whose embedding call fails are still stored — they match through filters only
   until a re-search embeds them, and the run reports an "embeddings unavailable" warning.
+  Postings that never come back through a search (e.g. fetched before the embedding
+  feature existed) can be embedded without re-fetching via
+  `backend/scripts/backfill_embeddings.py` (run inside the API container — see the script
+  header; it also re-scores profiles so the matches appear immediately).
 - **Your profile is embedded on every content change** — create, manual save, re-upload
   merge, and gap-fill answers all refresh the profile vector, so ranking (issue #10) never
   needs to re-embed your profile per query.
 - **Hard filters run in SQL before ranking** — location (case-insensitive substring),
   remote type, job type, and posted-within; a posting without a known posting date is
   excluded when a posted-within filter is active.
-- **Ranking is pgvector cosine distance** (`embedding <=> profile_vector`) — queryable in
-  SQL today; the match pipeline (#10) builds directly on that query.
+- **Ranking is pgvector cosine distance** (`embedding <=> profile_vector`) — every
+  embeddable posting is scored against the profile after each search run and stored in the
+  `match` table (upsert, so repeat runs refresh scores instead of duplicating rows).
 - **Storage facts** — embeddings live in `vector(768)` columns on `job_posting` and
-  `profile`, pinned to Gemini `text-embedding-004`. Changing embedding models requires a
-  new column + backfill migration — the dimension is never changed silently. There is no
-  ANN index (HNSW/ivfflat) yet: at single-user scale a sequential scan is fast enough.
+  `profile`, pinned to Gemini `gemini-embedding-001` with `EMBEDDING_DIMENSIONS=768`
+  (the model's native output is 3072; the API truncates it via `dimensions`). Google
+  retired `text-embedding-004` (the original pin) in 2026 — the model switch needed no
+  schema change because both emit 768-dim vectors here. Changing the *dimension*
+  requires a new column + backfill migration — never a silent dimension change. There
+  is no ANN index (HNSW/ivfflat) yet: at single-user scale a sequential scan is fast
+  enough.
+
+## How matches are scored (live since #10)
+
+- **Every embeddable posting gets a `vector_score`** — clamped cosine similarity
+  (1 − distance) between the posting vector and your profile vector, computed in SQL and
+  stored per (profile, posting) after each search run.
+- **The top postings get an LLM re-rank** — the postings with the highest vector score
+  *that don't already have a rationale* are sent to your LLM (one batched call) which
+  returns a role-fit score (0–10), a company-fit score (0–10), and a "why this matches"
+  rationale. The cap is `RERANK_TOP_N` (10 by default).
+- **`final_score`** — for re-ranked postings: `0.4 × vector_score + 0.4 × role_fit/10 +
+  0.2 × company_fit/10` (weights are `MATCH_WEIGHT_VECTOR`, `MATCH_WEIGHT_ROLE_FIT`,
+  `MATCH_WEIGHT_COMPANY_FIT` in `.env` until the priority slider lands). Everything else
+  keeps `final_score = vector_score`.
+- **Repeat searches are cheap** — postings whose rationale is still valid are not sent to
+  the LLM again; a search that adds nothing new to the top costs zero LLM tokens. The run
+  banner shows the matching stage's outcome, including the re-rank token usage.
+- **Profile edits clear rationales** — saving profile content or applying gap-fill answers
+  re-scores all matches in SQL and clears the now-stale rationales and sub-scores (no LLM
+  call on the save path). The next search re-ranks the new top N against the updated
+  profile.
+- **Re-rank failure degrades gracefully** — if the LLM call fails, matches are still
+  ranked by vector score; the rationale is simply missing, and the run reports a
+  "re-rank unavailable" warning.
+- **`GET /api/matches` reads stored matches** — the dashboard filters (location, remote,
+  job type, posted-within) and sort (best match / similarity / newest) are applied at
+  read time, so changing filters never triggers re-scoring. The endpoint returns 409 if
+  the profile has no embedding (e.g. the embedding provider was down at save time) —
+  re-save the profile once the provider works.
 
 ## What happens on a search (behind the scenes)
 
@@ -146,12 +185,15 @@ mapper module — no core changes.
 
 ## Reading the results
 
-- **Rank** — blend of vector similarity, your hard filters, and the LLM re-rank
-- **"Why this matches"** — a generated explanation on the top matches, so you can judge the
-  ranking instead of trusting a black box
-- **Priority slider** — shift weighting between *role fit* and *company fit*; the ranking
-  updates accordingly
-- **Filters** — location, remote, job type, posting date
+- **Rank** — `final_score`: a blend of vector similarity and the LLM's role-fit and
+  company-fit ratings for re-ranked postings, plain similarity otherwise (see "How
+  matches are scored" above)
+- **"Why this matches"** — a generated explanation on the top matches, so you can judge
+  the ranking instead of trusting a black box; expand it on each match card
+- **Filters** — location, remote, job type, posting date, plus a sort selector (best
+  match / similarity / newest); applied to the stored matches
+- **Priority slider** — *(lands with issue #11)* shift weighting between *role fit* and
+  *company fit*; until then the weights are fixed in `.env` (`MATCH_WEIGHT_*`)
 
 ## Privacy
 

@@ -27,9 +27,10 @@ from app.schemas.job_search import (
     JobSearchRequest,
     JobSearchStartResponse,
     JobSearchStatusResponse,
+    MatchingOutcome,
     SourceOutcome,
 )
-from app.services import embedding, query_rendering
+from app.services import embedding, matching, query_rendering
 from app.services import sources as sources_service
 
 logger = logging.getLogger(__name__)
@@ -119,6 +120,7 @@ async def run_search(search_id: uuid.UUID, payload: JobSearchRequest) -> None:
             if ok
             else JobSearchStatus.failed
         )
+        run.matching = (await _run_matching(session, payload)).model_dump(mode="json")
         await session.commit()
 
     logger.info(
@@ -127,6 +129,14 @@ async def run_search(search_id: uuid.UUID, payload: JobSearchRequest) -> None:
         run.status.value,
         (time.monotonic() - started) * 1000,
     )
+
+
+async def _run_matching(session: AsyncSession, payload: JobSearchRequest) -> MatchingOutcome:
+    try:
+        return await matching.refresh_matches_for_search(session, payload)
+    except Exception:
+        logger.exception("matching stage failed for search run")
+        return MatchingOutcome(status="failed", warning="matching stage failed unexpectedly")
 
 
 async def _run_source(
@@ -243,11 +253,13 @@ async def get_search_status(session: AsyncSession, search_id: uuid.UUID) -> JobS
     if run is None:
         raise JobSearchNotFoundError()
     results = [SourceOutcome.model_validate(item) for item in (run.results or [])]
+    matching = MatchingOutcome.model_validate(run.matching) if run.matching else None
     return JobSearchStatusResponse(
         search_id=run.id,
         status=run.status.value,
         query=run.query,
         results=results,
+        matching=matching,
         created_at=run.created_at,
         updated_at=run.updated_at,
     )
@@ -264,18 +276,4 @@ async def get_search_postings(
         .where(JobPosting.job_search_id == search_id)
         .order_by(JobPosting.posted_at.desc().nulls_last(), JobPosting.title)
     )
-    return [
-        JobPostingSummary(
-            id=posting.id,
-            source=posting.source,
-            title=posting.title,
-            company=posting.company,
-            url=posting.url,
-            location=posting.location,
-            posted_at=posting.posted_at,
-            salary_min=float(posting.salary_min) if posting.salary_min is not None else None,
-            salary_max=float(posting.salary_max) if posting.salary_max is not None else None,
-            currency=posting.currency,
-        )
-        for posting in result.scalars().all()
-    ]
+    return [JobPostingSummary.from_posting(posting) for posting in result.scalars().all()]

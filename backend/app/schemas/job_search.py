@@ -4,6 +4,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from app.models import JobPosting
+
 JobSearchStatusLiteral = Literal["pending", "running", "succeeded", "partial", "failed"]
 
 _MAX_TITLE = 80
@@ -62,6 +64,7 @@ class SearchQueriesResponse(BaseModel):
 
 class JobSearchRequest(BaseModel):
     query: str | None = Field(default=None, min_length=1, max_length=_MAX_QUERY)
+    profile_id: uuid.UUID | None = None
     source_queries: dict[str, SourceQuerySpec] | None = Field(default=None, max_length=_MAX_QUERIES)
     location: str | None = Field(default=None, max_length=200)
     country: str = Field(min_length=2, max_length=2, pattern=r"^[A-Za-z]{2}$")
@@ -112,11 +115,21 @@ class SourceOutcome(BaseModel):
     warning: str | None = None
 
 
+class MatchingOutcome(BaseModel):
+    status: Literal["ok", "failed", "skipped"]
+    scored_count: int = 0
+    rationale_count: int = 0
+    rerank_prompt_tokens: int = 0
+    rerank_completion_tokens: int = 0
+    warning: str | None = None
+
+
 class JobSearchStatusResponse(BaseModel):
     search_id: uuid.UUID
     status: JobSearchStatusLiteral
     query: dict[str, Any]
     results: list[SourceOutcome] = []
+    matching: MatchingOutcome | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -145,3 +158,18 @@ class JobPostingSummary(BaseModel):
     salary_min: float | None = Field(default=None, ge=0)
     salary_max: float | None = Field(default=None, ge=0)
     currency: str | None = None
+
+    @classmethod
+    def from_posting(cls, posting: JobPosting) -> "JobPostingSummary":
+        return cls(
+            id=posting.id,
+            source=posting.source,
+            title=posting.title,
+            company=posting.company,
+            url=posting.url,
+            location=posting.location,
+            posted_at=posting.posted_at,
+            salary_min=float(posting.salary_min) if posting.salary_min is not None else None,
+            salary_max=float(posting.salary_max) if posting.salary_max is not None else None,
+            currency=posting.currency,
+        )

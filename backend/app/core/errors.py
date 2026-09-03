@@ -37,6 +37,11 @@ class ProfileNotFoundError(DomainError):
     default_detail = "profile not found"
 
 
+class ProfileNotEmbeddedError(DomainError):
+    status_code = 409
+    default_detail = "profile has no embedding; save the profile once the embedding provider works"
+
+
 class ResumeDraftUnavailableError(DomainError):
     status_code = 409
     default_detail = "resume has no extracted draft profile"

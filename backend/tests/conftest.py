@@ -50,6 +50,25 @@ async def clean_tables(migrated_database: None) -> None:
 
 
 @pytest.fixture(autouse=True)
+def no_real_llm(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Default-deny completion fake.
+
+    litellm falls back to ambient credentials (e.g. gcloud ADC) when no API
+    key is configured, which would otherwise make LLM-touching tests
+    non-hermetic. Tests that need the LLM install their own fake via
+    fakes.install_acompletion, overriding this one.
+    """
+    import litellm
+
+    from app.adapters.llm import LLMError
+
+    async def _no_llm(**kwargs: object) -> object:
+        raise LLMError("LLM provider not faked in tests")
+
+    monkeypatch.setattr(litellm, "acompletion", _no_llm)
+
+
+@pytest.fixture(autouse=True)
 def fake_embedding(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
     import litellm
     from fakes import embedding_response, fake_vector

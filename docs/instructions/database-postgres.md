@@ -31,8 +31,8 @@ alembic upgrade head
 - **PKs**: UUID (`uuid4`), generated client-side or via `server_default=text("gen_random_uuid()")`.
 - **Timestamps**: `timestamptz` only; `created_at` with server default `now()`; `updated_at` via `onupdate` + trigger or ORM hook.
 - **JSONB** for flexible payloads (`structured_profile`, `preferences`, `raw_payload`). Don't bury queryable relationships in JSONB — if we filter/group by it, it becomes a column or table.
-- **Indexes**: every FK column indexed; unique constraint on `(source, external_id)` for `job_posting` dedupe; index `match(candidate_id, final_score DESC)` for the dashboard query.
-- **pgvector**: extension created in the initial migration (`CREATE EXTENSION IF NOT EXISTS vector`); `Vector(dim)` dimension pinned to the embedding model (Gemini `text-embedding-004` = 768) and documented in the migration message; changing embedding models = new column + backfill migration, never silent dimension change.
+- **Indexes**: every FK column indexed; unique constraint on `(source, external_id)` for `job_posting` dedupe; index `match(profile_id, final_score DESC)` for the dashboard query (profiles are the matching unit — owner decision 2026-09-02).
+- **pgvector**: extension created in the initial migration (`CREATE EXTENSION IF NOT EXISTS vector`); `Vector(dim)` dimension pinned to the embedding model (Gemini `gemini-embedding-001` with `EMBEDDING_DIMENSIONS=768`; native output is 3072, truncated via the API's `dimensions` param) and documented in the migration message; changing embedding models = new column + backfill migration, never silent dimension change.
 - **Enums**: named native PG enums via `sa.Enum(..., name="job_type")` so values can be `ALTER TYPE ... ADD VALUE` in later migrations.
 - **Files/uploads**: DB stores path/metadata only; blobs on disk/object storage with UUID filenames.
 

@@ -22,7 +22,7 @@ from app.schemas.profile import (
     StructuredProfile,
 )
 from app.schemas.resume import DraftProfileResponse
-from app.services import embedding, query_builder
+from app.services import embedding, matching, query_builder
 from app.services.resume_service import get_or_create_candidate
 
 logger = logging.getLogger(__name__)
@@ -192,6 +192,8 @@ async def create_profile(session: AsyncSession, payload: ProfileCreate) -> Profi
     await session.flush()
     await embedding.refresh_profile_embedding(profile)
     await session.flush()
+    await matching.rescore_matches(session, profile, invalidate_rationales=True)
+    await session.flush()
     await session.refresh(profile)
 
     filename = await _resume_filename(session, profile.source_resume_id)
@@ -236,6 +238,8 @@ async def save_profile(
     await session.flush()
     if payload.structured_profile is not None:
         await embedding.refresh_profile_embedding(profile)
+        await session.flush()
+        await matching.rescore_matches(session, profile, invalidate_rationales=True)
         await session.flush()
     await session.refresh(profile)
 

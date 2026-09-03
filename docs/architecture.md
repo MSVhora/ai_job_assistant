@@ -163,7 +163,7 @@ erDiagram
     candidate ||--o{ resume : "uploads"
     candidate ||--o{ profile : "tracks"
     profile ||--o{ profile_revision : "audit trail"
-    candidate ||--o{ match : "ranked against"
+    profile ||--o{ match : "ranked against"
     job_search ||--o{ job_posting : "ingestion runs"
     job_posting ||--o{ match : "produces"
 
@@ -180,7 +180,7 @@ erDiagram
         jsonb structured_profile "contact, headline, skills, experience, projects, education, certifications, extra sections, embedded preferences"
         jsonb search_queries "per-source query specs + generation stamp; Regenerate overwrites"
         uuid source_resume_id FK "resume whose draft seeded this profile (provenance)"
-        vector embedding "pgvector, dim 768 (text-embedding-004); refreshed on every content save/gap-fill"
+        vector embedding "pgvector, dim 768 (gemini-embedding-001, truncated via dimensions param); refreshed on every content save/gap-fill"
         timestamptz created_at
         timestamptz updated_at
     }
@@ -214,6 +214,7 @@ erDiagram
         text status "pending | running | succeeded | partial | failed"
         jsonb query "validated search request (issue #7)"
         jsonb results "per-source {source, status, count, warning?}"
+        jsonb matching "per-run MatchingOutcome: status, counts, rerank token usage (issue #10)"
         timestamptz created_at
         timestamptz updated_at
     }
@@ -234,19 +235,22 @@ erDiagram
         numeric salary_max
         text currency
         jsonb raw_payload "original source data for debugging/re-mapping"
-        vector embedding "pgvector, dim 768 (text-embedding-004); null when the embed call failed"
+        vector embedding "pgvector, dim 768 (gemini-embedding-001, truncated via dimensions param); null when the embed call failed"
         timestamptz fetched_at
         uuid job_search_id FK "nullable; last run that returned this posting"
     }
 
     match {
         uuid id PK
-        uuid candidate_id FK
+        uuid profile_id FK "matching unit is the profile (owner decision 2026-09-02); CASCADE on profile or posting delete"
         uuid job_posting_id FK
-        real vector_score "pre-weight cosine similarity"
-        real final_score "post-weight/rerank"
-        text rationale "LLM why-this-matches, top N only"
+        real vector_score "clamped cosine similarity (1 - distance), SQL-computed"
+        real role_fit "LLM re-rank 0-10, null when not re-ranked; stored so #11 can re-weight without an LLM call"
+        real company_fit "LLM re-rank 0-10, null when not re-ranked"
+        real final_score "weighted blend when re-ranked, vector_score otherwise"
+        text rationale "LLM why-this-matches, top N only; cleared when profile content changes"
         timestamptz created_at
+        timestamptz updated_at
     }
 
     source_state {
@@ -259,14 +263,15 @@ erDiagram
 
 Deferred from plan §4 (issue #4 locked decision): the separate `preferences` (weights) and
 `completeness` jsonb columns. Preferences extracted from the resume stay inside the
-profile's `structured_profile`; the priority-weight column lands with the matching work
-that consumes it, and gap-fill (#5) derives completeness from the profile instead of
-storing it. Multi-profile moved the opposite way — from v2 into v1 (issue #6, owner
-decision 2026-09-01): `profile` is now the home of `structured_profile` and the revision
-audit.
+profile's `structured_profile`; the matching work (#10) reads blend weights from
+`Settings` (`MATCH_WEIGHT_*` in `.env.example`) and stores the re-rank sub-scores on
+`match` so the priority slider (#11) can re-weight without an LLM call, and gap-fill (#5)
+derives completeness from the profile instead of storing it. Multi-profile moved the
+opposite way — from v2 into v1 (issue #6, owner decision 2026-09-01): `profile` is now the
+home of `structured_profile` and the revision audit.
 
 Schema conventions and index rules (FK columns indexed, `(source, external_id)` unique,
-`match(candidate_id, final_score DESC)` for the dashboard query, embedding dimension pinned
+`match(profile_id, final_score DESC)` for the dashboard query, embedding dimension pinned
 to the embedding model) live in
 [instructions/database-postgres.md](instructions/database-postgres.md).
 

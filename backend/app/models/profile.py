@@ -18,7 +18,8 @@ class Profile(Base):
     )
     name: Mapped[str]
     structured_profile: Mapped[dict[str, object]] = mapped_column(JSONB)
-    # Dimension pinned to Gemini text-embedding-004 (768); changing embedding models =
+    # Dimension pinned to Gemini gemini-embedding-001 (dimensions=768; native output is
+    # 3072, truncated via the dimensions param). Changing the dimension =
     # new column + backfill migration, never a silent dimension change.
     embedding: Mapped[list[float] | None] = mapped_column(Vector(768), nullable=True)
     search_queries: Mapped[dict[str, object] | None] = mapped_column(JSONB, nullable=True)

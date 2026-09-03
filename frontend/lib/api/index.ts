@@ -1,5 +1,5 @@
 import { ApiError, ExtractionFailedError, apiFetch } from "./client";
-import type { components } from "./schema";
+import type { components, operations } from "./schema";
 
 export type HealthResponse = components["schemas"]["HealthResponse"];
 export type ResumeUploadResponse = components["schemas"]["ResumeUploadResponse"];
@@ -21,6 +21,9 @@ export type SourceQuerySpec = components["schemas"]["SourceQuerySpec"];
 export type StoredSearchQueries = components["schemas"]["StoredSearchQueries"];
 export type SearchQueriesResponse = components["schemas"]["SearchQueriesResponse"];
 export type JobPostingSummary = components["schemas"]["JobPostingSummary"];
+export type MatchResponse = components["schemas"]["MatchResponse"];
+export type MatchingOutcome = components["schemas"]["MatchingOutcome"];
+export type MatchListParams = operations["list_matches_api_matches_get"]["parameters"]["query"];
 
 export { ApiError, ExtractionFailedError, apiFetch } from "./client";
 
@@ -133,6 +136,16 @@ export async function getSearchPostings(searchId: string): Promise<JobPostingSum
   return apiFetch<JobPostingSummary[]>(
     `/api/jobs/searches/${encodeURIComponent(searchId)}/postings`,
   );
+}
+
+export async function listMatches(params: MatchListParams): Promise<MatchResponse[]> {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== "") {
+      query.set(key, String(value));
+    }
+  }
+  return apiFetch<MatchResponse[]>(`/api/matches?${query.toString()}`);
 }
 
 export async function regenerateSearchQueries(

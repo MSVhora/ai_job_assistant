@@ -6,6 +6,8 @@ import { useState } from "react";
 import { SearchForm } from "@/components/features/jobs/SearchForm";
 import { SearchResults } from "@/components/features/jobs/SearchResults";
 import { RunBanner } from "@/components/features/jobs/RunBanner";
+import { MatchList } from "@/components/features/jobs/MatchList";
+import { selectStyles as SELECT_STYLES } from "@/components/features/jobs/MatchFilterBar";
 import { Card } from "@/components/ui/card";
 import { useProfiles } from "@/hooks/use-profiles";
 import { useJobSearchStatus } from "@/hooks/use-job-search";
@@ -84,13 +86,11 @@ export function JobsPageClient() {
           setSearchId(null);
         }}
       />
+      <MatchList profileId={activeProfileId} />
       <SearchResults searchId={searchId} status={runStatus.data?.status} />
     </div>
   );
 }
-
-const SELECT_STYLES =
-  "w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100";
 
 function ProfileSelector({
   profiles,

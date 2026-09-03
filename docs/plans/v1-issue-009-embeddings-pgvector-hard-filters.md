@@ -1,6 +1,6 @@
 # Issue #9 — Embeddings + pgvector Storage + Hard Filters
 
-**Status:** Proposed (locked decisions below need owner sign-off before build)
+**Status:** Done (2026-09-03)
 **Tracks:** GitHub issue #9 (Day 8, Week 2)
 **Plan of record:** [v1-implementation-plan.md](v1-implementation-plan.md) §3 (matching engine), §4 (`job_posting.embedding`), §8 Day 8; [UI plan](v1-ui-implementation-plan.md) §6.5 (filters UI lands #10/#11, not here)
 **Depends on:** Issues #1–#8 (done). Matching endpoint/table/scores stay in #10.

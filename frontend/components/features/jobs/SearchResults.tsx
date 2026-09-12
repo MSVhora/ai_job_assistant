@@ -1,7 +1,6 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
 import { isRunFinished, useSearchPostings } from "@/hooks/use-job-search";
 import { salaryLine } from "@/lib/salary";
 
@@ -14,7 +13,7 @@ export function SearchResults({ searchId, status }: { searchId: string | null; s
   if (postings.isPending || postings.isFetching) {
     return (
       <div
-        className="h-40 animate-pulse rounded-xl border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-800"
+        className="h-40 animate-pulse rounded-3xl border border-gray-200 bg-white/60"
         aria-busy="true"
         aria-live="polite"
       />
@@ -23,18 +22,19 @@ export function SearchResults({ searchId, status }: { searchId: string | null; s
 
   if (postings.isError) {
     return (
-      <Card title="Results">
-        <p role="alert" className="text-sm text-red-700 dark:text-red-400">
+      <section aria-labelledby="results-heading" className="rounded-3xl border border-gray-200 bg-white p-6 shadow-lg shadow-gray-100">
+        <h2 id="results-heading" className="text-lg font-bold tracking-tight text-gray-900">Results</h2>
+        <p role="alert" className="mt-3 text-sm text-red-700">
           Could not load the results of this run.
         </p>
         <button
           type="button"
           onClick={() => void postings.refetch()}
-          className="mt-3 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:border-gray-700 dark:hover:bg-gray-800"
+          className="mt-3 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
         >
           Retry
         </button>
-      </Card>
+      </section>
     );
   }
 
@@ -42,35 +42,39 @@ export function SearchResults({ searchId, status }: { searchId: string | null; s
   if (list.length === 0) {
     if (status === "failed") {
       return (
-        <Card title="Search failed">
-          <p role="alert" className="text-sm text-red-700 dark:text-red-400">
+        <section aria-labelledby="results-heading" className="rounded-3xl border border-red-200 bg-red-50/60 p-6">
+          <h2 id="results-heading" className="text-lg font-bold tracking-tight text-gray-900">Search failed</h2>
+          <p role="alert" className="mt-2 text-sm text-red-700">
             The run failed before any source could return postings — see the run banner
             above for the per-source warnings. Fix the configuration and start a new
             search.
           </p>
-        </Card>
+        </section>
       );
     }
     return (
-      <Card title="No postings from this run">
-        <p className="text-sm text-gray-700 dark:text-gray-300">
+      <section aria-labelledby="results-heading" className="rounded-3xl border border-dashed border-violet-200 bg-white/70 p-6">
+        <h2 id="results-heading" className="text-lg font-bold tracking-tight text-gray-900">No postings from this run</h2>
+        <p className="mt-2 text-sm text-gray-600">
           The sources returned nothing for these queries and filters. Try broadening the
           title or skills, lowering or clearing the minimum salary (Adzuna&apos;s salary
           coverage is thin in some countries), or widening the location.
         </p>
-      </Card>
+      </section>
     );
   }
 
   return (
-    <Card
-      title={
-        <span aria-live="polite">
-          Results — {list.length} posting{list.length === 1 ? "" : "s"}
-        </span>
-      }
-    >
-      <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
+    <section aria-labelledby="results-heading" className="rounded-3xl border border-gray-200 bg-white p-5 shadow-lg shadow-gray-100 sm:p-6">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 id="results-heading" aria-live="polite" className="text-lg font-bold tracking-tight text-gray-900">
+          Results
+          <span className="ml-2 rounded-full bg-gray-100 px-2.5 py-0.5 text-sm font-semibold text-gray-600">
+            {list.length} posting{list.length === 1 ? "" : "s"}
+          </span>
+        </h2>
+      </div>
+      <p className="mb-3 text-xs text-gray-500">
         Unranked, as returned by the sources — the ranked view with the why-this-matches
         rationale is above.
       </p>
@@ -80,7 +84,7 @@ export function SearchResults({ searchId, status }: { searchId: string | null; s
           return (
             <li
               key={posting.id}
-              className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-800"
+              className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-2xl border border-gray-100 bg-gray-50/60 px-3.5 py-2.5 text-sm transition-colors hover:border-violet-200 hover:bg-violet-50/40"
             >
               <Badge variant={posting.source.startsWith("apify") ? "third-party-scraper" : "official-api"}>
                 {posting.source}
@@ -90,22 +94,22 @@ export function SearchResults({ searchId, status }: { searchId: string | null; s
                   href={posting.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="font-medium text-blue-700 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:text-blue-400"
+                  className="font-semibold text-gray-900 hover:text-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
                 >
                   {posting.title}
                 </a>
               ) : (
-                <span className="font-medium text-gray-900 dark:text-gray-100">{posting.title}</span>
+                <span className="font-semibold text-gray-900">{posting.title}</span>
               )}
               {posting.company && (
-                <span className="text-gray-700 dark:text-gray-300">{posting.company}</span>
+                <span className="text-gray-700">{posting.company}</span>
               )}
               {posting.location && (
-                <span className="text-gray-500 dark:text-gray-400">{posting.location}</span>
+                <span className="text-gray-500">{posting.location}</span>
               )}
-              {salary && <span className="text-gray-700 dark:text-gray-300">{salary}</span>}
+              {salary && <span className="font-medium text-gray-800">{salary}</span>}
               {posting.posted_at && (
-                <span className="ml-auto text-xs text-gray-500 dark:text-gray-400">
+                <span className="ml-auto text-xs text-gray-500">
                   {new Date(posting.posted_at).toLocaleDateString()}
                 </span>
               )}
@@ -113,6 +117,6 @@ export function SearchResults({ searchId, status }: { searchId: string | null; s
           );
         })}
       </ul>
-    </Card>
+    </section>
   );
 }

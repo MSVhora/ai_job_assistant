@@ -2,7 +2,7 @@
 
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 
-import { listMatches, type MatchListParams } from "@/lib/api";
+import { listMatchesPage, type MatchListParams } from "@/lib/api";
 
 export type MatchFilterValues = Pick<
   MatchListParams,
@@ -28,7 +28,7 @@ export function useMatches(
 ) {
   return useQuery({
     queryKey: ["matches", profileId, params],
-    queryFn: () => listMatches({ profile_id: profileId as string, ...params }),
+    queryFn: () => listMatchesPage({ profile_id: profileId as string, ...params }),
     enabled: profileId !== null,
     placeholderData: keepPreviousData,
   });

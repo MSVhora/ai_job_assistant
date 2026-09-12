@@ -1,9 +1,12 @@
 "use client";
 
 import type { MatchFilterValues } from "@/hooks/use-matches";
+import type { SourceInfo } from "@/lib/api";
+
+import { SourceMultiSelect } from "./SourceMultiSelect";
 
 export const selectStyles =
-  "w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100";
+  "w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500";
 
 const REMOTE_OPTIONS = [
   { value: "", label: "Any workplace" },
@@ -37,27 +40,23 @@ const SORT_OPTIONS = [
 export function MatchFilterBar({
   filters,
   onChange,
+  sources,
+  selectedSources,
+  onToggleSource,
 }: {
   filters: MatchFilterValues;
   onChange: (filters: MatchFilterValues) => void;
+  sources: SourceInfo[];
+  selectedSources: string[];
+  onToggleSource: (name: string, checked: boolean) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-end gap-2">
-      <div className="flex flex-col gap-1">
-        <label htmlFor="match-location" className="text-xs font-medium text-gray-700 dark:text-gray-300">
-          Location
-        </label>
-        <input
-          id="match-location"
-          type="text"
-          value={filters.location ?? ""}
-          onChange={(event) =>
-            onChange({ ...filters, location: event.target.value.trim() || undefined })
-          }
-          placeholder="e.g. Berlin"
-          className={`${selectStyles} w-40`}
-        />
-      </div>
+    <div className="flex flex-wrap items-end gap-x-2.5 gap-y-3">
+      <SourceMultiSelect
+        sources={sources}
+        selected={selectedSources}
+        onToggle={onToggleSource}
+      />
       <SelectField
         id="match-remote"
         label="Workplace"
@@ -111,7 +110,7 @@ function SelectField({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="text-xs font-medium text-gray-700 dark:text-gray-300">
+      <label htmlFor={id} className="text-xs font-medium text-gray-600">
         {label}
       </label>
       <select

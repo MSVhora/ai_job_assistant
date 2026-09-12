@@ -1,23 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
-import { toast } from "sonner";
+import { useState } from "react";
 
-import { Card } from "@/components/ui/card";
 import { MatchCard } from "@/components/features/jobs/MatchCard";
 import { MatchFilterBar } from "@/components/features/jobs/MatchFilterBar";
-import { PrioritySlider } from "@/components/features/jobs/PrioritySlider";
 import {
   DEFAULT_MATCH_FILTERS,
-  DEFAULT_PRIORITY,
   useMatches,
   type MatchFilterValues,
 } from "@/hooks/use-matches";
-import { useProfile, useUpdatePreferences } from "@/hooks/use-profiles";
+import type { MatchResponse, SourceInfo } from "@/lib/api";
 
-const MATCH_PAGE_SIZE = 50;
-const PERSIST_DEBOUNCE_MS = 400;
+const MATCH_PAGE_SIZE = 20;
+
+export type MatchSelection = {
+  match: MatchResponse | null;
+  toggle: (match: MatchResponse) => void;
+  clear: () => void;
+};
 
 function hasActiveFilters(filters: MatchFilterValues): boolean {
   return (
@@ -28,61 +29,89 @@ function hasActiveFilters(filters: MatchFilterValues): boolean {
   );
 }
 
-export function MatchList({ profileId }: { profileId: string | null }) {
+function ChevronLeftIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className="h-4 w-4">
+      <path
+        fillRule="evenodd"
+        d="M12.7 5.3a1 1 0 010 1.4L9.4 10l3.3 3.3a1 1 0 11-1.4 1.4l-4-4a1 1 0 010-1.4l4-4a1 1 0 011.4 0z"
+        clipRule="evenodd"
+      />
+    </svg>
+  );
+}
+
+function ChevronRightIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className="h-4 w-4">
+      <path
+        fillRule="evenodd"
+        d="M7.3 5.3a1 1 0 000 1.4l3.3 3.3-3.3 3.3a1 1 0 101.4 1.4l4-4a1 1 0 000-1.4l-4-4a1 1 0 00-1.4 0z"
+        clipRule="evenodd"
+      />
+    </svg>
+  );
+}
+
+export function MatchList({
+  profileId,
+  selection,
+  priority,
+  sources,
+  selectedSources,
+  onToggleSource,
+}: {
+  profileId: string | null;
+  selection: MatchSelection;
+  priority: number | undefined;
+  sources: SourceInfo[];
+  selectedSources: string[];
+  onToggleSource: (name: string, checked: boolean) => void;
+}) {
   const [filters, setFilters] = useState<MatchFilterValues>(DEFAULT_MATCH_FILTERS);
-  const [priorityOverride, setPriorityOverride] = useState<number | undefined>(undefined);
-  const persistTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const profile = useProfile(profileId);
-  const updatePreferences = useUpdatePreferences();
-  const storedPriority = profile.data?.preferences?.priority;
-  const priority = priorityOverride ?? storedPriority;
+  const [page, setPage] = useState(0);
   const matches = useMatches(profileId, {
     limit: MATCH_PAGE_SIZE,
-    offset: 0,
+    offset: page * MATCH_PAGE_SIZE,
     priority,
     ...filters,
   });
+  const list = matches.data?.items ?? [];
+  const total = matches.data?.total ?? 0;
+  const pageCount = Math.max(1, Math.ceil(total / MATCH_PAGE_SIZE));
 
-  function handlePriorityChange(value: number) {
-    setPriorityOverride(value);
-    if (persistTimer.current !== null) clearTimeout(persistTimer.current);
-    const targetProfileId = profileId;
-    persistTimer.current = setTimeout(() => {
-      if (targetProfileId === null) return;
-      updatePreferences.mutate(
-        { profileId: targetProfileId, payload: { priority: value } },
-        {
-          onError: () => {
-            toast.error("Couldn't save the preference — ranking reflects this session only.", {
-              id: "preferences-save-failed",
-            });
-          },
-        },
-      );
-    }, PERSIST_DEBOUNCE_MS);
+  function changePage(next: number) {
+    setPage(next);
+    selection.clear();
   }
 
   if (profileId === null) {
     return (
-      <Card title="Ranked matches">
-        <p className="text-sm text-gray-700 dark:text-gray-300">
+      <section
+        aria-labelledby="matches-heading"
+        className="rounded-3xl border border-dashed border-violet-200 bg-white/70 p-8 text-center shadow-lg shadow-gray-100"
+      >
+        <h2 id="matches-heading" className="text-lg font-bold tracking-tight text-gray-900">
+          Ranked matches
+        </h2>
+        <p className="mx-auto mt-2 max-w-md text-sm text-gray-600">
           Matches rank stored postings against a profile.{" "}
           <Link
             href="/profile"
-            className="font-medium text-blue-700 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:text-blue-400"
+            className="font-semibold text-violet-700 underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
           >
             Create a profile
           </Link>{" "}
           or run a search — matches appear here after the run finishes.
         </p>
-      </Card>
+      </section>
     );
   }
 
   if (matches.isPending) {
     return (
       <div
-        className="h-48 animate-pulse rounded-xl border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-800"
+        className="h-96 animate-pulse rounded-3xl border border-gray-200 bg-white/60"
         aria-busy="true"
         aria-live="polite"
       />
@@ -91,75 +120,135 @@ export function MatchList({ profileId }: { profileId: string | null }) {
 
   if (matches.isError) {
     return (
-      <Card title="Ranked matches">
-        <p role="alert" className="text-sm text-red-700 dark:text-red-400">
+      <section
+        aria-labelledby="matches-heading"
+        className="rounded-3xl border border-gray-200 bg-white p-6 shadow-lg shadow-gray-100"
+      >
+        <h2 id="matches-heading" className="text-lg font-bold tracking-tight text-gray-900">
+          Ranked matches
+        </h2>
+        <p role="alert" className="mt-3 text-sm text-red-700">
           Could not load matches: {matches.error.message}
         </p>
         <button
           type="button"
           onClick={() => void matches.refetch()}
-          className="mt-3 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:border-gray-700 dark:hover:bg-gray-800"
+          className="mt-3 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
         >
           Retry
         </button>
-      </Card>
+      </section>
     );
   }
 
-  const list = matches.data ?? [];
   const filtersActive = hasActiveFilters(filters);
 
   return (
-    <Card
-      title={
-        <span aria-live="polite">
-          Ranked matches{list.length > 0 ? ` — ${list.length}` : ""}
-        </span>
-      }
+    <section
+      id="matches-top"
+      aria-labelledby="matches-heading"
+      aria-live="polite"
+      className="scroll-mt-6 flex min-h-0 flex-col rounded-3xl border border-gray-200 bg-white shadow-lg shadow-gray-100"
     >
-      <div className="mb-4 flex flex-col gap-4">
-        <PrioritySlider
-          value={priorityOverride ?? storedPriority ?? DEFAULT_PRIORITY}
-          onChange={handlePriorityChange}
-          disabled={profile.isPending}
-        />
-        <MatchFilterBar filters={filters} onChange={setFilters} />
-      </div>
-      {list.length === 0 ? (
-        <div className="flex flex-col items-start gap-3">
-          <p className="text-sm text-gray-700 dark:text-gray-300">
-            {filtersActive
-              ? "No postings match the current filters. Clear them to see every ranked match for this profile."
-              : "No matches for this profile yet. Run a search to fetch postings — matches appear here when the run finishes."}
-          </p>
-          {filtersActive && (
-            <button
-              type="button"
-              onClick={() => setFilters(DEFAULT_MATCH_FILTERS)}
-              className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:border-gray-700 dark:hover:bg-gray-800"
-            >
-              Clear filters
-            </button>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-5 py-4 sm:px-6">
+        <h2 id="matches-heading" className="text-lg font-bold tracking-tight text-gray-900">
+          Ranked matches
+          {total > 0 && (
+            <span className="ml-2 rounded-full bg-violet-100 px-2.5 py-0.5 text-sm font-semibold text-violet-700">
+              {total}
+            </span>
           )}
-        </div>
-      ) : (
-        <>
-          <ul
-            className={`flex flex-col gap-2 transition-opacity${
-              matches.isFetching ? " opacity-60" : ""
-            }`}
+        </h2>
+        <span className="text-xs text-gray-500">
+          Page {page + 1} of {pageCount}
+        </span>
+      </div>
+      <div className="shrink-0 border-b border-gray-100 bg-gray-50/60 px-5 py-3 sm:px-6">
+        <MatchFilterBar
+          filters={filters}
+          onChange={(next) => {
+            setFilters(next);
+            setPage(0);
+          }}
+          sources={sources}
+          selectedSources={selectedSources}
+          onToggleSource={onToggleSource}
+        />
+      </div>
+      <div className="scrollbar-hidden min-h-0 flex-1 overflow-y-auto p-5 sm:p-6">
+        {list.length === 0 ? (
+          <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-violet-200 bg-violet-50/40 px-4 py-8 text-center">
+            <p className="max-w-md text-sm text-gray-600">
+              {filtersActive
+                ? "No postings match the current filters. Clear them to see every ranked match for this profile."
+                : "No matches for this profile yet. Run a search to fetch postings — matches appear here when the run finishes."}
+            </p>
+            {filtersActive && (
+              <button
+                type="button"
+                onClick={() => {
+                  setFilters(DEFAULT_MATCH_FILTERS);
+                  setPage(0);
+                }}
+                className="rounded-full border border-violet-300 bg-white px-4 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+        ) : (
+          <>
+            <ul
+              className={`flex flex-col gap-3 transition-opacity${
+                matches.isFetching ? " opacity-60" : ""
+              }`}
+            >
+              {list.map((match, index) => (
+                <MatchCard
+                  key={match.id}
+                  match={match}
+                  rank={page * MATCH_PAGE_SIZE + index + 1}
+                  selected={selection.match?.id === match.id}
+                  onOpenDetails={() => selection.toggle(match)}
+                />
+              ))}
+            </ul>
+            <p className="mt-4 text-xs text-gray-500">
+              Scores blend vector similarity with AI fit ratings; the priority slider re-weights
+              them live without re-calling the AI. &quot;Why this matches&quot; appears on the top
+              postings and refreshes on the next search after profile changes.
+            </p>
+          </>
+        )}
+      </div>
+      {pageCount > 1 && (
+        <nav
+          aria-label="Matches pagination"
+          className="flex shrink-0 items-center justify-center gap-2 border-t border-gray-100 py-3"
+        >
+          <button
+            type="button"
+            onClick={() => changePage(page - 1)}
+            disabled={page === 0}
+            className="inline-flex items-center gap-1 rounded-full border border-gray-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:border-violet-300 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
           >
-            {list.map((match, index) => (
-              <MatchCard key={match.id} match={match} rank={index + 1} />
-            ))}
-          </ul>
-          <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-            Scores blend vector similarity with AI fit ratings; the priority slider re-weights
-            them live without re-calling the AI. &quot;Why this matches&quot; appears on the top
-            postings and refreshes on the next search after profile changes.
-          </p>
-        </>
+            <ChevronLeftIcon />
+            Previous
+          </button>
+          <span className="px-2 text-xs text-gray-500" aria-current="page">
+            {page + 1} / {pageCount}
+          </span>
+          <button
+            type="button"
+            onClick={() => changePage(page + 1)}
+            disabled={page >= pageCount - 1}
+            className="inline-flex items-center gap-1 rounded-full border border-gray-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:border-violet-300 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
+          >
+            Next
+            <ChevronRightIcon />
+          </button>
+        </nav>
       )}
-    </Card>
+    </section>
   );
 }

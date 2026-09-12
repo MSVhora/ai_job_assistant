@@ -14,8 +14,8 @@ export function PrioritySlider({
   const percent = Math.min(100, Math.max(0, Math.round(value * 100)));
   const valueText = `${percent}% role fit / ${100 - percent}% company fit`;
   return (
-    <div className="flex flex-col gap-1">
-      <label htmlFor="match-priority" className="text-xs font-medium text-gray-700 dark:text-gray-300">
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor="match-priority" className="text-xs font-medium text-gray-600">
         Priority — role fit vs company fit
       </label>
       <input
@@ -28,9 +28,9 @@ export function PrioritySlider({
         disabled={disabled}
         aria-valuetext={valueText}
         onChange={(event) => onChange(Number(event.target.value) / 100)}
-        className="w-64 accent-blue-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 disabled:opacity-50 dark:accent-blue-400"
+        className="w-full max-w-md accent-violet-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 disabled:opacity-50"
       />
-      <p aria-live="polite" className="text-xs text-gray-500 dark:text-gray-400">
+      <p aria-live="polite" className="text-xs text-gray-500">
         {valueText}
         {disabled ? " (loading profile…)" : ""}
       </p>

@@ -3,22 +3,31 @@ import type { Metadata } from "next";
 import { JobsPageClient } from "@/components/features/jobs/JobsPageClient";
 
 export const metadata: Metadata = {
-  title: "Jobs — AI Job Assistant",
+  title: "Job openings",
   description: "Search enabled job sources and watch the ingestion run live.",
 };
 
 export default function JobsPage() {
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-col gap-8 p-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">
-          Job search
-        </h1>
-        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-          A run only starts when you submit it — the query below is exactly what gets sent.
-        </p>
+    <main className="relative flex min-h-screen w-full flex-col overflow-hidden">
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
+        <div className="absolute inset-x-0 top-0 h-[420px] bg-gradient-to-b from-violet-50 via-fuchsia-50/50 to-white" />
+        <div className="absolute -left-24 top-10 h-72 w-72 rounded-full bg-violet-300/40 blur-3xl" />
+        <div className="absolute -right-24 top-32 h-72 w-72 rounded-full bg-fuchsia-300/30 blur-3xl" />
       </div>
-      <JobsPageClient />
+
+      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-8 px-4 pb-16 pt-14 sm:px-6">
+        <section className="flex flex-col items-center gap-3 text-center">
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
+            Find your next{" "}
+            <span className="bg-gradient-to-r from-violet-600 via-purple-600 to-fuchsia-600 bg-clip-text text-transparent">
+              match
+            </span>
+          </h1>
+        </section>
+
+        <JobsPageClient />
+      </div>
     </main>
   );
 }

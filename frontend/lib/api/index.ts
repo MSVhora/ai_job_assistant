@@ -1,4 +1,4 @@
-import { ApiError, ExtractionFailedError, apiFetch } from "./client";
+import { ApiError, ExtractionFailedError, apiFetch, apiFetchWithTotal } from "./client";
 import type { components, operations } from "./schema";
 
 export type HealthResponse = components["schemas"]["HealthResponse"];
@@ -21,12 +21,13 @@ export type SourceQuerySpec = components["schemas"]["SourceQuerySpec"];
 export type StoredSearchQueries = components["schemas"]["StoredSearchQueries"];
 export type SearchQueriesResponse = components["schemas"]["SearchQueriesResponse"];
 export type JobPostingSummary = components["schemas"]["JobPostingSummary"];
+export type JobPostingDetail = components["schemas"]["JobPostingDetail"];
 export type MatchResponse = components["schemas"]["MatchResponse"];
 export type MatchingOutcome = components["schemas"]["MatchingOutcome"];
 export type StoredPreferences = components["schemas"]["StoredPreferences"];
 export type MatchListParams = operations["list_matches_api_matches_get"]["parameters"]["query"];
 
-export { ApiError, ExtractionFailedError, apiFetch } from "./client";
+export { ApiError, ExtractionFailedError, apiFetch, apiFetchWithTotal } from "./client";
 
 
 export async function getHealth(): Promise<HealthResponse> {
@@ -63,6 +64,10 @@ export async function listResumes(): Promise<ResumeSummaryResponse[]> {
 
 export async function getResumeDraft(resumeId: string): Promise<DraftProfileResponse> {
   return apiFetch<DraftProfileResponse>(`/api/resumes/${resumeId}/draft`);
+}
+
+export async function getJobPosting(postingId: string): Promise<JobPostingDetail> {
+  return apiFetch<JobPostingDetail>(`/api/jobs/postings/${encodeURIComponent(postingId)}`);
 }
 
 export async function listProfiles(): Promise<ProfileSummary[]> {
@@ -157,6 +162,18 @@ export async function listMatches(params: MatchListParams): Promise<MatchRespons
     }
   }
   return apiFetch<MatchResponse[]>(`/api/matches?${query.toString()}`);
+}
+
+export async function listMatchesPage(
+  params: MatchListParams,
+): Promise<{ items: MatchResponse[]; total: number }> {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== "") {
+      query.set(key, String(value));
+    }
+  }
+  return apiFetchWithTotal<MatchResponse[]>(`/api/matches?${query.toString()}`);
 }
 
 export async function regenerateSearchQueries(

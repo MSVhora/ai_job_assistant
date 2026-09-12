@@ -178,6 +178,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/jobs/postings/{posting_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Job Posting Detail */
+        get: operations["get_job_posting_detail_api_jobs_postings__posting_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/jobs/search": {
         parameters: {
             query?: never;
@@ -471,6 +488,41 @@ export interface components {
             database: boolean;
             /** Llm Configured */
             llm_configured: boolean;
+        };
+        /** JobPostingDetail */
+        JobPostingDetail: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Source */
+            source: string;
+            /** Title */
+            title: string;
+            /** Company */
+            company?: string | null;
+            /** Url */
+            url?: string | null;
+            /** Location */
+            location?: string | null;
+            /** Posted At */
+            posted_at?: string | null;
+            /** Salary Min */
+            salary_min?: number | null;
+            /** Salary Max */
+            salary_max?: number | null;
+            /** Currency */
+            currency?: string | null;
+            /** Description */
+            description?: string | null;
+            job_type?: components["schemas"]["JobType"] | null;
+            remote_type?: components["schemas"]["RemoteType"] | null;
+            /**
+             * Fetched At
+             * Format: date-time
+             */
+            fetched_at: string;
         };
         /** JobPostingSummary */
         JobPostingSummary: {
@@ -1425,6 +1477,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SearchQueriesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_job_posting_detail_api_jobs_postings__posting_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                posting_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobPostingDetail"];
                 };
             };
             /** @description Validation Error */

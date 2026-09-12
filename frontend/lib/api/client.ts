@@ -83,3 +83,27 @@ export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T>
   }
   return (await response.json()) as T;
 }
+
+export async function apiFetchWithTotal<T>(path: string, init?: ApiFetchInit): Promise<{ items: T; total: number }> {
+  const { timeoutMs = DEFAULT_TIMEOUT_MS, ...requestInit } = init ?? {};
+  let response: Response;
+  const headers = new Headers(requestInit.headers);
+  if (!headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+  const signal = requestInit.signal ?? AbortSignal.timeout(timeoutMs);
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, { ...requestInit, headers, signal });
+  } catch (cause) {
+    if (cause instanceof Error && cause.name === "TimeoutError") {
+      throw new ApiError(0, "The request timed out — try again.");
+    }
+    throw new ApiError(0, `network error: ${cause instanceof Error ? cause.message : "unknown"}`);
+  }
+  if (!response.ok) {
+    throw new ApiError(response.status, await errorMessage(response, path));
+  }
+  const items = (await response.json()) as T;
+  const total = Number(response.headers.get("X-Total-Count"));
+  return { items, total: Number.isFinite(total) ? total : 0 };
+}

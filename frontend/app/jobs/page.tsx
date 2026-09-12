@@ -16,9 +16,9 @@ export default function JobsPage() {
         <div className="absolute -right-24 top-32 h-72 w-72 rounded-full bg-fuchsia-300/30 blur-3xl" />
       </div>
 
-      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-8 px-4 pb-16 pt-14 sm:px-6">
-        <section className="flex flex-col items-center gap-3 text-center">
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900 sm:text-4xl">
+      <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-5 px-4 pb-8 pt-6 sm:px-6">
+        <section className="flex flex-col items-center gap-2 text-center">
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">
             Find your next{" "}
             <span className="bg-gradient-to-r from-violet-600 via-purple-600 to-fuchsia-600 bg-clip-text text-transparent">
               match

@@ -4,13 +4,13 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { MatchCard } from "@/components/features/jobs/MatchCard";
-import { MatchFilterBar } from "@/components/features/jobs/MatchFilterBar";
+import { hasActiveFilters } from "@/components/features/jobs/MatchFilterPanel";
 import {
   DEFAULT_MATCH_FILTERS,
   useMatches,
   type MatchFilterValues,
 } from "@/hooks/use-matches";
-import type { MatchResponse, SourceInfo } from "@/lib/api";
+import type { MatchResponse } from "@/lib/api";
 
 const MATCH_PAGE_SIZE = 20;
 
@@ -20,13 +20,8 @@ export type MatchSelection = {
   clear: () => void;
 };
 
-function hasActiveFilters(filters: MatchFilterValues): boolean {
-  return (
-    filters.location !== undefined ||
-    filters.remote_type !== undefined ||
-    filters.job_type !== undefined ||
-    filters.posted_within_days !== undefined
-  );
+function hasFiltersActive(filters: MatchFilterValues): boolean {
+  return hasActiveFilters(filters);
 }
 
 function ChevronLeftIcon() {
@@ -57,18 +52,15 @@ export function MatchList({
   profileId,
   selection,
   priority,
-  sources,
-  selectedSources,
-  onToggleSource,
+  filters,
+  onFiltersChange,
 }: {
   profileId: string | null;
   selection: MatchSelection;
   priority: number | undefined;
-  sources: SourceInfo[];
-  selectedSources: string[];
-  onToggleSource: (name: string, checked: boolean) => void;
+  filters: MatchFilterValues;
+  onFiltersChange: (filters: MatchFilterValues) => void;
 }) {
-  const [filters, setFilters] = useState<MatchFilterValues>(DEFAULT_MATCH_FILTERS);
   const [page, setPage] = useState(0);
   const matches = useMatches(profileId, {
     limit: MATCH_PAGE_SIZE,
@@ -141,7 +133,7 @@ export function MatchList({
     );
   }
 
-  const filtersActive = hasActiveFilters(filters);
+  const filtersActive = hasFiltersActive(filters);
 
   return (
     <section
@@ -163,18 +155,6 @@ export function MatchList({
           Page {page + 1} of {pageCount}
         </span>
       </div>
-      <div className="shrink-0 border-b border-gray-100 bg-gray-50/60 px-5 py-3 sm:px-6">
-        <MatchFilterBar
-          filters={filters}
-          onChange={(next) => {
-            setFilters(next);
-            setPage(0);
-          }}
-          sources={sources}
-          selectedSources={selectedSources}
-          onToggleSource={onToggleSource}
-        />
-      </div>
       <div className="scrollbar-hidden min-h-0 flex-1 overflow-y-auto p-5 sm:p-6">
         {list.length === 0 ? (
           <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-violet-200 bg-violet-50/40 px-4 py-8 text-center">
@@ -187,7 +167,7 @@ export function MatchList({
               <button
                 type="button"
                 onClick={() => {
-                  setFilters(DEFAULT_MATCH_FILTERS);
+                  onFiltersChange({ ...DEFAULT_MATCH_FILTERS });
                   setPage(0);
                 }}
                 className="rounded-full border border-violet-300 bg-white px-4 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"

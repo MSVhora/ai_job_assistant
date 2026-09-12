@@ -7,6 +7,8 @@ import { useProfile, useUpdatePreferences } from "@/hooks/use-profiles";
 
 const PERSIST_DEBOUNCE_MS = 400;
 
+export type PrioritySetting = ReturnType<typeof usePrioritySetting>;
+
 export function usePrioritySetting(profileId: string | null) {
   const profile = useProfile(profileId);
   const updatePreferences = useUpdatePreferences();

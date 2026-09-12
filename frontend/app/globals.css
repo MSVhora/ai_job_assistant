@@ -13,16 +13,309 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-    color-scheme: dark;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ai-particle {
+    opacity: 0;
+    animation: ai-particle-rise var(--dur, 24s) linear infinite;
+  }
+  .ai-particle::after {
+    content: "";
+    position: absolute;
+    inset: -4px;
+    border-radius: 9999px;
+    background: radial-gradient(circle, currentColor 0%, transparent 70%);
+    opacity: 0.5;
+  }
+  .dot-grid {
+    background-image: radial-gradient(rgba(139, 92, 246, 0.14) 1px, transparent 1px);
+    background-size: 28px 28px;
+    mask-image: linear-gradient(to bottom, black 0%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, black 0%, transparent 100%);
+  }
+  .radar-sweep {
+    animation: radar-rotate 7s linear infinite;
+  }
+  @keyframes radar-rotate {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  .why-reveal {
+    animation: why-up 0.55s ease-out both;
+  }
+  .why-reveal:nth-child(2) {
+    animation-delay: 0.3s;
+  }
+  .why-reveal:nth-child(3) {
+    animation-delay: 0.6s;
+  }
+  @keyframes why-up {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  .ai-twinkle {
+    opacity: 0;
+    animation: ai-twinkle var(--dur, 6s) ease-in-out infinite;
+  }
+
+  @keyframes ai-particle-rise {
+    0% {
+      transform: translate(0, 0) scale(0.6);
+      opacity: 0;
+    }
+    12% {
+      opacity: var(--peak-opacity, 1);
+    }
+    50% {
+      transform: translate(var(--drift-x, 20px), -58vh);
+    }
+    85% {
+      opacity: var(--peak-opacity, 1);
+    }
+    100% {
+      transform: translate(calc(var(--drift-x, 20px) * -0.4), -110vh) scale(1.1);
+      opacity: 0;
+    }
+  }
+
+  @keyframes ai-twinkle {
+    0%,
+    100% {
+      opacity: 0;
+      transform: scale(0.4) rotate(0deg);
+    }
+    50% {
+      opacity: 0.8;
+      transform: scale(1) rotate(24deg);
+    }
+  }
+
+  @keyframes hero-float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+  .hero-float {
+    animation: hero-float 6s ease-in-out infinite;
+  }
+  .hero-float-slow {
+    animation: hero-float 8s ease-in-out 1.2s infinite;
+  }
+  .hero-float-fast {
+    animation: hero-float 5s ease-in-out 0.6s infinite;
+  }
+
+  .reveal {
+    opacity: 0;
+  }
+  .reveal.is-visible {
+    animation: feature-fade-up 0.7s ease-out both;
+  }
+
+  .feature-caret {
+    animation: feature-blink 1s step-end infinite;
+  }
+  .feature-type {
+    animation: feature-typing 6s linear infinite;
+  }
+  .feature-gauge {
+    animation: feature-gauge 6s ease-in-out infinite;
+  }
+  .feature-row {
+    animation: feature-row 6s ease-out infinite both;
+  }
+  .feature-d1 {
+    animation-delay: 0.3s;
+  }
+  .feature-d2 {
+    animation-delay: 0.8s;
+  }
+  .feature-d3 {
+    animation-delay: 1.3s;
+  }
+  .feature-d4 {
+    animation-delay: 1.8s;
+  }
+  .feature-bar {
+    transform-origin: left;
+    animation: feature-bar 5s ease-in-out infinite;
+  }
+  .feature-pulse {
+    animation: feature-pulse 2.5s ease-in-out infinite;
+  }
+  .flow-dash {
+    animation: flow-dash 1.2s linear infinite;
+  }
+  .ai-ring {
+    animation: ai-ring 2.4s ease-out infinite;
+  }
+
+  @keyframes ai-ring {
+    0% {
+      transform: scale(1);
+      opacity: 0.7;
+    }
+    70%,
+    100% {
+      transform: scale(1.45);
+      opacity: 0;
+    }
+  }
+
+  @keyframes flow-dash {
+    to {
+      stroke-dashoffset: -24;
+    }
+  }
+
+  .marquee-mask {
+    mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
+    -webkit-mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent);
+  }
+
+  .job-detail-enter {
+    animation: job-detail-enter 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  @keyframes job-detail-enter {
+    from {
+      opacity: 0;
+      transform: translateX(24px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .scrollbar-hidden {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-hidden::-webkit-scrollbar {
+    display: none;
+  }  .marquee-track {
+    animation: marquee 36s linear infinite;
+  }
+  .marquee-track-reverse {
+    animation: marquee 42s linear infinite reverse;
+  }
+  .marquee-track:hover,
+  .marquee-track-reverse:hover {
+    animation-play-state: paused;
+  }
+
+  @keyframes marquee {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+
+  @keyframes feature-fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(24px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes feature-blink {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0;
+    }
+  }
+  @keyframes feature-typing {
+    0% {
+      width: 0;
+    }
+    30% {
+      width: 18ch;
+    }
+    85% {
+      width: 18ch;
+    }
+    92%,
+    100% {
+      width: 0;
+    }
+  }
+  @keyframes feature-gauge {
+    0% {
+      stroke-dashoffset: 213.6;
+    }
+    45% {
+      stroke-dashoffset: 17.1;
+    }
+    85% {
+      stroke-dashoffset: 17.1;
+    }
+    100% {
+      stroke-dashoffset: 213.6;
+    }
+  }
+  @keyframes feature-row {
+    0% {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    12%,
+    88% {
+      opacity: 1;
+      transform: none;
+    }
+    100% {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+  }
+  @keyframes feature-bar {
+    0% {
+      transform: scaleX(0);
+    }
+    45% {
+      transform: scaleX(1);
+    }
+    85% {
+      transform: scaleX(1);
+    }
+    100% {
+      transform: scaleX(0);
+    }
+  }
+  @keyframes feature-pulse {
+    0%,
+    100% {
+      transform: scale(1);
+      box-shadow: 0 8px 20px rgb(139 92 246 / 0.35);
+    }
+    50% {
+      transform: scale(1.05);
+      box-shadow: 0 8px 28px rgb(139 92 246 / 0.55);
+    }
+  }
 }

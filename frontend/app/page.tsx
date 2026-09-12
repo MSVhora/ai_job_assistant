@@ -1,36 +1,27 @@
-import { BackendStatus } from "@/components/features/BackendStatus";
-import { ProfilesSection } from "@/components/features/ProfilesSection";
-import { ResumeList } from "@/components/features/ResumeList";
-import { ResumeUploadForm } from "@/components/features/ResumeUploadForm";
-import Link from "next/link";
+import { AiParticles } from "@/components/features/AiParticles";
+import { CompaniesSection } from "@/components/features/CompaniesSection";
+import { FeaturesSection } from "@/components/features/FeaturesSection";
+import { HeroSection } from "@/components/features/HeroSection";
+import { HowItWorksSection } from "@/components/features/HowItWorksSection";
+import { SiteFooter } from "@/components/features/SiteFooter";
 
 export default function Home() {
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-8 p-8">
-      <div className="flex flex-col items-center gap-2 text-center">
-        <h1 className="text-3xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">
-          AI Job Assistant
-        </h1>
-        <p className="max-w-md text-gray-600 dark:text-gray-400">
-          Self-hosted, bring-your-own-key job matching. Upload a resume, save it as one or more
-          profiles, and match each track separately.
-        </p>
-      </div>
-      <div className="flex justify-center">
-        <ResumeUploadForm />
-      </div>
-      <ProfilesSection />
-      <ResumeList />
-      <p className="text-center text-sm text-gray-600 dark:text-gray-400">
-        Want to review or merge a draft?{" "}
-        <Link
-          href="/profile"
-          className="font-medium text-blue-700 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:text-blue-400"
-        >
-          Go to your profiles
-        </Link>
-      </p>
-      <BackendStatus />
+    <main className="relative isolate flex min-h-screen w-full flex-col text-gray-900">
+      <AiParticles />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-0 -z-10 bg-[linear-gradient(180deg,#ede9fe_0%,#f5f3ff_16%,#fae8ff_38%,#ffffff_78%)]"
+      />
+      <div
+        aria-hidden="true"
+        className="dot-grid pointer-events-none fixed inset-x-0 top-0 -z-10 h-[900px]"
+      />
+      <HeroSection />
+      <FeaturesSection />
+      <CompaniesSection />
+      <HowItWorksSection />
+      <SiteFooter />
     </main>
   );
 }

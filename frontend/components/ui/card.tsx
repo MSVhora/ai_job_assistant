@@ -10,7 +10,7 @@ export function Card({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900">
+    <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
       {(title || action) && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           {title}

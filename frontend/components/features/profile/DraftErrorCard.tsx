@@ -19,11 +19,11 @@ export function DraftErrorCard({
   if (error instanceof ApiError && error.status === 409) {
     return (
       <Card title="Extraction didn't complete">
-        <p role="alert" className="mb-3 text-sm text-red-700 dark:text-red-400">
+        <p role="alert" className="mb-3 text-sm text-red-700">
           This resume has no extracted draft yet — extraction failed or was interrupted.
         </p>
         {extract.error !== null && (
-          <p role="alert" className="mb-3 text-sm text-red-700 dark:text-red-400">
+          <p role="alert" className="mb-3 text-sm text-red-700">
             {extract.error.message}
           </p>
         )}
@@ -39,7 +39,7 @@ export function DraftErrorCard({
 
   return (
     <Card title="Could not load the extracted draft">
-      <p role="alert" className="mb-3 text-sm text-red-700 dark:text-red-400">
+      <p role="alert" className="mb-3 text-sm text-red-700">
         {error.message}
       </p>
       <Button variant="secondary" onClick={onResolved}>

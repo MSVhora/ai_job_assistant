@@ -32,7 +32,7 @@ export function ProfileEditor({ profileId }: { profileId: string }) {
   if (profileQuery.isError) {
     return (
       <Card title="Could not load this profile">
-        <p role="alert" className="mb-3 text-sm text-red-700 dark:text-red-400">
+        <p role="alert" className="mb-3 text-sm text-red-700">
           {profileQuery.error.message}
         </p>
         <div className="flex gap-2">

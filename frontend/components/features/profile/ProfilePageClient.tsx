@@ -37,7 +37,7 @@ export function ProfilePageClient() {
     if (profilesQuery.isError) {
       return (
         <Card title="Could not load your profiles">
-          <p role="alert" className="mb-3 text-sm text-red-700 dark:text-red-400">
+          <p role="alert" className="mb-3 text-sm text-red-700">
             {profilesQuery.error.message}
           </p>
           <Button variant="secondary" onClick={() => void profilesQuery.refetch()}>

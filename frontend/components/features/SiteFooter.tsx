@@ -1,12 +1,5 @@
 import Link from "next/link";
-
-function SparkleIcon({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className={className}>
-      <path d="M10 1.5l1.8 4.7 4.7 1.8-4.7 1.8L10 14.5 8.2 9.8 3.5 8l4.7-1.8L10 1.5zM15.5 13l.9 2.3 2.3.9-2.3.9-.9 2.3-.9-2.3-2.3-.9 2.3-.9.9-2.3z" />
-    </svg>
-  );
-}
+import Image from "next/image";
 
 export function SiteFooter() {
   return (
@@ -21,15 +14,16 @@ export function SiteFooter() {
         <div className="flex flex-col items-center gap-4 text-center">
           <Link
             href="/"
-            className="flex items-center gap-2.5 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
+            className="rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
           >
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-fuchsia-500 shadow-md shadow-violet-300">
-              <SparkleIcon className="h-5 w-5 text-white" />
-            </span>
-            <span className="text-lg font-bold tracking-tight">
-              Job<span className="text-violet-600">Gen</span>
-              <span className="text-fuchsia-500">.</span>
-            </span>
+            <Image
+              src="/logo.png"
+              alt="JobGen"
+              width={160}
+              height={42}
+              unoptimized
+              className="h-12 w-auto"
+            />
           </Link>
           <p className="max-w-md text-sm leading-relaxed text-gray-600">
             Self-hosted, bring-your-own-key AI job search. JobGen drafts your profile, you stay in

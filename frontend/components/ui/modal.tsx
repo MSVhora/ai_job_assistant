@@ -19,20 +19,20 @@ export function Modal({
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-black/50" />
-        <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-50 max-h-[85vh] w-[min(92vw,32rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border border-gray-200 bg-white p-6 shadow-lg focus:outline-none dark:border-gray-800 dark:bg-gray-900">
-          <DialogPrimitive.Title className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-violet-950/40 backdrop-blur-sm" />
+        <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-50 max-h-[88vh] w-[min(94vw,42rem)] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-3xl border border-violet-100 bg-white p-6 shadow-2xl shadow-violet-300/40 focus:outline-none sm:p-8">
+          <DialogPrimitive.Title className="pr-8 text-lg font-bold tracking-tight text-gray-900">
             {title}
           </DialogPrimitive.Title>
           {description && (
-            <DialogPrimitive.Description className="mt-1 text-sm text-gray-600 dark:text-gray-400">
+            <DialogPrimitive.Description className="mt-1 text-sm text-gray-600">
               {description}
             </DialogPrimitive.Description>
           )}
-          <div className="mt-4">{children}</div>
+          <div className="mt-5">{children}</div>
           <DialogPrimitive.Close
             aria-label="Close"
-            className="absolute right-4 top-4 rounded-full p-2 text-gray-500 hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:text-gray-400 dark:hover:bg-gray-800"
+            className="absolute right-4 top-4 rounded-full p-2 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
           >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
               <path

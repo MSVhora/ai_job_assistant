@@ -9,8 +9,8 @@ export function Toaster() {
       toastOptions={{
         classNames: {
           toast:
-            "!rounded-lg !border !border-gray-200 !bg-white !text-gray-900 !shadow-lg dark:!border-gray-700 dark:!bg-gray-900 dark:!text-gray-100",
-          description: "!text-gray-600 dark:!text-gray-400",
+            "!rounded-lg !border !border-gray-200 !bg-white !text-gray-900 !shadow-lg",
+          description: "!text-gray-600",
         },
       }}
     />

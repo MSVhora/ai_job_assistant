@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-
 import { SiteHeader } from "@/components/features/SiteHeader";
 import { Toaster } from "@/components/ui/toast";
 import { Providers } from "./providers";
@@ -33,12 +32,14 @@ export const metadata: Metadata = {
     "bring your own key AI",
   ],
   applicationName: "JobGen",
+  icons: { icon: "/icon.png", apple: "/icon.png" },
   openGraph: {
     title: "JobGen — AI Job Search, Apply Smarter",
     description:
       "Upload once, review your AI-drafted profile, and get ranked job openings with plain-language explanations of why each role fits.",
     siteName: "JobGen",
     type: "website",
+    images: [{ url: "/logo.png", width: 1391, height: 365, alt: "JobGen — AI job search" }],
   },
   twitter: {
     card: "summary_large_image",

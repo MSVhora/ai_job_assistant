@@ -31,7 +31,7 @@ export function MergeMode({
   if (profileQuery.isError) {
     return (
       <Card title="Could not load the profile">
-        <p role="alert" className="mb-3 text-sm text-red-700 dark:text-red-400">
+        <p role="alert" className="mb-3 text-sm text-red-700">
           {profileQuery.error.message}
         </p>
         <Button variant="secondary" onClick={() => void profileQuery.refetch()}>

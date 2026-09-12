@@ -3,7 +3,6 @@
 import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
 import { Modal } from "@/components/ui/modal";
 import { useEnableSource, useSources } from "@/hooks/use-setup";
 
@@ -21,11 +20,15 @@ export function SourceList() {
 
   if (isPending) {
     return (
-      <div className="flex flex-col gap-3" aria-busy="true" aria-live="polite">
+      <div
+        className="flex flex-col gap-3 rounded-3xl border border-violet-100 bg-white/80 p-6 shadow-xl shadow-violet-100/60 backdrop-blur"
+        aria-busy="true"
+        aria-live="polite"
+      >
         {[0, 1].map((index) => (
           <div
             key={index}
-            className="h-16 animate-pulse rounded-xl border border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-800"
+            className="h-14 animate-pulse rounded-2xl border border-violet-100 bg-violet-50/50"
           />
         ))}
       </div>
@@ -34,32 +37,46 @@ export function SourceList() {
 
   if (isError || data === undefined) {
     return (
-      <Card title="Job sources">
-        <p className="text-sm text-red-700 dark:text-red-400">
+      <section className="rounded-3xl border border-violet-100 bg-white/80 p-6 shadow-xl shadow-violet-100/60 backdrop-blur">
+        <h2 className="text-base font-bold tracking-tight text-gray-900">Job sources</h2>
+        <p className="mt-2 text-sm text-red-700">
           Could not load the job sources from the backend.
         </p>
         <button
           type="button"
           onClick={() => void refetch()}
-          className="mt-3 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:border-gray-700 dark:hover:bg-gray-800"
+          className="mt-3 rounded-full bg-gradient-to-r from-violet-600 to-purple-600 px-5 py-2 text-sm font-semibold text-white shadow-md shadow-violet-300 hover:shadow-lg hover:shadow-violet-400/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
         >
           Retry
         </button>
-      </Card>
+      </section>
     );
   }
 
   return (
     <>
-      <Card title="Job sources">
+      <section
+        className="rounded-3xl border border-violet-100 bg-white/80 p-6 shadow-xl shadow-violet-100/60 backdrop-blur sm:p-8"
+        aria-labelledby="job-sources-heading"
+      >
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <h2 id="job-sources-heading" className="text-base font-bold tracking-tight text-gray-900">
+            Job sources
+          </h2>
+          <p className="text-xs text-gray-500">
+            Where the app searches for job postings
+          </p>
+        </div>
         <ul className="flex flex-col gap-3">
           {data.map((source) => (
             <li
               key={source.name}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 p-3 dark:border-gray-800"
+              className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-violet-100 bg-violet-50/40 p-4"
             >
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-medium text-gray-900 dark:text-gray-100">{source.name}</span>
+                <span className="font-mono text-sm font-semibold text-gray-900">
+                  {source.name}
+                </span>
                 <Badge variant={source.is_official_api ? "official-api" : "third-party-scraper"}>
                   {source.is_official_api ? "Official API" : "Third-party scraper"}
                 </Badge>
@@ -73,7 +90,7 @@ export function SourceList() {
                   type="button"
                   disabled={!source.is_configured}
                   onClick={() => setDisclosureFor(source.name)}
-                  className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+                  className="rounded-full bg-gradient-to-r from-violet-600 to-purple-600 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-violet-300 transition hover:-translate-y-0.5 hover:shadow-lg hover:shadow-violet-400/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
                 >
                   Enable…
                 </button>
@@ -82,12 +99,15 @@ export function SourceList() {
           ))}
         </ul>
         {data.every((source) => !source.is_configured) && (
-          <p className="mt-3 text-sm text-gray-600 dark:text-gray-400">
-            No source keys are configured yet — add them to your backend <code>.env</code> and
-            restart the API, then reload this page.
+          <p className="mt-4 text-sm text-gray-600">
+            No source keys are configured yet — add them to your backend{" "}
+            <code className="rounded bg-violet-50 px-1.5 py-0.5 font-mono text-xs text-violet-700 ring-1 ring-violet-200">
+              .env
+            </code>
+            , restart the API, then use “Re-check status” above.
           </p>
         )}
-      </Card>
+      </section>
       <DisclosureDialog
         sourceName={disclosureFor}
         pending={enable.isPending}
@@ -128,17 +148,17 @@ function DisclosureDialog({
       title="Before you enable this scraping source"
       description="Please read and acknowledge the terms below."
     >
-      <ul className="list-disc space-y-2 pl-5 text-sm text-gray-700 dark:text-gray-300">
+      <ul className="list-disc space-y-2 pl-5 text-sm text-gray-700">
         {LINKEDIN_DISCLOSURE.map((line) => (
           <li key={line}>{line}</li>
         ))}
       </ul>
-      <label className="mt-4 flex items-start gap-2 text-sm text-gray-900 dark:text-gray-100">
+      <label className="mt-4 flex items-start gap-2 text-sm text-gray-900">
         <input
           type="checkbox"
           checked={acknowledged}
           onChange={(event) => setAcknowledged(event.target.checked)}
-          className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+          className="mt-0.5 h-4 w-4 rounded border-gray-300 text-violet-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
         />
         I have read and acknowledge the disclosure above.
       </label>
@@ -149,7 +169,7 @@ function DisclosureDialog({
             setAcknowledged(false);
             onClose();
           }}
-          className="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium hover:bg-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600 dark:border-gray-700 dark:hover:bg-gray-800"
+          className="rounded-full border border-gray-300 px-4 py-2 text-sm font-semibold hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
         >
           Cancel
         </button>
@@ -159,7 +179,7 @@ function DisclosureDialog({
           onClick={() => {
             if (sourceName !== null) onConfirm(sourceName);
           }}
-          className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+          className="rounded-full bg-gradient-to-r from-violet-600 to-purple-600 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-violet-300 transition hover:-translate-y-0.5 hover:shadow-lg hover:shadow-violet-400/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
         >
           {pending ? "Enabling…" : "Enable source"}
         </button>

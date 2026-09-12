@@ -15,6 +15,7 @@ from app.adapters.llm import LLMError
 from app.core.db import session_factory
 from app.core.errors import (
     DomainError,
+    JobPostingNotFoundError,
     JobSearchNotFoundError,
     JobSourceNotEnabledError,
     MissingSearchQueryError,
@@ -23,6 +24,7 @@ from app.core.errors import (
 )
 from app.models import JobPosting, JobSearch, JobSearchStatus
 from app.schemas.job_search import (
+    JobPostingDetail,
     JobPostingSummary,
     JobSearchRequest,
     JobSearchStartResponse,
@@ -277,3 +279,10 @@ async def get_search_postings(
         .order_by(JobPosting.posted_at.desc().nulls_last(), JobPosting.title)
     )
     return [JobPostingSummary.from_posting(posting) for posting in result.scalars().all()]
+
+
+async def get_posting_detail(session: AsyncSession, posting_id: uuid.UUID) -> JobPostingDetail:
+    posting = await session.get(JobPosting, posting_id)
+    if posting is None:
+        raise JobPostingNotFoundError()
+    return JobPostingDetail.from_posting(posting)

@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.deps import get_db
 from app.schemas.job_search import (
+    JobPostingDetail,
     JobPostingSummary,
     JobSearchRequest,
     JobSearchStartResponse,
@@ -17,6 +18,14 @@ from app.services import ingestion
 from app.services import sources as sources_service
 
 router = APIRouter(prefix="/api", tags=["jobs"])
+
+
+@router.get("/jobs/postings/{posting_id}", response_model=JobPostingDetail)
+async def get_job_posting_detail(
+    posting_id: uuid.UUID,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> JobPostingDetail:
+    return await ingestion.get_posting_detail(session, posting_id)
 
 
 @router.post("/jobs/search", response_model=JobSearchStartResponse, status_code=202)

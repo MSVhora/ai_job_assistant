@@ -92,6 +92,11 @@ class JobSearchNotFoundError(DomainError):
     default_detail = "job search not found"
 
 
+class JobPostingNotFoundError(DomainError):
+    status_code = 404
+    default_detail = "job posting not found"
+
+
 class JobSourceNotFoundError(DomainError):
     status_code = 404
     default_detail = "job source not found"

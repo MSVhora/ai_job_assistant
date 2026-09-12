@@ -4,7 +4,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from app.models import JobPosting
+from app.models import JobPosting, JobType, RemoteType
 
 JobSearchStatusLiteral = Literal["pending", "running", "succeeded", "partial", "failed"]
 
@@ -172,4 +172,30 @@ class JobPostingSummary(BaseModel):
             salary_min=float(posting.salary_min) if posting.salary_min is not None else None,
             salary_max=float(posting.salary_max) if posting.salary_max is not None else None,
             currency=posting.currency,
+        )
+
+
+class JobPostingDetail(JobPostingSummary):
+    description: str | None = None
+    job_type: JobType | None = None
+    remote_type: RemoteType | None = None
+    fetched_at: datetime
+
+    @classmethod
+    def from_posting(cls, posting: JobPosting) -> "JobPostingDetail":
+        return cls(
+            id=posting.id,
+            source=posting.source,
+            title=posting.title,
+            company=posting.company,
+            url=posting.url,
+            location=posting.location,
+            posted_at=posting.posted_at,
+            salary_min=float(posting.salary_min) if posting.salary_min is not None else None,
+            salary_max=float(posting.salary_max) if posting.salary_max is not None else None,
+            currency=posting.currency,
+            description=posting.description,
+            job_type=posting.job_type.value if posting.job_type is not None else None,
+            remote_type=posting.remote_type.value if posting.remote_type is not None else None,
+            fetched_at=posting.fetched_at,
         )

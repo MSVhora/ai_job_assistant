@@ -341,6 +341,22 @@ _SORT_ORDERS = {
 }
 
 
+async def count_matches(session: AsyncSession, params: MatchQueryParams) -> int:
+    profile = await session.get(Profile, params.profile_id)
+    if profile is None:
+        raise ProfileNotFoundError()
+    if profile.embedding is None:
+        raise ProfileNotEmbeddedError()
+    query: Select[tuple[int]] = (
+        select(func.count())
+        .select_from(Match)
+        .join(JobPosting, Match.job_posting_id == JobPosting.id)
+        .where(Match.profile_id == params.profile_id)
+    )
+    query = _apply_posting_filters(query, params)
+    return int((await session.execute(query)).scalar_one())
+
+
 async def list_matches(session: AsyncSession, params: MatchQueryParams) -> list[MatchResponse]:
     profile = await session.get(Profile, params.profile_id)
     if profile is None:

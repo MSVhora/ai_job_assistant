@@ -12,13 +12,23 @@ import {
 import type { StructuredProfile } from "@/lib/api";
 
 import {
-  EducationSection,
   CertificationsSection,
+  EducationSection,
   AwardsSection,
   ExtraSectionsSection,
 } from "./EducationCredentials";
 import { ExperienceSection, ProjectsSection } from "./ExperienceProjects";
-import { AiExtractedBadge, SectionCard, SelectField, StringListField, TextField } from "./fields";
+import {
+  AiExtractedBadge,
+  ContactIcon,
+  HeadlineIcon,
+  PreferencesIcon,
+  SectionCard,
+  SelectField,
+  SkillsIcon,
+  StringListField,
+  TextField,
+} from "./fields";
 import { SaveStatus } from "./SaveStatus";
 
 const emptyLink = { label: "", url: "" };
@@ -66,68 +76,121 @@ export function ProfileReviewForm({
   });
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-6" noValidate>
-      <SectionCard title="Contact" badge={aiBadge}>
+    <form onSubmit={submit} className="flex flex-col gap-5" noValidate>
+      <SectionCard
+        title="Contact"
+        description="How employers can reach you"
+        icon={<ContactIcon />}
+        badge={aiBadge}
+        hasError={errors.contact !== undefined}
+      >
         <div className="grid gap-4 sm:grid-cols-2">
           <TextField
             label="Full name"
             name="contact.full_name"
+            placeholder="Jane Doe"
             error={errors.contact?.full_name?.message}
             badge={aiBadge}
           />
-          <TextField label="Email" name="contact.email" error={errors.contact?.email?.message} badge={aiBadge} />
-          <TextField label="Phone" name="contact.phone" badge={aiBadge} />
-          <TextField label="Location" name="contact.location" badge={aiBadge} />
+          <TextField
+            label="Email"
+            name="contact.email"
+            type="email"
+            placeholder="jane@example.com"
+            error={errors.contact?.email?.message}
+            badge={aiBadge}
+          />
+          <TextField label="Phone" name="contact.phone" placeholder="+1 555 000 0000" badge={aiBadge} />
+          <TextField label="Location" name="contact.location" placeholder="Berlin, Germany" badge={aiBadge} />
         </div>
-        <div className="mt-4">
+        <div className="mt-5">
           <div className="mb-2 flex items-center justify-between">
-            <span className="text-sm font-medium text-gray-800 dark:text-gray-200">Links</span>
-            <Button variant="secondary" onClick={() => append(emptyLink)}>
-              Add link
+            <span className="text-sm font-medium text-gray-800">Links</span>
+            <Button
+              variant="secondary"
+              className="rounded-full border-dashed px-4 py-1.5 text-xs font-semibold text-violet-700 hover:border-violet-400 hover:bg-violet-50"
+              onClick={() => append(emptyLink)}
+            >
+              + Add link
             </Button>
           </div>
-          {fields.map((field, index) => (
-            <div key={field.id} className="mb-2 grid grid-cols-[1fr_2fr_auto] items-start gap-2">
-              <Field label="Label" htmlFor={`contact.links.${index}.label`}>
-                <Input
-                  id={`contact.links.${index}.label`}
-                  {...register(`contact.links.${index}.label`)}
-                  placeholder="LinkedIn"
-                />
-              </Field>
-              <Field
-                label="URL"
-                htmlFor={`contact.links.${index}.url`}
-                error={errors.contact?.links?.[index]?.url?.message}
-              >
-                <Input
-                  id={`contact.links.${index}.url`}
-                  {...register(`contact.links.${index}.url`)}
-                  placeholder="https://…"
-                />
-              </Field>
-              <Button
-                variant="danger"
-                className="mt-7 px-2 py-1"
-                onClick={() => remove(index)}
-                aria-label={`Remove link ${index + 1}`}
-              >
-                ✕
-              </Button>
-            </div>
-          ))}
+          {fields.length === 0 ? (
+            <p className="rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-500">
+              No links yet — add LinkedIn, GitHub, or a portfolio URL.
+            </p>
+          ) : (
+            fields.map((field, index) => (
+              <div key={field.id} className="mb-2 grid grid-cols-[1fr_2fr_auto] items-start gap-2">
+                <Field label="Label" htmlFor={`contact.links.${index}.label`}>
+                  <Input
+                    id={`contact.links.${index}.label`}
+                    {...register(`contact.links.${index}.label`)}
+                    placeholder="LinkedIn"
+                  />
+                </Field>
+                <Field
+                  label="URL"
+                  htmlFor={`contact.links.${index}.url`}
+                  error={errors.contact?.links?.[index]?.url?.message}
+                >
+                  <Input
+                    id={`contact.links.${index}.url`}
+                    {...register(`contact.links.${index}.url`)}
+                    placeholder="https://…"
+                  />
+                </Field>
+                <Button
+                  variant="danger"
+                  className="mt-7 rounded-full px-2.5 py-1.5 text-xs"
+                  onClick={() => remove(index)}
+                  aria-label={`Remove link ${index + 1}`}
+                >
+                  ✕
+                </Button>
+              </div>
+            ))
+          )}
         </div>
       </SectionCard>
 
-      <SectionCard title="Headline & summary" badge={aiBadge}>
+      <SectionCard
+        title="Headline & summary"
+        description="Your elevator pitch — what you do and what you're looking for"
+        icon={<HeadlineIcon />}
+        badge={aiBadge}
+        hasError={errors.headline !== undefined || errors.summary !== undefined}
+      >
         <div className="flex flex-col gap-4">
-          <TextField label="Headline" name="headline" error={errors.headline?.message} badge={aiBadge} />
-          <TextField label="Summary" name="summary" badge={aiBadge} />
+          <TextField
+            label="Headline"
+            name="headline"
+            placeholder="Senior Android Developer"
+            error={errors.headline?.message}
+            badge={aiBadge}
+          />
+          <TextField
+            label="Summary"
+            name="summary"
+            placeholder="A short paragraph summarising your experience and strengths…"
+            badge={aiBadge}
+          />
         </div>
       </SectionCard>
 
-      <SectionCard title="Skills" badge={aiBadge}>
-        <StringListField control={control} name="skills" label="Skills" addLabel="Add skill" />
+      <SectionCard
+        title="Skills"
+        description="Your strongest and most relevant skills — order matters"
+        icon={<SkillsIcon />}
+        badge={aiBadge}
+        hasError={errors.skills !== undefined}
+      >
+        <StringListField
+          control={control}
+          name="skills"
+          label="Skills"
+          addLabel="Add skill"
+          placeholder="e.g. Kotlin, React, SQL"
+        />
       </SectionCard>
 
       <ExperienceSection />
@@ -137,10 +200,26 @@ export function ProfileReviewForm({
       <AwardsSection />
       <ExtraSectionsSection />
 
-      <SectionCard title="Job preferences" badge={aiBadge}>
+      <SectionCard
+        title="Job preferences"
+        description="Drives which jobs get matched and how they're ranked"
+        icon={<PreferencesIcon />}
+        badge={aiBadge}
+        hasError={errors.preferences !== undefined}
+      >
         <div className="grid gap-4 sm:grid-cols-2">
-          <TextField label="Target title" name="preferences.target_title" badge={aiBadge} />
-          <TextField label="Target location" name="preferences.target_location" badge={aiBadge} />
+          <TextField
+            label="Target title"
+            name="preferences.target_title"
+            placeholder="e.g. Senior Android Developer"
+            badge={aiBadge}
+          />
+          <TextField
+            label="Target location"
+            name="preferences.target_location"
+            placeholder="e.g. Berlin, Germany"
+            badge={aiBadge}
+          />
           <SelectField
             label="Remote preference"
             name="preferences.remote_preference"
@@ -163,26 +242,32 @@ export function ProfileReviewForm({
           <TextField
             label="Salary min"
             name="preferences.salary_min"
+            placeholder="60000"
             error={errors.preferences?.salary_min?.message}
             badge={aiBadge}
           />
           <TextField
             label="Salary max"
             name="preferences.salary_max"
+            placeholder="80000"
             error={errors.preferences?.salary_max?.message}
             badge={aiBadge}
           />
         </div>
       </SectionCard>
 
-      <div className="sticky bottom-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white/95 p-4 shadow-md backdrop-blur dark:border-gray-800 dark:bg-gray-900/95">
+      <div className="sticky bottom-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-violet-100 bg-white/95 p-4 shadow-xl shadow-violet-100/60 backdrop-blur">
         <SaveStatus isSaving={isSaving} error={saveError} savedRevisionSource={savedRevisionSource} />
         {errors.root?.message && (
           <p role="alert" className="text-sm text-red-600">
             {errors.root.message}
           </p>
         )}
-        <Button type="submit" disabled={isSaving}>
+        <Button
+          type="submit"
+          disabled={isSaving}
+          className="rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-6 py-2.5 font-semibold shadow-lg shadow-violet-200 hover:from-violet-700 hover:to-fuchsia-700"
+        >
           {isSaving ? "Saving…" : "Save profile"}
         </Button>
       </div>

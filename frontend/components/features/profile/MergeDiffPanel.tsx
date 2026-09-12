@@ -102,18 +102,23 @@ export function MergeDiffPanel({
     <SectionCard
       title="Merge re-uploaded draft"
       action={
-        <Button variant="secondary" onClick={onDiscard} disabled={isSaving}>
+        <Button
+          variant="secondary"
+          className="rounded-full px-4 py-1.5 text-xs"
+          onClick={onDiscard}
+          disabled={isSaving}
+        >
           Discard draft
         </Button>
       }
     >
-      <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+      <p className="mb-4 text-sm text-gray-600">
         Your saved profile is compared with the AI draft from the re-uploaded resume. Nothing
         changes until you save — choose per field whether to keep the current value or take the
         draft&apos;s suggestion.
       </p>
       {differing.length === 0 ? (
-        <p className="text-sm text-gray-600 dark:text-gray-400">
+        <p className="text-sm text-gray-600">
           The draft matches your saved profile — no decisions needed.
         </p>
       ) : (
@@ -121,12 +126,18 @@ export function MergeDiffPanel({
           <div className="mb-4 flex flex-wrap items-center gap-3">
             <Button
               variant="secondary"
+              className="rounded-full px-4 py-1.5 text-xs"
               onClick={() => setTakenDraft(new Set(differing))}
               disabled={isSaving}
             >
               Use all draft values
             </Button>
-            <Button variant="secondary" onClick={() => setTakenDraft(new Set())} disabled={isSaving}>
+            <Button
+              variant="secondary"
+              className="rounded-full px-4 py-1.5 text-xs"
+              onClick={() => setTakenDraft(new Set())}
+              disabled={isSaving}
+            >
               Keep all current values
             </Button>
             <AiExtractedBadge />
@@ -135,17 +146,17 @@ export function MergeDiffPanel({
             {differing.map((key) => (
               <li
                 key={key}
-                className="rounded-lg border border-gray-200 p-4 dark:border-gray-700"
+                className="rounded-2xl border border-gray-100 bg-gray-50/60 p-4"
                 aria-label={FIELD_LABELS[key]}
               >
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                  <span className="text-sm font-semibold text-gray-900">
                     {FIELD_LABELS[key]}
                   </span>
                   <div className="flex gap-1" role="group" aria-label={`Choose value for ${FIELD_LABELS[key]}`}>
                     <Button
                       variant={takenDraft.has(key) ? "secondary" : "primary"}
-                      className="px-2 py-1"
+                      className="rounded-full px-3 py-1 text-xs"
                       aria-pressed={!takenDraft.has(key)}
                       onClick={() => toggle(key)}
                       disabled={isSaving}
@@ -154,7 +165,7 @@ export function MergeDiffPanel({
                     </Button>
                     <Button
                       variant={takenDraft.has(key) ? "primary" : "secondary"}
-                      className="px-2 py-1"
+                      className="rounded-full px-3 py-1 text-xs"
                       aria-pressed={takenDraft.has(key)}
                       onClick={() => toggle(key)}
                       disabled={isSaving}
@@ -164,11 +175,11 @@ export function MergeDiffPanel({
                   </div>
                 </div>
                 <div className="grid gap-2 text-sm sm:grid-cols-2">
-                  <p className="rounded-md bg-gray-50 px-3 py-2 text-gray-700 dark:bg-gray-800 dark:text-gray-300">
+                  <p className="rounded-xl bg-white px-3 py-2 text-gray-700 shadow-sm">
                     <Badge variant="neutral">current</Badge>{" "}
                     <span className="ml-1">{summarize(current[key])}</span>
                   </p>
-                  <p className="rounded-md bg-sky-50 px-3 py-2 text-gray-700 dark:bg-sky-950 dark:text-gray-300">
+                  <p className="rounded-xl bg-sky-50 px-3 py-2 text-gray-700">
                     <Badge variant="ai">draft</Badge>{" "}
                     <span className="ml-1">{summarize(draft[key])}</span>
                   </p>
@@ -178,9 +189,13 @@ export function MergeDiffPanel({
           </ul>
         </>
       )}
-      <div className="mt-6 flex items-center justify-between gap-3 border-t border-gray-100 pt-4 dark:border-gray-800">
+      <div className="mt-6 flex items-center justify-between gap-3 border-t border-gray-100 pt-4">
         <SaveStatus isSaving={isSaving} error={saveError} savedRevisionSource={savedRevisionSource} />
-        <Button onClick={saveMerged} disabled={isSaving || differing.length === 0}>
+        <Button
+          onClick={saveMerged}
+          disabled={isSaving || differing.length === 0}
+          className="rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-6 py-2.5 font-semibold shadow-lg shadow-violet-200 hover:from-violet-700 hover:to-fuchsia-700"
+        >
           {isSaving ? "Saving…" : "Save merged profile"}
         </Button>
       </div>

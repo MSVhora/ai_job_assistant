@@ -24,7 +24,7 @@ export function MergeMode({
 
   if (profileQuery.isPending || draftQuery.isPending) {
     return (
-      <div className="h-96 animate-pulse rounded-xl bg-gray-200 dark:bg-gray-800" aria-live="polite" />
+      <div className="h-96 animate-pulse rounded-3xl bg-white/60" aria-live="polite" />
     );
   }
 
@@ -55,12 +55,12 @@ export function MergeMode({
   const draft = draftQuery.data;
 
   return (
-    <div className="flex flex-col gap-4">
-      <div>
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+    <div className="flex flex-col gap-6">
+      <div className="rounded-3xl border border-violet-100 bg-white/80 p-6 shadow-xl shadow-violet-100/60 backdrop-blur">
+        <h2 className="text-xl font-bold tracking-tight text-gray-900">
           Merge draft into “{profile.name}”
         </h2>
-        <p className="text-xs text-gray-500 dark:text-gray-400">
+        <p className="mt-1 text-sm text-gray-600">
           Comparing the AI draft with the saved profile — nothing changes until you save.
         </p>
       </div>
@@ -85,7 +85,7 @@ export function MergeMode({
         }
         onDiscard={() => void router.replace(`/profile?profile=${profileId}`)}
       />
-      <Link href="/profile" className="text-sm text-gray-600 underline dark:text-gray-400">
+      <Link href="/profile" className="text-center text-sm font-medium text-gray-600 underline underline-offset-2 hover:text-gray-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600">
         Back to all profiles
       </Link>
     </div>

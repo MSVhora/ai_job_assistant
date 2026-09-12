@@ -31,7 +31,7 @@ export function ProfilePageClient() {
   if (resumeId !== null) {
     if (profilesQuery.isPending || draftQuery.isPending) {
       return (
-        <div className="h-96 animate-pulse rounded-xl bg-gray-200 dark:bg-gray-800" aria-live="polite" />
+        <div className="h-96 animate-pulse rounded-3xl bg-white/60" aria-live="polite" />
       );
     }
     if (profilesQuery.isError) {

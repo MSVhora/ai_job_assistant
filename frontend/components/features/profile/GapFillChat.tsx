@@ -4,7 +4,6 @@ import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useGapFillTurn } from "@/hooks/use-gap-fill";
 import type { GapFillResponse } from "@/lib/api";
@@ -61,34 +60,41 @@ export function GapFillChat({
   const idle = entries.length === 0 && !turn.isPending;
 
   return (
-    <Card
-      title={
-        <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Fill missing details</h2>
-      }
-      action={
-        missing.length > 0 ? (
+    <section
+      aria-labelledby="gapfill-heading"
+      className="rounded-3xl border border-gray-200 bg-white p-6 shadow-lg shadow-gray-100"
+    >
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <h2 id="gapfill-heading" className="text-lg font-bold tracking-tight text-gray-900">
+          Fill missing details
+        </h2>
+        {missing.length > 0 ? (
           <Badge variant="warn">
             {missing.length} field{missing.length === 1 ? "" : "s"} to go
           </Badge>
         ) : complete ? (
           <Badge variant="success">All set</Badge>
-        ) : undefined
-      }
-    >
+        ) : undefined}
+      </div>
       {idle ? (
         <div className="flex flex-col gap-3">
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            A short chat to complete your job preferences - target location, remote preference,
+          <p className="text-sm text-gray-600">
+            A short chat to complete your job preferences — target location, remote preference,
             salary band, seniority, and work authorization. Only missing fields are asked about;
             answers are validated before anything is saved.
           </p>
           {turn.isError && (
-            <p role="alert" className="text-sm text-red-700 dark:text-red-400">
+            <p role="alert" className="text-sm text-red-700">
               {turn.error.message} Press “Start conversation” to try again.
             </p>
           )}
           <div>
-            <Button variant="secondary" onClick={start} disabled={turn.isPending}>
+            <Button
+              variant="secondary"
+              className="rounded-full px-5 py-2 text-sm font-semibold"
+              onClick={start}
+              disabled={turn.isPending}
+            >
               Start conversation
             </Button>
           </div>
@@ -99,30 +105,30 @@ export function GapFillChat({
             role="log"
             aria-live="polite"
             aria-label="Gap-fill conversation"
-            className="flex max-h-72 flex-col gap-2 overflow-y-auto"
+            className="flex max-h-72 flex-col gap-2 overflow-y-auto rounded-2xl border border-gray-100 bg-gray-50/60 p-3"
           >
             {entries.map((entry, index) => (
               <div
                 key={index}
                 className={
                   entry.role === "user"
-                    ? "self-end max-w-[85%] rounded-lg bg-blue-600 px-3 py-2 text-sm text-white"
-                    : "self-start max-w-[85%] rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-900 dark:bg-gray-800 dark:text-gray-100"
+                    ? "max-w-[85%] self-end rounded-2xl rounded-br-md bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3.5 py-2 text-sm text-white shadow-md shadow-violet-200"
+                    : "max-w-[85%] self-start rounded-2xl rounded-bl-md border border-gray-100 bg-white px-3.5 py-2 text-sm text-gray-900 shadow-sm"
                 }
               >
                 {entry.content}
               </div>
             ))}
             {turn.isPending && (
-              <div className="self-start rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-500 dark:bg-gray-800 dark:text-gray-400">
+              <div className="max-w-[85%] self-start rounded-2xl rounded-bl-md border border-gray-100 bg-white px-3.5 py-2 text-sm text-gray-500 shadow-sm">
                 Thinking…
               </div>
             )}
           </div>
 
           {turn.isError && (
-            <p role="alert" className="text-sm text-red-700 dark:text-red-400">
-              {turn.error.message} Your message is back in the box - press Send to try again.
+            <p role="alert" className="text-sm text-red-700">
+              {turn.error.message} Your message is back in the box — press Send to try again.
             </p>
           )}
 
@@ -138,7 +144,7 @@ export function GapFillChat({
 
           {missing.length > 0 && !complete && (
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-xs text-gray-500 dark:text-gray-400">Still needed:</span>
+              <span className="text-xs text-gray-500">Still needed:</span>
               {missing.map((field) => (
                 <Badge key={field.key}>{field.label}</Badge>
               ))}
@@ -146,7 +152,7 @@ export function GapFillChat({
           )}
 
           {complete ? (
-            <p className="text-sm text-emerald-700 dark:text-emerald-400">
+            <p className="text-sm font-medium text-emerald-700">
               Every gap is filled. You can still edit these fields in the form below.
             </p>
           ) : (
@@ -164,13 +170,17 @@ export function GapFillChat({
                 onChange={(event) => setInput(event.target.value)}
                 disabled={turn.isPending}
               />
-              <Button type="submit" disabled={turn.isPending || input.trim() === ""}>
+              <Button
+                type="submit"
+                disabled={turn.isPending || input.trim() === ""}
+                className="rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 font-semibold shadow-md shadow-violet-200 hover:from-violet-700 hover:to-fuchsia-700"
+              >
                 Send
               </Button>
             </form>
           )}
         </div>
       )}
-    </Card>
+    </section>
   );
 }

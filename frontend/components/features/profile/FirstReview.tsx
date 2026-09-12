@@ -49,21 +49,33 @@ export function FirstReview({ draft }: { draft: DraftProfileResponse }) {
   };
 
   return (
-    <div className="flex flex-col gap-4">
-      <Field
-        label="Profile name"
-        htmlFor="profile-name"
-        error={nameError ?? undefined}
-        hint="One career can seed several profiles — e.g. a native-Android track and a broader SWE track."
+    <div className="flex flex-col gap-6">
+      <section
+        aria-labelledby="profile-name-heading"
+        className="rounded-3xl border border-violet-100 bg-white/80 p-6 shadow-xl shadow-violet-100/60 backdrop-blur"
       >
-        <Input
-          id="profile-name"
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          placeholder="Senior Android Developer"
-          aria-invalid={nameError ? true : undefined}
-        />
-      </Field>
+        <h2 id="profile-name-heading" className="text-lg font-bold tracking-tight text-gray-900">
+          Name this profile
+        </h2>
+        <p className="mt-1 text-sm text-gray-600">
+          One career can seed several profiles — e.g. a native-Android track and a broader SWE track.
+        </p>
+        <div className="mt-4">
+          <Field
+            label="Profile name"
+            htmlFor="profile-name"
+            error={nameError ?? undefined}
+          >
+            <Input
+              id="profile-name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder="Senior Android Developer"
+              aria-invalid={nameError ? true : undefined}
+            />
+          </Field>
+        </div>
+      </section>
       <FormProvider {...form}>
         <ProfileReviewForm
           highlightAi
@@ -73,7 +85,7 @@ export function FirstReview({ draft }: { draft: DraftProfileResponse }) {
           onSave={save}
         />
       </FormProvider>
-      <p className="text-xs text-gray-500 dark:text-gray-400">
+      <p className="text-center text-xs text-gray-500">
         Saving creates a new profile — the resume and its draft stay untouched.
       </p>
     </div>

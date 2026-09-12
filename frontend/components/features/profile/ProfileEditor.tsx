@@ -25,7 +25,7 @@ export function ProfileEditor({ profileId }: { profileId: string }) {
 
   if (profileQuery.isPending) {
     return (
-      <div className="h-96 animate-pulse rounded-xl bg-gray-200 dark:bg-gray-800" aria-live="polite" />
+      <div className="h-96 animate-pulse rounded-3xl bg-white/60" aria-live="polite" />
     );
   }
 
@@ -98,8 +98,8 @@ function EditorBody({ profile }: { profile: ProfileResponse }) {
   };
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-wrap items-end justify-between gap-3 rounded-3xl border border-violet-100 bg-white/80 p-6 shadow-xl shadow-violet-100/60 backdrop-blur">
         {renaming ? (
           <div className="min-w-64 flex-1">
             <Field
@@ -116,10 +116,8 @@ function EditorBody({ profile }: { profile: ProfileResponse }) {
           </div>
         ) : (
           <div>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-              {profile.name}
-            </h2>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
+            <h2 className="text-xl font-bold tracking-tight text-gray-900">{profile.name}</h2>
+            <p className="text-xs text-gray-500">
               {profile.source_resume_filename ? `From ${profile.source_resume_filename} · ` : ""}
               Updated {new Date(profile.updated_at).toLocaleString()}
             </p>
@@ -149,6 +147,7 @@ function EditorBody({ profile }: { profile: ProfileResponse }) {
         ) : (
           <Button
             variant="secondary"
+            className="rounded-full px-4 py-1.5 text-xs"
             onClick={() => {
               setNameInput(profile.name);
               setRenaming(true);
@@ -174,7 +173,7 @@ function EditorBody({ profile }: { profile: ProfileResponse }) {
           }
         />
       </FormProvider>
-      <Link href="/profile" className="text-sm text-gray-600 underline dark:text-gray-400">
+      <Link href="/profile" className="text-center text-sm font-medium text-gray-600 underline underline-offset-2 hover:text-gray-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600">
         Back to all profiles
       </Link>
     </div>

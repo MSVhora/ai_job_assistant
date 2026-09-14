@@ -2,13 +2,10 @@
 
 import { Modal } from "@/components/ui/modal";
 import { SearchForm } from "@/components/features/jobs/SearchForm";
+import { ProfileSelector } from "@/components/features/jobs/ProfileSelector";
 import { SourceMultiSelect } from "@/components/features/jobs/SourceMultiSelect";
-import { PrioritySlider } from "@/components/features/jobs/PrioritySlider";
 import { RebuildBanner } from "@/components/features/jobs/RebuildBanner";
-import { selectStyles } from "@/components/features/jobs/MatchFilterPanel";
-import type { PrioritySetting } from "@/hooks/use-priority-setting";
-import type { SourceInfo } from "@/lib/api";
-import Link from "next/link";
+import type { ProfileSummary, SourceInfo } from "@/lib/api";
 
 function GearIcon() {
   return (
@@ -41,7 +38,7 @@ export function GlobalConfigTrigger({ onClick }: { onClick: () => void }) {
         Global configuration
       </span>
       <span className="block text-[11px] font-medium text-violet-100">
-        Profile · priority · queries · sources
+        Profile · queries · sources
       </span>
     </button>
   );
@@ -58,20 +55,18 @@ export function GlobalConfigModal({
   sources,
   selectedSources,
   onToggleSource,
-  priority,
   onSearchStarted,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   profilesPending: boolean;
   profilesError: boolean;
-  profilesList: { profile_id: string; name: string }[];
+  profilesList: ProfileSummary[];
   activeProfileId: string | null;
   onSelectProfile: (profileId: string) => void;
   sources: SourceInfo[];
   selectedSources: string[];
   onToggleSource: (name: string, checked: boolean) => void;
-  priority: PrioritySetting;
   onSearchStarted: (searchId: string) => void;
 }) {
   return (
@@ -79,23 +74,16 @@ export function GlobalConfigModal({
       open={open}
       onOpenChange={onOpenChange}
       title="Global configuration"
-      description="Everything that defines a new search run — profile, priority, queries and sources. Changes apply immediately."
+      description="Everything that defines a new search run — profile, queries and sources. Changes apply immediately."
     >
       <div className="flex flex-col gap-6">
-        <div className="grid gap-5 rounded-2xl border border-violet-100 bg-violet-50/40 p-4 sm:grid-cols-2">
+        <div className="rounded-2xl border border-violet-100 bg-violet-50/40 p-4">
           <ProfileSelector
             profiles={profilesList}
             activeProfileId={activeProfileId}
             disabled={profilesPending || profilesError}
             onSelect={onSelectProfile}
           />
-          <div className="flex flex-col justify-center">
-            <PrioritySlider
-              value={priority.value ?? 2 / 3}
-              onChange={priority.change}
-              disabled={priority.disabled}
-            />
-          </div>
         </div>
         <RebuildBanner profileId={activeProfileId} />
         <div className="flex flex-col gap-3">
@@ -114,61 +102,5 @@ export function GlobalConfigModal({
         </div>
       </div>
     </Modal>
-  );
-}
-
-function ProfileSelector({
-  profiles,
-  activeProfileId,
-  disabled,
-  onSelect,
-}: {
-  profiles: { profile_id: string; name: string }[];
-  activeProfileId: string | null;
-  disabled: boolean;
-  onSelect: (profileId: string) => void;
-}) {
-  if (disabled || profiles.length === 0) {
-    return (
-      <p className="rounded-2xl border border-dashed border-violet-200 bg-violet-50/50 p-3 text-xs text-gray-600">
-        {disabled
-          ? "Loading profiles…"
-          : "No profile yet — select or create one before starting a search, because every run is scoped to its profile. "}
-        {!disabled &&
-          profiles.length === 0 && (
-            <Link
-              href="/profile"
-              className="font-semibold text-violet-700 underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
-            >
-              Create a profile
-            </Link>
-          )}
-      </p>
-    );
-  }
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label
-        htmlFor="jobs-profile"
-        className="text-xs font-semibold uppercase tracking-wide text-gray-500"
-      >
-        Searching as profile
-      </label>
-      <select
-        id="jobs-profile"
-        value={activeProfileId ?? ""}
-        onChange={(event) => onSelect(event.target.value)}
-        className={selectStyles}
-      >
-        {profiles.map((profile) => (
-          <option key={profile.profile_id} value={profile.profile_id}>
-            {profile.name}
-          </option>
-        ))}
-      </select>
-      <p className="text-xs text-gray-500">
-        The selected track seeds the queries, location and country below.
-      </p>
-    </div>
   );
 }

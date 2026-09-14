@@ -6,20 +6,22 @@ export function PrioritySlider({
   value,
   onChange,
   disabled = false,
+  id = "match-priority",
 }: {
   value: number;
   onChange: (priority: number) => void;
   disabled?: boolean;
+  id?: string;
 }) {
   const percent = Math.min(100, Math.max(0, Math.round(value * 100)));
   const valueText = `${percent}% role fit / ${100 - percent}% company fit`;
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor="match-priority" className="text-xs font-medium text-gray-600">
+      <label htmlFor={id} className="text-xs font-medium text-gray-600">
         Priority — role fit vs company fit
       </label>
       <input
-        id="match-priority"
+        id={id}
         type="range"
         min={0}
         max={100}

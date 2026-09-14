@@ -168,6 +168,15 @@ connector maps validated values to its native parameters. Declarations are serve
 by `GET /api/sources` (`filters`), so the UI can render them generically — a new
 source that declares filters works everywhere with no per-source code.
 
+On the search page (live since #29) the form is generated from exactly these
+declarations: each source's accordion section grows an "Advanced filters" block
+built by one generic renderer (a toggle for `boolean`, a dropdown for `select`,
+a number field for `number`, and a comma-separated field or text field otherwise),
+with the values riding in that source's `source_queries[name].options`. Client-side
+validation is generated from the same declarations; the backend stays the source
+of truth. Stored LLM-chosen options (`search_query_v2`) are pre-filled and editable
+in the same fields.
+
 **This table is the living filter reference** — it mirrors the declarations in
 `backend/app/adapters/job_sources/` (`adzuna.py` and `connectors.yaml`):
 
@@ -314,13 +323,17 @@ mapper module — no core changes.
   matches are scored" above)
 - **"Why this matches"** — a generated explanation on the top matches, so you can judge
   the ranking instead of trusting a black box; expand it on each match card
-- **Filters** — location, remote, job type, posting date, plus a sort selector (best
-  match / similarity / newest); applied to the stored matches
+- **Filters** — location, remote, job type, posting date, a sort selector (best
+  match / similarity / newest), and the priority slider (below); all applied to the
+  stored matches at read time
+- **Profile scope** — the sidebar's "Searching as profile" selector scopes every search
+  run and the match list to one profile track (the same selector is also in the Global
+  configuration dialog; both always show the same track)
 - **Priority slider** — shift weighting between *role fit* and *company fit* (see below)
 
 ## The priority slider (issue #11)
 
-The slider above the filter bar re-weights the ranking between the two LLM signals:
+The slider in the filter panel re-weights the ranking between the two LLM signals:
 slide toward **role fit** to prioritise postings whose *work* matches your skills and
 seniority; slide toward **company fit** to prioritise employers that match your
 trajectory.

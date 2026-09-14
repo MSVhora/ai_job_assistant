@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { FormProvider, useForm } from "react-hook-form";
 
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { SearchQueriesCard } from "@/components/features/jobs/SearchQueriesCard";
 import { useProfile } from "@/hooks/use-profiles";
 import { useStartJobSearch } from "@/hooks/use-job-search";
@@ -13,10 +14,12 @@ import type { SourceInfo } from "@/lib/api";
 
 import {
   emptyQueryFields,
+  makeSearchFormSchema,
+  optionsFromStored,
   POSTED_WITHIN_OPTIONS,
-  searchFormSchema,
   seedSpec,
   toSearchRequest,
+  type QueryFieldValues,
   type SearchFormValues,
 } from "./search-form-schema";
 
@@ -35,12 +38,22 @@ export function SearchForm({
   const start = useStartJobSearch();
   const structured = profile.data?.structured_profile ?? null;
   const seed = structured !== null ? seedSpec(structured) : null;
+  const schema = useMemo(() => makeSearchFormSchema(sources), [sources]);
 
   const form = useForm<SearchFormValues>({
-    resolver: standardSchemaResolver(searchFormSchema),
+    resolver: standardSchemaResolver(schema),
     defaultValues: {
       queries: Object.fromEntries(
-        sources.map((source) => [source.name, emptyQueryFields()]),
+        sources.map((source) => [
+          source.name,
+          {
+            ...emptyQueryFields(),
+            options: optionsFromStored(
+              profile.data?.search_queries?.queries[source.name]?.options,
+              source,
+            ),
+          },
+        ]),
       ),
       location: "",
       country: "",
@@ -77,10 +90,7 @@ export function SearchForm({
         : "",
       { shouldValidate: false },
     );
-    const queries: Record<
-      string,
-      { title: string; skills: string; exclude: string }
-    > = {};
+    const queries: Record<string, QueryFieldValues> = {};
     for (const source of sources) {
       const stored = profile.data?.search_queries?.queries[source.name];
       const seeded = seed ?? { title: "", skills: [] };
@@ -88,6 +98,7 @@ export function SearchForm({
         title: stored?.title ?? seeded.title,
         skills: (stored?.skills ?? seeded.skills).join(", "),
         exclude: (stored?.exclude ?? []).join(", "),
+        options: optionsFromStored(stored?.options, source),
       };
     }
     form.setValue("queries", queries, { shouldValidate: false });
@@ -123,11 +134,7 @@ export function SearchForm({
     <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
       <FormProvider {...form}>
         <SearchQueriesCard
-          sources={sources.map((source) => ({
-            name: source.name,
-            is_official_api: source.is_official_api,
-            supports_exclusions: source.supports_exclusions,
-          }))}
+          sources={sources}
           profileId={profileId}
           structuredProfile={structured}
           storedQueries={profile.data?.search_queries ?? null}
@@ -195,9 +202,8 @@ export function SearchForm({
             htmlFor="job-posted-within"
             hint="Applied at the source when supported (exact on Adzuna, closest bucket on LinkedIn)."
           >
-            <select
+            <Select
               id="job-posted-within"
-              className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
               {...form.register("posted_within")}
             >
               {POSTED_WITHIN_OPTIONS.map((option) => (
@@ -205,7 +211,7 @@ export function SearchForm({
                   {option.label}
                 </option>
               ))}
-            </select>
+            </Select>
           </Field>
         </div>
       </FormProvider>

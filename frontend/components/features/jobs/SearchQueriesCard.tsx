@@ -2,13 +2,15 @@
 
 import { useState } from "react";
 
+import { Accordion } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { useRegenerateQueries } from "@/hooks/use-job-search";
-import type { StoredSearchQueries, StructuredProfile } from "@/lib/api";
+import type { SourceInfo, StoredSearchQueries, StructuredProfile } from "@/lib/api";
 import { useFormContext } from "react-hook-form";
 
+import { SourceFiltersForm } from "./SourceFiltersForm";
 import { seedSpec, type SearchFormValues } from "./search-form-schema";
 
 function relativeAge(iso: string): string {
@@ -34,7 +36,7 @@ export function SearchQueriesCard({
   storedQueries,
   updatedAt,
 }: {
-  sources: { name: string; is_official_api: boolean; supports_exclusions: boolean }[];
+  sources: SourceInfo[];
   profileId: string | null;
   structuredProfile: StructuredProfile | null;
   storedQueries: StoredSearchQueries | null | undefined;
@@ -57,14 +59,25 @@ export function SearchQueriesCard({
           AI search queries
         </h2>
         {profileId !== null && structuredProfile !== null && (
-          <button
-            type="button"
-            onClick={regenerateQueries}
-            disabled={regenerate.isPending}
-            className="rounded-full border border-violet-300 bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700 hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
-          >
-            {regenerate.isPending ? "Regenerating…" : "↻ Regenerate"}
-          </button>
+          <div className="flex items-center gap-2">
+            <span aria-live="polite" className="text-[11px] text-gray-500">
+              {regenerate.isPending
+                ? "Regenerating queries…"
+                : regenerate.isSuccess
+                  ? "Queries regenerated"
+                  : regenerate.isError
+                    ? "Regeneration failed"
+                    : ""}
+            </span>
+            <button
+              type="button"
+              onClick={regenerateQueries}
+              disabled={regenerate.isPending}
+              className="rounded-full border border-violet-300 bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700 hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
+            >
+              {regenerate.isPending ? "Regenerating…" : "↻ Regenerate"}
+            </button>
+          </div>
         )}
       </div>
       {stale && (
@@ -78,77 +91,67 @@ export function SearchQueriesCard({
           const seed = structuredProfile !== null ? seedSpec(structuredProfile) : null;
           const seeded = seed !== null && (seed.title !== "" || seed.skills.length > 0);
           const open = openSource === source.name;
+          const decls = source.filters ?? [];
           return (
-            <div key={source.name} className="rounded-xl border border-gray-200 bg-white">
-              <button
-                type="button"
-                onClick={() => setOpenSource(open ? null : source.name)}
-                aria-expanded={open}
-                className="flex w-full flex-wrap items-center gap-2 px-3 py-2.5 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
-              >
-                <span className="text-sm font-semibold text-gray-900">{source.name}</span>
-                <Badge variant={source.is_official_api ? "official-api" : "third-party-scraper"}>
-                  {source.is_official_api ? "Official API" : "Third-party scraper"}
-                </Badge>
-                {stored === undefined && (
-                  <span className="text-[11px] text-gray-500">
-                    {seeded ? "seed prefilled" : "no generated query yet"}
-                  </span>
-                )}
-                <svg
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                  aria-hidden="true"
-                  className={`ml-auto h-4 w-4 shrink-0 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`}
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M5.3 7.3a1 1 0 011.4 0L10 10.6l3.3-3.3a1 1 0 111.4 1.4l-4 4a1 1 0 01-1.4 0l-4-4a1 1 0 010-1.4z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              </button>
-              {open && (
-                <div className="flex flex-col gap-2.5 border-t border-gray-100 p-3">
-                  <Field label="Title" htmlFor={`query-${source.name}-title`}>
-                    <Input
-                      id={`query-${source.name}-title`}
-                      maxLength={80}
-                      {...form.register(`queries.${source.name}.title`)}
-                      placeholder={seed?.title || "Senior Android Engineer"}
-                    />
-                  </Field>
-                  <Field
-                    label="Skills (comma-separated)"
-                    htmlFor={`query-${source.name}-skills`}
-                    hint="Sent as any-of keywords where the source supports it."
-                  >
-                    <Input
-                      id={`query-${source.name}-skills`}
-                      {...form.register(`queries.${source.name}.skills`)}
-                      placeholder={seed?.skills.join(", ") || "Kotlin, Java"}
-                    />
-                  </Field>
-                  {source.supports_exclusions ? (
-                    <Field
-                      label="Exclude (optional, comma-separated)"
-                      htmlFor={`query-${source.name}-exclude`}
-                      hint="Supported by this source."
-                    >
-                      <Input
-                        id={`query-${source.name}-exclude`}
-                        {...form.register(`queries.${source.name}.exclude`)}
-                        placeholder="intern"
-                      />
-                    </Field>
-                  ) : (
-                    <p className="text-xs text-gray-500">
-                      This source does not support exclusions.
-                    </p>
+            <Accordion
+              key={source.name}
+              id={`query-${source.name}`}
+              open={open}
+              onToggle={() => setOpenSource(open ? null : source.name)}
+              trigger={
+                <>
+                  <span className="text-sm font-semibold text-gray-900">{source.name}</span>
+                  <Badge variant={source.is_official_api ? "official-api" : "third-party-scraper"}>
+                    {source.is_official_api ? "Official API" : "Third-party scraper"}
+                  </Badge>
+                  {stored === undefined && (
+                    <span className="text-[11px] text-gray-500">
+                      {seeded ? "seed prefilled" : "no generated query yet"}
+                    </span>
                   )}
-                </div>
+                </>
+              }
+            >
+              <Field label="Title" htmlFor={`query-${source.name}-title`}>
+                <Input
+                  id={`query-${source.name}-title`}
+                  maxLength={80}
+                  {...form.register(`queries.${source.name}.title`)}
+                  placeholder={seed?.title || "Senior Android Engineer"}
+                />
+              </Field>
+              <Field
+                label="Skills (comma-separated)"
+                htmlFor={`query-${source.name}-skills`}
+                hint="Sent as any-of keywords where the source supports it."
+              >
+                <Input
+                  id={`query-${source.name}-skills`}
+                  {...form.register(`queries.${source.name}.skills`)}
+                  placeholder={seed?.skills.join(", ") || "Kotlin, Java"}
+                />
+              </Field>
+              {source.supports_exclusions ? (
+                <Field
+                  label="Exclude (optional, comma-separated)"
+                  htmlFor={`query-${source.name}-exclude`}
+                  hint="Supported by this source."
+                >
+                  <Input
+                    id={`query-${source.name}-exclude`}
+                    {...form.register(`queries.${source.name}.exclude`)}
+                    placeholder="intern"
+                  />
+                </Field>
+              ) : (
+                <p className="text-xs text-gray-500">
+                  This source does not support exclusions.
+                </p>
               )}
-            </div>
+              {decls.length > 0 && (
+                <SourceFiltersForm sourceName={source.name} decls={decls} />
+              )}
+            </Accordion>
           );
         })}
       </div>

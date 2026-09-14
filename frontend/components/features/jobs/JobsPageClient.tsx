@@ -14,6 +14,7 @@ import {
 import { MatchList, type MatchSelection } from "@/components/features/jobs/MatchList";
 import { JobDetailPanel } from "@/components/features/jobs/JobDetailPanel";
 import { MatchFilterPanel } from "@/components/features/jobs/MatchFilterPanel";
+import { ProfileSelector } from "@/components/features/jobs/ProfileSelector";
 import { Card } from "@/components/ui/card";
 import { useProfiles } from "@/hooks/use-profiles";
 import { usePrioritySetting } from "@/hooks/use-priority-setting";
@@ -154,9 +155,20 @@ export function JobsPageClient() {
           </div>
         </div>
         <div className="scrollbar-hidden flex min-h-0 flex-1 grow flex-col gap-5 overflow-y-auto p-5">
+          <section className="rounded-2xl border border-violet-100 bg-violet-50/40 p-3" aria-label="Profile scope">
+            <ProfileSelector
+              profiles={profilesList}
+              activeProfileId={activeProfileId}
+              disabled={profiles.isPending || profiles.isError}
+              onSelect={selectProfile}
+              id="filter-profile"
+              hint="Every search run and the match list below are scoped to this profile."
+            />
+          </section>
           <MatchFilterPanel
             filters={filters}
             onChange={changeFilters}
+            priority={priority}
           />
         </div>
         <div className="shrink-0 border-t border-gray-100 p-3">
@@ -235,7 +247,6 @@ export function JobsPageClient() {
         sources={enabled}
         selectedSources={effectiveSelectedSources}
         onToggleSource={toggleSource}
-        priority={priority}
         onSearchStarted={(id) => {
           setSearchId(id);
           setConfigOpen(false);

@@ -47,6 +47,12 @@ docs/plans/         # versioned implementation plans (v1/, v2/, v3/ per-version 
 4. **Never commit secrets.** Keys live in `.env` (gitignored), documented in `.env.example`.
 5. **Never trust the client.** Backend re-validates everything with pydantic regardless of frontend checks.
 
+## Git workflow
+
+- **One branch per issue.** Create `v{N}/{issue-number}-{slug}` (e.g. `v3/24-profile-scoped-searches`) before starting an issue; docs-only changes may go straight to `main`.
+- **Merge on close, not before.** When the issue is tested, reviewed, and complete: merge the branch into `main`, `git pull`, then delete the branch (local + remote).
+- Never commit directly to `main` for issue work; keep the milestone-commit message convention.
+
 ## Definition of done (before reporting a task complete)
 
 - Backend touched: `ruff check . && ruff format --check . && pytest` pass (run in `backend/`).

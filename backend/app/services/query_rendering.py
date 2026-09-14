@@ -19,6 +19,7 @@ def build_connector_query(
         "location": request.location,
         "country": request.country,
         "results_wanted": request.results_wanted,
+        "max_days_old": request.max_days_old,
         "salary_min": request.salary_min,
         "salary_max": request.salary_max,
         "salary_currency": request.salary_currency,

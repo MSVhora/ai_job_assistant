@@ -50,6 +50,7 @@ class JobSearchQuery(BaseModel):
     location: str | None = None
     country: str
     results_wanted: int = Field(default=50, ge=1, le=50)
+    max_days_old: int | None = Field(default=None, ge=1, le=90)
     salary_min: float | None = Field(default=None, ge=0)
     salary_max: float | None = Field(default=None, ge=0)
     salary_currency: str | None = Field(default=None, pattern=r"^[A-Za-z]{3}$")
@@ -63,6 +64,19 @@ class JobSearchQuery(BaseModel):
     @classmethod
     def _strip_title(cls, value: str | None) -> str | None:
         return value.strip() if value else value
+
+
+def date_posted_bucket(max_days_old: int | None) -> str:
+    """Map the shared day-count freshness filter to a LinkedIn datePosted bucket."""
+    if max_days_old is None:
+        return "anyTime"
+    if max_days_old <= 1:
+        return "past24h"
+    if max_days_old <= 7:
+        return "pastWeek"
+    if max_days_old <= 30:
+        return "pastMonth"
+    return "anyTime"
 
 
 class RawJobPosting(BaseModel):

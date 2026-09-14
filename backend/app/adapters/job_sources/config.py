@@ -3,11 +3,15 @@ from pathlib import Path
 import yaml
 from pydantic import BaseModel, Field, ValidationError
 
-from app.adapters.job_sources.base import ConnectorConfigError, JobSearchQuery
+from app.adapters.job_sources.base import (
+    ConnectorConfigError,
+    JobSearchQuery,
+    date_posted_bucket,
+)
 
 DEFAULT_CONFIG_PATH = Path(__file__).parent / "connectors.yaml"
 
-_PLACEHOLDER_KEYS = ("query", "location", "country", "results_wanted")
+_PLACEHOLDER_KEYS = ("query", "location", "country", "results_wanted", "date_posted_bucket")
 
 _OMIT = object()
 
@@ -43,6 +47,8 @@ def _resolve_value(value: object, query: JobSearchQuery) -> object:
                 return query.country
             case "results_wanted":
                 return query.results_wanted
+            case "date_posted_bucket":
+                return date_posted_bucket(query.max_days_old)
     return value
 
 

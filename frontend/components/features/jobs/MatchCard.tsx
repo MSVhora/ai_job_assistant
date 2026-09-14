@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
+import { FreshnessBadge } from "@/components/features/jobs/FreshnessBadge";
 import type { MatchResponse } from "@/lib/api";
 import { salaryLine, scorePercent } from "@/lib/salary";
 
@@ -74,6 +75,7 @@ export function MatchCard({
             <Badge variant={posting.source.startsWith("apify") ? "third-party-scraper" : "official-api"}>
               {posting.source}
             </Badge>
+            <FreshnessBadge expiresAt={posting.expires_at} postedAt={posting.posted_at} />
           </div>
           <p className="mt-0.5 truncate text-sm text-gray-600">
             {posting.company && <span className="font-medium text-gray-800">{posting.company}</span>}

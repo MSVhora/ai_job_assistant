@@ -102,10 +102,10 @@ sequenceDiagram
     participant G as Gemini (LiteLLM)
     participant D as Postgres + pgvector
 
-    B->>A: POST /api/jobs/search
+    B->>A: POST /api/jobs/search (incl. max_days_old freshness filter)
     A-->>B: background run accepted
     A->>D: job_search row (status + per-source outcomes)
-    A->>C: query enabled sources
+    A->>C: query enabled sources (freshness: Adzuna max_days_old, LinkedIn datePosted bucket)
     C-->>A: raw postings (failures skip + warn)
     A->>A: normalize + dedupe (source, external_id) — upsert refresh
     A->>G: embed descriptions
@@ -149,6 +149,13 @@ with no source-reported expiry a posting goes stale after `STALE_POSTING_DAYS`
 (default 45) since `posted_at`. A source-reported expiry is authoritative (LinkedIn
 `expireAt`); Adzuna has none, so the grace window governs. `posted_within_days` stacks on
 top. The filter is read-time only — the scoring corpus and rebuild cleanup are untouched.
+
+**Query-time freshness (v3 issue #27):** the search request accepts `max_days_old`
+(1–90), rendered by `query_rendering.py` into every connector query. Adzuna sends it
+directly (`max_days_old`); the LinkedIn actor input's `datePosted` resolves through the
+`{date_posted_bucket}` YAML placeholder (≤1 → `past24h`, ≤7 → `pastWeek`, ≤30 →
+`pastMonth`, else `anyTime`). Sources without a native parameter ignore it; the value is
+echoed in the run's stored query.
 
 ## Source enablement (issue #8)
 

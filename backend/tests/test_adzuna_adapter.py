@@ -117,6 +117,22 @@ async def test_search_requests_country_path_and_params(
     ]
 
 
+async def test_search_sends_max_days_old_param(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["url"] = str(request.url)
+        return httpx.Response(200, json=_fixture())
+
+    monkeypatch.setattr("app.adapters.retry.asyncio.sleep", _no_delay)
+    source = _mock_source(monkeypatch, httpx.MockTransport(handler))
+
+    await source.search(JobSearchQuery(query="python developer", country="DE", max_days_old=7))
+
+    params = _request_params(str(seen["url"]))
+    assert params["max_days_old"] == "7"
+
+
 async def test_search_retries_once_on_rate_limit(monkeypatch: pytest.MonkeyPatch) -> None:
     calls = {"count": 0}
 

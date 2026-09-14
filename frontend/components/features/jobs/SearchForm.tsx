@@ -13,6 +13,7 @@ import type { SourceInfo } from "@/lib/api";
 
 import {
   emptyQueryFields,
+  POSTED_WITHIN_OPTIONS,
   searchFormSchema,
   seedSpec,
   toSearchRequest,
@@ -44,6 +45,7 @@ export function SearchForm({
       location: "",
       country: "",
       minSalary: "",
+      posted_within: "any",
       results_wanted: 50,
       sources: sources.map((source) => source.name),
     },
@@ -187,6 +189,23 @@ export function SearchForm({
               max={50}
               {...form.register("results_wanted")}
             />
+          </Field>
+          <Field
+            label="Posted within"
+            htmlFor="job-posted-within"
+            hint="Applied at the source when supported (exact on Adzuna, closest bucket on LinkedIn)."
+          >
+            <select
+              id="job-posted-within"
+              className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
+              {...form.register("posted_within")}
+            >
+              {POSTED_WITHIN_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </Field>
         </div>
       </FormProvider>

@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { Badge } from "@/components/ui/badge";
+import { FreshnessBadge } from "@/components/features/jobs/FreshnessBadge";
 import { getJobPosting, type MatchResponse } from "@/lib/api";
 import { salaryLine, scorePercent } from "@/lib/salary";
 
@@ -144,6 +145,7 @@ export function JobDetailPanel({
                   {posting.remote_type && (
                     <Badge variant="ai">{REMOTE_TYPE_LABELS[posting.remote_type] ?? posting.remote_type}</Badge>
                   )}
+                  <FreshnessBadge expiresAt={posting.expires_at} postedAt={posting.posted_at} />
                 </div>
                 <h3 className="mt-2 text-xl font-bold leading-snug tracking-tight text-gray-900">
                   {posting.title}

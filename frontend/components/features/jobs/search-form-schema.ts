@@ -4,14 +4,24 @@ import type { JobSearchRequest, SourceInfo, StructuredProfile } from "@/lib/api"
 
 export type QueryFieldValues = { title: string; skills: string; exclude: string };
 
+export type PostedWithinValue = "any" | "1" | "7" | "30";
+
 export type SearchFormValues = {
   queries: Record<string, QueryFieldValues>;
   location: string;
   country: string;
   minSalary: string;
+  posted_within: PostedWithinValue;
   results_wanted: number;
   sources: string[];
 };
+
+export const POSTED_WITHIN_OPTIONS: { value: PostedWithinValue; label: string }[] = [
+  { value: "any", label: "Any time" },
+  { value: "1", label: "Last 24 hours" },
+  { value: "7", label: "Last week" },
+  { value: "30", label: "Last month" },
+];
 
 export const searchFormSchema = z.object({
   queries: z.record(
@@ -29,6 +39,7 @@ export const searchFormSchema = z.object({
     .refine((value) => value.trim() === "" || Number.isFinite(Number(value.trim())), {
       message: "Must be a number",
     }),
+  posted_within: z.enum(["any", "1", "7", "30"]),
   results_wanted: z.coerce
     .number()
     .int("Whole number only")
@@ -120,8 +131,10 @@ export function toSearchRequest(
       profile_id: profileId ?? undefined,
       country: values.country,
       location: values.location.trim() === "" ? null : values.location.trim(),
-      results_wanted: values.results_wanted,
-      sources: selected,
+    results_wanted: values.results_wanted,
+    max_days_old:
+      values.posted_within === "any" ? undefined : Number(values.posted_within),
+    sources: selected,
       source_queries: sourceQueries,
       salary_min: minSalary === "" ? undefined : Number(minSalary),
       salary_currency: currency,

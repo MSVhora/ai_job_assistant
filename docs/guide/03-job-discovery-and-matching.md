@@ -141,6 +141,23 @@ The filter is read-time only: stored matches for expired postings may remain in 
 database (and count toward rebuild's corpus checks) but never render — no dead leads on
 the dashboard. Your `posted_within_days` filter stacks on top of this as before.
 
+## Freshness at query time: "Posted within" (live since #27)
+
+The search form's "Posted within" select (Any time / Last 24 hours / Last week / Last
+month) sends `max_days_old` (1–90) with the search request and narrows what the sources
+return — before anything is scraped or stored. Each source maps it to its native
+freshness parameter:
+
+| Source | Parameter | Mapping |
+|---|---|---|
+| Adzuna (official API) | `max_days_old` | exact day count |
+| Apify LinkedIn (scraper) | `datePosted` bucket | ≤1 day → `past24h`, ≤7 → `pastWeek`, ≤30 → `pastMonth`, wider/none → `anyTime` |
+
+The shared filter is independent of the read-side layer above: a run with "Last week"
+still passes its results through the expiry filter (a scraper-reported old date is still
+excluded on read). Sources that support no freshness parameter simply ignore it, and the
+choice is recorded in the run's query echo for reproducibility.
+
 ## How matching content is prepared (live since #9)
 
 - **Job descriptions are embedded at ingest** — every normalized posting gets a vector

@@ -69,6 +69,7 @@ class JobSearchRequest(BaseModel):
     location: str | None = Field(default=None, max_length=200)
     country: str = Field(min_length=2, max_length=2, pattern=r"^[A-Za-z]{2}$")
     results_wanted: int = Field(default=50, ge=1, le=50)
+    max_days_old: int | None = Field(default=None, ge=1, le=90)
     salary_min: float | None = Field(default=None, ge=0)
     salary_max: float | None = Field(default=None, ge=0)
     salary_currency: str | None = Field(default=None, pattern=r"^[A-Za-z]{3}$")

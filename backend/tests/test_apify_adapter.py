@@ -25,7 +25,7 @@ CONFIG = ActorConfig(
         "keywords": "{query}",
         "location": "{location}",
         "limitPerSource": "{results_wanted}",
-        "datePosted": "anyTime",
+        "datePosted": "{date_posted_bucket}",
         "scrapeCompany": False,
     },
 )
@@ -174,6 +174,32 @@ async def test_search_builds_input_and_reads_dataset(
         "4439105297",
         "4441105250",
     ]
+
+
+async def test_search_maps_max_days_old_to_posted_bucket(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        if request.method == "POST" and path == "/v2/acts/hKByXkMQaC5Qt9UMN/runs":
+            seen["input"] = json.loads(request.content)
+            return httpx.Response(200, json={"data": {"id": "run-1", "status": "READY"}})
+        if request.method == "GET" and path == "/v2/actor-runs/run-1":
+            return httpx.Response(
+                200,
+                json={"data": {"id": "run-1", "status": "SUCCEEDED", "defaultDatasetId": "ds-1"}},
+            )
+        if request.method == "GET" and path == "/v2/datasets/ds-1/items":
+            return httpx.Response(200, json=[])
+        return httpx.Response(404)
+
+    source = _mock_source(monkeypatch, httpx.MockTransport(handler))
+
+    await source.search(JobSearchQuery(query="data analyst", country="us", max_days_old=7))
+
+    assert seen["input"]["datePosted"] == "pastWeek"
 
 
 async def test_search_polls_until_succeeded(monkeypatch: pytest.MonkeyPatch) -> None:

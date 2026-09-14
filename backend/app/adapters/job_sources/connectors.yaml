@@ -7,6 +7,6 @@ sources:
       keywords: "{query}"
       location: "{location}"
       limitPerSource: "{results_wanted}"
-      datePosted: anyTime
+      datePosted: "{date_posted_bucket}"
       autoConvertToAiSearch: true
       scrapeCompany: false

@@ -76,6 +76,11 @@ def _apply_salary_filter(params: dict[str, str], query: JobSearchQuery) -> None:
         params["salary_max"] = str(int(query.salary_max))
 
 
+def _apply_freshness(params: dict[str, str], query: JobSearchQuery) -> None:
+    if query.max_days_old is not None:
+        params["max_days_old"] = str(query.max_days_old)
+
+
 class AdzunaJobSource:
     name = "adzuna"
     is_official_api = True
@@ -102,6 +107,7 @@ class AdzunaJobSource:
         }
         _apply_search_terms(params, query)
         _apply_salary_filter(params, query)
+        _apply_freshness(params, query)
         if query.location:
             params["where"] = query.location
         url = f"{_BASE_URL}/v1/api/jobs/{query.country}/search/1"

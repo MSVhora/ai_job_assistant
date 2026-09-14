@@ -1,6 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
+import { FreshnessBadge } from "@/components/features/jobs/FreshnessBadge";
 import { isRunFinished, useSearchPostings } from "@/hooks/use-job-search";
 import { salaryLine } from "@/lib/salary";
 
@@ -97,6 +98,7 @@ export function SearchResults({
               <Badge variant={posting.source.startsWith("apify") ? "third-party-scraper" : "official-api"}>
                 {posting.source}
               </Badge>
+              <FreshnessBadge expiresAt={posting.expires_at} postedAt={posting.posted_at} />
               {posting.url ? (
                 <a
                   href={posting.url}

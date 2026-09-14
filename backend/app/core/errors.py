@@ -97,6 +97,11 @@ class JobSearchNotFoundError(DomainError):
     default_detail = "job search not found"
 
 
+class MatchRebuildNotFoundError(DomainError):
+    status_code = 404
+    default_detail = "no match rebuild run recorded for this profile"
+
+
 class JobPostingNotFoundError(DomainError):
     status_code = 404
     default_detail = "job posting not found"

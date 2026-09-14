@@ -131,7 +131,7 @@ function ProfileSelector({
       <p className="rounded-2xl border border-dashed border-violet-200 bg-violet-50/50 p-3 text-xs text-gray-600">
         {disabled
           ? "Loading profiles…"
-          : "No profile yet — searches run without one, but a profile seeds the queries. "}
+          : "No profile yet — select or create one before starting a search, because every run is scoped to its profile. "}
         {!disabled &&
           profiles.length === 0 && (
             <Link

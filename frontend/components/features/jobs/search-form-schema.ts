@@ -88,10 +88,14 @@ export function toSearchRequest(
   values: SearchFormValues,
   sources: SourceInfo[],
   profileCurrency: string | null,
+  profileId: string | null,
 ): { payload: JobSearchRequest; missing: string[] } {
   const selected = values.sources;
   const sourceQueries: JobSearchRequest["source_queries"] = {};
   const missing: string[] = [];
+  if (profileId === null) {
+    missing.push("profile");
+  }
   for (const name of selected) {
     const fields = values.queries[name] ?? emptyQueryFields();
     const title = fields.title.trim();
@@ -113,6 +117,7 @@ export function toSearchRequest(
   const currency = profileCurrency && /^[A-Za-z]{3}$/.test(profileCurrency) ? profileCurrency : undefined;
   return {
     payload: {
+      profile_id: profileId ?? undefined,
       country: values.country,
       location: values.location.trim() === "" ? null : values.location.trim(),
       results_wanted: values.results_wanted,

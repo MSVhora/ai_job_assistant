@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
 import { JobsPageClient } from "@/components/features/jobs/JobsPageClient";
 
@@ -26,7 +27,13 @@ export default function JobsPage() {
           </h1>
         </section>
 
-        <JobsPageClient />
+        <Suspense
+          fallback={
+            <div className="h-64 animate-pulse rounded-3xl bg-white/60" aria-live="polite" />
+          }
+        >
+          <JobsPageClient />
+        </Suspense>
       </div>
     </main>
   );

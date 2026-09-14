@@ -15,12 +15,24 @@ MatchSort = Literal["final_score", "vector_score", "posted_at"]
 __all__ = [
     "MatchFilters",
     "MatchQueryParams",
+    "MatchRebuildStatusResponse",
     "MatchResponse",
     "MatchSort",
     "RerankItem",
     "RerankResult",
     "MatchingOutcome",
 ]
+
+
+class MatchRebuildStatusResponse(BaseModel):
+    id: uuid.UUID
+    profile_id: uuid.UUID
+    status: Literal["pending", "running", "succeeded", "failed"]
+    corpus_count: int
+    scored_count: int
+    warning: str | None = None
+    created_at: datetime
+    updated_at: datetime
 
 
 class MatchFilters(BaseModel):

@@ -15,7 +15,7 @@ from sqlalchemy import select
 
 from app.core.config import Settings
 from app.core.db import session_factory
-from app.models import JobPosting, Match, Profile
+from app.models import JobPosting, JobSearch, JobSearchStatus, Match, Profile, SearchPosting
 from app.schemas.matching import MatchQueryParams, MatchResponse
 from app.schemas.profile import ProfileCreate, ProfileUpdate, StructuredProfile
 from app.services import matching
@@ -47,8 +47,20 @@ async def seed_profile(name: str = "Default") -> uuid.UUID:
         return response.profile_id
 
 
-async def seed_postings(specs: list[dict[str, Any]]) -> list[JobPosting]:
+async def seed_postings(
+    specs: list[dict[str, Any]], found_by: uuid.UUID | None = None
+) -> list[JobPosting]:
+    """Seed postings; with `found_by`, attach them via an owned search (scoped corpus)."""
     async with session_factory() as session:
+        search: JobSearch | None = None
+        if found_by is not None:
+            search = JobSearch(
+                profile_id=found_by,
+                status=JobSearchStatus.succeeded,
+                query={"profile_id": str(found_by)},
+            )
+            session.add(search)
+            await session.flush()
         postings: list[JobPosting] = []
         for index, spec in enumerate(specs):
             posting = JobPosting(
@@ -66,6 +78,10 @@ async def seed_postings(specs: list[dict[str, Any]]) -> list[JobPosting]:
             )
             session.add(posting)
             postings.append(posting)
+        await session.flush()
+        if search is not None:
+            for posting in postings:
+                session.add(SearchPosting(search_id=search.id, posting_id=posting.id))
         await session.commit()
         for posting in postings:
             await session.refresh(posting)
@@ -143,7 +159,9 @@ async def refresh(profile_id: uuid.UUID) -> Any:
 async def test_refresh_scores_and_reranks_all_postings(monkeypatch: pytest.MonkeyPatch) -> None:
     profile_id = await seed_profile()
     _, profile_embedding = await fetch_profile_ids_with_embeddings(profile_id)
-    postings = await seed_postings([{"embedding": fake_vector(f"j{i}")} for i in range(3)])
+    postings = await seed_postings(
+        [{"embedding": fake_vector(f"j{i}")} for i in range(3)], found_by=profile_id
+    )
     scores = expected_scores(profile_embedding, postings)
     calls = install_rerank_for(monkeypatch, postings)
 
@@ -172,7 +190,9 @@ async def test_second_refresh_makes_no_llm_calls_when_all_rationaled(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     profile_id = await seed_profile()
-    postings = await seed_postings([{"embedding": fake_vector(f"j{i}")} for i in range(2)])
+    postings = await seed_postings(
+        [{"embedding": fake_vector(f"j{i}")} for i in range(2)], found_by=profile_id
+    )
     calls = install_rerank_for(monkeypatch, postings)
 
     first = await refresh(profile_id)
@@ -191,7 +211,9 @@ async def test_rerank_caps_to_top_n_and_targets_rationaleless(
 ) -> None:
     profile_id = await seed_profile()
     _, profile_embedding = await fetch_profile_ids_with_embeddings(profile_id)
-    postings = await seed_postings([{"embedding": fake_vector(f"j{i}")} for i in range(3)])
+    postings = await seed_postings(
+        [{"embedding": fake_vector(f"j{i}")} for i in range(3)], found_by=profile_id
+    )
     scores = expected_scores(profile_embedding, postings)
     calls = install_rerank_for(monkeypatch, postings)
     monkeypatch.setattr(matching, "get_settings", lambda: Settings(rerank_top_n=1))
@@ -217,7 +239,7 @@ async def test_rerank_caps_to_top_n_and_targets_rationaleless(
 async def test_rerank_failure_degrades_to_vector_scores(monkeypatch: pytest.MonkeyPatch) -> None:
     profile_id = await seed_profile()
     _, profile_embedding = await fetch_profile_ids_with_embeddings(profile_id)
-    postings = await seed_postings([{"embedding": fake_vector("j0")}])
+    postings = await seed_postings([{"embedding": fake_vector("j0")}], found_by=profile_id)
     scores = expected_scores(profile_embedding, postings)
     install_acompletion(monkeypatch, lambda **kw: ProviderError(400))
 
@@ -236,7 +258,9 @@ async def test_rerank_failure_degrades_to_vector_scores(monkeypatch: pytest.Monk
 
 async def test_unknown_llm_item_ids_are_ignored(monkeypatch: pytest.MonkeyPatch) -> None:
     profile_id = await seed_profile()
-    postings = await seed_postings([{"embedding": fake_vector(f"j{i}")} for i in range(2)])
+    postings = await seed_postings(
+        [{"embedding": fake_vector(f"j{i}")} for i in range(2)], found_by=profile_id
+    )
     items = rerank_items_for(postings[:1])
     items.append(
         {"posting_id": str(uuid.uuid4()), "role_fit": 9.0, "company_fit": 9.0, "rationale": "Nope."}
@@ -257,7 +281,7 @@ async def test_rescore_with_invalidation_clears_llm_state_without_llm_calls(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     profile_id = await seed_profile()
-    postings = await seed_postings([{"embedding": fake_vector("j0")}])
+    postings = await seed_postings([{"embedding": fake_vector("j0")}], found_by=profile_id)
     install_rerank_for(monkeypatch, postings)
     await refresh(profile_id)
     calls = install_acompletion(monkeypatch, lambda **kw: ProviderError(400))
@@ -283,7 +307,7 @@ async def test_rescore_with_invalidation_clears_llm_state_without_llm_calls(
 
 async def test_refresh_skips_profile_without_embedding() -> None:
     profile_id = await seed_profile()
-    await seed_postings([{"embedding": fake_vector("j0")}])
+    await seed_postings([{"embedding": fake_vector("j0")}], found_by=profile_id)
     await clear_profile_embedding(profile_id)
 
     outcome = await refresh(profile_id)
@@ -352,7 +376,9 @@ async def seed_subscored(
     monkeypatch: pytest.MonkeyPatch, role_fit: float
 ) -> tuple[uuid.UUID, list[JobPosting]]:
     profile_id = await seed_profile()
-    postings = await seed_postings([{"embedding": fake_vector("twin")} for _ in range(2)])
+    postings = await seed_postings(
+        [{"embedding": fake_vector("twin")} for _ in range(2)], found_by=profile_id
+    )
     items = [
         {
             "posting_id": str(postings[0].id),
@@ -420,3 +446,82 @@ async def test_list_matches_uses_stored_preference_and_falls_back_on_junk(
         assert row.final_score == pytest.approx(
             0.4 * row.vector_score + 0.4 * row.role_fit / 10 + 0.2 * row.company_fit / 10, abs=1e-6
         )
+
+
+async def test_scoped_corpus_postings_from_other_profile_never_scored(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    profile_a = await seed_profile("A")
+    profile_b = await seed_profile("B")
+    _, profile_b_embedding = await fetch_profile_ids_with_embeddings(profile_b)
+    postings = await seed_postings(
+        [{"embedding": fake_vector(f"j{i}")} for i in range(2)], found_by=profile_a
+    )
+    install_rerank_for(monkeypatch, postings)
+
+    outcome = await refresh(profile_b)
+
+    assert outcome.status == "ok"
+    assert outcome.scored_count == 0
+    assert await fetch_matches(profile_b) == []
+    outcome_a = await refresh(profile_a)
+    assert outcome_a.status == "ok"
+    assert outcome_a.scored_count == 2
+    matches = await fetch_matches(profile_a)
+    assert {match.job_posting_id for match in matches} == {posting.id for posting in postings}
+
+
+async def test_scoped_corpus_requires_embedding_even_when_associated(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    profile_id = await seed_profile()
+    postings = await seed_postings(
+        [{"embedding": fake_vector("embedded")}, {"embedding": None}], found_by=profile_id
+    )
+    install_rerank_for(monkeypatch, postings[:1])
+
+    outcome = await refresh(profile_id)
+
+    assert outcome.status == "ok"
+    assert outcome.scored_count == 1
+    matches = await fetch_matches(profile_id)
+    assert matches[0].job_posting_id == postings[0].id
+
+
+async def test_delete_out_of_corpus_matches_removes_only_stale_rows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    profile_id = await seed_profile()
+    postings = await seed_postings(
+        [{"embedding": fake_vector(f"j{i}")} for i in range(2)], found_by=profile_id
+    )
+    await refresh(profile_id)
+    orphan = JobPosting(
+        source="adzuna",
+        external_id="orphan-0",
+        title="Orphan",
+        location="Berlin",
+        description=DESCRIPTION,
+        embedding=fake_vector("orphan"),
+        raw_payload={"id": "orphan-0"},
+    )
+    async with session_factory() as session:
+        session.add(orphan)
+        await session.commit()
+        await session.refresh(orphan)
+        session.add(
+            Match(
+                profile_id=profile_id,
+                job_posting_id=orphan.id,
+                vector_score=0.9,
+                final_score=0.9,
+            )
+        )
+        await session.commit()
+
+        deleted = await matching.delete_out_of_corpus_matches(session, profile_id)
+        await session.commit()
+
+    assert deleted == 1
+    matches = await fetch_matches(profile_id)
+    assert {match.job_posting_id for match in matches} == {posting.id for posting in postings}

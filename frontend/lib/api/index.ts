@@ -26,6 +26,7 @@ export type MatchResponse = components["schemas"]["MatchResponse"];
 export type MatchingOutcome = components["schemas"]["MatchingOutcome"];
 export type StoredPreferences = components["schemas"]["StoredPreferences"];
 export type MatchListParams = operations["list_matches_api_matches_get"]["parameters"]["query"];
+export type MatchRebuildStatus = components["schemas"]["MatchRebuildStatusResponse"];
 
 export { ApiError, ExtractionFailedError, apiFetch, apiFetchWithTotal } from "./client";
 
@@ -144,13 +145,34 @@ export async function startJobSearch(payload: JobSearchRequest): Promise<JobSear
   });
 }
 
-export async function getJobSearchStatus(searchId: string): Promise<JobSearchStatus> {
-  return apiFetch<JobSearchStatus>(`/api/jobs/searches/${encodeURIComponent(searchId)}`);
+export async function getJobSearchStatus(
+  searchId: string,
+  profileId: string,
+): Promise<JobSearchStatus> {
+  return apiFetch<JobSearchStatus>(
+    `/api/jobs/searches/${encodeURIComponent(searchId)}?profile_id=${encodeURIComponent(profileId)}`,
+  );
 }
 
-export async function getSearchPostings(searchId: string): Promise<JobPostingSummary[]> {
+export async function getSearchPostings(
+  searchId: string,
+  profileId: string,
+): Promise<JobPostingSummary[]> {
   return apiFetch<JobPostingSummary[]>(
-    `/api/jobs/searches/${encodeURIComponent(searchId)}/postings`,
+    `/api/jobs/searches/${encodeURIComponent(searchId)}/postings?profile_id=${encodeURIComponent(profileId)}`,
+  );
+}
+
+export async function startMatchRebuild(profileId: string): Promise<MatchRebuildStatus> {
+  return apiFetch<MatchRebuildStatus>(
+    `/api/profiles/${encodeURIComponent(profileId)}/rebuild-matches`,
+    { method: "POST" },
+  );
+}
+
+export async function getMatchRebuildStatus(profileId: string): Promise<MatchRebuildStatus> {
+  return apiFetch<MatchRebuildStatus>(
+    `/api/profiles/${encodeURIComponent(profileId)}/rebuild-matches`,
   );
 }
 

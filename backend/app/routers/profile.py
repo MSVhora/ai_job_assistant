@@ -1,12 +1,13 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.deps import get_db
 from app.schemas.gap_fill import GapFillRequest, GapFillResponse
 from app.schemas.job_search import SearchQueriesResponse, SearchQueryGenerateRequest
+from app.schemas.matching import MatchRebuildStatusResponse
 from app.schemas.profile import (
     ProfileCreate,
     ProfileResponse,
@@ -14,7 +15,7 @@ from app.schemas.profile import (
     ProfileUpdate,
     StoredPreferences,
 )
-from app.services import gap_fill, profile_service, query_builder
+from app.services import gap_fill, match_rebuild, profile_service, query_builder
 
 router = APIRouter(prefix="/api", tags=["profile"])
 
@@ -78,6 +79,30 @@ async def regenerate_search_queries(
     return await query_builder.regenerate_for_profile(
         session, profile_id, payload.sources if payload else None
     )
+
+
+@router.post(
+    "/profiles/{profile_id}/rebuild-matches",
+    response_model=MatchRebuildStatusResponse,
+    status_code=202,
+)
+async def rebuild_matches(
+    profile_id: uuid.UUID,
+    background_tasks: BackgroundTasks,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> MatchRebuildStatusResponse:
+    return await match_rebuild.start_rebuild(session, background_tasks, profile_id)
+
+
+@router.get(
+    "/profiles/{profile_id}/rebuild-matches",
+    response_model=MatchRebuildStatusResponse,
+)
+async def get_rebuild_matches_status(
+    profile_id: uuid.UUID,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> MatchRebuildStatusResponse:
+    return await match_rebuild.get_latest_rebuild(session, profile_id)
 
 
 @router.delete("/profiles/{profile_id}", status_code=204)

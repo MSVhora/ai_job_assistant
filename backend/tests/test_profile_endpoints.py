@@ -623,3 +623,74 @@ async def test_content_save_keeps_preferences(client: AsyncClient) -> None:
     assert saved.status_code == 200
     fetched = (await client.get(f"/api/profiles/{profile_id}")).json()
     assert fetched["preferences"] == {"priority": 0.25}
+
+
+async def test_rebuild_matches_endpoint_lifecycle(client: AsyncClient) -> None:
+    from fakes import fake_vector
+
+    from app.models import JobPosting, JobSearch, JobSearchStatus, Profile, SearchPosting
+    from app.services import match_rebuild
+
+    created = await create_profile(client, "Seeker", VALID_PROFILE)
+    assert created.status_code == 201
+    profile_id = uuid.UUID(created.json()["profile_id"])
+
+    async with session_factory() as session:
+        posting = JobPosting(
+            source="adzuna",
+            external_id="ext-0",
+            title="Data Analyst",
+            location="Berlin",
+            description="Analyse data with SQL and Python. " * 10,
+            embedding=fake_vector("rebuild-posting"),
+            raw_payload={"id": "ext-0"},
+        )
+        session.add(posting)
+        await session.flush()
+        search = JobSearch(
+            profile_id=profile_id,
+            status=JobSearchStatus.succeeded,
+            query={"profile_id": str(profile_id)},
+        )
+        session.add(search)
+        await session.flush()
+        session.add(SearchPosting(search_id=search.id, posting_id=posting.id))
+        await session.commit()
+
+    unknown = await client.post(f"/api/profiles/{uuid.uuid4()}/rebuild-matches")
+    assert unknown.status_code == 404
+
+    no_run = await client.get(f"/api/profiles/{profile_id}/rebuild-matches")
+    assert no_run.status_code == 404
+
+    async with session_factory() as session:
+        profile = await session.get(Profile, profile_id)
+        assert profile is not None
+        profile.embedding = None
+        await session.commit()
+    unembedded_status = await client.post(f"/api/profiles/{profile_id}/rebuild-matches")
+    assert unembedded_status.status_code == 409
+    async with session_factory() as session:
+        profile = await session.get(Profile, profile_id)
+        assert profile is not None
+        profile.embedding = fake_vector("profile")
+        await session.commit()
+
+    started = await client.post(f"/api/profiles/{profile_id}/rebuild-matches")
+    assert started.status_code == 202
+    body = started.json()
+    assert body["profile_id"] == str(profile_id)
+    assert body["status"] == "pending"
+
+    latest = await client.get(f"/api/profiles/{profile_id}/rebuild-matches")
+    assert latest.status_code == 200
+    assert latest.json()["status"] in ("pending", "running", "succeeded")
+
+    await match_rebuild.run_rebuild(uuid.UUID(body["id"]))
+
+    final = await client.get(f"/api/profiles/{profile_id}/rebuild-matches")
+    assert final.status_code == 200
+    final_body = final.json()
+    assert final_body["status"] == "succeeded"
+    assert final_body["corpus_count"] == 1
+    assert final_body["scored_count"] == 1

@@ -90,6 +90,27 @@ Career tracks live side by side, and jobs found for one track must not leak into
   `search_posting` join table (unique per `(search_id, posting_id)`), replacing the old
   mutable pointer that a re-search used to overwrite. A posting re-found by a later
   search gains a new association row; earlier runs' results views are untouched.
+- **The URL carries the current profile.** On `/jobs` the selected profile is the
+  `?profile=` URL param (same convention as `/profile`); switching profiles resets the
+  run state and refetches that profile's matches.
+
+## Match corpus is per profile (live since #25)
+
+Matching only ever scores the profile's **own** corpus: the distinct postings found by
+searches whose owning `profile_id` is that profile. A posting found by profile A's
+searches is invisible to profile B's matches, even if the target roles overlap. A
+profile with no searches yet has an empty corpus and zero matches until its first run.
+
+Already ingested a global (pre-scoping) corpus of matches? Nothing is deleted
+automatically — rebuild is explicit per profile:
+
+- **"Rebuild matches for this profile"** on `/jobs` (also
+  `POST /api/profiles/{id}/rebuild-matches`) refreshes the profile embedding, scores
+  the profile's scoped corpus, and **drops stored matches whose posting is no longer
+  in that corpus** — the cleanup for stale cross-profile rows.
+- The rebuild runs in the background; its banner reports the corpus size (postings
+  found by the profile's searches) and how many were scored, with status queryable
+  afterwards via `GET /api/profiles/{id}/rebuild-matches`.
 
 ## How matching content is prepared (live since #9)
 

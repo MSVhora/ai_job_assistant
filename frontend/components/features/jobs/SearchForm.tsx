@@ -102,10 +102,14 @@ export function SearchForm({
       values,
       sources,
       structured?.preferences?.currency ?? null,
+      profileId,
     );
     if (missing.length > 0) {
       form.setError("root", {
-        message: `Add a title or skills for: ${missing.join(", ")}`,
+        message:
+          missing[0] === "profile"
+            ? "Select a profile before starting a search (every run is scoped to one)."
+            : `Add a title or skills for: ${missing.join(", ")}`,
       });
       return;
     }

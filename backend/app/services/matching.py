@@ -3,14 +3,24 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 from pydantic import ValidationError
-from sqlalchemy import ColumnElement, Select, bindparam, case, func, select, update
+from sqlalchemy import (
+    ColumnElement,
+    Select,
+    bindparam,
+    case,
+    delete,
+    exists,
+    func,
+    select,
+    update,
+)
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.llm import LLMError, parse_structured
 from app.core.config import get_settings
 from app.core.errors import ProfileNotEmbeddedError, ProfileNotFoundError
-from app.models import JobPosting, Match, Profile
+from app.models import JobPosting, JobSearch, Match, Profile, SearchPosting
 from app.schemas.job_search import JobPostingSummary, MatchingOutcome
 from app.schemas.matching import (
     MatchFilters,
@@ -118,20 +128,39 @@ def _priority_sort_expression(priority: float) -> ColumnElement[float]:
     return case((Match.role_fit.is_not(None), blended), else_=Match.vector_score)
 
 
+def scoped_corpus_exists(profile_id: uuid.UUID) -> ColumnElement[bool]:
+    """Postings found by this profile's own searches (v3 §2 D1 corpus).
+
+    EXISTS avoids DISTINCT over the append-only many-to-many: a posting
+    re-found by several of the profile's searches is scored once.
+    """
+    return exists(
+        select(SearchPosting.posting_id)
+        .select_from(SearchPosting)
+        .join(JobSearch, JobSearch.id == SearchPosting.search_id)
+        .where(SearchPosting.posting_id == JobPosting.id, JobSearch.profile_id == profile_id)
+    )
+
+
 async def rescore_matches(
     session: AsyncSession, profile: Profile, *, invalidate_rationales: bool
 ) -> int:
-    """Bulk re-score every embeddable posting against the profile (SQL only).
+    """Re-score the profile's scoped corpus against the profile (SQL only).
 
-    Writes one `match` row per posting (upsert). Existing re-rank sub-scores are
-    blended into the new final_score unless `invalidate_rationales` clears them.
-    Returns the number of scored postings; 0 when the profile has no embedding.
+    The corpus is only the postings found by the profile's own searches
+    (`search_posting → job_search.profile_id`) that have an embedding — never
+    the global corpus. Writes one `match` row per posting (upsert). Existing
+    re-rank sub-scores are blended into the new final_score unless
+    `invalidate_rationales` clears them. Returns the number of scored postings;
+    0 when the profile has no embedding.
     """
     if profile.embedding is None:
         return 0
     score = vector_score_expression(profile.embedding)
     result = await session.execute(
-        select(JobPosting.id, score.label("vector_score")).where(JobPosting.embedding.is_not(None))
+        select(JobPosting.id, score.label("vector_score")).where(
+            JobPosting.embedding.is_not(None), scoped_corpus_exists(profile.id)
+        )
     )
     rows = [
         {
@@ -182,8 +211,64 @@ async def refresh_matches_for_profile(
             status="skipped",
             warning="profile has no embedding; save the profile once the embedding provider works",
         )
+    return await rescore_and_rerank(session, profile)
+
+
+async def rescore_and_rerank(session: AsyncSession, profile: Profile) -> MatchingOutcome:
+    """Scoped rescore + re-rank of the rationale-less top N."""
     scored = await rescore_matches(session, profile, invalidate_rationales=False)
     return await _rerank_top_matches(session, profile, scored)
+
+
+async def count_corpus_postings(session: AsyncSession, profile_id: uuid.UUID) -> int:
+    """Size of the profile's scoped corpus: postings found by its own searches."""
+    return int(
+        (
+            await session.execute(
+                select(func.count()).select_from(JobPosting).where(scoped_corpus_exists(profile_id))
+            )
+        ).scalar_one()
+    )
+
+
+def _corpus_ids_subquery(profile_id: uuid.UUID) -> Select[tuple[uuid.UUID]]:
+    return (
+        select(JobPosting.id)
+        .join(SearchPosting, SearchPosting.posting_id == JobPosting.id)
+        .join(JobSearch, JobSearch.id == SearchPosting.search_id)
+        .where(JobSearch.profile_id == profile_id)
+    )
+
+
+async def count_out_of_corpus_matches(session: AsyncSession, profile_id: uuid.UUID) -> int:
+    """Stored matches for this profile whose posting is outside its scoped corpus."""
+    return int(
+        (
+            await session.execute(
+                select(func.count())
+                .select_from(Match)
+                .where(
+                    Match.profile_id == profile_id,
+                    Match.job_posting_id.not_in(_corpus_ids_subquery(profile_id)),
+                )
+            )
+        ).scalar_one()
+    )
+
+
+async def delete_out_of_corpus_matches(session: AsyncSession, profile_id: uuid.UUID) -> int:
+    """Drop matches whose posting is no longer in the profile's scoped corpus.
+
+    Only called on an explicit rebuild (D7): stale rows from the pre-#25
+    global corpus are removed the moment the user opts back in per profile.
+    """
+    result = await session.execute(
+        delete(Match).where(
+            Match.profile_id == profile_id,
+            Match.job_posting_id.not_in(_corpus_ids_subquery(profile_id)),
+        )
+    )
+    return int(result.rowcount or 0)
 
 
 async def _rerank_top_matches(

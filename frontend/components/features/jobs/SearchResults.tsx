@@ -4,9 +4,17 @@ import { Badge } from "@/components/ui/badge";
 import { isRunFinished, useSearchPostings } from "@/hooks/use-job-search";
 import { salaryLine } from "@/lib/salary";
 
-export function SearchResults({ searchId, status }: { searchId: string | null; status: string | undefined }) {
+export function SearchResults({
+  searchId,
+  profileId,
+  status,
+}: {
+  searchId: string | null;
+  profileId: string | null;
+  status: string | undefined;
+}) {
   const finished = isRunFinished(status);
-  const postings = useSearchPostings(searchId, finished);
+  const postings = useSearchPostings(searchId, profileId, finished);
 
   if (searchId === null || !finished) return null;
 

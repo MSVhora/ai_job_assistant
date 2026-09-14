@@ -90,6 +90,33 @@ Career tracks live side by side, and jobs found for one track must not leak into
   `search_posting` join table (unique per `(search_id, posting_id)`), replacing the old
   mutable pointer that a re-search used to overwrite. A posting re-found by a later
   search gains a new association row; earlier runs' results views are untouched.
+- **The URL carries the current profile.** On `/jobs` the selected profile is the
+  `?profile=` URL param (same convention as `/profile`); switching profiles resets the
+  run state and refetches that profile's matches.
+
+## Match corpus is per profile (live since #25)
+
+Matching only ever scores the profile's **own** corpus: the distinct postings found by
+searches whose owning `profile_id` is that profile. A posting found by profile A's
+searches is invisible to profile B's matches, even if the target roles overlap. A
+profile with no searches yet has an empty corpus and zero matches until its first run.
+
+Already ingested a global (pre-scoping) corpus of matches? Nothing is deleted
+automatically — rebuild is explicit per profile, and only appears when needed:
+
+- **Discrepancy detection** — the status endpoint reports `stale_count`: how many stored
+  matches for that profile are posts *not* found by that profile's own searches. The
+  rebuild affordance is hidden until this count is non-zero (or a rebuild run is active
+  or failed), so a clean profile shows no extra UI.
+- **"Rebuild matches for this profile"** (in the Global configuration dialog on `/jobs`,
+  next to the profile selector; also `POST /api/profiles/{id}/rebuild-matches`) refreshes
+  the profile embedding, scores the profile's scoped corpus, and **drops stored matches
+  whose posting is no longer in that corpus** — the cleanup for stale cross-profile rows.
+  `stale_count` returns to 0 afterwards and the affordance disappears.
+- The rebuild runs in the background; the run reports the corpus size (postings
+  found by the profile's searches) and how many were scored, with status queryable
+  afterwards via `GET /api/profiles/{id}/rebuild-matches` (returns `status: "idle"` with
+  the computed `stale_count` when the profile has never rebuilt).
 
 ## How matching content is prepared (live since #9)
 

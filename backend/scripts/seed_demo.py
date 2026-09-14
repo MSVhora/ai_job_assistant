@@ -25,7 +25,7 @@ from typing import Any
 import sqlalchemy as sa
 
 from app.core.db import session_factory
-from app.models import Candidate, JobPosting, Profile
+from app.models import Candidate, JobPosting, JobSearch, JobSearchStatus, Profile, SearchPosting
 from app.schemas.profile import StructuredProfile
 from app.services import matching
 
@@ -251,6 +251,18 @@ async def seed(count: int, *, rerank: bool) -> None:
 
         for row in _posting_rows(count):
             session.add(JobPosting(**row))
+        await session.flush()
+
+        postings = (await session.execute(sa.select(JobPosting))).scalars().all()
+        search = JobSearch(
+            profile_id=profile.id,
+            status=JobSearchStatus.succeeded,
+            query={"profile_id": str(profile.id)},
+        )
+        session.add(search)
+        await session.flush()
+        for posting in postings:
+            session.add(SearchPosting(search_id=search.id, posting_id=posting.id))
         await session.flush()
 
         scored = await matching.rescore_matches(session, profile, invalidate_rationales=True)

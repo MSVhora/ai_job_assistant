@@ -4,6 +4,7 @@ import { Modal } from "@/components/ui/modal";
 import { SearchForm } from "@/components/features/jobs/SearchForm";
 import { SourceMultiSelect } from "@/components/features/jobs/SourceMultiSelect";
 import { PrioritySlider } from "@/components/features/jobs/PrioritySlider";
+import { RebuildBanner } from "@/components/features/jobs/RebuildBanner";
 import { selectStyles } from "@/components/features/jobs/MatchFilterPanel";
 import type { PrioritySetting } from "@/hooks/use-priority-setting";
 import type { SourceInfo } from "@/lib/api";
@@ -96,6 +97,7 @@ export function GlobalConfigModal({
             />
           </div>
         </div>
+        <RebuildBanner profileId={activeProfileId} />
         <div className="flex flex-col gap-3">
           <SourceMultiSelect
             sources={sources}
@@ -131,7 +133,7 @@ function ProfileSelector({
       <p className="rounded-2xl border border-dashed border-violet-200 bg-violet-50/50 p-3 text-xs text-gray-600">
         {disabled
           ? "Loading profiles…"
-          : "No profile yet — searches run without one, but a profile seeds the queries. "}
+          : "No profile yet — select or create one before starting a search, because every run is scoped to its profile. "}
         {!disabled &&
           profiles.length === 0 && (
             <Link

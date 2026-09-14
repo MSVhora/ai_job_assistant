@@ -135,6 +135,14 @@ explicitly, since they outlive the request scope.
 `search_posting` join table (a posting re-found by a later search gains a row; nothing is
 overwritten), which also replaces the mutable `job_posting.job_search_id` pointer.
 
+**Scoped matching corpus + rebuild (v3 issue #25):** `rescore_matches` scores only the
+profile's own corpus (postings joined through `search_posting → job_search.profile_id`)
+— never the global postings table. Pre-scoping matches are never auto-deleted: the
+explicit `POST /api/profiles/{id}/rebuild-matches` runs the scoped rescore as a
+background task (status/metadata queryable via `GET`, banner shows corpus size) and
+deletes that profile's out-of-corpus matches. On `/jobs` the selected profile rides in
+the `?profile=` URL param and the search form refuses to submit without one.
+
 ## Source enablement (issue #8)
 
 Sources come from a code-level registry plus **`connectors.yaml`**-configured Apify actors
@@ -180,6 +188,7 @@ erDiagram
     job_search ||--o{ search_posting : "found by run"
     job_posting ||--o{ search_posting : "found in search"
     job_posting ||--o{ match : "produces"
+    profile ||--o{ match_rebuild : "rebuild runs"
 
     candidate {
         uuid id PK
@@ -271,6 +280,17 @@ erDiagram
         real company_fit "LLM re-rank 0-10, null when not re-ranked"
         real final_score "weighted blend when re-ranked, vector_score otherwise"
         text rationale "LLM why-this-matches, top N only; cleared when profile content changes"
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    match_rebuild {
+        uuid id PK
+        uuid profile_id FK "CASCADE"
+        text status "pending | running | succeeded | failed"
+        integer corpus_count "postings found by this profile's searches (scoped corpus size)"
+        integer scored_count "corpus postings that had embeddings to score"
+        text warning "degraded-notice, e.g. re-rank unavailable"
         timestamptz created_at
         timestamptz updated_at
     }

@@ -23,12 +23,14 @@ const STATUS_STYLES: Record<string, string> = {
 
 export function RunBanner({
   searchId,
+  profileId,
   onDismiss,
 }: {
   searchId: string | null;
+  profileId: string | null;
   onDismiss: () => void;
 }) {
-  const status = useJobSearchStatus(searchId);
+  const status = useJobSearchStatus(searchId, profileId);
 
   if (searchId === null) return null;
 

@@ -9,16 +9,15 @@ import {
   startJobSearch,
   type JobSearchRequest,
 } from "@/lib/api";
-
 const ACTIVE_STATUSES = new Set(["pending", "running"]);
 const POLL_INTERVAL_MS = 1500;
 const TERMINAL_STATUSES = new Set(["succeeded", "partial", "failed"]);
 
-export function useJobSearchStatus(searchId: string | null) {
+export function useJobSearchStatus(searchId: string | null, profileId: string | null) {
   return useQuery({
-    queryKey: ["job-search", searchId],
-    queryFn: () => getJobSearchStatus(searchId as string),
-    enabled: searchId !== null,
+    queryKey: ["job-search", searchId, profileId],
+    queryFn: () => getJobSearchStatus(searchId as string, profileId as string),
+    enabled: searchId !== null && profileId !== null,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
       return status !== undefined && ACTIVE_STATUSES.has(status) ? POLL_INTERVAL_MS : false;
@@ -26,11 +25,15 @@ export function useJobSearchStatus(searchId: string | null) {
   });
 }
 
-export function useSearchPostings(searchId: string | null, enabled: boolean) {
+export function useSearchPostings(
+  searchId: string | null,
+  profileId: string | null,
+  enabled: boolean,
+) {
   return useQuery({
-    queryKey: ["job-search-postings", searchId],
-    queryFn: () => getSearchPostings(searchId as string),
-    enabled: searchId !== null && enabled,
+    queryKey: ["job-search-postings", searchId, profileId],
+    queryFn: () => getSearchPostings(searchId as string, profileId as string),
+    enabled: searchId !== null && profileId !== null && enabled,
   });
 }
 

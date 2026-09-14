@@ -15,12 +15,31 @@ MatchSort = Literal["final_score", "vector_score", "posted_at"]
 __all__ = [
     "MatchFilters",
     "MatchQueryParams",
+    "MatchRebuildStatusResponse",
     "MatchResponse",
     "MatchSort",
     "RerankItem",
     "RerankResult",
     "MatchingOutcome",
 ]
+
+
+class MatchRebuildStatusResponse(BaseModel):
+    """Rebuild-run status; `id=None`, `status="idle"` when the profile never rebuilt.
+
+    `stale_count` is computed at read time: stored matches whose posting is
+    outside the profile's scoped corpus — the discrepancy the rebuild cleans.
+    """
+
+    id: uuid.UUID | None = None
+    profile_id: uuid.UUID
+    status: Literal["idle", "pending", "running", "succeeded", "failed"]
+    stale_count: int
+    corpus_count: int
+    scored_count: int
+    warning: str | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 class MatchFilters(BaseModel):

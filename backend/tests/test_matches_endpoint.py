@@ -15,7 +15,7 @@ from httpx import ASGITransport, AsyncClient
 
 from app.core.db import session_factory
 from app.main import app
-from app.models import JobPosting, Profile
+from app.models import JobPosting, JobSearch, JobSearchStatus, Profile, SearchPosting
 from app.schemas.profile import ProfileCreate, StructuredProfile
 from app.services import matching
 from app.services.profile_service import create_profile
@@ -97,7 +97,16 @@ async def seed_matched_profile(
             )
             session.add(posting)
             postings.append(posting)
-        await session.commit()
+        search = JobSearch(
+            profile_id=profile_id,
+            status=JobSearchStatus.succeeded,
+            query={"profile_id": str(profile_id)},
+        )
+        session.add(search)
+        await session.flush()
+        for posting in postings:
+            session.add(SearchPosting(search_id=search.id, posting_id=posting.id))
+        await session.flush()
         for posting in postings:
             await session.refresh(posting)
 
@@ -152,7 +161,16 @@ async def seed_subscored_profile(
             )
             session.add(posting)
             postings.append(posting)
-        await session.commit()
+        search = JobSearch(
+            profile_id=profile_id,
+            status=JobSearchStatus.succeeded,
+            query={"profile_id": str(profile_id)},
+        )
+        session.add(search)
+        await session.flush()
+        for posting in postings:
+            session.add(SearchPosting(search_id=search.id, posting_id=posting.id))
+        await session.flush()
         for posting in postings:
             await session.refresh(posting)
 

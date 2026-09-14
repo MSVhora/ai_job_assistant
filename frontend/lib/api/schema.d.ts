@@ -178,6 +178,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/profiles/{profile_id}/rebuild-matches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Rebuild Matches Status */
+        get: operations["get_rebuild_matches_status_api_profiles__profile_id__rebuild_matches_get"];
+        put?: never;
+        /** Rebuild Matches */
+        post: operations["rebuild_matches_api_profiles__profile_id__rebuild_matches_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/jobs/postings/{posting_id}": {
         parameters: {
             query?: never;
@@ -629,6 +647,39 @@ export interface components {
          * @enum {string}
          */
         JobType: "full_time" | "part_time" | "contract" | "internship" | "temporary";
+        /**
+         * MatchRebuildStatusResponse
+         * @description Rebuild-run status; `id=None`, `status="idle"` when the profile never rebuilt.
+         *
+         *     `stale_count` is computed at read time: stored matches whose posting is
+         *     outside the profile's scoped corpus — the discrepancy the rebuild cleans.
+         */
+        MatchRebuildStatusResponse: {
+            /** Id */
+            id?: string | null;
+            /**
+             * Profile Id
+             * Format: uuid
+             */
+            profile_id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "idle" | "pending" | "running" | "succeeded" | "failed";
+            /** Stale Count */
+            stale_count: number;
+            /** Corpus Count */
+            corpus_count: number;
+            /** Scored Count */
+            scored_count: number;
+            /** Warning */
+            warning?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            /** Updated At */
+            updated_at?: string | null;
+        };
         /** MatchResponse */
         MatchResponse: {
             /**
@@ -1477,6 +1528,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SearchQueriesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_rebuild_matches_status_api_profiles__profile_id__rebuild_matches_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchRebuildStatusResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rebuild_matches_api_profiles__profile_id__rebuild_matches_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MatchRebuildStatusResponse"];
                 };
             };
             /** @description Validation Error */

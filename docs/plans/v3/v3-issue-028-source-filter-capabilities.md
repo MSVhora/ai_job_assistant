@@ -1,6 +1,6 @@
 # Issue #28 — Source filter capabilities: declarations, validation, connector mapping (M3)
 
-**Status:** Planned
+**Status:** Done (merged)
 **Tracks:** GitHub issue #28 (milestone `v3`, M3 advanced filters — backend part)
 **Plan of record:** [v3-implementation-plan.md](v3-implementation-plan.md) §2 D5, D6; §3 (capability tables); §4 M3
 **Depends on:** #27 (merged — `max_days_old`, `date_posted_bucket` seam, `{date_posted_bucket}` placeholder all exist and are designed to be absorbed by this issue)

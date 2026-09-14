@@ -11,7 +11,7 @@ def build_connector_query(
     """Map a per-source spec + shared filters into the connector's query object.
 
     Spec fields are set for every source; each connector consumes only what it
-    supports (capability table in docs/plans/v1-llm-source-queries.md).
+    supports (capability table in docs/plans/v1/v1-llm-source-queries.md).
     """
     effective_query = _effective_query(spec, base_query)
     kwargs: dict[str, object] = {

@@ -8,7 +8,7 @@ Detailed per-area standards live in `docs/instructions/` and are loaded automati
 AI Job Assistant — self-hosted, single-user, BYOK (bring-your-own-key) web app:
 resume upload → AI-extracted, human-reviewed profile → multi-source job discovery → ranked matches with explanations.
 
-- **Plan of record:** `docs/plans/v1-implementation-plan.md` — read it before non-trivial work. Do not silently drift from its scope; if something in it is wrong or changed, say so in the response.
+- **Plan of record:** `docs/plans/v1/v1-implementation-plan.md` — read it before non-trivial work. Do not silently drift from its scope; if something in it is wrong or changed, say so in the response.
 
 ## Stack
 
@@ -36,7 +36,7 @@ backend/
 frontend/
   app/, components/ (ui/ + features/), lib/, hooks/
 docs/instructions/  # coding standards (always loaded)
-docs/plans/         # versioned implementation plans
+docs/plans/         # versioned implementation plans (v1/, v2/, v3/ per-version folders)
 ```
 
 ## Non-negotiables

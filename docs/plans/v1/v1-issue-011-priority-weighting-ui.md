@@ -111,7 +111,7 @@ minutes.
 ### README + docs
 
 - README: walkthrough section + screenshot embed(s)
-- `docs/plans/v1-implementation-plan.md`: §4 amendment note (preferences column lands
+- `docs/plans/v1/v1-implementation-plan.md`: §4 amendment note (preferences column lands
   with #11); **§6 API surface gains `PATCH /api/profiles/{id}/preferences`**; §7/§8 stay
   as-is
 - `docs/architecture.md`: ER gains `profile.preferences`; the deferred-preferences note

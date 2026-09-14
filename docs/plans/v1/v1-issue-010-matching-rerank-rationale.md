@@ -122,7 +122,7 @@ token counts (adapter logs already carry token counts; the run outcome surfaces 
 
 ### Doc impact
 
-- `docs/plans/v1-implementation-plan.md`: §4 `match` sketch gains `role_fit`/`company_fit`
+- `docs/plans/v1/v1-implementation-plan.md`: §4 `match` sketch gains `role_fit`/`company_fit`
   + `updated_at` and the `job_search.matching` column (amendments flagged here for owner
   acceptance); §8 Day 9 stays as-is
 - `docs/architecture.md`: ER `match` entity — `candidate_id` → `profile_id`, new columns,

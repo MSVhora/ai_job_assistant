@@ -186,7 +186,7 @@ banner with the per-source reasons.
 | Adzuna | Official API | "Official API" | Free Adzuna key |
 | LinkedIn jobs scraper | Third-party scraper | "Third-party scraper" | Your Apify account — paid per result (~$1 / 1,000 results) |
 
-The [Setup page](../app/setup) lists every source with its badge always visible. Official
+The [Setup page](01-getting-started.md) lists every source with its badge always visible. Official
 API sources enable themselves once their keys exist; before a scraper-based source can be
 enabled you must **acknowledge its terms-of-use disclosure** in a modal. The badge stays
 visible on every job card so you always know where a listing came from. Scraping happens

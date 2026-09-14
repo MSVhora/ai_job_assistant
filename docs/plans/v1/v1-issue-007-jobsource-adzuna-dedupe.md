@@ -117,7 +117,7 @@ search
 
 ### Doc impact
 
-- `docs/plans/v1-implementation-plan.md`: §4 job_posting sketch annotated (`url` column,
+- `docs/plans/v1/v1-implementation-plan.md`: §4 job_posting sketch annotated (`url` column,
   `search_query_id` → `job_search_id`/`job_search` table)
 - `docs/architecture.md`: connector registry block + ER (job_search, job_posting) + API table
 - `docs/guide/03-job-discovery-and-matching.md`: mark search/ingestion/dedupe as landed;

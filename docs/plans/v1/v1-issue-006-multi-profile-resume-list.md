@@ -86,7 +86,7 @@ profile's `profile_revision` trail.
 
 ### Doc impact
 
-- `docs/plans/v1-implementation-plan.md`: §1 deferral row annotated (multi-profile → v1)
+- `docs/plans/v1/v1-implementation-plan.md`: §1 deferral row annotated (multi-profile → v1)
 - `docs/guide/02-upload-and-profile.md`: multi-profile flow, profiles/resumes lists,
   renamed paths
 - `docs/architecture.md`: ER gains `profile` (revisions re-parented, candidate slimmed);

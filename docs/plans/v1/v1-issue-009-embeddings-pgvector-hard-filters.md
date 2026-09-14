@@ -100,7 +100,7 @@ via `pgvector.sqlalchemy.Vector(768)`
 
 ### Doc impact
 
-- `docs/plans/v1-implementation-plan.md`: §4 sketch gains `profile.embedding` (amendment
+- `docs/plans/v1/v1-implementation-plan.md`: §4 sketch gains `profile.embedding` (amendment
   flagged here for owner acceptance); §8 Day 8 stays as-is
 - `docs/architecture.md`: ER annotations — "lands with issue #9" notes become landed
   state; profile entity gains the embedding attribute → re-render diagrams

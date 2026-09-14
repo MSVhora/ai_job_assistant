@@ -1,12 +1,12 @@
 # 2 — Upload & Profile Review
 
 **Status: shipped** — resume upload + text extraction
-([issue #2](../plans/v1-issue-002-resume-upload.md)), LLM extraction to a reviewable draft
-([issue #3](../plans/v1-issue-003-llm-extraction.md)), the review/edit UI with the
-`profile_revision` audit trail ([issue #4](../plans/v1-issue-004-profile-persistence-review-ui.md)),
+([issue #2](../plans/v1/v1-issue-002-resume-upload.md)), LLM extraction to a reviewable draft
+([issue #3](../plans/v1/v1-issue-003-llm-extraction.md)), the review/edit UI with the
+`profile_revision` audit trail ([issue #4](../plans/v1/v1-issue-004-profile-persistence-review-ui.md)),
 multi-profile tracks with the resume list
-([issue #6](../plans/v1-issue-006-multi-profile-resume-list.md)), and conversational gap-fill
-([issue #5](../plans/v1-issue-005-gap-fill.md)) are live — and since the search-queries
+([issue #6](../plans/v1/v1-issue-006-multi-profile-resume-list.md)), and conversational gap-fill
+([issue #5](../plans/v1/v1-issue-005-gap-fill.md)) are live — and since the search-queries
 follow-up, extraction also drafts **per-source search queries** from the profile (a second
 small LLM call; a failure there never fails the extraction, and [Regenerate on the jobs
 page](03-job-discovery-and-matching.md) refills them anytime). This guide describes the

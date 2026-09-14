@@ -2,7 +2,7 @@
 
 **Status:** Planned
 **Tracks:** GitHub issues #4, #5, #8, #11 (frontend scope) — issue #2 is backend-only
-**Plan of record:** [v1-implementation-plan.md](v1-implementation-plan.md) §7 (pages), [frontend standards](../instructions/frontend-nextjs.md)
+**Plan of record:** [v1-implementation-plan.md](v1-implementation-plan.md) §7 (pages), [frontend standards](../../instructions/frontend-nextjs.md)
 **Doc impact:** this plan doc + page-flow diagram; guides 02/03 updated as pages land
 
 ---
@@ -60,7 +60,7 @@ flowchart TD
     J --> M["Background run →<br/>ranked matches + rationale"]
 ```
 
-![ui-page-flow diagram](../assets/ui-page-flow.svg)
+![ui-page-flow diagram](../../assets/ui-page-flow.svg)
 
 ## 4. Design system
 

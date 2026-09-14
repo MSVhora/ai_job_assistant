@@ -149,7 +149,7 @@ per-source results/warnings live.
 
 ### Doc impact
 
-- `docs/plans/v1-implementation-plan.md`: amend §1 deferral table (LinkedIn actor moved
+- `docs/plans/v1/v1-implementation-plan.md`: amend §1 deferral table (LinkedIn actor moved
   into v1 via owner decision 2026-09-01), §5 sketch (one `apify_linkedin` entry; Google
   Jobs/Indeed deferred), §9 acceptance ("all 3 sources" → "both v1 sources")
 - `docs/architecture.md`: `source_state` in the ER + endpoints table + connectors.yaml/Apify

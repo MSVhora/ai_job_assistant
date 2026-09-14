@@ -5,8 +5,12 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 import { SearchResults } from "@/components/features/jobs/SearchResults";
-import { RunBanner } from "@/components/features/jobs/RunBanner";
-import { GlobalConfigModal, GlobalConfigTrigger } from "@/components/features/jobs/GlobalConfigModal";
+import { RunBanners } from "@/components/features/jobs/RunBanners";
+import { RebuildBanner } from "@/components/features/jobs/RebuildBanner";
+import {
+  SearchStepperModal,
+  StartSearchButton,
+} from "@/components/features/jobs/SearchStepperModal";
 import {
   DEFAULT_MATCH_FILTERS,
   type MatchFilterValues,
@@ -40,10 +44,11 @@ function FunnelIcon() {
 }
 
 export function JobsPageClient() {
-  const [searchId, setSearchId] = useState<string | null>(null);
+  const [searchIds, setSearchIds] = useState<string[]>([]);
+  const [selectedSearchId, setSelectedSearchId] = useState<string | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<MatchResponse | null>(null);
   const [filters, setFilters] = useState<MatchFilterValues>(DEFAULT_MATCH_FILTERS);
-  const [configOpen, setConfigOpen] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const urlProfileId = searchParams.get("profile");
@@ -53,7 +58,7 @@ export function JobsPageClient() {
   const fallbackProfileId =
     urlProfileId === null ? (profilesList[0]?.profile_id ?? null) : urlProfileId;
   const activeProfileId = fallbackProfileId;
-  const runStatus = useJobSearchStatus(searchId, activeProfileId);
+  const selectedRunStatus = useJobSearchStatus(selectedSearchId, activeProfileId);
   const setup = useSetupCheck();
   const selection: MatchSelection = {
     match: selectedMatch,
@@ -65,26 +70,14 @@ export function JobsPageClient() {
     setSelectedMatch(null);
   };
   const selectProfile = (profileId: string) => {
-    setSearchId(null);
+    setSearchIds([]);
+    setSelectedSearchId(null);
     setSelectedMatch(null);
     void router.replace(`/jobs?profile=${profileId}`);
   };
 
   const priority = usePrioritySetting(activeProfileId);
-  const enabledSources = sources.data?.filter((source) => source.enabled) ?? [];
-  const [selectedSources, setSelectedSources] = useState<string[] | null>(null);
-  const effectiveSelectedSources = selectedSources ?? enabledSources.map((s) => s.name);
-
-  const toggleSource = (name: string, checked: boolean) => {
-    setSelectedSources((current) => {
-      const base = current ?? enabledSources.map((s) => s.name);
-      return checked
-        ? base.includes(name)
-          ? base
-          : [...base, name]
-        : base.filter((source) => source !== name);
-    });
-  };
+  const enabled = sources.data?.filter((source) => source.enabled) ?? [];
 
   if (sources.isPending) {
     return (
@@ -113,7 +106,6 @@ export function JobsPageClient() {
     );
   }
 
-  const enabled = sources.data.filter((source) => source.enabled);
   if (enabled.length === 0) {
     return (
       <Card title="No sources enabled yet">
@@ -171,8 +163,9 @@ export function JobsPageClient() {
             priority={priority}
           />
         </div>
-        <div className="shrink-0 border-t border-gray-100 p-3">
-          <GlobalConfigTrigger onClick={() => setConfigOpen(true)} />
+        <div className="flex shrink-0 flex-col gap-2 border-t border-gray-100 p-3">
+          <RebuildBanner profileId={activeProfileId} />
+          <StartSearchButton onClick={() => setSearchOpen(true)} />
         </div>
       </aside>
 
@@ -213,12 +206,12 @@ export function JobsPageClient() {
             </p>
           </Card>
         )}
-        <RunBanner
-          searchId={searchId}
+        <RunBanners
+          searchIds={searchIds}
           profileId={activeProfileId}
-          onDismiss={() => {
-            setSearchId(null);
-          }}
+          onDismiss={(searchId) =>
+            setSearchIds((current) => current.filter((id) => id !== searchId))
+          }
         />
         <MatchList
           profileId={activeProfileId}
@@ -227,7 +220,11 @@ export function JobsPageClient() {
           filters={filters}
           onFiltersChange={changeFilters}
         />
-        <SearchResults searchId={searchId} profileId={activeProfileId} status={runStatus.data?.status} />
+        <SearchResults
+          searchId={selectedSearchId}
+          profileId={activeProfileId}
+          status={selectedRunStatus.data?.status}
+        />
       </div>
 
       {selectedMatch !== null && (
@@ -236,20 +233,19 @@ export function JobsPageClient() {
         </div>
       )}
 
-      <GlobalConfigModal
-        open={configOpen}
-        onOpenChange={setConfigOpen}
+      <SearchStepperModal
+        open={searchOpen}
+        onOpenChange={setSearchOpen}
         profilesPending={profiles.isPending}
         profilesError={profiles.isError}
         profilesList={profilesList}
         activeProfileId={activeProfileId}
         onSelectProfile={selectProfile}
         sources={enabled}
-        selectedSources={effectiveSelectedSources}
-        onToggleSource={toggleSource}
-        onSearchStarted={(id) => {
-          setSearchId(id);
-          setConfigOpen(false);
+        onSearchStarted={(searchId) => {
+          setSearchIds((current) => [...current, searchId]);
+          setSelectedSearchId(searchId);
+          setSearchOpen(false);
         }}
       />
     </div>

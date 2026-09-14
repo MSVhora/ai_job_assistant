@@ -358,6 +358,7 @@ export function TextField({
   badge,
   placeholder,
   type,
+  hint,
 }: {
   label: string;
   name: string;
@@ -365,10 +366,11 @@ export function TextField({
   badge?: ReactNode;
   placeholder?: string;
   type?: string;
+  hint?: string;
 }) {
   const { register } = useFormContext<ProfileFormValues>();
   return (
-    <Field label={label} htmlFor={name} error={error} badge={badge}>
+    <Field label={label} htmlFor={name} error={error} badge={badge} hint={hint}>
       <Input
         id={name}
         type={type}

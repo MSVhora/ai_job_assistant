@@ -201,6 +201,23 @@ options; OpenAPI types regenerated (`npm run generate:api`).
 | #27 | Freshness at query time: `max_days_old` → Adzuna / `datePosted` → LinkedIn + form field (M2) | v3 |
 | #28 | Source filter capabilities: declarations, validation, connector mapping (M3) | v3 |
 | #29 | Capability-driven search UI: ui primitives + generic per-source filter form (M3) | v3 |
+| #30 | Search initiation stepper (one source per run, parallel runs OK) + profile country persistence fix | v3 |
+
+### Scope addition (owner, 2026-09-15 — issue #30)
+
+Post-plan addition, owner-approved in
+[v3-issue-030-search-stepper-ui-and-country-persistence.md](v3-issue-030-search-stepper-ui-and-country-persistence.md):
+
+1. **Search initiation as a stepper, one source per run.** The Global configuration
+   dialog (delivered through #29) is replaced by a Start-search button + 4-step
+   wizard (profile → source → details → advanced filters). `JobSearchRequest`
+   moves from `sources: list[str]` to a required single `source`; parallel runs on
+   different sources remain allowed (no concurrency guard). All capability-driven
+   filter UI from #28/#29 is reused unchanged in step 4.
+2. **Bug fix:** chat-set `contact.country` is silently wiped by any manual profile
+   save — the frontend form model (`profile-schema.ts`) omits the field, so
+   `toProfilePayload()` rebuilds `contact` without it and the backend defaults it
+   back to `None`. Fix is frontend-only; no migration.
 
 Process fixes adopted from the v1/v2 retro: each issue's plan doc
 (`v3-issue-0NN-*.md`) is written and reviewed **before** implementation; each GitHub

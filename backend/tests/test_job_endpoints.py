@@ -34,6 +34,7 @@ async def test_search_start_and_status_flow(
             "profile_id": str(profile_id),
             "location": "Berlin",
             "country": "de",
+            "source": "adzuna",
         },
     )
     assert response.status_code == 202
@@ -56,7 +57,7 @@ async def test_search_start_and_status_flow(
         "salary_min": None,
         "salary_max": None,
         "salary_currency": None,
-        "sources": None,
+        "source": "adzuna",
     }
     assert status["results"] == [{"source": "adzuna", "status": "ok", "count": 1, "warning": None}]
 
@@ -71,7 +72,12 @@ async def test_search_persists_postings_and_associations(
     start = (
         await client.post(
             "/api/jobs/search",
-            json={"query": "data", "profile_id": str(profile_id), "country": "de"},
+            json={
+                "query": "data",
+                "profile_id": str(profile_id),
+                "country": "de",
+                "source": "adzuna",
+            },
         )
     ).json()
 
@@ -89,7 +95,9 @@ async def test_search_persists_postings_and_associations(
 
 
 async def test_search_without_profile_id_returns_400(client: AsyncClient) -> None:
-    response = await client.post("/api/jobs/search", json={"query": "data", "country": "de"})
+    response = await client.post(
+        "/api/jobs/search", json={"query": "data", "country": "de", "source": "adzuna"}
+    )
     assert response.status_code == 400
     assert "profile_id is required" in response.json()["detail"]
 
@@ -97,7 +105,12 @@ async def test_search_without_profile_id_returns_400(client: AsyncClient) -> Non
 async def test_search_with_unknown_profile_returns_404(client: AsyncClient) -> None:
     response = await client.post(
         "/api/jobs/search",
-        json={"query": "data", "country": "de", "profile_id": str(uuid.uuid4())},
+        json={
+            "query": "data",
+            "country": "de",
+            "profile_id": str(uuid.uuid4()),
+            "source": "adzuna",
+        },
     )
     assert response.status_code == 404
     assert "profile not found" in response.json()["detail"]
@@ -117,6 +130,7 @@ async def test_search_records_max_days_old_and_validates_bounds(
             "query": "python developer",
             "profile_id": str(profile_id),
             "country": "de",
+            "source": "adzuna",
             "max_days_old": 7,
         },
     )
@@ -134,6 +148,7 @@ async def test_search_records_max_days_old_and_validates_bounds(
             "query": "python developer",
             "profile_id": str(profile_id),
             "country": "de",
+            "source": "adzuna",
             "max_days_old": 91,
         },
     )
@@ -144,13 +159,14 @@ async def test_search_records_max_days_old_and_validates_bounds(
             "query": "python developer",
             "profile_id": str(profile_id),
             "country": "de",
+            "source": "adzuna",
             "max_days_old": 0,
         },
     )
     assert zero.status_code == 422
 
 
-async def test_search_without_configured_sources_returns_400(
+async def test_search_with_unconfigured_source_returns_409(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     profile_id = await seed_profile_light("Owner")
@@ -160,11 +176,11 @@ async def test_search_without_configured_sources_returns_400(
 
     response = await client.post(
         "/api/jobs/search",
-        json={"query": "data", "profile_id": str(profile_id), "country": "de"},
+        json={"query": "data", "profile_id": str(profile_id), "country": "de", "source": "adzuna"},
     )
 
-    assert response.status_code == 400
-    assert "no job sources" in response.json()["detail"]
+    assert response.status_code == 409
+    assert "not enabled" in response.json()["detail"]
 
 
 async def test_search_with_unknown_source_returns_400(
@@ -177,7 +193,7 @@ async def test_search_with_unknown_source_returns_400(
             "query": "data",
             "profile_id": str(profile_id),
             "country": "de",
-            "sources": ["not_a_source"],
+            "source": "not_a_source",
         },
     )
 
@@ -198,6 +214,7 @@ async def test_search_rejects_invalid_source_options(
             "query": "python developer",
             "profile_id": str(profile_id),
             "country": "de",
+            "source": "adzuna",
             "source_queries": {
                 "adzuna": {"options": {"bogus_filter": 1}},
             },
@@ -227,6 +244,7 @@ async def test_search_accepts_declared_source_options(
             "query": "python developer",
             "profile_id": str(profile_id),
             "country": "de",
+            "source": "adzuna",
             "source_queries": {"adzuna": {"options": {"title_only": True}}},
         },
     )
@@ -247,7 +265,7 @@ async def test_search_requires_effective_query_per_source(
 
     response = await client.post(
         "/api/jobs/search",
-        json={"country": "de", "profile_id": str(profile_id), "sources": ["adzuna"]},
+        json={"country": "de", "profile_id": str(profile_id), "source": "adzuna"},
     )
 
     assert response.status_code == 400
@@ -267,7 +285,7 @@ async def test_search_accepts_per_source_specs_and_salary(
             "country": "in",
             "profile_id": str(profile_id),
             "location": "Bangalore",
-            "sources": ["adzuna"],
+            "source": "adzuna",
             "source_queries": {
                 "adzuna": {"title": "Senior Android Engineer", "skills": ["Kotlin"]}
             },
@@ -285,7 +303,13 @@ async def test_search_accepts_per_source_specs_and_salary(
 async def test_search_rejects_inverted_salary_range(client: AsyncClient) -> None:
     response = await client.post(
         "/api/jobs/search",
-        json={"query": "data", "country": "de", "salary_min": 100, "salary_max": 50},
+        json={
+            "query": "data",
+            "country": "de",
+            "salary_min": 100,
+            "salary_max": 50,
+            "source": "adzuna",
+        },
     )
 
     assert response.status_code == 422
@@ -304,7 +328,7 @@ async def test_search_with_unacknowledged_scraper_returns_409(
             "query": "data",
             "profile_id": str(profile_id),
             "country": "de",
-            "sources": ["apify_linkedin"],
+            "source": "apify_linkedin",
         },
     )
 
@@ -315,7 +339,7 @@ async def test_search_with_unacknowledged_scraper_returns_409(
 async def test_search_validates_country(client: AsyncClient) -> None:
     response = await client.post(
         "/api/jobs/search",
-        json={"query": "data", "country": "germany"},
+        json={"query": "data", "country": "germany", "source": "adzuna"},
     )
 
     assert response.status_code == 422
@@ -330,7 +354,7 @@ async def test_search_normalizes_country(
 
     response = await client.post(
         "/api/jobs/search",
-        json={"query": "data", "profile_id": str(profile_id), "country": "DE"},
+        json={"query": "data", "profile_id": str(profile_id), "country": "DE", "source": "adzuna"},
     )
 
     assert response.status_code == 202
@@ -342,7 +366,12 @@ async def test_search_status_requires_profile_id(client: AsyncClient) -> None:
     start = (
         await client.post(
             "/api/jobs/search",
-            json={"query": "data", "profile_id": str(profile_id), "country": "de"},
+            json={
+                "query": "data",
+                "profile_id": str(profile_id),
+                "country": "de",
+                "source": "adzuna",
+            },
         )
     ).json()
 
@@ -372,7 +401,12 @@ async def test_search_postings_endpoint(
     start = (
         await client.post(
             "/api/jobs/search",
-            json={"query": "data", "profile_id": str(profile_id), "country": "de"},
+            json={
+                "query": "data",
+                "profile_id": str(profile_id),
+                "country": "de",
+                "source": "adzuna",
+            },
         )
     ).json()
 

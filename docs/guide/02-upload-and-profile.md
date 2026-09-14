@@ -135,10 +135,13 @@ Nothing in the flow dead-ends — every failure has an explicit recovery path:
    profile, or save as a new one (named — e.g. "Senior Android Developer" vs "Senior
    Software Engineer"). Every correction lands in that profile's `profile_revision` trail.
 3. **Fill the gaps** *(live)* — on the profile page, a short chat asks *only* about genuinely
-    missing fields (typically: target location, remote preference, salary band, seniority, work
-    authorization). Answers are pydantic-validated before anything is saved, each applied turn
+    missing fields (typically: country, target location, remote preference, salary band, seniority,
+    work authorization). Answers are pydantic-validated before anything is saved, each applied turn
     lands in `profile_revision` with source `gap_fill`, and the editor form stays in sync with
     what the chat saved.
+    The manual-edit form carries the country too: the **Country code** field in the Contact
+    section (ISO 3166-1 alpha-2, e.g. `de`) round-trips with every save, so a country the
+    chat set survives later manual edits (fixed in v3 #30 — it used to be silently wiped).
 4. **Done** — each profile is an independent track for job discovery and matching.
    Re-uploading a newer resume opens a merge/diff review per profile; nothing is
    overwritten until you explicitly save the merge.

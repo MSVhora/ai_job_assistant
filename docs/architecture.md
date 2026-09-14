@@ -102,10 +102,10 @@ sequenceDiagram
     participant G as Gemini (LiteLLM)
     participant D as Postgres + pgvector
 
-    B->>A: POST /api/jobs/search (incl. max_days_old freshness filter)
+    B->>A: POST /api/jobs/search (one source per run, with profile_id and filters)
     A-->>B: background run accepted
     A->>D: job_search row (status + per-source outcomes)
-    A->>C: query enabled sources (freshness: Adzuna max_days_old, LinkedIn datePosted bucket)
+    A->>C: query the run's single source (freshness: Adzuna max_days_old, LinkedIn datePosted bucket)
     C-->>A: raw postings (failures skip + warn)
     A->>A: normalize + dedupe (source, external_id) — upsert refresh
     A->>G: embed descriptions
@@ -125,6 +125,12 @@ and are tracked in `job_search` (status + per-source `{source, status, count, wa
 outcomes, queryable via `GET /api/jobs/searches/{id}`). A failing source is a run warning,
 never an error. Background runs open fresh sessions from `session_factory` and commit
 explicitly, since they outlive the request scope.
+
+**One source per run (v3 issue #30):** `JobSearchRequest.source` is a required single
+source (no more `sources` list); `source_queries` may only refine that source (mismatched
+keys → 422). The UI's Start search wizard enforces the same shape; parallel runs on other
+sources are allowed (no concurrency guard — runs are independent). With a single source a
+run is `succeeded` or `failed` — the `partial` status remains only for older stored rows.
 
 **Profile scoping (v3 issue #24):** every search is owned by a profile —
 `JobSearchRequest.profile_id` is required (400 when absent, 404 for an unknown profile),

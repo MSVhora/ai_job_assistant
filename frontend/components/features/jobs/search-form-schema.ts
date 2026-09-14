@@ -14,13 +14,14 @@ export type QueryFieldValues = {
 export type PostedWithinValue = "any" | "1" | "7" | "30";
 
 export type SearchFormValues = {
-  queries: Record<string, QueryFieldValues>;
+  query: QueryFieldValues;
+  source: string;
   location: string;
   country: string;
   minSalary: string;
+  maxSalary: string;
   posted_within: PostedWithinValue;
   results_wanted: number;
-  sources: string[];
 };
 
 export const POSTED_WITHIN_OPTIONS: { value: PostedWithinValue; label: string }[] = [
@@ -60,55 +61,46 @@ function optionSchemaFor(decl: SourceFilterDecl): z.ZodType {
   }
 }
 
-export function makeSearchFormSchema(sources: SourceInfo[]) {
-  const optionSchemas = new Map<string, Record<string, z.ZodType>>();
-  for (const source of sources) {
-    const fields: Record<string, z.ZodType> = {};
-    for (const decl of source.filters ?? []) {
-      fields[decl.key] = optionSchemaFor(decl);
-    }
-    optionSchemas.set(source.name, fields);
+export function makeSearchFormSchema(source: SourceInfo | null) {
+  const optionSchemas = new Map<string, z.ZodType>();
+  for (const decl of source?.filters ?? []) {
+    optionSchemas.set(decl.key, optionSchemaFor(decl));
   }
   return z.object({
-    queries: z
-      .record(
-        z.string(),
-        z.object({
-          title: z.string(),
-          skills: z.string(),
-          exclude: z.string(),
-          options: z.record(z.string(), z.union([z.string(), z.boolean()])),
-        }),
-      )
-      .superRefine((queries, ctx) => {
-        for (const [name, query] of Object.entries(queries)) {
-          const schemas = optionSchemas.get(name) ?? {};
-          const keys = Object.keys(query.options);
-          if (keys.length > MAX_OPTIONS) {
-            ctx.addIssue({ code: "custom", path: [name, "options"], message: "Too many filters" });
+    query: z
+      .object({
+        title: z.string().max(80, "Keep the title under 80 characters"),
+        skills: z.string(),
+        exclude: z.string(),
+        options: z.record(z.string(), z.union([z.string(), z.boolean()])),
+      })
+      .superRefine((query, ctx) => {
+        const keys = Object.keys(query.options);
+        if (keys.length > MAX_OPTIONS) {
+          ctx.addIssue({ code: "custom", path: ["options"], message: "Too many filters" });
+          return;
+        }
+        for (const key of keys) {
+          const schema = optionSchemas.get(key);
+          if (!schema) {
+            ctx.addIssue({
+              code: "custom",
+              path: ["options", key],
+              message: "This source does not declare that filter",
+            });
             continue;
           }
-          for (const key of keys) {
-            const schema = schemas[key];
-            if (!schema) {
-              ctx.addIssue({
-                code: "custom",
-                path: [name, "options", key],
-                message: "This source does not declare that filter",
-              });
-              continue;
-            }
-            const result = schema.safeParse(query.options[key]);
-            if (!result.success) {
-              ctx.addIssue({
-                code: "custom",
-                path: [name, "options", key],
-                message: result.error.issues[0]?.message ?? "Invalid value",
-              });
-            }
+          const result = schema.safeParse(query.options[key]);
+          if (!result.success) {
+            ctx.addIssue({
+              code: "custom",
+              path: ["options", key],
+              message: result.error.issues[0]?.message ?? "Invalid value",
+            });
           }
         }
       }),
+    source: z.string(),
     location: z.string().max(200, "Keep the location under 200 characters"),
     country: z
       .string()
@@ -120,17 +112,19 @@ export function makeSearchFormSchema(sources: SourceInfo[]) {
       .refine((value) => value.trim() === "" || Number.isFinite(Number(value.trim())), {
         message: "Must be a number",
       }),
+    maxSalary: z
+      .string()
+      .refine((value) => value.trim() === "" || Number.isFinite(Number(value.trim())), {
+        message: "Must be a number",
+      }),
     posted_within: z.enum(["any", "1", "7", "30"]),
     results_wanted: z.coerce
       .number()
       .int("Whole number only")
       .min(1, "At least 1 result")
       .max(50, "Up to 50 results per search"),
-    sources: z.array(z.string()).min(1, "Pick at least one source"),
   });
 }
-
-export const searchFormSchema = makeSearchFormSchema([]);
 
 export function emptyQueryFields(): QueryFieldValues {
   return { title: "", skills: "", exclude: "", options: {} };
@@ -175,22 +169,14 @@ export function seedSpec(profile: StructuredProfile): { title: string; skills: s
   return { title, skills: picked };
 }
 
-export function supportsExclusions(sources: SourceInfo[], name: string): boolean {
-  return sources.find((source) => source.name === name)?.supports_exclusions ?? false;
-}
-
-export function declaredFilters(sources: SourceInfo[], name: string): SourceFilterDecl[] {
-  return sources.find((source) => source.name === name)?.filters ?? [];
-}
-
 type StoredQuerySpec = NonNullable<NonNullable<JobSearchRequest["source_queries"]>[string]>;
 type StoredOptions = NonNullable<StoredQuerySpec["options"]>;
 
 export function optionsFromStored(
   stored: StoredOptions | undefined,
-  source: SourceInfo,
+  source: SourceInfo | null,
 ): OptionValues {
-  if (!stored) return {};
+  if (!stored || source === null) return {};
   const options: OptionValues = {};
   for (const decl of source.filters ?? []) {
     const value = stored[decl.key];
@@ -238,48 +224,50 @@ function coerceOptions(
 
 export function toSearchRequest(
   values: SearchFormValues,
-  sources: SourceInfo[],
+  source: SourceInfo | null,
   profileCurrency: string | null,
   profileId: string | null,
 ): { payload: JobSearchRequest; missing: string[] } {
-  const selected = values.sources;
-  const sourceQueries: JobSearchRequest["source_queries"] = {};
   const missing: string[] = [];
   if (profileId === null) {
     missing.push("profile");
   }
-  for (const name of selected) {
-    const fields = values.queries[name] ?? emptyQueryFields();
-    const title = fields.title.trim();
-    const skills = splitList(fields.skills);
-    const options = coerceOptions(fields, declaredFilters(sources, name));
-    if (title === "" && skills.length === 0 && Object.keys(options).length === 0) {
-      missing.push(name);
-      continue;
-    }
-    sourceQueries[name] = {
-      title: title || undefined,
-      skills: skills.length > 0 ? skills : undefined,
-      exclude:
-        supportsExclusions(sources, name) && splitList(fields.exclude).length > 0
-          ? splitList(fields.exclude)
-          : undefined,
-      options: Object.keys(options).length > 0 ? options : undefined,
-    };
+  if (values.source === "" || source === null) {
+    missing.push("source");
   }
+  const fields = values.query ?? emptyQueryFields();
+  const title = fields.title.trim();
+  const skills = splitList(fields.skills);
+  const exclude = source?.supports_exclusions ? splitList(fields.exclude) : [];
+  const options = source !== null ? coerceOptions(fields, source.filters ?? []) : {};
+  const hasSpec = title !== "" || skills.length > 0 || Object.keys(options).length > 0;
+  if (missing.length === 0 && !hasSpec) {
+    missing.push(values.source);
+  }
+
   const minSalary = values.minSalary.trim();
+  const maxSalary = values.maxSalary.trim();
   const currency = profileCurrency && /^[A-Za-z]{3}$/.test(profileCurrency) ? profileCurrency : undefined;
+  const spec = hasSpec
+    ? {
+        title: title || undefined,
+        skills: skills.length > 0 ? skills : undefined,
+        exclude: exclude.length > 0 ? exclude : undefined,
+        options: Object.keys(options).length > 0 ? options : undefined,
+      }
+    : undefined;
+
   return {
     payload: {
       profile_id: profileId ?? undefined,
+      source: values.source,
       country: values.country,
       location: values.location.trim() === "" ? null : values.location.trim(),
-    results_wanted: values.results_wanted,
-    max_days_old:
-      values.posted_within === "any" ? undefined : Number(values.posted_within),
-    sources: selected,
-      source_queries: sourceQueries,
+      results_wanted: values.results_wanted,
+      max_days_old: values.posted_within === "any" ? undefined : Number(values.posted_within),
+      source_queries: spec !== undefined ? { [values.source]: spec } : undefined,
       salary_min: minSalary === "" ? undefined : Number(minSalary),
+      salary_max: maxSalary === "" ? undefined : Number(maxSalary),
       salary_currency: currency,
     },
     missing,

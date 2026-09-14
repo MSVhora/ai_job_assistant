@@ -582,12 +582,18 @@ export interface components {
             /** Currency */
             currency?: string | null;
         };
-        /** JobSearchRequest */
+        /**
+         * JobSearchRequest
+         * @description One search run targets exactly one source (`source`); `source_queries`,
+         *     when present, may only refine that source (extra keys are rejected).
+         */
         JobSearchRequest: {
             /** Query */
             query?: string | null;
             /** Profile Id */
             profile_id?: string | null;
+            /** Source */
+            source: string;
             /** Source Queries */
             source_queries?: {
                 [key: string]: components["schemas"]["SourceQuerySpec"];
@@ -609,8 +615,6 @@ export interface components {
             salary_max?: number | null;
             /** Salary Currency */
             salary_currency?: string | null;
-            /** Sources */
-            sources?: string[] | null;
         };
         /** JobSearchStartResponse */
         JobSearchStartResponse: {

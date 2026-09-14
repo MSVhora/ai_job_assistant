@@ -14,6 +14,7 @@ from app.adapters.job_sources.base import (
     JobPostingData,
     JobSearchQuery,
     RawJobPosting,
+    SourceFilterDecl,
 )
 from app.adapters.job_sources.config import ActorConfig, build_actor_input
 from app.adapters.retry import Transient, retry_after_header, retryable_status, with_retry
@@ -93,6 +94,9 @@ class ApifyActorSource:
 
     def is_configured(self) -> bool:
         return get_settings().apify_token is not None
+
+    def filters(self) -> list[SourceFilterDecl]:
+        return list(self._config.filters)
 
     async def search(self, query: JobSearchQuery) -> list[RawJobPosting]:
         token = get_settings().apify_token

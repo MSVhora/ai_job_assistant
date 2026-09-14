@@ -92,6 +92,11 @@ class UnknownJobSourceError(DomainError):
     default_detail = "unknown job source"
 
 
+class InvalidSourceFilterError(DomainError):
+    status_code = 400
+    default_detail = "invalid filter option for the selected source"
+
+
 class JobSearchNotFoundError(DomainError):
     status_code = 404
     default_detail = "job search not found"

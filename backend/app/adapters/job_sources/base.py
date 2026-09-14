@@ -2,11 +2,12 @@ import html
 import re
 from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Protocol
+from typing import Literal, Protocol
 
 import httpx
 from pydantic import BaseModel, Field, field_validator
 
+from app.core.errors import InvalidSourceFilterError
 from app.models import JobType, RemoteType
 
 
@@ -42,6 +43,27 @@ def parse_datetime(value: object) -> datetime | None:
     return datetime.fromtimestamp(seconds, tz=UTC)
 
 
+SourceFilterValue = str | int | bool | list[str]
+
+_MAX_OPTION_LIST_ITEMS = 50
+_MAX_OPTION_ITEM_LEN = 200
+
+
+class SourceFilterOption(BaseModel):
+    value: str = Field(min_length=1, max_length=100)
+    label: str = Field(min_length=1, max_length=100)
+
+
+class SourceFilterDecl(BaseModel):
+    key: str = Field(min_length=1, max_length=50, pattern=r"^[a-z][a-z0-9_]*$")
+    label: str = Field(min_length=1, max_length=100)
+    type: Literal["text", "number", "select", "multiselect", "boolean"]
+    options: list[SourceFilterOption] | None = None
+    required: bool = False
+    placeholder: str | None = Field(default=None, max_length=100)
+    help_text: str | None = Field(default=None, max_length=200)
+
+
 class JobSearchQuery(BaseModel):
     query: str = ""
     title_phrase: str | None = None
@@ -54,6 +76,7 @@ class JobSearchQuery(BaseModel):
     salary_min: float | None = Field(default=None, ge=0)
     salary_max: float | None = Field(default=None, ge=0)
     salary_currency: str | None = Field(default=None, pattern=r"^[A-Za-z]{3}$")
+    options: dict[str, "SourceFilterValue"] = Field(default_factory=dict)
 
     @field_validator("country", mode="after")
     @classmethod
@@ -110,9 +133,63 @@ class JobSource(Protocol):
 
     def is_configured(self) -> bool: ...
 
+    def filters(self) -> list[SourceFilterDecl]: ...
+
     async def search(self, query: JobSearchQuery) -> list[RawJobPosting]: ...
 
     def normalize(self, raw: RawJobPosting) -> JobPostingData: ...
 
 
 ClientFactory = Callable[[], httpx.AsyncClient]
+
+
+def _validate_option_value(decl: SourceFilterDecl, value: object) -> None:
+    noun = f"filter '{decl.key}'"
+    if decl.type == "number":
+        if type(value) is not int:
+            raise InvalidSourceFilterError(f"{noun} must be an integer")
+        return
+    if decl.type == "boolean":
+        if type(value) is not bool:
+            raise InvalidSourceFilterError(f"{noun} must be true or false")
+        return
+    if decl.type == "select":
+        allowed = {option.value for option in decl.options or []}
+        if type(value) is not str or value not in allowed:
+            allowed_list = ", ".join(sorted(allowed))
+            raise InvalidSourceFilterError(f"{noun} must be one of: {allowed_list}")
+        return
+    if decl.type == "multiselect":
+        if not isinstance(value, list) or not value:
+            raise InvalidSourceFilterError(f"{noun} must be a non-empty list of strings")
+        if any(type(item) is not str for item in value):
+            raise InvalidSourceFilterError(f"{noun} must be a non-empty list of strings")
+        if len(value) > _MAX_OPTION_LIST_ITEMS:
+            raise InvalidSourceFilterError(
+                f"{noun} must have at most {_MAX_OPTION_LIST_ITEMS} entries"
+            )
+        if any(len(item) == 0 or len(item) > _MAX_OPTION_ITEM_LEN for item in value):
+            raise InvalidSourceFilterError(
+                f"{noun} entries must be between 1 and {_MAX_OPTION_ITEM_LEN} characters"
+            )
+        return
+    if type(value) is not str or not value.strip():
+        raise InvalidSourceFilterError(f"{noun} must be a non-empty string")
+    if len(value) > _MAX_OPTION_ITEM_LEN:
+        raise InvalidSourceFilterError(f"{noun} must be at most {_MAX_OPTION_ITEM_LEN} characters")
+
+
+def validate_source_options(
+    declarations: list[SourceFilterDecl], options: dict[str, SourceFilterValue], source_name: str
+) -> None:
+    """Validate per-source option values against the source's declaration.
+
+    Raises InvalidSourceFilterError (400) naming the offending key; C{options} is
+    the request-side dict already capped by the schema (12 keys).
+    """
+    decls = {decl.key: decl for decl in declarations}
+    for key, value in options.items():
+        decl = decls.get(key)
+        if decl is None:
+            raise InvalidSourceFilterError(f"unknown filter '{key}' for source '{source_name}'")
+        _validate_option_value(decl, value)

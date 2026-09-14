@@ -231,7 +231,7 @@ async def test_extract_generates_search_queries(
     assert response.status_code == 200
     body = response.json()
     assert body["search_queries"]["queries"]["adzuna"]["title"] == "Senior Data Analyst"
-    assert body["search_queries"]["prompt_version"] == "search_query_v1"
+    assert body["search_queries"]["prompt_version"] == "search_query_v2"
     temperatures = [call["temperature"] for call in calls]
     assert 0.2 in temperatures and 0.8 in temperatures
     query_prompt = next(call for call in calls if call["temperature"] == 0.8)

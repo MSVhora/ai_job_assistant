@@ -10,7 +10,12 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.job_sources import registry
-from app.adapters.job_sources.base import ConnectorError, JobPostingData, JobSource
+from app.adapters.job_sources.base import (
+    ConnectorError,
+    JobPostingData,
+    JobSource,
+    validate_source_options,
+)
 from app.adapters.llm import LLMError
 from app.core.db import session_factory
 from app.core.errors import (
@@ -46,8 +51,10 @@ def _validate_queries(payload: JobSearchRequest, selected: list[JobSource]) -> N
             raise UnknownJobSourceError(f"unknown job source: {name}")
     for source in selected:
         spec = (payload.source_queries or {}).get(source.name)
-        if spec is not None and spec.has_content():
-            continue
+        if spec is not None:
+            validate_source_options(source.filters(), spec.options, source.name)
+            if spec.has_content():
+                continue
         if payload.query:
             continue
         raise MissingSearchQueryError(f"no search query for source: {source.name}")

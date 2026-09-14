@@ -6,12 +6,15 @@ from pydantic import BaseModel, Field, ValidationError
 from app.adapters.job_sources.base import (
     ConnectorConfigError,
     JobSearchQuery,
+    SourceFilterDecl,
     date_posted_bucket,
 )
 
 DEFAULT_CONFIG_PATH = Path(__file__).parent / "connectors.yaml"
 
 _PLACEHOLDER_KEYS = ("query", "location", "country", "results_wanted", "date_posted_bucket")
+
+_OPTION_PLACEHOLDER_PREFIX = "option:"
 
 _OMIT = object()
 
@@ -21,6 +24,7 @@ class ActorConfig(BaseModel):
     actor_id: str = Field(min_length=1)
     external_id_field: str = Field(min_length=1)
     input: dict[str, object] = Field(default_factory=dict)
+    filters: list[SourceFilterDecl] = Field(default_factory=list)
 
 
 class ConnectorsConfig(BaseModel):
@@ -38,7 +42,11 @@ def build_actor_input(actor: ActorConfig, query: JobSearchQuery) -> dict[str, ob
 
 def _resolve_value(value: object, query: JobSearchQuery) -> object:
     if isinstance(value, str) and value.startswith("{") and value.endswith("}"):
-        match value[1:-1]:
+        token = value[1:-1]
+        if token.startswith(_OPTION_PLACEHOLDER_PREFIX):
+            option_key = token.removeprefix(_OPTION_PLACEHOLDER_PREFIX)
+            return query.options.get(option_key, _OMIT)
+        match token:
             case "query":
                 return query.query
             case "location":
@@ -48,6 +56,9 @@ def _resolve_value(value: object, query: JobSearchQuery) -> object:
             case "results_wanted":
                 return query.results_wanted
             case "date_posted_bucket":
+                explicit = query.options.get("date_posted")
+                if type(explicit) is str:
+                    return explicit
                 return date_posted_bucket(query.max_days_old)
     return value
 
@@ -71,12 +82,28 @@ def load_actor_configs(path: Path = DEFAULT_CONFIG_PATH) -> list[ActorConfig]:
 
 
 def _validate_placeholders(actor: ActorConfig) -> None:
+    declared_option_keys = {decl.key for decl in actor.filters}
     for value in actor.input.values():
         if not isinstance(value, str):
             continue
         stripped = value.strip("{}")
-        if value.startswith("{") and value.endswith("}") and stripped not in _PLACEHOLDER_KEYS:
+        if not (value.startswith("{") and value.endswith("}")):
+            continue
+        if stripped.startswith(_OPTION_PLACEHOLDER_PREFIX):
+            option_key = stripped.removeprefix(_OPTION_PLACEHOLDER_PREFIX)
+            if option_key not in declared_option_keys:
+                raise ConnectorConfigError(
+                    f"actor {actor.name}: placeholder {{{stripped}}} declares no filter; "
+                    f"declared filters: {_describe_filters(actor)}"
+                )
+        elif stripped not in _PLACEHOLDER_KEYS:
             raise ConnectorConfigError(
                 f"actor {actor.name}: unknown placeholder {{{stripped}}} "
-                f"(supported: {_PLACEHOLDER_KEYS})"
+                f"(supported: {_PLACEHOLDER_KEYS} or {{option:<declared filter key>}})"
             )
+
+
+def _describe_filters(actor: ActorConfig) -> str:
+    if not actor.filters:
+        return "(none)"
+    return ", ".join(decl.key for decl in actor.filters)

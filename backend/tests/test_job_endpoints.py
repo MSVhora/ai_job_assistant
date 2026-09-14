@@ -185,6 +185,60 @@ async def test_search_with_unknown_source_returns_400(
     assert "unknown job source" in response.json()["detail"]
 
 
+async def test_search_rejects_invalid_source_options(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    profile_id = await seed_profile_light("Owner")
+    source = FakeJobSource("adzuna", configured=True, filters=[])
+    monkeypatch.setattr(registry, "all_sources", lambda: (source,))
+
+    response = await client.post(
+        "/api/jobs/search",
+        json={
+            "query": "python developer",
+            "profile_id": str(profile_id),
+            "country": "de",
+            "source_queries": {
+                "adzuna": {"options": {"bogus_filter": 1}},
+            },
+        },
+    )
+
+    assert response.status_code == 400
+    assert "unknown filter 'bogus_filter' for source 'adzuna'" in response.json()["detail"]
+
+
+async def test_search_accepts_declared_source_options(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.adapters.job_sources.base import SourceFilterDecl
+
+    profile_id = await seed_profile_light("Owner")
+    source = FakeJobSource(
+        "adzuna",
+        configured=True,
+        filters=[SourceFilterDecl(key="title_only", label="Title-only", type="boolean")],
+    )
+    monkeypatch.setattr(registry, "all_sources", lambda: (source,))
+
+    response = await client.post(
+        "/api/jobs/search",
+        json={
+            "query": "python developer",
+            "profile_id": str(profile_id),
+            "country": "de",
+            "source_queries": {"adzuna": {"options": {"title_only": True}}},
+        },
+    )
+
+    assert response.status_code == 202
+    search_id = response.json()["search_id"]
+    status = (
+        await client.get(f"/api/jobs/searches/{search_id}", params={"profile_id": profile_id})
+    ).json()
+    assert status["query"]["source_queries"]["adzuna"]["options"] == {"title_only": True}
+
+
 async def test_search_requires_effective_query_per_source(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -362,6 +416,37 @@ async def test_list_sources_includes_state(
     assert sources["adzuna"]["enabled"] is True
     assert sources["apify_linkedin"]["disclosure_required"] is True
     assert sources["apify_linkedin"]["enabled"] is False
+    assert sources["apify_linkedin"]["filters"] == []
+
+
+async def test_list_sources_includes_filter_declarations(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.adapters.job_sources.base import SourceFilterDecl
+
+    source = FakeJobSource(
+        "adzuna",
+        configured=True,
+        filters=[SourceFilterDecl(key="title_only", label="Title-only", type="boolean")],
+    )
+    monkeypatch.setattr(registry, "all_sources", lambda: (source,))
+
+    response = await client.get("/api/sources")
+
+    assert response.status_code == 200
+    [payload] = response.json()
+    assert payload["supports_exclusions"] is False
+    assert payload["filters"] == [
+        {
+            "key": "title_only",
+            "label": "Title-only",
+            "type": "boolean",
+            "options": None,
+            "required": False,
+            "placeholder": None,
+            "help_text": None,
+        }
+    ]
 
 
 async def test_enable_requires_acknowledgment(

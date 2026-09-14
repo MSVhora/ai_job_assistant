@@ -47,6 +47,7 @@ def _source_info(source: JobSource, acknowledged: set[str]) -> SourceInfoRespons
         enabled=source.is_configured()
         and (not source.disclosure_required or source.name in acknowledged),
         supports_exclusions=source.supports_exclusions,
+        filters=source.filters(),
     )
 
 

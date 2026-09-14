@@ -3,6 +3,7 @@ import json
 import pytest
 from fakes import VALID_PROFILE, install_acompletion, llm_response
 
+from app.adapters.job_sources.base import SourceFilterDecl, SourceFilterOption
 from app.core.config import get_settings
 from app.schemas.job_search import SourceQuerySpec
 from app.schemas.profile import StructuredProfile
@@ -13,6 +14,34 @@ from app.services.query_builder import (
 )
 
 pytestmark = pytest.mark.usefixtures("clean_tables")
+
+
+def adzuna_filters() -> list[SourceFilterDecl]:
+    return [
+        SourceFilterDecl(
+            key="sort_by",
+            label="Sort by",
+            type="select",
+            options=[
+                SourceFilterOption(value="relevance", label="Relevance"),
+                SourceFilterOption(value="date", label="Date"),
+                SourceFilterOption(value="salary", label="Salary"),
+            ],
+        )
+    ]
+
+
+def linkedin_filters() -> list[SourceFilterDecl]:
+    return [
+        SourceFilterDecl(
+            key="date_posted",
+            label="Date posted",
+            type="select",
+            options=[SourceFilterOption(value="pastWeek", label="Past week")],
+        ),
+        SourceFilterDecl(key="under_10_applicants", label="Few applicants", type="boolean"),
+    ]
+
 
 SPEC_PAYLOAD = {
     "queries": {
@@ -54,12 +83,50 @@ async def test_generate_queries_produces_stamped_specs(
     assert stored.queries["adzuna"].exclude == ["intern"]
     assert stored.queries["apify_linkedin"].exclude is None
     assert stored.generated_by == "gemini/gemini-2.5-flash"
-    assert stored.prompt_version == "search_query_v1"
+    assert stored.prompt_version == "search_query_v2"
     assert calls[0]["temperature"] == 0.8
     prompt = calls[0]["messages"][1]["content"]
     assert "Senior Data Analyst" in prompt
     assert "SQL" in prompt
     assert "resume text" not in prompt.lower()
+
+
+async def test_generate_queries_lists_declared_options_in_prompt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = install_acompletion(monkeypatch, lambda **kw: queries_response())
+    declarations = {
+        "adzuna": adzuna_filters(),
+        "apify_linkedin": linkedin_filters(),
+    }
+
+    await generate_queries(profile(), ["adzuna", "apify_linkedin"], declarations=declarations)
+
+    prompt = calls[0]["messages"][1]["content"]
+    assert "adzuna.options.sort_by" in prompt
+    assert "one of: relevance, date, salary" in prompt
+    assert "apify_linkedin.options.under_10_applicants" in prompt
+    assert "true or false" in prompt
+
+
+async def test_generate_queries_drops_invented_options(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = {
+        "queries": {
+            "adzuna": {
+                "title": "Senior Android Engineer",
+                "options": {"sort_by": "date", "bogus_filter": "x"},
+            },
+        }
+    }
+    install_acompletion(monkeypatch, lambda **kw: llm_response(json.dumps(payload)))
+
+    stored = await generate_queries(
+        profile(), ["adzuna"], declarations={"adzuna": adzuna_filters()}
+    )
+
+    assert stored.queries["adzuna"].options == {"sort_by": "date"}
 
 
 async def test_generate_queries_asks_for_fresh_variant(

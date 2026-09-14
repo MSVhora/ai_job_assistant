@@ -6,6 +6,7 @@ from app.adapters.job_sources import registry
 from app.adapters.job_sources.base import (
     ConnectorConfigError,
     JobSearchQuery,
+    SourceFilterDecl,
     date_posted_bucket,
 )
 from app.adapters.job_sources.config import (
@@ -57,6 +58,13 @@ def test_package_config_loads() -> None:
     assert [actor.name for actor in actors] == ["apify_linkedin"]
     assert actors[0].actor_id == "hKByXkMQaC5Qt9UMN"
     assert actors[0].external_id_field == "id"
+    assert [decl.key for decl in actors[0].filters] == [
+        "date_posted",
+        "distance_miles",
+        "under_10_applicants",
+        "company_ids",
+        "geo_id",
+    ]
 
 
 def test_registry_contains_code_and_actor_sources() -> None:
@@ -144,3 +152,64 @@ def test_build_actor_input_resolves_posted_bucket() -> None:
     assert build_actor_input(actor, JobSearchQuery(query="x", country="us", max_days_old=30)) == {
         "datePosted": "pastMonth"
     }
+
+
+def test_build_actor_input_resolves_option_placeholders() -> None:
+    actor = ActorConfig(
+        name="apify_x",
+        actor_id="a",
+        external_id_field="id",
+        input={
+            "distance": "{option:distance_miles}",
+            "under10Applicants": "{option:under_10_applicants}",
+            "companyIds": "{option:company_ids}",
+            "geoId": "{option:geo_id}",
+        },
+        filters=[
+            SourceFilterDecl(key="distance_miles", label="Radius", type="number"),
+            SourceFilterDecl(key="under_10_applicants", label="Few applicants", type="boolean"),
+            SourceFilterDecl(key="company_ids", label="Companies", type="multiselect"),
+            SourceFilterDecl(key="geo_id", label="Geo", type="text"),
+        ],
+    )
+
+    query = JobSearchQuery(
+        query="x",
+        country="us",
+        options={
+            "distance_miles": 25,
+            "under_10_applicants": True,
+            "company_ids": ["123"],
+            "geo_id": "abc",
+        },
+    )
+    assert build_actor_input(actor, query) == {
+        "distance": 25,
+        "under10Applicants": True,
+        "companyIds": ["123"],
+        "geoId": "abc",
+    }
+    assert build_actor_input(actor, JobSearchQuery(query="x", country="us")) == {}
+
+
+def test_declared_option_overrides_date_posted_bucket() -> None:
+    actor = ActorConfig(
+        name="apify_x",
+        actor_id="a",
+        external_id_field="id",
+        input={"datePosted": "{date_posted_bucket}"},
+    )
+
+    explicit = JobSearchQuery(
+        query="x", country="us", max_days_old=7, options={"date_posted": "anyTime"}
+    )
+    assert build_actor_input(actor, explicit) == {"datePosted": "anyTime"}
+    derived = JobSearchQuery(query="x", country="us", max_days_old=7)
+    assert build_actor_input(actor, derived) == {"datePosted": "pastWeek"}
+
+
+def test_rejects_option_placeholder_for_undeclared_filter(tmp_path: Path) -> None:
+    content = VALID.replace('keywords: "{query}"', 'keywords: "{option:bogus}"')
+
+    with pytest.raises(ConnectorConfigError, match="declares no filter"):
+        load_actor_configs(_write(tmp_path, content))

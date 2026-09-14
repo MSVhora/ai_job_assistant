@@ -71,3 +71,13 @@ def test_max_days_old_passes_through() -> None:
 
 def test_spec_query_is_used_for_fallback_when_no_title() -> None:
     assert build_connector_query("adzuna", SourceQuerySpec(), "base", request()).query == "base"
+
+
+def test_spec_options_pass_through() -> None:
+    spec = SourceQuerySpec(title="Senior Android Engineer", options={"title_only": True})
+
+    query = build_connector_query("adzuna", spec, None, request())
+
+    assert query.options == {"title_only": True}
+    assert build_connector_query("adzuna", SourceQuerySpec(), None, request()).options == {}
+    assert build_connector_query("adzuna", None, "base", request()).options == {}

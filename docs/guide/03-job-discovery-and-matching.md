@@ -156,7 +156,38 @@ freshness parameter:
 The shared filter is independent of the read-side layer above: a run with "Last week"
 still passes its results through the expiry filter (a scraper-reported old date is still
 excluded on read). Sources that support no freshness parameter simply ignore it, and the
-choice is recorded in the run's query echo for reproducibility.
+choice is recorded in the run's query echo for reproducibility. Setting the source's own
+`Date posted` advanced filter (below) overrides the derived bucket for that source.
+
+## Advanced per-source filters (live since #28)
+
+Every source declares the advanced filters it supports in one schema
+(`SourceFilterDecl`); the backend validates values against the declaring source
+(unknown key, wrong type, or bad enum → 400 naming the offending key), and each
+connector maps validated values to its native parameters. Declarations are served
+by `GET /api/sources` (`filters`), so the UI can render them generically — a new
+source that declares filters works everywhere with no per-source code.
+
+**This table is the living filter reference** — it mirrors the declarations in
+`backend/app/adapters/job_sources/` (`adzuna.py` and `connectors.yaml`):
+
+| Source | Filter | Values / form | Notes |
+|---|---|---|---|
+| Adzuna (official API) | `title_only` | on/off toggle | Match the title phrase instead of the full description |
+| Adzuna (official API) | `distance_km` | integer | Distance from the location; only applied when a location is set |
+| Adzuna (official API) | `sort_by` | select: relevance / date / salary | Adzuna's result ordering |
+| Apify LinkedIn (scraper) | `date_posted` | select: anyTime / past24h / pastWeek / pastMonth | Overrides the "posted within" bucket derived from `max_days_old` |
+| Apify LinkedIn (scraper) | `distance_miles` | integer | Actor `distance` field (miles) |
+| Apify LinkedIn (scraper) | `under_10_applicants` | on/off toggle | Actor `under10Applicants` field |
+| Apify LinkedIn (scraper) | `company_ids` | list of LinkedIn company IDs | Multiselect-text; advanced targeting |
+| Apify LinkedIn (scraper) | `geo_id` | text | LinkedIn `geoId`; overrides the location field |
+
+Shared filters outside this scheme: `max_days_old` (#27), `salary_min` and
+`salary_max` (the salary min/max fields are shared request filters, not per-source
+options — Adzuna maps both to native params), `results_wanted`, and `location`/
+`country`. LinkedIn has no salary filter; its salary mention rides the keywords line.
+LLM-generated per-source specs may fill option fields the source declares
+(`search_query_v2` specs); invented keys are dropped rather than stored.
 
 ## How matching content is prepared (live since #9)
 

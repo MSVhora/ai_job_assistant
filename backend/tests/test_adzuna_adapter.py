@@ -133,6 +133,62 @@ async def test_search_sends_max_days_old_param(monkeypatch: pytest.MonkeyPatch) 
     assert params["max_days_old"] == "7"
 
 
+async def test_search_sends_params_for_declared_options(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["url"] = str(request.url)
+        return httpx.Response(200, json=_fixture())
+
+    monkeypatch.setattr("app.adapters.retry.asyncio.sleep", _no_delay)
+    source = _mock_source(monkeypatch, httpx.MockTransport(handler))
+
+    await source.search(
+        JobSearchQuery(
+            query="python",
+            country="de",
+            location="Berlin",
+            options={"title_only": True, "distance_km": 25, "sort_by": "date"},
+        )
+    )
+
+    params = _request_params(str(seen["url"]))
+    assert params["title_only"] == "true"
+    assert params["distance"] == "25"
+    assert params["sort_by"] == "date"
+
+
+async def test_search_skips_distance_without_location(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["url"] = str(request.url)
+        return httpx.Response(200, json=_fixture())
+
+    monkeypatch.setattr("app.adapters.retry.asyncio.sleep", _no_delay)
+    source = _mock_source(monkeypatch, httpx.MockTransport(handler))
+
+    await source.search(
+        JobSearchQuery(
+            query="python", country="de", options={"distance_km": 25, "title_only": True}
+        )
+    )
+
+    params = _request_params(str(seen["url"]))
+    assert "distance" not in params
+    assert params["title_only"] == "true"
+
+
+def test_filters_declared_capabilities() -> None:
+    source = AdzunaJobSource()
+
+    keys = [decl.key for decl in source.filters()]
+    assert keys == ["title_only", "distance_km", "sort_by"]
+    sort_by = source.filters()[2]
+    assert sort_by.options is not None
+    assert [option.value for option in sort_by.options] == ["relevance", "date", "salary"]
+
+
 async def test_search_retries_once_on_rate_limit(monkeypatch: pytest.MonkeyPatch) -> None:
     calls = {"count": 0}
 

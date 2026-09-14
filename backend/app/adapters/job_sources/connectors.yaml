@@ -8,5 +8,35 @@ sources:
       location: "{location}"
       limitPerSource: "{results_wanted}"
       datePosted: "{date_posted_bucket}"
+      distance: "{option:distance_miles}"
+      under10Applicants: "{option:under_10_applicants}"
+      companyIds: "{option:company_ids}"
+      geoId: "{option:geo_id}"
       autoConvertToAiSearch: true
       scrapeCompany: false
+    filters:
+      - key: date_posted
+        label: Date posted
+        type: select
+        options:
+          - {value: anyTime, label: Any time}
+          - {value: past24h, label: Past 24 hours}
+          - {value: pastWeek, label: Past week}
+          - {value: pastMonth, label: Past month}
+        help_text: Overrides the shared "posted within" filter when set
+      - key: distance_miles
+        label: Radius (miles)
+        type: number
+        placeholder: "25"
+        help_text: Distance from the location to search within; requires a location
+      - key: under_10_applicants
+        label: Fewer than 10 applicants
+        type: boolean
+      - key: company_ids
+        label: Company IDs
+        type: multiselect
+        help_text: LinkedIn company IDs to target (third-party scraper source)
+      - key: geo_id
+        label: Geo ID
+        type: text
+        help_text: LinkedIn geoId for the location, overrides the location field

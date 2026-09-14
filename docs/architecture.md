@@ -180,7 +180,24 @@ Search queries are **profile data**: a second LLM call at extraction drafts per-
 specs (`{title, skills, exclude}` per enabled source) into `resume.search_queries`; saving a
 profile copies them; `POST /api/profiles/{id}/search-queries` regenerates from the current
 content (temperature 0.8 + anti-repeat instruction, so Regenerate observably changes the
-result). Searches are **filter-first**: the renderer maps each spec to the source's native
+result). Generated specs are stamped `prompt_version` (`search_query_v2` since #28: the
+prompt includes each source's declared option fields and the generated options are
+restricted to those keys).
+
+## Source filter capabilities (v3 issue #28)
+
+Each `JobSource` declares its advanced filters in one schema (`SourceFilterDecl`: key,
+label, type, select options, help text): Adzuna in code (`adzuna.py`), YAML-configured
+actors in `connectors.yaml` (`filters:` per source). `GET /api/sources` serves the
+declarations (`filters` field, alongside the legacy `supports_exclusions`), the backend
+validates `source_queries[name].options` against the declaring source (unknown key /
+bad type / bad enum → 400 naming the key), and connectors map validated options to
+native parameters — Adzuna in `_apply_options`, YAML sources via
+`{option:<key>}` placeholders in `connectors.yaml` (native types preserved; keys omitted
+when unset). `query_rendering.py` stays the single render seam; a new source = a
+declaration + mapper, with no changes to search logic.
+
+Searches are **filter-first**: the renderer maps each spec to the source's native
 capabilities — Adzuna gets `what_phrase` + `what_or` + `what_exclude` + `salary_min`,
 LinkedIn gets a natural-language keywords line (+ salary mention; it has no exclusion or
 salary filter). `job_search.query` stores exactly what was sent, and the run status echoes

@@ -11,6 +11,8 @@ from app.adapters.job_sources.base import (
     JobPostingData,
     JobSearchQuery,
     RawJobPosting,
+    SourceFilterDecl,
+    SourceFilterOption,
     clean_text,
     parse_datetime,
 )
@@ -81,6 +83,47 @@ def _apply_freshness(params: dict[str, str], query: JobSearchQuery) -> None:
         params["max_days_old"] = str(query.max_days_old)
 
 
+_SORT_BY_OPTIONS = (
+    SourceFilterOption(value="relevance", label="Relevance"),
+    SourceFilterOption(value="date", label="Date posted"),
+    SourceFilterOption(value="salary", label="Salary"),
+)
+
+_FILTERS = [
+    SourceFilterDecl(
+        key="title_only",
+        label="Title-only search",
+        type="boolean",
+        help_text="Match the title phrase only instead of the full description",
+    ),
+    SourceFilterDecl(
+        key="distance_km",
+        label="Radius (km)",
+        type="number",
+        placeholder="25",
+        help_text="Distance from the location to search within; requires a location",
+    ),
+    SourceFilterDecl(
+        key="sort_by",
+        label="Sort by",
+        type="select",
+        options=list(_SORT_BY_OPTIONS),
+    ),
+]
+
+
+def _apply_options(params: dict[str, str], query: JobSearchQuery) -> None:
+    title_only = query.options.get("title_only")
+    if title_only is True:
+        params["title_only"] = "true"
+    distance_km = query.options.get("distance_km")
+    if type(distance_km) is int and query.location:
+        params["distance"] = str(distance_km)
+    sort_by = query.options.get("sort_by")
+    if type(sort_by) is str and sort_by in {option.value for option in _SORT_BY_OPTIONS}:
+        params["sort_by"] = sort_by
+
+
 class AdzunaJobSource:
     name = "adzuna"
     is_official_api = True
@@ -93,6 +136,9 @@ class AdzunaJobSource:
     def is_configured(self) -> bool:
         settings = get_settings()
         return settings.adzuna_app_id is not None and settings.adzuna_app_key is not None
+
+    def filters(self) -> list[SourceFilterDecl]:
+        return list(_FILTERS)
 
     async def search(self, query: JobSearchQuery) -> list[RawJobPosting]:
         settings = get_settings()
@@ -108,6 +154,7 @@ class AdzunaJobSource:
         _apply_search_terms(params, query)
         _apply_salary_filter(params, query)
         _apply_freshness(params, query)
+        _apply_options(params, query)
         if query.location:
             params["where"] = query.location
         url = f"{_BASE_URL}/v1/api/jobs/{query.country}/search/1"

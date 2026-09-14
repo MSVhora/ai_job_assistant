@@ -12,6 +12,7 @@ from app.adapters.job_sources.base import (
     JobPostingData,
     JobSearchQuery,
     RawJobPosting,
+    SourceFilterDecl,
 )
 
 VALID_PROFILE: dict[str, Any] = {
@@ -107,6 +108,7 @@ class FakeJobSource:
         supports_exclusions: bool = False,
         postings: list[JobPostingData] | None = None,
         error: Exception | None = None,
+        filters: list[SourceFilterDecl] | None = None,
     ) -> None:
         self.name = name
         self.is_official_api = False
@@ -115,7 +117,11 @@ class FakeJobSource:
         self._configured = configured
         self._postings = postings or []
         self._error = error
+        self._filters = filters or []
         self.queries: list[JobSearchQuery] = []
+
+    def filters(self) -> list[SourceFilterDecl]:
+        return self._filters
 
     def is_configured(self) -> bool:
         return self._configured

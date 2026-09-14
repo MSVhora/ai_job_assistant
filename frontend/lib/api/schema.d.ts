@@ -997,6 +997,36 @@ export interface components {
              */
             acknowledged_disclosure: boolean;
         };
+        /** SourceFilterDecl */
+        SourceFilterDecl: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "text" | "number" | "select" | "multiselect" | "boolean";
+            /** Options */
+            options?: components["schemas"]["SourceFilterOption"][] | null;
+            /**
+             * Required
+             * @default false
+             */
+            required: boolean;
+            /** Placeholder */
+            placeholder?: string | null;
+            /** Help Text */
+            help_text?: string | null;
+        };
+        /** SourceFilterOption */
+        SourceFilterOption: {
+            /** Value */
+            value: string;
+            /** Label */
+            label: string;
+        };
         /** SourceInfoResponse */
         SourceInfoResponse: {
             /** Name */
@@ -1014,6 +1044,8 @@ export interface components {
              * @default false
              */
             supports_exclusions: boolean;
+            /** Filters */
+            filters?: components["schemas"]["SourceFilterDecl"][];
         };
         /** SourceLink */
         SourceLink: {
@@ -1052,6 +1084,10 @@ export interface components {
             exclude?: string[] | null;
             /** Query */
             query?: string | null;
+            /** Options */
+            options?: {
+                [key: string]: string | number | boolean | string[];
+            };
         };
         /**
          * StoredPreferences

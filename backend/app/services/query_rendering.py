@@ -31,6 +31,8 @@ def build_connector_query(
             kwargs["skills_any"] = spec.skills
         if spec.exclude and source_name == "adzuna":
             kwargs["exclude_any"] = spec.exclude
+        if spec.options:
+            kwargs["options"] = spec.options
     return JobSearchQuery(**kwargs)  # type: ignore[arg-type]
 
 

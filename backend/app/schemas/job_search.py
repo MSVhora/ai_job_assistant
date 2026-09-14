@@ -4,6 +4,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from app.adapters.job_sources.base import SourceFilterDecl, SourceFilterValue
 from app.models import JobPosting, JobType, RemoteType
 
 JobSearchStatusLiteral = Literal["pending", "running", "succeeded", "partial", "failed"]
@@ -28,6 +29,7 @@ class SourceQuerySpec(BaseModel):
     skills: list[str] | None = Field(default=None, max_length=_MAX_SKILLS)
     exclude: list[str] | None = Field(default=None, max_length=_MAX_EXCLUDE)
     query: str | None = Field(default=None, max_length=_MAX_QUERY)
+    options: dict[str, SourceFilterValue] = Field(default_factory=dict, max_length=12)
 
     @field_validator("title", "query", mode="after")
     @classmethod
@@ -42,7 +44,7 @@ class SourceQuerySpec(BaseModel):
         return _clean_terms(values)
 
     def has_content(self) -> bool:
-        return bool(self.title or self.query or self.skills)
+        return bool(self.title or self.query or self.skills or self.options)
 
 
 class StoredSearchQueries(BaseModel):
@@ -142,6 +144,7 @@ class SourceInfoResponse(BaseModel):
     is_configured: bool
     enabled: bool
     supports_exclusions: bool = False
+    filters: list[SourceFilterDecl] = Field(default_factory=list)
 
 
 class SourceEnableRequest(BaseModel):

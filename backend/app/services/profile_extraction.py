@@ -138,7 +138,10 @@ async def _generate_draft_queries(
         enabled = await sources_service.enabled_sources(session)
         if not enabled:
             return None
-        stored = await query_builder.generate_queries(profile, [source.name for source in enabled])
+        declarations = {source.name: source.filters() for source in enabled}
+        stored = await query_builder.generate_queries(
+            profile, [source.name for source in enabled], declarations=declarations
+        )
     except (LLMError, LLMQueryGenerationError) as exc:
         logger.warning("draft query generation failed for resume %s: %s", resume.id, exc)
         return None

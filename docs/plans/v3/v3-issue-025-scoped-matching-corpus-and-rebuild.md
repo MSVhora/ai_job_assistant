@@ -1,6 +1,6 @@
 # Issue #25 — Scoped matching corpus + rebuild-matches affordance + frontend sends profile & URL param
 
-**Status:** Planned (not started)
+**Status:** Done (branches `v3/25-scoped-matching-corpus-and-rebuild`, commits b4aaab1 + d823b9e)
 **Tracks:** GitHub issue #25 (milestone `v3`, M1 matching + frontend)
 **Plan of record:** [v3-implementation-plan.md](v3-implementation-plan.md) §2 D1, D7; §4 M1 (matching + frontend part)
 **Depends on:** #24 (merged — `job_search.profile_id` NOT NULL, `search_posting` join table, `_require_owned_search` all exist). **Blocks:** nothing in M1; M2/#26 builds on M1's frontend conventions.

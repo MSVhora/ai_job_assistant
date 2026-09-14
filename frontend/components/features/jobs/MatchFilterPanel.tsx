@@ -1,7 +1,10 @@
 "use client";
 
 import { DEFAULT_MATCH_FILTERS, type MatchFilterValues } from "@/hooks/use-matches";
+import type { PrioritySetting } from "@/hooks/use-priority-setting";
 import { Input } from "@/components/ui/input";
+
+import { PrioritySlider } from "./PrioritySlider";
 
 export const selectStyles =
   "w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 shadow-sm focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500";
@@ -57,9 +60,11 @@ function activeFilterCount(filters: MatchFilterValues): number {
 export function MatchFilterPanel({
   filters,
   onChange,
+  priority,
 }: {
   filters: MatchFilterValues;
   onChange: (filters: MatchFilterValues) => void;
+  priority: PrioritySetting;
 }) {
   const active = activeFilterCount(filters);
 
@@ -123,6 +128,13 @@ export function MatchFilterPanel({
         options={SORT_OPTIONS}
         onChange={(value) => onChange({ ...filters, sort: value as MatchFilterValues["sort"] })}
       />
+      <div className="border-t border-gray-100 pt-3">
+        <PrioritySlider
+          value={priority.value ?? 2 / 3}
+          onChange={priority.change}
+          disabled={priority.disabled}
+        />
+      </div>
       {active > 0 && (
         <button
           type="button"

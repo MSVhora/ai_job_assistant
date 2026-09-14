@@ -77,6 +77,11 @@ class MissingSearchQueryError(DomainError):
     default_detail = "no search query provided for a selected source"
 
 
+class MissingProfileIdError(DomainError):
+    status_code = 400
+    default_detail = "profile_id is required"
+
+
 class NoJobSourcesConfiguredError(DomainError):
     status_code = 400
     default_detail = "no job sources are configured for the selected search"

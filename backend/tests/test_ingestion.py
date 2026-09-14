@@ -2,7 +2,8 @@ import uuid
 from datetime import UTC, datetime
 
 import pytest
-from fakes import FakeJobSource, fake_posting, install_aembedding
+from fakes import FakeJobSource, fake_posting, install_aembedding, seed_profile_light
+from fastapi import BackgroundTasks
 from sqlalchemy import select
 
 from app.adapters.job_sources import registry
@@ -11,12 +12,14 @@ from app.adapters.llm import LLMError
 from app.core.db import session_factory
 from app.core.errors import (
     JobSourceNotEnabledError,
+    MissingProfileIdError,
     NoJobSourcesConfiguredError,
+    ProfileNotFoundError,
     UnknownJobSourceError,
 )
-from app.models import JobPosting, JobSearch, Match, SourceState
+from app.models import JobPosting, JobSearch, Match, SearchPosting, SourceState
 from app.schemas.job_search import JobSearchRequest
-from app.services.ingestion import _selected_sources, run_search
+from app.services.ingestion import _selected_sources, run_search, start_search
 
 pytestmark = pytest.mark.usefixtures("clean_tables")
 
@@ -43,7 +46,9 @@ async def selected(payload: JobSearchRequest) -> list[str]:
 
 async def create_run(payload: JobSearchRequest) -> uuid.UUID:
     async with session_factory() as session:
-        run = JobSearch(query=payload.model_dump(mode="json"))
+        profile_id = payload.profile_id or await seed_profile_light()
+        stored = payload.model_copy(update={"profile_id": profile_id})
+        run = JobSearch(profile_id=profile_id, query=stored.model_dump(mode="json"))
         session.add(run)
         await session.commit()
         return run.id
@@ -62,6 +67,12 @@ async def get_postings() -> list[JobPosting]:
         return list(result.scalars().all())
 
 
+async def get_associations() -> set[tuple[uuid.UUID, uuid.UUID]]:
+    async with session_factory() as session:
+        result = await session.execute(select(SearchPosting.search_id, SearchPosting.posting_id))
+        return set(result.all())
+
+
 async def test_run_search_persists_and_dedupes(monkeypatch: pytest.MonkeyPatch) -> None:
     source = FakeJobSource(
         "adzuna", postings=[fake_posting("1", title="Original Title", salary_min=50000.0)]
@@ -73,9 +84,10 @@ async def test_run_search_persists_and_dedupes(monkeypatch: pytest.MonkeyPatch) 
 
     postings = await get_postings()
     assert len(postings) == 1
+    posting_id = postings[0].id
     assert postings[0].title == "Original Title"
     assert postings[0].source == "adzuna"
-    assert postings[0].job_search_id == run_1
+    assert await get_associations() == {(run_1, posting_id)}
 
     refreshed = FakeJobSource(
         "adzuna", postings=[fake_posting("1", title="Refreshed Title", salary_min=65000.0)]
@@ -86,12 +98,49 @@ async def test_run_search_persists_and_dedupes(monkeypatch: pytest.MonkeyPatch) 
 
     postings = await get_postings()
     assert len(postings) == 1
+    assert postings[0].id == posting_id
     assert postings[0].title == "Refreshed Title"
     assert postings[0].salary_min == 65000.0
-    assert postings[0].job_search_id == run_2
+    assert await get_associations() == {(run_1, posting_id), (run_2, posting_id)}
 
     run_row = await get_run(run_2)
     assert run_row.status.value == "succeeded"
+
+
+async def test_upsert_is_idempotent_for_same_search(monkeypatch: pytest.MonkeyPatch) -> None:
+    source = FakeJobSource("adzuna", postings=[fake_posting("1")])
+    only_sources(monkeypatch, source)
+
+    run = await create_run(payload())
+    await run_search(run, payload())
+    await run_search(run, payload())
+
+    postings = await get_postings()
+    assert len(postings) == 1
+    assert await get_associations() == {(run, postings[0].id)}
+
+
+async def test_start_search_requires_existing_profile(monkeypatch: pytest.MonkeyPatch) -> None:
+    only_sources(monkeypatch, FakeJobSource("adzuna"))
+
+    with pytest.raises(MissingProfileIdError):
+        await start_search(None, BackgroundTasks(), payload())
+
+
+async def test_start_search_unknown_profile_returns_404() -> None:
+    async with session_factory() as session:
+        with pytest.raises(ProfileNotFoundError):
+            await start_search(session, BackgroundTasks(), payload(profile_id=uuid.uuid4()))
+
+
+async def test_start_search_stamps_run_with_profile() -> None:
+    profile_id = await seed_profile_light("Owner")
+    async with session_factory() as session:
+        response = await start_search(session, BackgroundTasks(), payload(profile_id=profile_id))
+        await session.commit()
+    run_row = await get_run(response.search_id)
+    assert run_row.profile_id == profile_id
+    assert run_row.query["profile_id"] == str(profile_id)
 
 
 async def test_run_search_passes_query_to_connector(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -401,7 +450,7 @@ async def get_matches(profile_id: uuid.UUID) -> list[Match]:
         return list(result.scalars().all())
 
 
-async def test_run_search_refreshes_matches_for_latest_profile(
+async def test_run_search_refreshes_matches_for_run_profile(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from fakes import install_acompletion, llm_response
@@ -414,11 +463,12 @@ async def test_run_search_refreshes_matches_for_latest_profile(
         lambda **kw: llm_response('{"items": []}', prompt_tokens=9, completion_tokens=4),
     )
 
-    run = await create_run(payload())
-    await run_search(run, payload())
+    run = await create_run(payload(profile_id=profile_id))
+    await run_search(run, payload(profile_id=profile_id))
 
     run_row = await get_run(run)
     assert run_row.status.value == "succeeded"
+    assert run_row.profile_id == profile_id
     assert run_row.matching is not None
     assert run_row.matching["status"] == "ok"
     assert run_row.matching["scored_count"] == 1
@@ -429,20 +479,21 @@ async def test_run_search_refreshes_matches_for_latest_profile(
     assert len(matches) == 1
 
 
-async def test_run_search_without_profile_skips_matching(
+async def test_run_search_skips_matching_when_profile_has_no_embedding(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     source = FakeJobSource("adzuna", postings=[fake_posting("1")])
     only_sources(monkeypatch, source)
 
-    run = await create_run(payload())
-    await run_search(run, payload())
+    profile_id = await seed_profile_light("NoEmbedding")
+    run = await create_run(payload(profile_id=profile_id))
+    await run_search(run, payload(profile_id=profile_id))
 
     run_row = await get_run(run)
     assert run_row.status.value == "succeeded"
     assert run_row.matching is not None
     assert run_row.matching["status"] == "skipped"
-    assert "no profile" in run_row.matching["warning"]
+    assert "no embedding" in run_row.matching["warning"]
     assert await get_postings() != []
 
 
@@ -451,13 +502,13 @@ async def test_run_search_matching_failure_degrades(
 ) -> None:
     from fakes import ProviderError, install_acompletion
 
-    await seed_profile()
+    profile_id = await seed_profile()
     source = FakeJobSource("adzuna", postings=[fake_posting("1", description="Great role")])
     only_sources(monkeypatch, source)
     install_acompletion(monkeypatch, lambda **kw: ProviderError(400))
 
-    run = await create_run(payload())
-    await run_search(run, payload())
+    run = await create_run(payload(profile_id=profile_id))
+    await run_search(run, payload(profile_id=profile_id))
 
     run_row = await get_run(run)
     assert run_row.status.value == "succeeded"

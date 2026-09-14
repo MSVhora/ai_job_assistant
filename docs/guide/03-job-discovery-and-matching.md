@@ -76,6 +76,21 @@ per-source results/warnings while a live banner polls it, the run's postings are
 them. Ranked matches with the "why this matches" rationale are shown below the banner and
 refresh after every run.
 
+## Searches belong to a profile (live since v3 #24)
+
+Career tracks live side by side, and jobs found for one track must not leak into another:
+
+- **Every search has an owning profile.** `POST /api/jobs/search` requires a
+  `profile_id` (400 when missing, 404 for an unknown profile); the run row stores it
+  as a database-level `job_search.profile_id`.
+- **Notes on ownership are enforced by the API, not just the UI.** The run-status and
+  run-postings endpoints require a `profile_id` query param and answer 404 when the
+  run does not belong to you.
+- **"Found by this run" is append-only.** Postings link to searches through the
+  `search_posting` join table (unique per `(search_id, posting_id)`), replacing the old
+  mutable pointer that a re-search used to overwrite. A posting re-found by a later
+  search gains a new association row; earlier runs' results views are untouched.
+
 ## How matching content is prepared (live since #9)
 
 - **Job descriptions are embedded at ingest** — every normalized posting gets a vector

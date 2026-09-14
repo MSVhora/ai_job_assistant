@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import DateTime, Enum, ForeignKey, Numeric, String, Text, UniqueConstraint, func
+from sqlalchemy import DateTime, Enum, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -57,6 +57,3 @@ class JobPosting(Base):
     currency: Mapped[str | None] = mapped_column(String(3), nullable=True)
     raw_payload: Mapped[dict[str, object]] = mapped_column(JSONB)
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-    job_search_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("job_search.id", ondelete="SET NULL"), nullable=True, index=True
-    )

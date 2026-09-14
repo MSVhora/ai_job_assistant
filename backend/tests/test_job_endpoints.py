@@ -1,14 +1,14 @@
 import uuid
 
 import pytest
-from fakes import FakeJobSource, fake_posting
+from fakes import FakeJobSource, fake_posting, seed_profile_light
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
 
 from app.adapters.job_sources import registry
 from app.core.db import session_factory
 from app.main import app
-from app.models import JobPosting
+from app.models import JobPosting, SearchPosting
 
 pytestmark = pytest.mark.usefixtures("clean_tables")
 
@@ -23,23 +23,31 @@ async def client() -> AsyncClient:
 async def test_search_start_and_status_flow(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    profile_id = await seed_profile_light("Owner")
     source = FakeJobSource("adzuna", postings=[fake_posting("1", title="Data Engineer")])
     monkeypatch.setattr(registry, "all_sources", lambda: (source,))
 
     response = await client.post(
         "/api/jobs/search",
-        json={"query": "python developer", "location": "Berlin", "country": "de"},
+        json={
+            "query": "python developer",
+            "profile_id": str(profile_id),
+            "location": "Berlin",
+            "country": "de",
+        },
     )
     assert response.status_code == 202
     body = response.json()
     assert body["status"] == "pending"
     search_id = body["search_id"]
 
-    status = (await client.get(f"/api/jobs/searches/{search_id}")).json()
+    status = (
+        await client.get(f"/api/jobs/searches/{search_id}", params={"profile_id": profile_id})
+    ).json()
     assert status["status"] == "succeeded"
     assert status["query"] == {
         "query": "python developer",
-        "profile_id": None,
+        "profile_id": str(profile_id),
         "source_queries": None,
         "location": "Berlin",
         "country": "de",
@@ -52,37 +60,77 @@ async def test_search_start_and_status_flow(
     assert status["results"] == [{"source": "adzuna", "status": "ok", "count": 1, "warning": None}]
 
 
-async def test_search_persists_postings(
+async def test_search_persists_postings_and_associations(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    profile_id = await seed_profile_light("Owner")
     source = FakeJobSource("adzuna", postings=[fake_posting("1"), fake_posting("2")])
     monkeypatch.setattr(registry, "all_sources", lambda: (source,))
 
-    start = (await client.post("/api/jobs/search", json={"query": "data", "country": "de"})).json()
+    start = (
+        await client.post(
+            "/api/jobs/search",
+            json={"query": "data", "profile_id": str(profile_id), "country": "de"},
+        )
+    ).json()
 
     async with session_factory() as session:
         postings = (await session.execute(select(JobPosting))).scalars().all()
+        associations = (await session.execute(select(SearchPosting))).scalars().all()
     assert len(postings) == 2
-    assert all(posting.job_search_id == uuid.UUID(start["search_id"]) for posting in postings)
+    assert {association.posting_id for association in associations} == {
+        posting.id for posting in postings
+    }
+    assert all(
+        association.search_id == uuid.UUID(start["search_id"]) for association in associations
+    )
+    assert not hasattr(postings[0], "job_search_id")
+
+
+async def test_search_without_profile_id_returns_400(client: AsyncClient) -> None:
+    response = await client.post("/api/jobs/search", json={"query": "data", "country": "de"})
+    assert response.status_code == 400
+    assert "profile_id is required" in response.json()["detail"]
+
+
+async def test_search_with_unknown_profile_returns_404(client: AsyncClient) -> None:
+    response = await client.post(
+        "/api/jobs/search",
+        json={"query": "data", "country": "de", "profile_id": str(uuid.uuid4())},
+    )
+    assert response.status_code == 404
+    assert "profile not found" in response.json()["detail"]
 
 
 async def test_search_without_configured_sources_returns_400(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    profile_id = await seed_profile_light("Owner")
     monkeypatch.setattr(
         registry, "all_sources", lambda: (FakeJobSource("adzuna", configured=False),)
     )
 
-    response = await client.post("/api/jobs/search", json={"query": "data", "country": "de"})
+    response = await client.post(
+        "/api/jobs/search",
+        json={"query": "data", "profile_id": str(profile_id), "country": "de"},
+    )
 
     assert response.status_code == 400
     assert "no job sources" in response.json()["detail"]
 
 
-async def test_search_with_unknown_source_returns_400(client: AsyncClient) -> None:
+async def test_search_with_unknown_source_returns_400(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    profile_id = await seed_profile_light("Owner")
     response = await client.post(
         "/api/jobs/search",
-        json={"query": "data", "country": "de", "sources": ["not_a_source"]},
+        json={
+            "query": "data",
+            "profile_id": str(profile_id),
+            "country": "de",
+            "sources": ["not_a_source"],
+        },
     )
 
     assert response.status_code == 400
@@ -92,9 +140,13 @@ async def test_search_with_unknown_source_returns_400(client: AsyncClient) -> No
 async def test_search_requires_effective_query_per_source(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    profile_id = await seed_profile_light("Owner")
     monkeypatch.setattr(registry, "all_sources", lambda: (FakeJobSource("adzuna"),))
 
-    response = await client.post("/api/jobs/search", json={"country": "de", "sources": ["adzuna"]})
+    response = await client.post(
+        "/api/jobs/search",
+        json={"country": "de", "profile_id": str(profile_id), "sources": ["adzuna"]},
+    )
 
     assert response.status_code == 400
     assert "no search query" in response.json()["detail"]
@@ -103,6 +155,7 @@ async def test_search_requires_effective_query_per_source(
 async def test_search_accepts_per_source_specs_and_salary(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    profile_id = await seed_profile_light("Owner")
     source = FakeJobSource("adzuna", postings=[fake_posting("1")])
     monkeypatch.setattr(registry, "all_sources", lambda: (source,))
 
@@ -110,6 +163,7 @@ async def test_search_accepts_per_source_specs_and_salary(
         "/api/jobs/search",
         json={
             "country": "in",
+            "profile_id": str(profile_id),
             "location": "Bangalore",
             "sources": ["adzuna"],
             "source_queries": {
@@ -138,12 +192,18 @@ async def test_search_rejects_inverted_salary_range(client: AsyncClient) -> None
 async def test_search_with_unacknowledged_scraper_returns_409(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    profile_id = await seed_profile_light("Owner")
     scraper = FakeJobSource("apify_linkedin", disclosure_required=True)
     monkeypatch.setattr(registry, "all_sources", lambda: (scraper,))
 
     response = await client.post(
         "/api/jobs/search",
-        json={"query": "data", "country": "de", "sources": ["apify_linkedin"]},
+        json={
+            "query": "data",
+            "profile_id": str(profile_id),
+            "country": "de",
+            "sources": ["apify_linkedin"],
+        },
     )
 
     assert response.status_code == 409
@@ -162,24 +222,42 @@ async def test_search_validates_country(client: AsyncClient) -> None:
 async def test_search_normalizes_country(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    profile_id = await seed_profile_light("Owner")
     source = FakeJobSource("adzuna", postings=[])
     monkeypatch.setattr(registry, "all_sources", lambda: (source,))
 
-    response = await client.post("/api/jobs/search", json={"query": "data", "country": "DE"})
+    response = await client.post(
+        "/api/jobs/search",
+        json={"query": "data", "profile_id": str(profile_id), "country": "DE"},
+    )
 
     assert response.status_code == 202
     assert source.queries[0].country == "de"
 
 
-async def test_get_unknown_search_returns_404(client: AsyncClient) -> None:
-    response = await client.get(f"/api/jobs/searches/{uuid.uuid4()}")
+async def test_search_status_requires_profile_id(client: AsyncClient) -> None:
+    profile_id = await seed_profile_light("Owner")
+    start = (
+        await client.post(
+            "/api/jobs/search",
+            json={"query": "data", "profile_id": str(profile_id), "country": "de"},
+        )
+    ).json()
 
-    assert response.status_code == 404
+    missing = await client.get(f"/api/jobs/searches/{start['search_id']}")
+    assert missing.status_code == 422
+
+    wrong = await client.get(
+        f"/api/jobs/searches/{start['search_id']}", params={"profile_id": str(uuid.uuid4())}
+    )
+    assert wrong.status_code == 404
+    assert "job search not found" in wrong.json()["detail"]
 
 
 async def test_search_postings_endpoint(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    profile_id = await seed_profile_light("Owner")
     source = FakeJobSource(
         "adzuna",
         postings=[
@@ -189,16 +267,33 @@ async def test_search_postings_endpoint(
     )
     monkeypatch.setattr(registry, "all_sources", lambda: (source,))
 
-    start = (await client.post("/api/jobs/search", json={"query": "data", "country": "de"})).json()
+    start = (
+        await client.post(
+            "/api/jobs/search",
+            json={"query": "data", "profile_id": str(profile_id), "country": "de"},
+        )
+    ).json()
 
-    postings = (await client.get(f"/api/jobs/searches/{start['search_id']}/postings")).json()
+    postings = (
+        await client.get(
+            f"/api/jobs/searches/{start['search_id']}/postings", params={"profile_id": profile_id}
+        )
+    ).json()
     assert [posting["title"] for posting in postings] == ["Engineer A", "Engineer B"]
     assert postings[0]["source"] == "adzuna"
     assert postings[0]["salary_min"] == 100.0
     assert postings[0]["currency"] == "EUR"
 
-    missing = await client.get(f"/api/jobs/searches/{uuid.uuid4()}/postings")
+    missing = await client.get(
+        f"/api/jobs/searches/{uuid.uuid4()}/postings", params={"profile_id": profile_id}
+    )
     assert missing.status_code == 404
+
+    cross_profile = await client.get(
+        f"/api/jobs/searches/{start['search_id']}/postings",
+        params={"profile_id": str(uuid.uuid4())},
+    )
+    assert cross_profile.status_code == 404
 
 
 async def test_list_sources_includes_state(

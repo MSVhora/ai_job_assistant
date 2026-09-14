@@ -2,11 +2,35 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, func
+from sqlalchemy import DateTime, Enum, ForeignKey, UniqueConstraint, func, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.db import Base
+
+
+class SearchPosting(Base):
+    """Append-only posting↔search association (many-to-many).
+
+    A posting found again by any later search gains a row; nothing is
+    overwritten. `job_posting.job_search_id` was backfilled here then dropped.
+    """
+
+    __tablename__ = "search_posting"
+    __table_args__ = (
+        UniqueConstraint("search_id", "posting_id", name="uq_search_posting_search_posting"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()")
+    )
+    search_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("job_search.id", ondelete="CASCADE"), index=True
+    )
+    posting_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("job_posting.id", ondelete="CASCADE"), index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class JobSearchStatus(enum.StrEnum):
@@ -21,6 +45,9 @@ class JobSearch(Base):
     __tablename__ = "job_search"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    profile_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("profile.id", ondelete="CASCADE"), index=True
+    )
     status: Mapped[JobSearchStatus] = mapped_column(
         Enum(JobSearchStatus, name="job_search_status", native_enum=True),
         default=JobSearchStatus.pending,

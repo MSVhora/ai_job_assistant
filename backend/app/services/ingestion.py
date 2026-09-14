@@ -18,11 +18,13 @@ from app.core.errors import (
     JobPostingNotFoundError,
     JobSearchNotFoundError,
     JobSourceNotEnabledError,
+    MissingProfileIdError,
     MissingSearchQueryError,
     NoJobSourcesConfiguredError,
+    ProfileNotFoundError,
     UnknownJobSourceError,
 )
-from app.models import JobPosting, JobSearch, JobSearchStatus
+from app.models import JobPosting, JobSearch, JobSearchStatus, Profile, SearchPosting
 from app.schemas.job_search import (
     JobPostingDetail,
     JobPostingSummary,
@@ -70,12 +72,26 @@ async def _selected_sources(session: AsyncSession, payload: JobSearchRequest) ->
     return selected
 
 
+async def _require_profile(session: AsyncSession, profile_id: uuid.UUID | None) -> Profile:
+    if profile_id is None:
+        raise MissingProfileIdError()
+    profile = await session.get(Profile, profile_id)
+    if profile is None:
+        raise ProfileNotFoundError()
+    return profile
+
+
 async def start_search(
     session: AsyncSession, background_tasks: BackgroundTasks, payload: JobSearchRequest
 ) -> JobSearchStartResponse:
+    await _require_profile(session, payload.profile_id)
     selected = await _selected_sources(session, payload)
     _validate_queries(payload, selected)
-    run = JobSearch(status=JobSearchStatus.pending, query=payload.model_dump(mode="json"))
+    run = JobSearch(
+        status=JobSearchStatus.pending,
+        profile_id=payload.profile_id,
+        query=payload.model_dump(mode="json"),
+    )
     session.add(run)
     await session.flush()
     background_tasks.add_task(run_search, run.id, payload)
@@ -122,7 +138,7 @@ async def run_search(search_id: uuid.UUID, payload: JobSearchRequest) -> None:
             if ok
             else JobSearchStatus.failed
         )
-        run.matching = (await _run_matching(session, payload)).model_dump(mode="json")
+        run.matching = (await _run_matching(session, run.profile_id)).model_dump(mode="json")
         await session.commit()
 
     logger.info(
@@ -133,9 +149,9 @@ async def run_search(search_id: uuid.UUID, payload: JobSearchRequest) -> None:
     )
 
 
-async def _run_matching(session: AsyncSession, payload: JobSearchRequest) -> MatchingOutcome:
+async def _run_matching(session: AsyncSession, profile_id: uuid.UUID) -> MatchingOutcome:
     try:
-        return await matching.refresh_matches_for_search(session, payload)
+        return await matching.refresh_matches_for_profile(session, profile_id)
     except Exception:
         logger.exception("matching stage failed for search run")
         return MatchingOutcome(status="failed", warning="matching stage failed unexpectedly")
@@ -208,24 +224,27 @@ async def _upsert_posting(
     search_id: uuid.UUID,
     embedding_vector: list[float] | None,
 ) -> None:
-    stmt = pg_insert(JobPosting).values(
-        source=source_name,
-        external_id=data.external_id,
-        title=data.title,
-        company=data.company,
-        url=data.url,
-        location=data.location,
-        job_type=data.job_type,
-        remote_type=data.remote_type,
-        description=data.description,
-        embedding=embedding_vector,
-        posted_at=data.posted_at,
-        salary_min=data.salary_min,
-        salary_max=data.salary_max,
-        currency=data.currency.upper() if data.currency else None,
-        raw_payload=data.raw_payload,
-        job_search_id=search_id,
-        fetched_at=datetime.now(UTC),
+    stmt = (
+        pg_insert(JobPosting)
+        .values(
+            source=source_name,
+            external_id=data.external_id,
+            title=data.title,
+            company=data.company,
+            url=data.url,
+            location=data.location,
+            job_type=data.job_type,
+            remote_type=data.remote_type,
+            description=data.description,
+            embedding=embedding_vector,
+            posted_at=data.posted_at,
+            salary_min=data.salary_min,
+            salary_max=data.salary_max,
+            currency=data.currency.upper() if data.currency else None,
+            raw_payload=data.raw_payload,
+            fetched_at=datetime.now(UTC),
+        )
+        .returning(JobPosting.id)
     )
     stmt = stmt.on_conflict_do_update(
         constraint="uq_job_posting_source_external_id",
@@ -243,17 +262,30 @@ async def _upsert_posting(
             "salary_max": stmt.excluded.salary_max,
             "currency": stmt.excluded.currency,
             "raw_payload": stmt.excluded.raw_payload,
-            "job_search_id": stmt.excluded.job_search_id,
             "fetched_at": stmt.excluded.fetched_at,
         },
     )
-    await session.execute(stmt)
+    posting_id = (await session.execute(stmt)).scalar_one()
+    await session.execute(
+        pg_insert(SearchPosting)
+        .values(search_id=search_id, posting_id=posting_id)
+        .on_conflict_do_nothing(constraint="uq_search_posting_search_posting")
+    )
 
 
-async def get_search_status(session: AsyncSession, search_id: uuid.UUID) -> JobSearchStatusResponse:
+async def _require_owned_search(
+    session: AsyncSession, search_id: uuid.UUID, profile_id: uuid.UUID | None
+) -> JobSearch:
     run = await session.get(JobSearch, search_id)
-    if run is None:
+    if run is None or run.profile_id != profile_id:
         raise JobSearchNotFoundError()
+    return run
+
+
+async def get_search_status(
+    session: AsyncSession, search_id: uuid.UUID, profile_id: uuid.UUID
+) -> JobSearchStatusResponse:
+    run = await _require_owned_search(session, search_id, profile_id)
     results = [SourceOutcome.model_validate(item) for item in (run.results or [])]
     matching = MatchingOutcome.model_validate(run.matching) if run.matching else None
     return JobSearchStatusResponse(
@@ -268,14 +300,13 @@ async def get_search_status(session: AsyncSession, search_id: uuid.UUID) -> JobS
 
 
 async def get_search_postings(
-    session: AsyncSession, search_id: uuid.UUID
+    session: AsyncSession, search_id: uuid.UUID, profile_id: uuid.UUID
 ) -> list[JobPostingSummary]:
-    run = await session.get(JobSearch, search_id)
-    if run is None:
-        raise JobSearchNotFoundError()
+    await _require_owned_search(session, search_id, profile_id)
     result = await session.execute(
         select(JobPosting)
-        .where(JobPosting.job_search_id == search_id)
+        .join(SearchPosting, SearchPosting.posting_id == JobPosting.id)
+        .where(SearchPosting.search_id == search_id)
         .order_by(JobPosting.posted_at.desc().nulls_last(), JobPosting.title)
     )
     return [JobPostingSummary.from_posting(posting) for posting in result.scalars().all()]

@@ -109,12 +109,12 @@ sequenceDiagram
     C-->>A: raw postings (failures skip + warn)
     A->>A: normalize + dedupe (source, external_id) — upsert refresh
     A->>G: embed descriptions
-    A->>D: upsert postings + embeddings
+    A->>D: upsert postings + embeddings + search_posting rows (append-only)
     A->>D: hard filters + cosine → top N
     A->>G: re-rank top N + rationale
     A->>D: store matches
-    B->>A: GET /api/jobs/searches/{id} → run status + warnings
-    B->>A: GET /api/jobs/searches/{id}/postings → unranked run results
+    B->>A: GET /api/jobs/searches/{id}?profile_id= → run status + warnings (404 unless owned)
+    B->>A: GET /api/jobs/searches/{id}/postings?profile_id= → unranked run results (404 unless owned)
     B->>A: GET /api/matches → ranked + "why this matches"
 ```
 
@@ -125,6 +125,15 @@ and are tracked in `job_search` (status + per-source `{source, status, count, wa
 outcomes, queryable via `GET /api/jobs/searches/{id}`). A failing source is a run warning,
 never an error. Background runs open fresh sessions from `session_factory` and commit
 explicitly, since they outlive the request scope.
+
+**Profile scoping (v3 issue #24):** every search is owned by a profile —
+`JobSearchRequest.profile_id` is required (400 when absent, 404 for an unknown profile),
+`job_search.profile_id` is NOT NULL, and both run-status/read endpoints require a
+`profile_id` query param and answer 404 when it does not match the run's owner
+(single-user app: state ownership, never leak across profiles). There is no
+`latest_profile_id` fallback anymore. The posting↔search link lives in the append-only
+`search_posting` join table (a posting re-found by a later search gains a row; nothing is
+overwritten), which also replaces the mutable `job_posting.job_search_id` pointer.
 
 ## Source enablement (issue #8)
 
@@ -167,7 +176,9 @@ erDiagram
     candidate ||--o{ profile : "tracks"
     profile ||--o{ profile_revision : "audit trail"
     profile ||--o{ match : "ranked against"
-    job_search ||--o{ job_posting : "ingestion runs"
+    profile ||--o{ job_search : "owns searches"
+    job_search ||--o{ search_posting : "found by run"
+    job_posting ||--o{ search_posting : "found in search"
     job_posting ||--o{ match : "produces"
 
     candidate {
@@ -215,12 +226,20 @@ erDiagram
 
     job_search {
         uuid id PK
+        uuid profile_id FK "owning profile — searches are profile-scoped (v3 #24); cascade on profile delete"
         text status "pending | running | succeeded | partial | failed"
         jsonb query "validated search request (issue #7)"
         jsonb results "per-source {source, status, count, warning?}"
         jsonb matching "per-run MatchingOutcome: status, counts, rerank token usage (issue #10)"
         timestamptz created_at
         timestamptz updated_at
+    }
+
+    search_posting {
+        uuid id PK
+        uuid search_id FK "run that found the posting; CASCADE"
+        uuid posting_id FK "CASCADE"
+        timestamptz created_at "append-only: unique (search_id, posting_id), nothing overwritten (v3 #24)"
     }
 
     job_posting {
@@ -241,7 +260,6 @@ erDiagram
         jsonb raw_payload "original source data for debugging/re-mapping"
         vector embedding "pgvector, dim 768 (gemini-embedding-001, truncated via dimensions param); null when the embed call failed"
         timestamptz fetched_at
-        uuid job_search_id FK "nullable; last run that returned this posting"
     }
 
     match {

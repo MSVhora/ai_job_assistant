@@ -4,6 +4,7 @@ import { Modal } from "@/components/ui/modal";
 import { SearchForm } from "@/components/features/jobs/SearchForm";
 import { SourceMultiSelect } from "@/components/features/jobs/SourceMultiSelect";
 import { PrioritySlider } from "@/components/features/jobs/PrioritySlider";
+import { RebuildBanner } from "@/components/features/jobs/RebuildBanner";
 import { selectStyles } from "@/components/features/jobs/MatchFilterPanel";
 import type { PrioritySetting } from "@/hooks/use-priority-setting";
 import type { SourceInfo } from "@/lib/api";
@@ -96,6 +97,7 @@ export function GlobalConfigModal({
             />
           </div>
         </div>
+        <RebuildBanner profileId={activeProfileId} />
         <div className="flex flex-col gap-3">
           <SourceMultiSelect
             sources={sources}

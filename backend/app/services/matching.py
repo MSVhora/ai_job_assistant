@@ -231,20 +231,42 @@ async def count_corpus_postings(session: AsyncSession, profile_id: uuid.UUID) ->
     )
 
 
+def _corpus_ids_subquery(profile_id: uuid.UUID) -> Select[tuple[uuid.UUID]]:
+    return (
+        select(JobPosting.id)
+        .join(SearchPosting, SearchPosting.posting_id == JobPosting.id)
+        .join(JobSearch, JobSearch.id == SearchPosting.search_id)
+        .where(JobSearch.profile_id == profile_id)
+    )
+
+
+async def count_out_of_corpus_matches(session: AsyncSession, profile_id: uuid.UUID) -> int:
+    """Stored matches for this profile whose posting is outside its scoped corpus."""
+    return int(
+        (
+            await session.execute(
+                select(func.count())
+                .select_from(Match)
+                .where(
+                    Match.profile_id == profile_id,
+                    Match.job_posting_id.not_in(_corpus_ids_subquery(profile_id)),
+                )
+            )
+        ).scalar_one()
+    )
+
+
 async def delete_out_of_corpus_matches(session: AsyncSession, profile_id: uuid.UUID) -> int:
     """Drop matches whose posting is no longer in the profile's scoped corpus.
 
     Only called on an explicit rebuild (D7): stale rows from the pre-#25
     global corpus are removed the moment the user opts back in per profile.
     """
-    corpus = (
-        select(JobPosting.id)
-        .join(SearchPosting, SearchPosting.posting_id == JobPosting.id)
-        .join(JobSearch, JobSearch.id == SearchPosting.search_id)
-        .where(JobSearch.profile_id == profile_id)
-    )
     result = await session.execute(
-        delete(Match).where(Match.profile_id == profile_id, Match.job_posting_id.not_in(corpus))
+        delete(Match).where(
+            Match.profile_id == profile_id,
+            Match.job_posting_id.not_in(_corpus_ids_subquery(profile_id)),
+        )
     )
     return int(result.rowcount or 0)
 

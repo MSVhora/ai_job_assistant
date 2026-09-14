@@ -14,7 +14,6 @@ import {
 import { MatchList, type MatchSelection } from "@/components/features/jobs/MatchList";
 import { JobDetailPanel } from "@/components/features/jobs/JobDetailPanel";
 import { MatchFilterPanel } from "@/components/features/jobs/MatchFilterPanel";
-import { RebuildBanner } from "@/components/features/jobs/RebuildBanner";
 import { Card } from "@/components/ui/card";
 import { useProfiles } from "@/hooks/use-profiles";
 import { usePrioritySetting } from "@/hooks/use-priority-setting";
@@ -209,9 +208,6 @@ export function JobsPageClient() {
             setSearchId(null);
           }}
         />
-        {activeProfileId !== null && profiles.isError === false && (
-          <RebuildBanner profileId={activeProfileId} />
-        )}
         <MatchList
           profileId={activeProfileId}
           selection={selection}

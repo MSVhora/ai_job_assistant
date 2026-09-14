@@ -628,7 +628,7 @@ async def test_content_save_keeps_preferences(client: AsyncClient) -> None:
 async def test_rebuild_matches_endpoint_lifecycle(client: AsyncClient) -> None:
     from fakes import fake_vector
 
-    from app.models import JobPosting, JobSearch, JobSearchStatus, Profile, SearchPosting
+    from app.models import JobPosting, JobSearch, JobSearchStatus, Match, Profile, SearchPosting
     from app.services import match_rebuild
 
     created = await create_profile(client, "Seeker", VALID_PROFILE)
@@ -655,13 +655,34 @@ async def test_rebuild_matches_endpoint_lifecycle(client: AsyncClient) -> None:
         session.add(search)
         await session.flush()
         session.add(SearchPosting(search_id=search.id, posting_id=posting.id))
+        stale_posting = JobPosting(
+            source="adzuna",
+            external_id="stale-0",
+            title="Stale",
+            description="x",
+            raw_payload={"id": "stale-0"},
+        )
+        session.add(stale_posting)
+        await session.flush()
+        session.add(
+            Match(
+                profile_id=profile_id,
+                job_posting_id=stale_posting.id,
+                vector_score=0.5,
+                final_score=0.5,
+            )
+        )
         await session.commit()
 
     unknown = await client.post(f"/api/profiles/{uuid.uuid4()}/rebuild-matches")
     assert unknown.status_code == 404
 
     no_run = await client.get(f"/api/profiles/{profile_id}/rebuild-matches")
-    assert no_run.status_code == 404
+    assert no_run.status_code == 200
+    no_run_body = no_run.json()
+    assert no_run_body["status"] == "idle"
+    assert no_run_body["id"] is None
+    assert no_run_body["stale_count"] == 1
 
     async with session_factory() as session:
         profile = await session.get(Profile, profile_id)
@@ -694,3 +715,4 @@ async def test_rebuild_matches_endpoint_lifecycle(client: AsyncClient) -> None:
     assert final_body["status"] == "succeeded"
     assert final_body["corpus_count"] == 1
     assert final_body["scored_count"] == 1
+    assert final_body["stale_count"] == 0

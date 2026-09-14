@@ -647,13 +647,16 @@ export interface components {
          * @enum {string}
          */
         JobType: "full_time" | "part_time" | "contract" | "internship" | "temporary";
-        /** MatchRebuildStatusResponse */
+        /**
+         * MatchRebuildStatusResponse
+         * @description Rebuild-run status; `id=None`, `status="idle"` when the profile never rebuilt.
+         *
+         *     `stale_count` is computed at read time: stored matches whose posting is
+         *     outside the profile's scoped corpus — the discrepancy the rebuild cleans.
+         */
         MatchRebuildStatusResponse: {
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
+            /** Id */
+            id?: string | null;
             /**
              * Profile Id
              * Format: uuid
@@ -663,23 +666,19 @@ export interface components {
              * Status
              * @enum {string}
              */
-            status: "pending" | "running" | "succeeded" | "failed";
+            status: "idle" | "pending" | "running" | "succeeded" | "failed";
+            /** Stale Count */
+            stale_count: number;
             /** Corpus Count */
             corpus_count: number;
             /** Scored Count */
             scored_count: number;
             /** Warning */
             warning?: string | null;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-            /**
-             * Updated At
-             * Format: date-time
-             */
-            updated_at: string;
+            /** Created At */
+            created_at?: string | null;
+            /** Updated At */
+            updated_at?: string | null;
         };
         /** MatchResponse */
         MatchResponse: {

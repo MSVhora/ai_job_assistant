@@ -102,15 +102,21 @@ searches is invisible to profile B's matches, even if the target roles overlap. 
 profile with no searches yet has an empty corpus and zero matches until its first run.
 
 Already ingested a global (pre-scoping) corpus of matches? Nothing is deleted
-automatically — rebuild is explicit per profile:
+automatically — rebuild is explicit per profile, and only appears when needed:
 
-- **"Rebuild matches for this profile"** on `/jobs` (also
-  `POST /api/profiles/{id}/rebuild-matches`) refreshes the profile embedding, scores
-  the profile's scoped corpus, and **drops stored matches whose posting is no longer
-  in that corpus** — the cleanup for stale cross-profile rows.
-- The rebuild runs in the background; its banner reports the corpus size (postings
+- **Discrepancy detection** — the status endpoint reports `stale_count`: how many stored
+  matches for that profile are posts *not* found by that profile's own searches. The
+  rebuild affordance is hidden until this count is non-zero (or a rebuild run is active
+  or failed), so a clean profile shows no extra UI.
+- **"Rebuild matches for this profile"** (in the Global configuration dialog on `/jobs`,
+  next to the profile selector; also `POST /api/profiles/{id}/rebuild-matches`) refreshes
+  the profile embedding, scores the profile's scoped corpus, and **drops stored matches
+  whose posting is no longer in that corpus** — the cleanup for stale cross-profile rows.
+  `stale_count` returns to 0 afterwards and the affordance disappears.
+- The rebuild runs in the background; the run reports the corpus size (postings
   found by the profile's searches) and how many were scored, with status queryable
-  afterwards via `GET /api/profiles/{id}/rebuild-matches`.
+  afterwards via `GET /api/profiles/{id}/rebuild-matches` (returns `status: "idle"` with
+  the computed `stale_count` when the profile has never rebuilt).
 
 ## How matching content is prepared (live since #9)
 

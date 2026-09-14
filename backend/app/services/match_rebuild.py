@@ -8,7 +8,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import session_factory
 from app.core.errors import (
-    MatchRebuildNotFoundError,
     ProfileNotEmbeddedError,
     ProfileNotFoundError,
 )
@@ -26,16 +25,19 @@ async def _require_profile(session: AsyncSession, profile_id: uuid.UUID) -> Prof
     return profile
 
 
-def _to_response(run: MatchRebuild) -> MatchRebuildStatusResponse:
+def _to_response(
+    run: MatchRebuild, stale_count: int, *, idle: bool = False
+) -> MatchRebuildStatusResponse:
     return MatchRebuildStatusResponse(
-        id=run.id,
+        id=None if idle else run.id,
         profile_id=run.profile_id,
-        status=run.status.value,
+        status="idle" if idle else run.status.value,
+        stale_count=stale_count,
         corpus_count=run.corpus_count,
         scored_count=run.scored_count,
         warning=run.warning,
-        created_at=run.created_at,
-        updated_at=run.updated_at,
+        created_at=None if idle else run.created_at,
+        updated_at=None if idle else run.updated_at,
     )
 
 
@@ -45,13 +47,14 @@ async def start_rebuild(
     profile = await _require_profile(session, profile_id)
     if profile.embedding is None:
         raise ProfileNotEmbeddedError()
+    stale_count = await matching.count_out_of_corpus_matches(session, profile_id)
     run = MatchRebuild(profile_id=profile_id, status=MatchRebuildStatus.pending)
     session.add(run)
     await session.flush()
     await session.refresh(run)
     background_tasks.add_task(run_rebuild, run.id)
     logger.info("matching.rebuild.start profile_id=%s run_id=%s", profile_id, run.id)
-    return _to_response(run)
+    return _to_response(run, stale_count)
 
 
 async def get_latest_rebuild(
@@ -66,9 +69,16 @@ async def get_latest_rebuild(
             .limit(1)
         )
     ).scalar_one_or_none()
+    stale_count = await matching.count_out_of_corpus_matches(session, profile_id)
     if run is None:
-        raise MatchRebuildNotFoundError()
-    return _to_response(run)
+        return MatchRebuildStatusResponse(
+            profile_id=profile_id,
+            status="idle",
+            stale_count=stale_count,
+            corpus_count=0,
+            scored_count=0,
+        )
+    return _to_response(run, stale_count)
 
 
 async def run_rebuild(run_id: uuid.UUID) -> None:

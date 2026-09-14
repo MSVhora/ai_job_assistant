@@ -60,5 +60,14 @@ def test_shared_filters_pass_through() -> None:
     assert query.salary_currency == "INR"
 
 
+def test_max_days_old_passes_through() -> None:
+    spec = SourceQuerySpec(title="Senior Android Engineer")
+
+    query = build_connector_query("adzuna", spec, None, request(max_days_old=7))
+
+    assert query.max_days_old == 7
+    assert build_connector_query("adzuna", spec, None, request()).max_days_old is None
+
+
 def test_spec_query_is_used_for_fallback_when_no_title() -> None:
     assert build_connector_query("adzuna", SourceQuerySpec(), "base", request()).query == "base"

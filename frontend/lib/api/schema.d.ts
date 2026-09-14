@@ -601,6 +601,8 @@ export interface components {
              * @default 50
              */
             results_wanted: number;
+            /** Max Days Old */
+            max_days_old?: number | null;
             /** Salary Min */
             salary_min?: number | null;
             /** Salary Max */

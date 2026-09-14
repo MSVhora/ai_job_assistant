@@ -52,6 +52,7 @@ async def test_search_start_and_status_flow(
         "location": "Berlin",
         "country": "de",
         "results_wanted": 50,
+        "max_days_old": None,
         "salary_min": None,
         "salary_max": None,
         "salary_currency": None,
@@ -100,6 +101,53 @@ async def test_search_with_unknown_profile_returns_404(client: AsyncClient) -> N
     )
     assert response.status_code == 404
     assert "profile not found" in response.json()["detail"]
+
+
+async def test_search_records_max_days_old_and_validates_bounds(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    profile_id = await seed_profile_light("Owner")
+    monkeypatch.setattr(
+        registry, "all_sources", lambda: (FakeJobSource("adzuna", configured=True),)
+    )
+
+    start = await client.post(
+        "/api/jobs/search",
+        json={
+            "query": "python developer",
+            "profile_id": str(profile_id),
+            "country": "de",
+            "max_days_old": 7,
+        },
+    )
+    assert start.status_code == 202
+    search_id = start.json()["search_id"]
+
+    status = (
+        await client.get(f"/api/jobs/searches/{search_id}", params={"profile_id": profile_id})
+    ).json()
+    assert status["query"]["max_days_old"] == 7
+
+    invalid = await client.post(
+        "/api/jobs/search",
+        json={
+            "query": "python developer",
+            "profile_id": str(profile_id),
+            "country": "de",
+            "max_days_old": 91,
+        },
+    )
+    assert invalid.status_code == 422
+    zero = await client.post(
+        "/api/jobs/search",
+        json={
+            "query": "python developer",
+            "profile_id": str(profile_id),
+            "country": "de",
+            "max_days_old": 0,
+        },
+    )
+    assert zero.status_code == 422
 
 
 async def test_search_without_configured_sources_returns_400(

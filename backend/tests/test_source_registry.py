@@ -3,12 +3,34 @@ from pathlib import Path
 import pytest
 
 from app.adapters.job_sources import registry
-from app.adapters.job_sources.base import ConnectorConfigError, JobSearchQuery
+from app.adapters.job_sources.base import (
+    ConnectorConfigError,
+    JobSearchQuery,
+    date_posted_bucket,
+)
 from app.adapters.job_sources.config import (
     ActorConfig,
     build_actor_input,
     load_actor_configs,
 )
+
+
+@pytest.mark.parametrize(
+    ("max_days_old", "bucket"),
+    [
+        (None, "anyTime"),
+        (1, "past24h"),
+        (2, "pastWeek"),
+        (7, "pastWeek"),
+        (8, "pastMonth"),
+        (30, "pastMonth"),
+        (31, "anyTime"),
+        (90, "anyTime"),
+    ],
+)
+def test_date_posted_bucket(max_days_old: int | None, bucket: str) -> None:
+    assert date_posted_bucket(max_days_old) == bucket
+
 
 VALID = """
 sources:
@@ -103,3 +125,22 @@ def test_build_actor_input_omits_null_location() -> None:
 
     located = JobSearchQuery(query="python dev", location="Berlin", country="us")
     assert build_actor_input(actor, located) == {"keywords": "python dev", "location": "Berlin"}
+
+
+def test_build_actor_input_resolves_posted_bucket() -> None:
+    actor = ActorConfig(
+        name="apify_x",
+        actor_id="a",
+        external_id_field="id",
+        input={"datePosted": "{date_posted_bucket}"},
+    )
+
+    assert build_actor_input(actor, JobSearchQuery(query="x", country="us")) == {
+        "datePosted": "anyTime"
+    }
+    assert build_actor_input(actor, JobSearchQuery(query="x", country="us", max_days_old=7)) == {
+        "datePosted": "pastWeek"
+    }
+    assert build_actor_input(actor, JobSearchQuery(query="x", country="us", max_days_old=30)) == {
+        "datePosted": "pastMonth"
+    }

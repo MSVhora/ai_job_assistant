@@ -2,6 +2,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from app.core.config import Settings, get_settings
 from app.core.db import session_factory
 from app.models import JobPosting, JobType, RemoteType
 from app.schemas.matching import MatchFilters
@@ -10,6 +11,12 @@ from app.services.matching import ranked_postings_query
 pytestmark = pytest.mark.usefixtures("clean_tables")
 
 NOW = datetime.now(UTC)
+
+
+def override_grace_days(monkeypatch: pytest.MonkeyPatch, days: int) -> None:
+    settings = Settings()
+    settings.stale_posting_days = days
+    monkeypatch.setattr("app.services.matching.get_settings", lambda: settings)
 
 
 def axis_vector(index: int, sign: float = 1.0) -> list[float]:
@@ -25,6 +32,8 @@ def posting(
     remote: RemoteType = RemoteType.remote,
     job_type: JobType = JobType.full_time,
     posted_at: datetime | None = NOW - timedelta(days=2),
+    expires_at: datetime | None = None,
+    is_closed: bool = False,
     embedding: list[float] | None = None,
 ) -> JobPosting:
     return JobPosting(
@@ -35,6 +44,8 @@ def posting(
         remote_type=remote,
         job_type=job_type,
         posted_at=posted_at,
+        expires_at=expires_at,
+        is_closed=is_closed,
         description="desc",
         embedding=embedding,
         raw_payload={"id": external_id},
@@ -146,3 +157,84 @@ async def test_null_posted_at_rows_rank_without_date_filter() -> None:
     rows = await run_query(axis_vector(0), MatchFilters())
 
     assert "null_date" in [external_id for external_id, _ in rows]
+
+
+async def test_freshness_excludes_closed_and_expired() -> None:
+    async with session_factory() as session:
+        session.add_all(
+            [
+                posting("closed", is_closed=True, embedding=axis_vector(10)),
+                posting(
+                    "expired",
+                    expires_at=NOW - timedelta(days=1),
+                    embedding=axis_vector(11),
+                ),
+                posting("fresh", embedding=axis_vector(12)),
+            ]
+        )
+        await session.commit()
+
+    rows = await run_query(axis_vector(0), MatchFilters())
+
+    assert {external_id for external_id, _ in rows} == {"fresh"}
+
+
+async def test_future_expiry_keeps_old_posting_visible() -> None:
+    async with session_factory() as session:
+        session.add_all(
+            [
+                posting(
+                    "old_but_listed",
+                    posted_at=NOW - timedelta(days=60),
+                    expires_at=NOW + timedelta(days=10),
+                    embedding=axis_vector(10),
+                ),
+                posting("stale", posted_at=NOW - timedelta(days=50), embedding=axis_vector(11)),
+            ]
+        )
+        await session.commit()
+
+    rows = await run_query(axis_vector(0), MatchFilters())
+
+    assert {external_id for external_id, _ in rows} == {"old_but_listed"}
+
+
+async def test_no_expiry_uses_grace_window_and_keeps_unknown_ages() -> None:
+    await insert_postings()
+
+    rows = await run_query(axis_vector(0), MatchFilters())
+
+    # default grace = 45 days: 40-day-old "far" survives, unknown dates survive.
+    assert {"far", "null_date"} <= {external_id for external_id, _ in rows}
+
+
+async def test_grace_window_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    override_grace_days(monkeypatch, 10)
+    await insert_postings()
+
+    rows = await run_query(axis_vector(0), MatchFilters())
+
+    assert "far" not in [external_id for external_id, _ in rows]
+    assert "null_date" in [external_id for external_id, _ in rows]
+
+
+async def test_posted_within_stacks_on_freshness() -> None:
+    async with session_factory() as session:
+        session.add_all(
+            [
+                posting("fresh", posted_at=NOW - timedelta(days=20), embedding=axis_vector(10)),
+            ]
+        )
+        await session.commit()
+
+    inside_freshness = await run_query(axis_vector(0), MatchFilters())
+    narrowed = await run_query(axis_vector(0), MatchFilters(posted_within_days=7))
+
+    assert [external_id for external_id, _ in inside_freshness] == ["fresh"]
+    assert narrowed == []
+
+
+def test_stale_posting_days_default() -> None:
+    get_settings.cache_clear()
+    assert get_settings().stale_posting_days == 45
+    get_settings.cache_clear()

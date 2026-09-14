@@ -1,7 +1,8 @@
 from functools import lru_cache
 from pathlib import Path
+from typing import Annotated
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -31,6 +32,10 @@ class Settings(BaseSettings):
     match_weight_vector: float = 0.4
     match_weight_role_fit: float = 0.4
     match_weight_company_fit: float = 0.2
+
+    # Read-side freshness grace window (D4): postings without a source-reported
+    # expiry become stale after this many days since posting.
+    stale_posting_days: Annotated[int, Field(ge=1)] = 45
 
     @field_validator(
         "gemini_api_key", "adzuna_app_id", "adzuna_app_key", "apify_token", mode="before"

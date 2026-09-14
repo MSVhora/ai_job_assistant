@@ -120,6 +120,30 @@ async def test_upsert_is_idempotent_for_same_search(monkeypatch: pytest.MonkeyPa
     assert await get_associations() == {(run, postings[0].id)}
 
 
+async def test_upsert_refreshes_expiry_on_refetch(monkeypatch: pytest.MonkeyPatch) -> None:
+    from datetime import timedelta
+
+    source = FakeJobSource(
+        "adzuna",
+        postings=[fake_posting("1", expires_at=datetime.now(UTC) + timedelta(days=5))],
+    )
+    only_sources(monkeypatch, source)
+    run = await create_run(payload())
+    await run_search(run, payload())
+
+    postings = await get_postings()
+    assert postings[0].expires_at is not None
+
+    refreshed = FakeJobSource("adzuna", postings=[fake_posting("1")])
+    only_sources(monkeypatch, refreshed)
+    run_2 = await create_run(payload())
+    await run_search(run_2, payload())
+
+    postings = await get_postings()
+    assert len(postings) == 1
+    assert postings[0].expires_at is None
+
+
 async def test_start_search_requires_existing_profile(monkeypatch: pytest.MonkeyPatch) -> None:
     only_sources(monkeypatch, FakeJobSource("adzuna"))
 
@@ -538,3 +562,66 @@ async def test_run_search_honors_explicit_profile_id(
     matches = await get_matches(explicit)
     assert len(matches) == 1
     assert await get_matches(latest) == []
+
+
+async def test_get_search_postings_filters_stale_or_expired() -> None:
+    from datetime import timedelta
+
+    from app.services.ingestion import get_search_postings
+
+    run = await create_run(payload())
+
+    async with session_factory() as session:
+        session.add_all(
+            [
+                JobPosting(
+                    source="adzuna",
+                    external_id="fresh",
+                    title="Fresh",
+                    posted_at=datetime.now(UTC),
+                    expires_at=datetime.now(UTC) + timedelta(days=5),
+                    raw_payload={"id": "fresh"},
+                ),
+                JobPosting(
+                    source="adzuna",
+                    external_id="expired",
+                    title="Expired",
+                    posted_at=datetime.now(UTC) - timedelta(days=10),
+                    expires_at=datetime.now(UTC) - timedelta(days=1),
+                    raw_payload={"id": "expired"},
+                ),
+                JobPosting(
+                    source="adzuna",
+                    external_id="ancient",
+                    title="Ancient",
+                    posted_at=datetime.now(UTC) - timedelta(days=60),
+                    raw_payload={"id": "ancient"},
+                ),
+                JobPosting(
+                    source="adzuna",
+                    external_id="closed",
+                    title="Closed",
+                    posted_at=datetime.now(UTC),
+                    is_closed=True,
+                    raw_payload={"id": "closed"},
+                ),
+            ]
+        )
+        await session.commit()
+        ids = {
+            row[0]: row[1]
+            for row in (await session.execute(select(JobPosting.external_id, JobPosting.id))).all()
+        }
+        session.add_all(
+            [
+                SearchPosting(search_id=run, posting_id=ids[name])
+                for name in ["fresh", "expired", "ancient", "closed"]
+            ]
+        )
+        await session.commit()
+
+    run_row = await get_run(run)
+    async with session_factory() as session:
+        seen = await get_search_postings(session, run, run_row.profile_id)
+
+    assert {summary.title for summary in seen} == {"Fresh"}

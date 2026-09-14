@@ -112,6 +112,33 @@ def test_normalize_rejects_posting_without_title() -> None:
         ApifyActorSource(CONFIG).normalize(_raw({"id": "1", "title": ""}))
 
 
+def test_normalize_maps_expires_at_from_expire_at() -> None:
+    data = ApifyActorSource(CONFIG).normalize(
+        _raw({"id": "1", "title": "A", "expireAt": "2026-09-30T15:00:00.000Z"})
+    )
+
+    assert data.expires_at == datetime(2026, 9, 30, 15, 0, tzinfo=UTC)
+    assert data.is_closed is False
+
+
+def test_normalize_parses_expires_at_epoch_millis() -> None:
+    data = ApifyActorSource(CONFIG).normalize(
+        _raw({"id": "1", "title": "A", "expireAt": 1790202000000})
+    )
+
+    assert data.expires_at == datetime(2026, 9, 23, 22, 20, tzinfo=UTC)
+
+
+def test_normalize_keeps_missing_or_malformed_expire_at_null() -> None:
+    missing = ApifyActorSource(CONFIG).normalize(_raw({"id": "1", "title": "A"}))
+    malformed = ApifyActorSource(CONFIG).normalize(
+        _raw({"id": "1", "title": "A", "expireAt": "soon"})
+    )
+
+    assert missing.expires_at is None
+    assert malformed.expires_at is None
+
+
 async def test_search_builds_input_and_reads_dataset(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -4,7 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import DateTime, Enum, Numeric, String, Text, UniqueConstraint, func
+from sqlalchemy import DateTime, Enum, Numeric, String, Text, UniqueConstraint, func, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -52,6 +52,8 @@ class JobPosting(Base):
     posted_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, index=True
     )
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    is_closed: Mapped[bool] = mapped_column(default=False, server_default=text("false"))
     salary_min: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     salary_max: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     currency: Mapped[str | None] = mapped_column(String(3), nullable=True)

@@ -118,6 +118,29 @@ automatically — rebuild is explicit per profile, and only appears when needed:
   afterwards via `GET /api/profiles/{id}/rebuild-matches` (returns `status: "idle"` with
   the computed `stale_count` when the profile has never rebuilt).
 
+## Freshness: closed and stale postings never surface (live since #26)
+
+Matches and search results share one read-side expiry filter, applied in SQL:
+
+| Posting state | Visible? |
+|---|---|
+| Closed (`is_closed`) | never |
+| Source-reported expiry in the past (`expires_at < now()`) | never |
+| No expiry, posted within the grace window | yes |
+| No expiry, no known posting date | yes (unknown age is not proof of staleness) |
+| No expiry, posted more than `STALE_POSTING_DAYS` ago (default 45) | never |
+
+Per-source expiry signals: LinkedIn (Apify actor) reports `expireAt`, which is mapped to
+`expires_at` and is authoritative — the grace window does not apply to it (a posting can
+be listed for months with a future expiry). Adzuna's API provides no expiry field, so its
+postings rely entirely on the grace window. Re-fetching a posting refreshes its expiry
+from the source (a re-fetched posting that no longer reports one is un-expired and
+becomes grace-window-managed again).
+
+The filter is read-time only: stored matches for expired postings may remain in the
+database (and count toward rebuild's corpus checks) but never render — no dead leads on
+the dashboard. Your `posted_within_days` filter stacks on top of this as before.
+
 ## How matching content is prepared (live since #9)
 
 - **Job descriptions are embedded at ingest** — every normalized posting gets a vector
@@ -132,9 +155,9 @@ automatically — rebuild is explicit per profile, and only appears when needed:
 - **Your profile is embedded on every content change** — create, manual save, re-upload
   merge, and gap-fill answers all refresh the profile vector, so ranking never needs to
   re-embed your profile per query.
-- **Hard filters run in SQL before ranking** — location (case-insensitive substring),
-  remote type, job type, and posted-within; a posting without a known posting date is
-  excluded when a posted-within filter is active.
+- **Hard filters run in SQL before ranking** — the freshness filter (above), location
+  (case-insensitive substring), remote type, job type, and posted-within; a posting
+  without a known posting date is excluded when a posted-within filter is active.
 - **Ranking is pgvector cosine distance** (`embedding <=> profile_vector`) — every
   embeddable posting is scored against the profile after each search run and stored in the
   `match` table (upsert, so repeat runs refresh scores instead of duplicating rows).

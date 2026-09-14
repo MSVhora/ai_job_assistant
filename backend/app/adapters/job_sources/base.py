@@ -80,6 +80,8 @@ class JobPostingData(BaseModel):
     remote_type: RemoteType | None = None
     description: str | None = None
     posted_at: datetime | None = None
+    expires_at: datetime | None = None
+    is_closed: bool = False
     salary_min: float | None = Field(default=None, ge=0)
     salary_max: float | None = Field(default=None, ge=0)
     currency: str | None = Field(default=None, pattern=r"^[A-Za-z]{3}$")

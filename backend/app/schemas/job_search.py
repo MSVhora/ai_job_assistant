@@ -155,6 +155,8 @@ class JobPostingSummary(BaseModel):
     url: str | None = None
     location: str | None = None
     posted_at: datetime | None = None
+    expires_at: datetime | None = None
+    is_closed: bool = False
     salary_min: float | None = Field(default=None, ge=0)
     salary_max: float | None = Field(default=None, ge=0)
     currency: str | None = None
@@ -169,6 +171,8 @@ class JobPostingSummary(BaseModel):
             url=posting.url,
             location=posting.location,
             posted_at=posting.posted_at,
+            expires_at=posting.expires_at,
+            is_closed=posting.is_closed,
             salary_min=float(posting.salary_min) if posting.salary_min is not None else None,
             salary_max=float(posting.salary_max) if posting.salary_max is not None else None,
             currency=posting.currency,
@@ -191,6 +195,8 @@ class JobPostingDetail(JobPostingSummary):
             url=posting.url,
             location=posting.location,
             posted_at=posting.posted_at,
+            expires_at=posting.expires_at,
+            is_closed=posting.is_closed,
             salary_min=float(posting.salary_min) if posting.salary_min is not None else None,
             salary_max=float(posting.salary_max) if posting.salary_max is not None else None,
             currency=posting.currency,

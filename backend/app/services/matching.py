@@ -6,11 +6,13 @@ from pydantic import ValidationError
 from sqlalchemy import (
     ColumnElement,
     Select,
+    and_,
     bindparam,
     case,
     delete,
     exists,
     func,
+    or_,
     select,
     update,
 )
@@ -70,7 +72,24 @@ def ranked_postings_query(
     return _apply_posting_filters(query, filters)
 
 
+def freshness_condition() -> ColumnElement[bool]:
+    """D4 read-side freshness: closed or expired postings never surface.
+
+    A source-reported expiry is authoritative (the grace window does not
+    apply); without one, a posting is stale once `posted_at` breaches the
+    `STALE_POSTING_DAYS` window. Unknown dates keep the posting visible.
+    """
+    settings = get_settings()
+    stale_cutoff = datetime.now(UTC) - timedelta(days=settings.stale_posting_days)
+    not_stale = JobPosting.posted_at.is_(None) | (JobPosting.posted_at >= stale_cutoff)
+    return and_(
+        JobPosting.is_closed.is_(False),
+        or_(JobPosting.expires_at >= func.now(), and_(JobPosting.expires_at.is_(None), not_stale)),
+    )
+
+
 def _apply_posting_filters[RowT](query: Select[RowT], filters: MatchFilters) -> Select[RowT]:
+    query = query.where(freshness_condition())
     if filters.location is not None:
         escaped = filters.location.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         query = query.where(JobPosting.location.ilike(f"%{escaped}%", escape="\\"))

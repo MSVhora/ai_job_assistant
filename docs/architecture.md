@@ -143,6 +143,13 @@ background task (status/metadata queryable via `GET`, banner shows corpus size) 
 deletes that profile's out-of-corpus matches. On `/jobs` the selected profile rides in
 the `?profile=` URL param and the search form refuses to submit without one.
 
+**Read-side freshness (v3 issue #26):** matches and search results share one SQL filter —
+closed postings (`is_closed`) or expired postings (`expires_at < now()`) never surface;
+with no source-reported expiry a posting goes stale after `STALE_POSTING_DAYS`
+(default 45) since `posted_at`. A source-reported expiry is authoritative (LinkedIn
+`expireAt`); Adzuna has none, so the grace window governs. `posted_within_days` stacks on
+top. The filter is read-time only — the scoring corpus and rebuild cleanup are untouched.
+
 ## Source enablement (issue #8)
 
 Sources come from a code-level registry plus **`connectors.yaml`**-configured Apify actors
@@ -263,6 +270,8 @@ erDiagram
         text remote_type "native enum, nullable"
         text description
         timestamptz posted_at
+        timestamptz expires_at "source-reported (LinkedIn expireAt); null when unknown"
+        boolean is_closed "not null, default false; future seam — no producing source yet (v3 #26)"
         numeric salary_min
         numeric salary_max
         text currency

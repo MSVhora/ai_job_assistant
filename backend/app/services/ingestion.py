@@ -238,6 +238,8 @@ async def _upsert_posting(
             description=data.description,
             embedding=embedding_vector,
             posted_at=data.posted_at,
+            expires_at=data.expires_at,
+            is_closed=data.is_closed,
             salary_min=data.salary_min,
             salary_max=data.salary_max,
             currency=data.currency.upper() if data.currency else None,
@@ -258,6 +260,8 @@ async def _upsert_posting(
             "description": stmt.excluded.description,
             "embedding": stmt.excluded.embedding,
             "posted_at": stmt.excluded.posted_at,
+            "expires_at": stmt.excluded.expires_at,
+            "is_closed": stmt.excluded.is_closed,
             "salary_min": stmt.excluded.salary_min,
             "salary_max": stmt.excluded.salary_max,
             "currency": stmt.excluded.currency,
@@ -306,7 +310,7 @@ async def get_search_postings(
     result = await session.execute(
         select(JobPosting)
         .join(SearchPosting, SearchPosting.posting_id == JobPosting.id)
-        .where(SearchPosting.search_id == search_id)
+        .where(SearchPosting.search_id == search_id, matching.freshness_condition())
         .order_by(JobPosting.posted_at.desc().nulls_last(), JobPosting.title)
     )
     return [JobPostingSummary.from_posting(posting) for posting in result.scalars().all()]

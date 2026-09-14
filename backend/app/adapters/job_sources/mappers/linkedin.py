@@ -73,6 +73,10 @@ def _posted_at(payload: dict[str, object]) -> datetime | None:
     return parsed
 
 
+def _expires_at(payload: dict[str, object]) -> datetime | None:
+    return parse_datetime(payload.get("expireAt"))
+
+
 def normalize(raw: RawJobPosting) -> JobPostingData:
     payload = raw.payload
     title = clean_text(payload.get("title"))
@@ -93,6 +97,7 @@ def normalize(raw: RawJobPosting) -> JobPostingData:
             remote_type=_remote_type(payload),
             description=description,
             posted_at=_posted_at(payload),
+            expires_at=_expires_at(payload),
             salary_min=salary_min,
             salary_max=salary_max,
             raw_payload=payload,

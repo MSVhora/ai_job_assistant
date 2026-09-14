@@ -36,6 +36,9 @@ def _run_alembic(op: str, arg: str) -> None:
 
 async def migrate(op: str, arg: str) -> None:
     await asyncio.get_running_loop().run_in_executor(None, _run_alembic, op, arg)
+    from app.core.db import engine
+
+    await engine.dispose()
 
 
 @pytest.fixture
@@ -175,3 +178,61 @@ async def test_migration_0013_backfill_and_roundtrip(migration_database: None) -
                 )
             )
         ).scalar_one() == 0
+
+
+async def _expiry_columns(conn) -> dict[str, tuple[bool, bool]]:
+    rows = await conn.execute(
+        text(
+            "SELECT column_name, is_nullable, column_default FROM information_schema.columns "
+            "WHERE table_name='job_posting' AND column_name IN ('expires_at', 'is_closed')"
+        )
+    )
+    mapping = rows.all()
+    return {name: (nullable == "YES", default is not None) for name, nullable, default in mapping}
+
+
+@pytest.fixture
+async def migration_0014(migrated_database: None):
+    await migrate("downgrade", "0014")
+    yield
+    await migrate("upgrade", "head")
+
+
+async def test_migration_0015_expiry_roundtrip(migration_0014: None) -> None:
+    marker = f"expiry-{uuid.uuid4()}"
+    async with session_factory() as session:
+        conn = await session.connection()
+        assert await _expiry_columns(conn) == {}
+
+    await migrate("upgrade", "head")
+
+    async with session_factory() as session:
+        conn = await session.connection()
+        expired = await _expiry_columns(conn)
+        assert expired["expires_at"] == (True, False)
+        assert expired["is_closed"] == (False, True)
+
+        await conn.execute(
+            text(
+                "INSERT INTO job_posting (id, source, external_id, title, raw_payload) "
+                "VALUES (:id, 'adzuna', :external_id, 'Posting A', '{}')"
+            ),
+            {"id": uuid.uuid4(), "external_id": marker},
+        )
+        defaults = (
+            await conn.execute(
+                text(
+                    "SELECT expires_at, is_closed FROM job_posting WHERE external_id = :external_id"
+                ),
+                {"external_id": marker},
+            )
+        ).one()
+        assert defaults[0] is None
+        assert defaults[1] is False
+        await conn.rollback()
+
+    await migrate("downgrade", "0014")
+
+    async with session_factory() as session:
+        conn = await session.connection()
+        assert await _expiry_columns(conn) == {}

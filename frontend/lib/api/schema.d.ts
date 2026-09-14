@@ -526,6 +526,13 @@ export interface components {
             location?: string | null;
             /** Posted At */
             posted_at?: string | null;
+            /** Expires At */
+            expires_at?: string | null;
+            /**
+             * Is Closed
+             * @default false
+             */
+            is_closed: boolean;
             /** Salary Min */
             salary_min?: number | null;
             /** Salary Max */
@@ -561,6 +568,13 @@ export interface components {
             location?: string | null;
             /** Posted At */
             posted_at?: string | null;
+            /** Expires At */
+            expires_at?: string | null;
+            /**
+             * Is Closed
+             * @default false
+             */
+            is_closed: boolean;
             /** Salary Min */
             salary_min?: number | null;
             /** Salary Max */

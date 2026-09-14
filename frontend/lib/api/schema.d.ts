@@ -1556,7 +1556,9 @@ export interface operations {
     };
     get_job_search_status_api_jobs_searches__search_id__get: {
         parameters: {
-            query?: never;
+            query: {
+                profile_id: string;
+            };
             header?: never;
             path: {
                 search_id: string;
@@ -1587,7 +1589,9 @@ export interface operations {
     };
     get_job_search_postings_api_jobs_searches__search_id__postings_get: {
         parameters: {
-            query?: never;
+            query: {
+                profile_id: string;
+            };
             header?: never;
             path: {
                 search_id: string;

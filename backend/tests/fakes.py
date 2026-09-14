@@ -163,3 +163,34 @@ def install_aembedding(monkeypatch: Any, handler: Callable[..., object]) -> list
 
     monkeypatch.setattr(litellm, "aembedding", _spy)
     return calls
+
+
+async def seed_profile_light(name: str = "Seeker") -> Any:
+    """Create a profile (no embedding) and return its id."""
+    import uuid
+
+    from sqlalchemy import select
+
+    from app.core.db import session_factory
+    from app.models import Candidate, Profile
+    from app.schemas.profile import StructuredProfile
+
+    async with session_factory() as session:
+        result = await session.execute(select(Candidate).limit(1))
+        candidate = result.scalars().first()
+        if candidate is None:
+            candidate = Candidate()
+            session.add(candidate)
+            await session.flush()
+        profile = Profile(
+            candidate_id=candidate.id,
+            name=name,
+            structured_profile=StructuredProfile.model_validate(VALID_PROFILE).model_dump(
+                mode="json"
+            ),
+        )
+        session.add(profile)
+        await session.flush()
+        profile_id: uuid.UUID = profile.id
+        await session.commit()
+        return profile_id

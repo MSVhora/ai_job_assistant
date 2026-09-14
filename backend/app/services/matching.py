@@ -11,7 +11,7 @@ from app.adapters.llm import LLMError, parse_structured
 from app.core.config import get_settings
 from app.core.errors import ProfileNotEmbeddedError, ProfileNotFoundError
 from app.models import JobPosting, Match, Profile
-from app.schemas.job_search import JobPostingSummary, JobSearchRequest, MatchingOutcome
+from app.schemas.job_search import JobPostingSummary, MatchingOutcome
 from app.schemas.matching import (
     MatchFilters,
     MatchQueryParams,
@@ -186,15 +186,6 @@ async def refresh_matches_for_profile(
     return await _rerank_top_matches(session, profile, scored)
 
 
-async def refresh_matches_for_search(
-    session: AsyncSession, payload: JobSearchRequest
-) -> MatchingOutcome:
-    profile_id = payload.profile_id or await latest_profile_id(session)
-    if profile_id is None:
-        return MatchingOutcome(status="skipped", warning="no profile available to match against")
-    return await refresh_matches_for_profile(session, profile_id)
-
-
 async def _rerank_top_matches(
     session: AsyncSession, profile: Profile, scored_count: int
 ) -> MatchingOutcome:
@@ -327,11 +318,6 @@ def _rerank_prompt(profile: StructuredProfile, postings: list[JobPosting]) -> st
             f"location: {location}\ndescription: {description}"
         )
     return "\n\n".join(blocks)
-
-
-async def latest_profile_id(session: AsyncSession) -> uuid.UUID | None:
-    result = await session.execute(select(Profile.id).order_by(Profile.updated_at.desc()).limit(1))
-    return result.scalars().first()
 
 
 _SORT_ORDERS = {

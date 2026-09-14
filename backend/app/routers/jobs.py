@@ -40,17 +40,19 @@ async def start_job_search(
 @router.get("/jobs/searches/{search_id}", response_model=JobSearchStatusResponse)
 async def get_job_search_status(
     search_id: uuid.UUID,
+    profile_id: uuid.UUID,
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> JobSearchStatusResponse:
-    return await ingestion.get_search_status(session, search_id)
+    return await ingestion.get_search_status(session, search_id, profile_id)
 
 
 @router.get("/jobs/searches/{search_id}/postings", response_model=list[JobPostingSummary])
 async def get_job_search_postings(
     search_id: uuid.UUID,
+    profile_id: uuid.UUID,
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> list[JobPostingSummary]:
-    return await ingestion.get_search_postings(session, search_id)
+    return await ingestion.get_search_postings(session, search_id, profile_id)
 
 
 @router.get("/sources", response_model=list[SourceInfoResponse])

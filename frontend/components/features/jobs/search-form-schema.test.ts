@@ -51,13 +51,13 @@ const adzunaFilters = [
 
 const linkedinFilters = [
   {
-    key: "date_posted",
-    label: "Date posted",
+    key: "workplace_type",
+    label: "Workplace type",
     type: "select" as const,
     required: false,
     options: [
-      { value: "anyTime", label: "Any time" },
-      { value: "pastWeek", label: "Past week" },
+      { value: "remote", label: "Remote" },
+      { value: "hybrid", label: "Hybrid" },
     ],
   },
   {
@@ -192,7 +192,7 @@ describe("toSearchRequest", () => {
       title: "Engineer",
       skills: "",
       exclude: "interns",
-      options: { date_posted: "pastWeek", company_ids: "123, 456" },
+      options: { workplace_type: "hybrid", company_ids: "123, 456" },
     };
     const { payload, missing } = toSearchRequest(values, linkedin, null, "p-1");
     expect(missing).toEqual([]);
@@ -200,7 +200,7 @@ describe("toSearchRequest", () => {
     expect(spec?.exclude).toBeUndefined();
     expect(spec?.options).toMatchObject({
       company_ids: ["123", "456"],
-      date_posted: "pastWeek",
+      workplace_type: "hybrid",
     });
     expect(payload.salary_max).toBeUndefined();
     expect(payload.salary_min).toBeUndefined();

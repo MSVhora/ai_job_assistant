@@ -114,7 +114,7 @@ describe("SearchStepperModal", () => {
     onOpenChange.mockReset();
   });
 
-  it("step 4 shows the declared filters and does not start a search on Next", async () => {
+  it("details hosts the source filters accordion; review lists every field without starting a run", async () => {
     const user = userEvent.setup();
     mount();
 
@@ -122,12 +122,20 @@ describe("SearchStepperModal", () => {
     await goThrough(user);
 
     expect(screen.getByText("AI search queries")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Next" }));
-
-    expect(screen.getByText("Advanced filters")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /More filters for this source/ }),
+    ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /More filters for this source/ }));
     expect(
       screen.getByRole("checkbox", { name: "Title-only search" }),
     ).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Next" }));
+
+    const review = screen.getByRole("region", { name: /Review of the search/ });
+    expect(review).toHaveTextContent("Review");
+    expect(review).toHaveTextContent("Profile");
+    expect(review).toHaveTextContent("Posted within");
+    expect(review).toHaveTextContent("Advanced filters");
     expect(startMutation).not.toHaveBeenCalled();
   });
 
@@ -135,11 +143,12 @@ describe("SearchStepperModal", () => {
     const user = userEvent.setup();
     mount();
 
-    await user.click(screen.getByRole("button", { name: "Next" }));
-    await user.click(screen.getByRole("radio", { name: "Search adzuna" }));
-    await user.click(screen.getByRole("button", { name: "Next" }));
+    await goThrough(user);
     await user.click(screen.getByRole("button", { name: "Next" }));
 
+    // The submit button is inert for its first moments on the review step, so
+    // wait the guard out before the genuine press.
+    await new Promise((resolve) => setTimeout(resolve, 450));
     await user.click(screen.getByRole("button", { name: "Start search" }));
     expect(startMutation).toHaveBeenCalledTimes(1);
   });
@@ -148,9 +157,7 @@ describe("SearchStepperModal", () => {
     const user = userEvent.setup();
     mount();
 
-    await user.click(screen.getByRole("button", { name: "Next" }));
-    await user.click(screen.getByRole("radio", { name: "Search adzuna" }));
-    await user.click(screen.getByRole("button", { name: "Next" }));
+    await goThrough(user);
     expect(screen.getByText("AI search queries")).toBeInTheDocument();
 
     // Implicit submissions (Enter in a field, browser defaults) land on the
@@ -159,6 +166,22 @@ describe("SearchStepperModal", () => {
     fireEvent.submit(document.querySelector("form") as HTMLFormElement);
     await sleep(0);
     expect(startMutation).not.toHaveBeenCalled();
-    expect(screen.getByText("Advanced filters")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: /Review of the search/ })).toBeInTheDocument();
+  });
+
+  it("a submit landing right after the review step renders is ignored", async () => {
+    const user = userEvent.setup();
+    mount();
+    await goThrough(user);
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByRole("region", { name: /Review of the search/ })).toBeInTheDocument();
+
+    fireEvent.submit(document.querySelector("form") as HTMLFormElement);
+    await sleep(0);
+    expect(startMutation).not.toHaveBeenCalled();
+
+    await new Promise((resolve) => setTimeout(resolve, 450));
+    await user.click(screen.getByRole("button", { name: "Start search" }));
+    expect(startMutation).toHaveBeenCalledTimes(1);
   });
 });

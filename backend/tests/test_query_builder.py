@@ -34,10 +34,10 @@ def adzuna_filters() -> list[SourceFilterDecl]:
 def linkedin_filters() -> list[SourceFilterDecl]:
     return [
         SourceFilterDecl(
-            key="date_posted",
-            label="Date posted",
+            key="workplace_type",
+            label="Workplace type",
             type="select",
-            options=[SourceFilterOption(value="pastWeek", label="Past week")],
+            options=[SourceFilterOption(value="remote", label="Remote")],
         ),
         SourceFilterDecl(key="under_10_applicants", label="Few applicants", type="boolean"),
     ]

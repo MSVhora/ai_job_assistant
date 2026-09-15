@@ -113,6 +113,7 @@ sequenceDiagram
     A->>D: hard filters + cosine → top N
     A->>G: re-rank top N + rationale
     A->>D: store matches
+    B->>A: GET /api/jobs/searches (profile_id) -> recent runs
     B->>A: GET /api/jobs/searches/{id}?profile_id= → run status + warnings (404 unless owned)
     B->>A: GET /api/jobs/searches/{id}/postings?profile_id= → unranked run results (404 unless owned)
     B->>A: GET /api/matches → ranked + "why this matches"

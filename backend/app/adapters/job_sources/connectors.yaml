@@ -15,15 +15,6 @@ sources:
       autoConvertToAiSearch: true
       scrapeCompany: false
     filters:
-      - key: date_posted
-        label: Date posted
-        type: select
-        options:
-          - {value: anyTime, label: Any time}
-          - {value: past24h, label: Past 24 hours}
-          - {value: pastWeek, label: Past week}
-          - {value: pastMonth, label: Past month}
-        help_text: Overrides the shared "posted within" filter when set
       - key: distance_miles
         label: Radius (miles)
         type: number

@@ -230,6 +230,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/jobs/searches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Job Searches */
+        get: operations["list_job_searches_api_jobs_searches_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/jobs/searches/{search_id}": {
         parameters: {
             query?: never;
@@ -645,6 +662,35 @@ export interface components {
             query: {
                 [key: string]: unknown;
             };
+            /**
+             * Results
+             * @default []
+             */
+            results: components["schemas"]["SourceOutcome"][];
+            matching?: components["schemas"]["MatchingOutcome"] | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** JobSearchSummary */
+        JobSearchSummary: {
+            /**
+             * Search Id
+             * Format: uuid
+             */
+            search_id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "running" | "succeeded" | "partial" | "failed";
             /**
              * Results
              * @default []
@@ -1710,6 +1756,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["JobSearchStartResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_job_searches_api_jobs_searches_get: {
+        parameters: {
+            query: {
+                profile_id: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["JobSearchSummary"][];
                 };
             };
             /** @description Validation Error */

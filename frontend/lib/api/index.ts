@@ -17,6 +17,7 @@ export type SourceInfo = components["schemas"]["SourceInfoResponse"];
 export type SourceFilterDecl = components["schemas"]["SourceFilterDecl"];
 export type SourceFilterOption = components["schemas"]["SourceFilterOption"];
 export type JobSearchRequest = components["schemas"]["JobSearchRequest"];
+export type JobSearchSummary = components["schemas"]["JobSearchSummary"];
 export type JobSearchStart = components["schemas"]["JobSearchStartResponse"];
 export type JobSearchStatus = components["schemas"]["JobSearchStatusResponse"];
 export type SourceQuerySpec = components["schemas"]["SourceQuerySpec"];
@@ -145,6 +146,12 @@ export async function startJobSearch(payload: JobSearchRequest): Promise<JobSear
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export async function listProfileSearches(profileId: string): Promise<JobSearchSummary[]> {
+  return apiFetch<JobSearchSummary[]>(
+    `/api/jobs/searches?profile_id=${encodeURIComponent(profileId)}`,
+  );
 }
 
 export async function getJobSearchStatus(

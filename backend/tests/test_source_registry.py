@@ -59,7 +59,6 @@ def test_package_config_loads() -> None:
     assert actors[0].actor_id == "hKByXkMQaC5Qt9UMN"
     assert actors[0].external_id_field == "id"
     assert [decl.key for decl in actors[0].filters] == [
-        "date_posted",
         "distance_miles",
         "under_10_applicants",
         "company_ids",
@@ -192,7 +191,7 @@ def test_build_actor_input_resolves_option_placeholders() -> None:
     assert build_actor_input(actor, JobSearchQuery(query="x", country="us")) == {}
 
 
-def test_declared_option_overrides_date_posted_bucket() -> None:
+def test_date_posted_bucket_placeholder_derives_from_shared_filter() -> None:
     actor = ActorConfig(
         name="apify_x",
         actor_id="a",
@@ -200,10 +199,6 @@ def test_declared_option_overrides_date_posted_bucket() -> None:
         input={"datePosted": "{date_posted_bucket}"},
     )
 
-    explicit = JobSearchQuery(
-        query="x", country="us", max_days_old=7, options={"date_posted": "anyTime"}
-    )
-    assert build_actor_input(actor, explicit) == {"datePosted": "anyTime"}
     derived = JobSearchQuery(query="x", country="us", max_days_old=7)
     assert build_actor_input(actor, derived) == {"datePosted": "pastWeek"}
 

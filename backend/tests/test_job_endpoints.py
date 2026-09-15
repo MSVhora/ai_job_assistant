@@ -1,4 +1,5 @@
 import uuid
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from fakes import FakeJobSource, fake_posting, seed_profile_light
@@ -430,6 +431,40 @@ async def test_search_postings_endpoint(
         params={"profile_id": str(uuid.uuid4())},
     )
     assert cross_profile.status_code == 404
+
+
+async def test_list_searches_returns_recent_runs_for_profile(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.models import JobSearch
+
+    profile_id = await seed_profile_light("Owner")
+
+    async with session_factory() as session:
+        session.add_all(
+            [
+                JobSearch(
+                    profile_id=profile_id,
+                    status="succeeded",
+                    query={},
+                    created_at=datetime.now(UTC) - timedelta(minutes=5),
+                ),
+                JobSearch(profile_id=profile_id, status="pending", query={}),
+            ]
+        )
+        await session.commit()
+
+    response = await client.get("/api/jobs/searches", params={"profile_id": profile_id})
+    assert response.status_code == 200
+    runs = response.json()
+    assert [run["status"] for run in runs] == ["pending", "succeeded"]
+    assert "query" not in runs[0]
+
+    unknown = await client.get("/api/jobs/searches", params={"profile_id": str(uuid.uuid4())})
+    assert unknown.status_code == 404
+
+    missing = await client.get("/api/jobs/searches")
+    assert missing.status_code == 422
 
 
 async def test_list_sources_includes_state(

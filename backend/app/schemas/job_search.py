@@ -147,6 +147,15 @@ class JobSearchStatusResponse(BaseModel):
     updated_at: datetime
 
 
+class JobSearchSummary(BaseModel):
+    search_id: uuid.UUID
+    status: JobSearchStatusLiteral
+    results: list[SourceOutcome] = []
+    matching: MatchingOutcome | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
 class SourceInfoResponse(BaseModel):
     name: str
     is_official_api: bool

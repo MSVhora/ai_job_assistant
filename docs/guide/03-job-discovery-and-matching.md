@@ -26,10 +26,20 @@ sources are fine. The wizard has four steps:
    scraper) are always visible, and a source without its API key is disabled.
 3. **Details** — prefilled from your profile (title, skills, exclusions from the stored
    AI queries or the seed, plus location, country, posted-within, and salary band), all
-   editable. Includes maximum salary in addition to minimum.
-4. **Filters & review** — the selected source's declared advanced filters (rendered
-   generically from `/api/sources` — no per-source forms anywhere), plus a one-line
-   review of exactly what will be sent.
+   editable. Includes maximum salary in addition to minimum. The selected source's
+   declared advanced filters (rendered generically from `/api/sources` — no per-source
+   forms anywhere) live in a collapsed "More filters for this source" accordion — open it
+   only if you want to override the source-specific knobs.
+4. **Review** — a summary of every value that will be sent: profile, source, search
+   title, skills, exclusions, location, country, posted within, salary band, result
+   count, and a one-line roll-up of the advanced filters that are actually set
+   (everything unset reads "none"). The run starts only from this step.
+
+Freshness has a single knob: **Posted within** (step 3) is the shared day-filter —
+sent exactly on Adzuna and converted to the closest `datePosted` bucket on LinkedIn
+(`anyTime`/`past24h`/`pastWeek`/`pastMonth`). There is no separate LinkedIn date filter
+(the redundant override was removed in v3 #30); the read-side expiry filter applies on
+top either way.
 
 Supporting details that carry over from earlier versions:
 
@@ -102,6 +112,9 @@ Career tracks live side by side, and jobs found for one track must not leak into
   `search_posting` join table (unique per `(search_id, posting_id)`), replacing the old
   mutable pointer that a re-search used to overwrite. A posting re-found by a later
   search gains a new association row; earlier runs' results views are untouched.
+- **Active runs survive a page refresh.** `GET /api/jobs/searches?profile_id=` lists the
+  profile's recent runs (fresh first, no request echo); the `/jobs` page derives its run
+  banners from it, so a search you started keeps its progress banner after reloading.
 - **The URL carries the current profile.** On `/jobs` the selected profile is the
   `?profile=` URL param (same convention as `/profile`); switching profiles resets the
   run state and refetches that profile's matches.

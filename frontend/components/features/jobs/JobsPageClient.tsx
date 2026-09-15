@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import { SearchResults } from "@/components/features/jobs/SearchResults";
 import { RunBanners } from "@/components/features/jobs/RunBanners";
+import { wizardDebug } from "@/components/features/jobs/wizard-debug";
 import { RebuildBanner } from "@/components/features/jobs/RebuildBanner";
 import {
   SearchStepperModal,
@@ -22,7 +23,8 @@ import { ProfileSelector } from "@/components/features/jobs/ProfileSelector";
 import { Card } from "@/components/ui/card";
 import { useProfiles } from "@/hooks/use-profiles";
 import { usePrioritySetting } from "@/hooks/use-priority-setting";
-import { useJobSearchStatus } from "@/hooks/use-job-search";
+import { useJobSearchStatus, useProfileSearches } from "@/hooks/use-job-search";
+import { isRunActive } from "@/hooks/use-job-search";
 import { useSetupCheck, useSources } from "@/hooks/use-setup";
 import type { MatchResponse } from "@/lib/api";
 
@@ -45,6 +47,7 @@ function FunnelIcon() {
 
 export function JobsPageClient() {
   const [searchIds, setSearchIds] = useState<string[]>([]);
+  const [dismissedIds, setDismissedIds] = useState<string[]>([]);
   const [selectedSearchId, setSelectedSearchId] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<MatchResponse | null>(null);
@@ -71,10 +74,20 @@ export function JobsPageClient() {
   };
   const selectProfile = (profileId: string) => {
     setSearchIds([]);
+    setDismissedIds([]);
     setSelectedSearchId(null);
     setSelectedMatch(null);
     void router.replace(`/jobs?profile=${profileId}`);
   };
+
+  // Persisted runs: banners for still-active runs are derived from the
+  // profile's run list, so they survive a page refresh; posts of finished runs
+  // only reappear in the results view via the most recent run fallback.
+  const searches = useProfileSearches(activeProfileId);
+  const persistedActiveIds = (searches.data ?? [])
+    .filter((run) => isRunActive(run.status) && !dismissedIds.includes(run.search_id))
+    .map((run) => run.search_id);
+  const bannerIds = [...new Set([...persistedActiveIds, ...searchIds])];
 
   const priority = usePrioritySetting(activeProfileId);
   const enabled = sources.data?.filter((source) => source.enabled) ?? [];
@@ -165,7 +178,12 @@ export function JobsPageClient() {
         </div>
         <div className="flex shrink-0 flex-col gap-2 border-t border-gray-100 p-3">
           <RebuildBanner profileId={activeProfileId} />
-          <StartSearchButton onClick={() => setSearchOpen(true)} />
+          <StartSearchButton
+          onClick={() => {
+            wizardDebug("start-search trigger clicked (page level)");
+            setSearchOpen(true);
+          }}
+        />
         </div>
       </aside>
 
@@ -207,11 +225,12 @@ export function JobsPageClient() {
           </Card>
         )}
         <RunBanners
-          searchIds={searchIds}
+          searchIds={bannerIds}
           profileId={activeProfileId}
-          onDismiss={(searchId) =>
-            setSearchIds((current) => current.filter((id) => id !== searchId))
-          }
+          onDismiss={(searchId) => {
+            setDismissedIds((current) => [...current, searchId]);
+            setSearchIds((current) => current.filter((id) => id !== searchId));
+          }}
         />
         <MatchList
           profileId={activeProfileId}
@@ -221,7 +240,7 @@ export function JobsPageClient() {
           onFiltersChange={changeFilters}
         />
         <SearchResults
-          searchId={selectedSearchId}
+          searchId={selectedSearchId ?? (searches.data?.[0]?.search_id ?? null)}
           profileId={activeProfileId}
           status={selectedRunStatus.data?.status}
         />
@@ -243,6 +262,7 @@ export function JobsPageClient() {
         onSelectProfile={selectProfile}
         sources={enabled}
         onSearchStarted={(searchId) => {
+          wizardDebug("onSearchStarted (page level)", { searchId, currentSearchIds: searchIds });
           setSearchIds((current) => [...current, searchId]);
           setSelectedSearchId(searchId);
           setSearchOpen(false);

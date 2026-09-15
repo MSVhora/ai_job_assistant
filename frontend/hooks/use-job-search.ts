@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getJobSearchStatus,
   getSearchPostings,
+  listProfileSearches,
   regenerateSearchQueries,
   startJobSearch,
   type JobSearchRequest,
@@ -39,6 +40,18 @@ export function useSearchPostings(
 
 export function isRunFinished(status: string | undefined): boolean {
   return status !== undefined && TERMINAL_STATUSES.has(status);
+}
+
+export function isRunActive(status: string): boolean {
+  return ACTIVE_STATUSES.has(status);
+}
+
+export function useProfileSearches(profileId: string | null) {
+  return useQuery({
+    queryKey: ["profile-searches", profileId],
+    queryFn: () => listProfileSearches(profileId as string),
+    enabled: profileId !== null,
+  });
 }
 
 export function useStartJobSearch() {

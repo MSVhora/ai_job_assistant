@@ -35,6 +35,7 @@ from app.schemas.job_search import (
     JobSearchRequest,
     JobSearchStartResponse,
     JobSearchStatusResponse,
+    JobSearchSummary,
     MatchingOutcome,
     SourceOutcome,
 )
@@ -287,6 +288,31 @@ async def get_search_status(
         created_at=run.created_at,
         updated_at=run.updated_at,
     )
+
+
+async def list_profile_searches(
+    session: AsyncSession, profile_id: uuid.UUID
+) -> list[JobSearchSummary]:
+    """Recent runs for a profile (fresh first) — drives run banners after a reload."""
+    await _require_profile(session, profile_id)
+    result = await session.execute(
+        select(JobSearch)
+        .where(JobSearch.profile_id == profile_id)
+        .order_by(JobSearch.created_at.desc())
+        .limit(20)
+    )
+    runs = result.scalars().all()
+    return [
+        JobSearchSummary(
+            search_id=run.id,
+            status=run.status.value,
+            results=[SourceOutcome.model_validate(item) for item in (run.results or [])],
+            matching=MatchingOutcome.model_validate(run.matching) if run.matching else None,
+            created_at=run.created_at,
+            updated_at=run.updated_at,
+        )
+        for run in runs
+    ]
 
 
 async def get_search_postings(

@@ -1,17 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import { FormProvider, useForm } from "react-hook-form";
 
 import { Button } from "@/components/ui/button";
-import { SourceFiltersForm } from "@/components/features/jobs/SourceFiltersForm";
 import { Modal } from "@/components/ui/modal";
 import { useStartJobSearch } from "@/hooks/use-job-search";
 import { useProfile } from "@/hooks/use-profiles";
 import type { ProfileSummary, SourceInfo } from "@/lib/api";
 
 import { DetailsStep, ProfileStep, ReviewSummary, SourceStep } from "./SearchSteps";
+import { wizardDebug } from "./wizard-debug";
 import {
   emptyQueryFields,
   makeSearchFormSchema,
@@ -21,7 +21,7 @@ import {
   type SearchFormValues,
 } from "./search-form-schema";
 
-const STEP_LABELS = ["Profile", "Source", "Details", "Filters & review"] as const;
+const STEP_LABELS = ["Profile", "Source", "Details", "Review"] as const;
 const LAST_STEP = 4;
 
 const STEP_FIELDS: (keyof SearchFormValues | string)[][] = [
@@ -79,6 +79,7 @@ export function SearchStepperModal({
   onSearchStarted: (searchId: string) => void;
 }) {
   const [step, setStep] = useState(1);
+  const step4AtRef = useRef<number | null>(null);
   const [sourceName, setSourceName] = useState("");
   const selectedSource = sources.find((source) => source.name === sourceName) ?? null;
   const profileQuery = useProfile(activeProfileId);
@@ -106,14 +107,52 @@ export function SearchStepperModal({
   // `open` prop flips (the render-phase adjustment pattern).
   const [wasOpen, setWasOpen] = useState(open);
   if (open === true && wasOpen === false) {
+    wizardDebug("modal-open reset", { wasOpen, open });
     setWasOpen(true);
     setStep(1);
     setSourceName("");
   } else if (open === false && wasOpen === true) {
+    wizardDebug("modal-close reset", { wasOpen });
     setWasOpen(false);
   }
 
+  // A fresh open must not inherit a step-enter timestamp from the last one.
   useEffect(() => {
+    if (!open) return;
+    step4AtRef.current = null;
+  }, [open]);
+
+  // Log every raw browser interaction inside the wizard (capture phase, so we
+  // see the true event timeline including events React never receives).
+  useEffect(() => {
+    if (!open) return;
+    const logRaw = (e: MouseEvent | KeyboardEvent | Event) => {
+      const target = e.target as HTMLElement | null;
+      const label = target?.closest("button")
+        ? `button:"${target.closest("button")?.textContent?.trim()?.slice(0, 24)}"`
+        : (target?.textContent?.trim().slice(0, 24) ?? null);
+      const submitter = e instanceof SubmitEvent ? (e.submitter?.textContent?.trim() ?? null) : undefined;
+      wizardDebug(`dom:${e.type}`, { target: label, submitter });
+    };
+    const types = [
+      "pointerdown",
+      "pointerup",
+      "mousedown",
+      "mouseup",
+      "click",
+      "dblclick",
+      "keydown",
+      "keyup",
+      "submit",
+    ];
+    types.forEach((type) => document.addEventListener(type, logRaw, true));
+    return () => {
+      types.forEach((type) => document.removeEventListener(type, logRaw, true));
+    };
+  }, [open]);
+
+  useEffect(() => {
+    wizardDebug("source-effect setValue", { sourceName });
     form.setValue("source", sourceName, { shouldValidate: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sourceName]);
@@ -122,12 +161,13 @@ export function SearchStepperModal({
   // regenerate refreshes the stored per-source queries.
   useEffect(() => {
     if (structured === null) {
+      wizardDebug("re-seed skipped (profile data missing)", { sourceName, activeProfileId });
       return;
     }
     const preferences = structured.preferences;
     const stored = profileQuery.data?.search_queries?.queries[sourceName];
     const seeded = seedSpec(structured);
-    form.reset({
+    const seededValues = {
       query: {
         title: stored?.title ?? seeded.title,
         skills: (stored?.skills ?? seeded.skills).join(", "),
@@ -145,9 +185,11 @@ export function SearchStepperModal({
         preferences?.salary_max !== undefined && preferences?.salary_max !== null
           ? String(preferences.salary_max)
           : "",
-      posted_within: "any",
+      posted_within: "any" as const,
       results_wanted: 50,
-    });
+    };
+    wizardDebug("re-seed reset", { trigger: { activeProfileId, sourceName }, seededValues });
+    form.reset(seededValues);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     activeProfileId,
@@ -156,21 +198,33 @@ export function SearchStepperModal({
     profileQuery.data?.search_queries?.generated_at,
   ]);
 
-  const advance = async () => {
+  const advance = async (origin: string) => {
     const fields = STEP_FIELDS[step - 1];
+    wizardDebug("advance start", { origin, step, fields });
     if (step === 1) {
       if (activeProfileId === null) {
+        wizardDebug("advance blocked (no profile)", { step });
         form.setError("root", { message: "Select a profile before continuing." });
         return;
       }
       form.clearErrors("root");
+      wizardDebug("advance ok: 1 -> 2", { activeProfileId });
       setStep(2);
       return;
     }
     const ok = await form.trigger(fields as never, { shouldFocus: true });
+    const invalid = Object.keys(form.formState.errors);
+    wizardDebug("advance validation", { fromStep: step, ok, invalid });
     if (ok) {
       form.clearErrors("root");
-      setStep((current) => Math.min(current + 1, LAST_STEP));
+      setStep((current) => {
+        const next = Math.min(current + 1, LAST_STEP);
+        wizardDebug("advance ok", { fromStep: current, toStep: next });
+        return next;
+      });
+      if (step + 1 === LAST_STEP) {
+        step4AtRef.current = Date.now();
+      }
     }
   };
 
@@ -181,6 +235,7 @@ export function SearchStepperModal({
       structured?.preferences?.currency ?? null,
       activeProfileId,
     );
+    wizardDebug("submit-start handler", { step, missing, payload });
     if (missing.length > 0) {
       form.setError("root", {
         message:
@@ -193,23 +248,67 @@ export function SearchStepperModal({
       return;
     }
     form.clearErrors("root");
-    start.mutate(payload, { onSuccess: (data) => onSearchStarted(data.search_id) });
+    wizardDebug("start.mutate issued", { step, source: payload.source });
+    start.mutate(payload, {
+      onSuccess: (data) => {
+        wizardDebug("run started", { searchId: data.search_id });
+        onSearchStarted(data.search_id);
+      },
+      onError: (error) => {
+        wizardDebug("run start failed", { message: error.message });
+      },
+    });
   });
 
   // Submissions only come from the review step's button in principle, but
   // implicit submit events (Enter in any input at any step) land on the form
   // too. They advance the wizard instead of ever starting a run early.
   const onFormSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    const native = event.nativeEvent as SubmitEvent;
+    const submitter = "submitter" in native ? (native.submitter ?? null) : null;
+    // A submit must come from an explicit press on the review step AFTER it
+    // rendered: the tail end of the pointer gesture that advanced the wizard
+    // (pointer-up landing on the submit button that mounts in the Next
+    // button's slot) is ignored.
+    const fresh = step4AtRef.current !== null && Date.now() - step4AtRef.current < 400;
+    if (step === LAST_STEP && fresh) {
+      wizardDebug("submit ignored (rendered just now — same gesture)", {
+        step,
+        isTrusted: event.nativeEvent.isTrusted,
+        submitter: submitter === null ? null : submitter.textContent?.trim(),
+      });
+      event.preventDefault();
+      return;
+    }
+    wizardDebug("form onSubmit fired", {
+      step,
+      isTrusted: event.nativeEvent.isTrusted,
+      submitterText: submitter?.textContent?.trim() ?? null,
+      sinceStep4Ms: step4AtRef.current === null ? null : Date.now() - step4AtRef.current,
+    });
     event.preventDefault();
     if (step < LAST_STEP) {
-      void advance();
+      void advance("form-submit (premature)");
       return;
     }
     void submit();
   };
 
   const currency = structured?.preferences?.currency ?? null;
-  const goingBack = () => setStep((current) => Math.max(current - 1, 1));
+  const goingBack = () => {
+    wizardDebug("back clicked", { step });
+    setStep((current) => Math.max(current - 1, 1));
+  };
+
+  wizardDebug("render", {
+    open,
+    step,
+    sourceName,
+    selectedSource: selectedSource?.name ?? null,
+    profileName,
+    currency,
+    values: form.getValues(),
+  });
 
   return (
     <Modal
@@ -270,12 +369,12 @@ export function SearchStepperModal({
             />
           )}
           {step === 4 && selectedSource !== null && (
-            <div aria-label="Step 4: filters and review" className="flex flex-col gap-4">
+            <div aria-label="Step 4: review" className="flex flex-col gap-3">
               <ReviewSummary
-                sourceName={selectedSource.name}
+                source={selectedSource}
                 profileName={profileName}
+                currency={currency}
               />
-              <SourceFiltersForm decls={selectedSource.filters ?? []} />
             </div>
           )}
 
@@ -292,12 +391,16 @@ export function SearchStepperModal({
               <Button
                 type="button"
                 disabled={step === 1 && activeProfileId === null}
-                onClick={() => void advance()}
+                onClick={() => void advance("next-button")}
               >
                 {step === 4 ? "Start search" : "Next"}
               </Button>
             ) : (
-              <Button type="submit" disabled={start.isPending}>
+              <Button
+                type="submit"
+                disabled={start.isPending}
+                onClick={() => wizardDebug("start-search clicked", { step })}
+              >
                 {start.isPending ? "Starting run…" : "Start search"}
               </Button>
             )}

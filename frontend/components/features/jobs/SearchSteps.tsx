@@ -1,15 +1,25 @@
 "use client";
 
+import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Accordion } from "@/components/ui/accordion";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
-import type { ProfileSummary, SourceInfo, StoredSearchQueries, StructuredProfile } from "@/lib/api";
+import type {
+  ProfileSummary,
+  SourceFilterDecl,
+  SourceInfo,
+  StoredSearchQueries,
+  StructuredProfile,
+} from "@/lib/api";
 import { useFormContext, useWatch } from "react-hook-form";
 
 import { ProfileSelector } from "./ProfileSelector";
 import { SearchQueriesCard } from "./SearchQueriesCard";
+import { SourceFiltersForm } from "./SourceFiltersForm";
 import { POSTED_WITHIN_OPTIONS, type SearchFormValues } from "./search-form-schema";
+import { wizardDebug } from "./wizard-debug";
 
 export function ProfileStep({
   profiles,
@@ -30,7 +40,10 @@ export function ProfileStep({
         profiles={profiles}
         activeProfileId={activeProfileId}
         disabled={profilesPending || profilesError}
-        onSelect={onSelectProfile}
+        onSelect={(profileId) => {
+          wizardDebug("profile selected", { profileId, current: activeProfileId });
+          onSelectProfile(profileId);
+        }}
         id="stepper-profile"
         hint="Every search run is scoped to exactly one profile."
       />
@@ -69,7 +82,10 @@ export function SourceStep({
             className="accent-violet-600"
             disabled={!source.is_configured}
             checked={selectedSourceId === source.name}
-            onChange={() => onSelect(source.name)}
+            onChange={() => {
+              wizardDebug("source selected", { source: source.name });
+              onSelect(source.name);
+            }}
             aria-label={`Search ${source.name}`}
           />
           <span>{source.name}</span>
@@ -107,6 +123,7 @@ export function DetailsStep({
 }) {
   const form = useFormContext<SearchFormValues>();
   const errors = form.formState.errors;
+  const decls = source.filters ?? [];
   return (
     <div aria-label="Step 3: search details" className="flex flex-col gap-4">
       <SearchQueriesCard
@@ -170,40 +187,117 @@ export function DetailsStep({
           </Select>
         </Field>
       </div>
+      {decls.length > 0 && <SourceFiltersAccordion decls={decls} />}
     </div>
   );
 }
 
-export function reviewLine(
-  values:
-    | { query?: { title?: string; skills?: string } | undefined }
-    | undefined,
-  sourceName: string,
-): string {
-  const title = values?.query?.title?.trim() ?? "";
-  const skills = values?.query?.skills?.trim() ?? "";
-  const parts = [title, skills ? `skills ${skills}` : null].filter(
-    (part): part is string => part !== null && part !== "",
+function SourceFiltersAccordion({ decls }: { decls: SourceFilterDecl[] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Accordion
+      id="details-advanced-filters"
+      open={open}
+      onToggle={() => setOpen((previous) => !previous)}
+      trigger={
+        <span className="text-sm font-semibold text-gray-900">
+          More filters for this source (optional)
+        </span>
+      }
+    >
+      {open && <SourceFiltersForm decls={decls} />}
+    </Accordion>
   );
-  return `${sourceName}: ${parts.length > 0 ? parts.join(" · ") : "no query yet"}`;
 }
 
+function optionDisplay(value: string | boolean | undefined, type: string): string | null {
+  if (value === undefined) return null;
+  if (type === "boolean") return value === true ? "On" : null;
+  if (typeof value === "string" && value.trim() === "") return null;
+  return String(value);
+}
+
+type ReviewRow = { label: string; value: string };
+
 export function ReviewSummary({
-  sourceName,
+  source,
   profileName,
+  currency,
 }: {
-  sourceName: string;
+  source: SourceInfo;
   profileName: string | null;
+  currency: string | null;
 }) {
   const { control } = useFormContext<SearchFormValues>();
   const values = useWatch({ control });
-  const location = values?.location ?? "";
-  const country = values?.country ?? "";
+  const query = values?.query ?? {};
+  const title = query.title?.trim();
+  const skills = query.skills?.trim();
+  const exclude = source.supports_exclusions ? (query.exclude?.trim() ?? "") : null;
+  const postedWithin =
+    POSTED_WITHIN_OPTIONS.find((option) => option.value === values?.posted_within)?.label ?? "—";
+  const advanced = (source.filters ?? [])
+    .map((decl) => ({
+      label: decl.label,
+      display: optionDisplay((query.options ?? {})[decl.key], decl.type),
+    }))
+    .filter((entry): entry is { label: string; display: string } => entry.display !== null);
+
+  const rows: ReviewRow[] = [
+    { label: "Profile", value: profileName ?? "—" },
+    { label: "Source", value: source.name },
+    { label: "Search title", value: title === undefined || title === "" ? "—" : title },
+    { label: "Include skills", value: skills === undefined || skills === "" ? "—" : skills },
+    {
+      label: "Exclude skills",
+      value: exclude === null ? "not supported by this source" : exclude === "" ? "—" : exclude,
+    },
+    {
+      label: "Location",
+      value: (values?.location ?? "").trim() === "" ? "—" : (values?.location ?? "").trim(),
+    },
+    {
+      label: "Country",
+      value: (values?.country ?? "").trim() === "" ? "—" : (values?.country ?? "").trim(),
+    },
+    { label: "Posted within", value: postedWithin },
+    {
+      label: "Min. salary",
+      value:
+        (values?.minSalary ?? "").trim() === ""
+          ? "—"
+          : `${values.minSalary}${currency !== null ? ` ${currency}` : ""}`,
+    },
+    {
+      label: "Max. salary",
+      value: (values?.maxSalary ?? "").trim() === "" ? "—" : `${values.maxSalary}${currency !== null ? ` ${currency}` : ""}`,
+    },
+    { label: "Results wanted", value: String(values?.results_wanted ?? "—") },
+    {
+      label: "Advanced filters",
+      value:
+        advanced.length === 0
+          ? "none"
+          : advanced.map((entry) => `${entry.label}: ${entry.display}`).join(", "),
+    },
+  ];
+
   return (
-    <p className="rounded-xl bg-violet-50 px-3 py-2 text-xs text-violet-900">
-      Review — {profileName ?? "no profile"} · {reviewLine(values, sourceName)}
-      {location !== "" && ` · ${location}`}
-      {` (${country})`}
-    </p>
+    <section aria-label="Review of the search you are about to start">
+      <h3 className="text-sm font-bold tracking-tight text-gray-900">Review</h3>
+      <dl className="mt-2 flex flex-col rounded-2xl border border-violet-100 bg-violet-50/50 p-3.5">
+        {rows.map((row) => (
+          <div
+            key={row.label}
+            className="flex items-baseline justify-between gap-4 border-b border-violet-100/70 py-1.5 text-sm last:border-0 last:pb-0"
+          >
+            <dt className="shrink-0 text-xs font-semibold uppercase tracking-wide text-gray-500">
+              {row.label}
+            </dt>
+            <dd className="min-w-0 break-words text-right text-gray-900">{row.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
   );
 }

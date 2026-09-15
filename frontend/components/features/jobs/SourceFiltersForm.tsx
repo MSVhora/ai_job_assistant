@@ -11,17 +11,15 @@ import type { SourceFilterDecl } from "@/lib/api";
 import type { SearchFormValues } from "./search-form-schema";
 
 function FilterControl({
-  sourceName,
   decl,
   invalid,
 }: {
-  sourceName: string;
   decl: SourceFilterDecl;
   invalid: boolean;
 }) {
   const { register } = useFormContext<SearchFormValues>();
-  const id = `query-${sourceName}-option-${decl.key}`;
-  const path = `queries.${sourceName}.options.${decl.key}` as const;
+  const id = `query-option-${decl.key}`;
+  const path = `query.options.${decl.key}` as const;
 
   if (decl.type === "boolean") {
     return (
@@ -59,16 +57,14 @@ function FilterControl({
 }
 
 export function SourceFiltersForm({
-  sourceName,
   decls,
 }: {
-  sourceName: string;
   decls: SourceFilterDecl[];
 }) {
   const {
     formState: { errors },
   } = useFormContext<SearchFormValues>();
-  const sourceErrors = errors.queries?.[sourceName]?.options;
+  const optionsErrors = errors.query?.options;
 
   return (
     <div className="flex flex-col gap-2.5 rounded-xl bg-gray-50 p-2.5">
@@ -77,19 +73,18 @@ export function SourceFiltersForm({
       </p>
       {decls.map((decl) => {
         const message =
-          sourceErrors?.[decl.key]?.message ??
-          sourceErrors?.root?.message ??
-          sourceErrors?.message;
+          optionsErrors?.[decl.key]?.message ??
+          optionsErrors?.root?.message ??
+          optionsErrors?.message;
         return (
           <Field
             key={decl.key}
             label={decl.type === "boolean" ? "" : decl.label}
-            htmlFor={`query-${sourceName}-option-${decl.key}`}
+            htmlFor={`query-option-${decl.key}`}
             error={typeof message === "string" ? message : undefined}
             hint={decl.help_text ?? undefined}
           >
             <FilterControl
-              sourceName={sourceName}
               decl={decl}
               invalid={message !== undefined}
             />

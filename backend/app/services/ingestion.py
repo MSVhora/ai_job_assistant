@@ -25,7 +25,6 @@ from app.core.errors import (
     JobSourceNotEnabledError,
     MissingProfileIdError,
     MissingSearchQueryError,
-    NoJobSourcesConfiguredError,
     ProfileNotFoundError,
     UnknownJobSourceError,
 )
@@ -36,6 +35,7 @@ from app.schemas.job_search import (
     JobSearchRequest,
     JobSearchStartResponse,
     JobSearchStatusResponse,
+    JobSearchSummary,
     MatchingOutcome,
     SourceOutcome,
 )
@@ -45,37 +45,28 @@ from app.services import sources as sources_service
 logger = logging.getLogger(__name__)
 
 
-def _validate_queries(payload: JobSearchRequest, selected: list[JobSource]) -> None:
-    for name in payload.source_queries or {}:
-        if registry.get_source(name) is None:
-            raise UnknownJobSourceError(f"unknown job source: {name}")
-    for source in selected:
-        spec = (payload.source_queries or {}).get(source.name)
-        if spec is not None:
-            validate_source_options(source.filters(), spec.options, source.name)
-            if spec.has_content():
-                continue
-        if payload.query:
-            continue
-        raise MissingSearchQueryError(f"no search query for source: {source.name}")
+def _validate_queries(payload: JobSearchRequest, source: JobSource) -> None:
+    spec = (payload.source_queries or {}).get(source.name)
+    if spec is not None:
+        validate_source_options(source.filters(), spec.options, source.name)
+        if spec.has_content():
+            return
+    if payload.query:
+        return
+    raise MissingSearchQueryError(f"no search query for source: {source.name}")
 
 
-async def _selected_sources(session: AsyncSession, payload: JobSearchRequest) -> list[JobSource]:
-    for name in payload.sources or []:
-        if registry.get_source(name) is None:
-            raise UnknownJobSourceError(f"unknown job source: {name}")
-    enabled = {source.name: source for source in await sources_service.enabled_sources(session)}
-    selected: list[JobSource] = []
-    if payload.sources is None:
-        selected = list(enabled.values())
-    else:
-        for name in payload.sources:
-            source = enabled.get(name)
-            if source is None:
-                raise JobSourceNotEnabledError(f"job source is not enabled: {name}")
-            selected.append(source)
-    if not selected:
-        raise NoJobSourcesConfiguredError()
+async def _selected_source(session: AsyncSession, payload: JobSearchRequest) -> JobSource:
+    source = registry.get_source(payload.source)
+    if source is None:
+        raise UnknownJobSourceError(f"unknown job source: {payload.source}")
+    enabled = {
+        enabled_source.name: enabled_source
+        for enabled_source in await sources_service.enabled_sources(session)
+    }
+    selected = enabled.get(payload.source)
+    if selected is None:
+        raise JobSourceNotEnabledError(f"job source is not enabled: {payload.source}")
     return selected
 
 
@@ -92,8 +83,8 @@ async def start_search(
     session: AsyncSession, background_tasks: BackgroundTasks, payload: JobSearchRequest
 ) -> JobSearchStartResponse:
     await _require_profile(session, payload.profile_id)
-    selected = await _selected_sources(session, payload)
-    _validate_queries(payload, selected)
+    source = await _selected_source(session, payload)
+    _validate_queries(payload, source)
     run = JobSearch(
         status=JobSearchStatus.pending,
         profile_id=payload.profile_id,
@@ -102,9 +93,7 @@ async def start_search(
     session.add(run)
     await session.flush()
     background_tasks.add_task(run_search, run.id, payload)
-    logger.info(
-        "ingestion.start search_id=%s sources=%s", run.id, [source.name for source in selected]
-    )
+    logger.info("ingestion.start search_id=%s source=%s", run.id, source.name)
     return JobSearchStartResponse(search_id=run.id, status=run.status.value)
 
 
@@ -119,8 +108,8 @@ async def run_search(search_id: uuid.UUID, payload: JobSearchRequest) -> None:
         await session.commit()
 
         try:
-            selected = await _selected_sources(session, payload)
-            _validate_queries(payload, selected)
+            source = await _selected_source(session, payload)
+            _validate_queries(payload, source)
         except DomainError as exc:
             run.status = JobSearchStatus.failed
             run.results = [
@@ -132,20 +121,11 @@ async def run_search(search_id: uuid.UUID, payload: JobSearchRequest) -> None:
             logger.warning("ingestion.run search_id=%s selection failed: %s", search_id, exc.detail)
             return
 
-        outcomes: list[SourceOutcome] = []
-        for source in selected:
-            outcomes.append(await _run_source(session, source, payload, search_id))
-
-        ok = [outcome for outcome in outcomes if outcome.status == "ok"]
-        run.results = [outcome.model_dump(mode="json") for outcome in outcomes]
-        run.status = (
-            JobSearchStatus.succeeded
-            if outcomes and len(ok) == len(outcomes)
-            else JobSearchStatus.partial
-            if ok
-            else JobSearchStatus.failed
-        )
-        run.matching = (await _run_matching(session, run.profile_id)).model_dump(mode="json")
+        outcome = await _run_source(session, source, payload, search_id)
+        outcomes: list[SourceOutcome] = [outcome]
+        run.results = [item.model_dump(mode="json") for item in outcomes]
+        run.status = JobSearchStatus.succeeded if outcome.status == "ok" else JobSearchStatus.failed
+        run.matching = (await _matching_stage(session, run, outcome)).model_dump(mode="json")
         await session.commit()
 
     logger.info(
@@ -154,6 +134,24 @@ async def run_search(search_id: uuid.UUID, payload: JobSearchRequest) -> None:
         run.status.value,
         (time.monotonic() - started) * 1000,
     )
+
+
+async def _matching_stage(
+    session: AsyncSession, run: JobSearch, outcome: SourceOutcome
+) -> MatchingOutcome:
+    """Re-score the profile corpus after ingestion — only when it can have changed."""
+    if outcome.status != "ok" or outcome.count == 0:
+        logger.info(
+            "ingestion.matching skipped search_id=%s source_outcome=%s count=%d",
+            run.id,
+            outcome.status,
+            outcome.count,
+        )
+        return MatchingOutcome(
+            status="skipped",
+            warning="no postings ingested by this run — matches kept as-is",
+        )
+    return await _run_matching(session, run.profile_id)
 
 
 async def _run_matching(session: AsyncSession, profile_id: uuid.UUID) -> MatchingOutcome:
@@ -308,6 +306,31 @@ async def get_search_status(
         created_at=run.created_at,
         updated_at=run.updated_at,
     )
+
+
+async def list_profile_searches(
+    session: AsyncSession, profile_id: uuid.UUID
+) -> list[JobSearchSummary]:
+    """Recent runs for a profile (fresh first) — drives run banners after a reload."""
+    await _require_profile(session, profile_id)
+    result = await session.execute(
+        select(JobSearch)
+        .where(JobSearch.profile_id == profile_id)
+        .order_by(JobSearch.created_at.desc())
+        .limit(20)
+    )
+    runs = result.scalars().all()
+    return [
+        JobSearchSummary(
+            search_id=run.id,
+            status=run.status.value,
+            results=[SourceOutcome.model_validate(item) for item in (run.results or [])],
+            matching=MatchingOutcome.model_validate(run.matching) if run.matching else None,
+            created_at=run.created_at,
+            updated_at=run.updated_at,
+        )
+        for run in runs
+    ]
 
 
 async def get_search_postings(

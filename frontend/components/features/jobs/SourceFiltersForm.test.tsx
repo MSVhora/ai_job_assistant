@@ -53,16 +53,14 @@ const linkedinDecls: SourceFilterDecl[] = [
 function Providers({ children }: { children: React.ReactNode }) {
   const form = useForm<SearchFormValues>({
     defaultValues: {
-      queries: {
-        adzuna: emptyQueryFields(),
-        apify_linkedin: emptyQueryFields(),
-      },
+      query: emptyQueryFields(),
+      source: "adzuna",
       location: "",
       country: "",
       minSalary: "",
+      maxSalary: "",
       posted_within: "any",
       results_wanted: 10,
-      sources: [],
     },
   });
   return <FormProvider {...form}>{children}</FormProvider>;
@@ -72,7 +70,7 @@ describe("SourceFiltersForm", () => {
   it("renders the declared fields with labels for a source", () => {
     render(
       <Providers>
-        <SourceFiltersForm sourceName="adzuna" decls={adzunaDecls} />
+        <SourceFiltersForm decls={adzunaDecls} />
       </Providers>,
     );
     expect(screen.getByText("Advanced filters")).toBeInTheDocument();
@@ -86,7 +84,7 @@ describe("SourceFiltersForm", () => {
   it("renders a text input for multiselect declarations", () => {
     render(
       <Providers>
-        <SourceFiltersForm sourceName="apify_linkedin" decls={linkedinDecls} />
+        <SourceFiltersForm decls={linkedinDecls} />
       </Providers>,
     );
     const input = screen.getByLabelText("Company IDs");

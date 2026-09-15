@@ -56,9 +56,6 @@ def _resolve_value(value: object, query: JobSearchQuery) -> object:
             case "results_wanted":
                 return query.results_wanted
             case "date_posted_bucket":
-                explicit = query.options.get("date_posted")
-                if type(explicit) is str:
-                    return explicit
                 return date_posted_bucket(query.max_days_old)
     return value
 

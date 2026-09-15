@@ -24,6 +24,13 @@ const numericText = z
     message: "Must be a number",
   });
 
+const country = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .regex(/^[a-z]{2}$/, "Two-letter country code, e.g. in")
+  .or(z.literal(""));
+
 export const profileFormSchema = z
   .object({
     contact: z.object({
@@ -31,6 +38,7 @@ export const profileFormSchema = z
       email: z.string(),
       phone: z.string(),
       location: z.string(),
+      country,
       links: z.array(
         z.object({
           label: z.string(),
@@ -142,6 +150,7 @@ export function toFormValues(profile: StructuredProfile): ProfileFormValues {
       email: profile.contact.email ?? "",
       phone: profile.contact.phone ?? "",
       location: profile.contact.location ?? "",
+      country: profile.contact.country ?? "",
       links: (profile.contact.links ?? []).map((link) => ({
         label: link.label ?? "",
         url: link.url,
@@ -240,6 +249,7 @@ export function toProfilePayload(values: ProfileFormValues): StructuredProfile {
       email: optionalText(values.contact.email),
       phone: optionalText(values.contact.phone),
       location: optionalText(values.contact.location),
+      country: optionalText(values.contact.country),
       links: values.contact.links
         .filter((link) => link.url.trim() !== "")
         .map((link) => ({

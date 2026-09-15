@@ -49,7 +49,7 @@ export function MatchCard({
 
   return (
     <li
-      className={`group relative rounded-2xl border bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-lg hover:shadow-violet-100 ${
+      className={`group relative rounded-2xl border bg-white p-4 shadow-sm transition-colors hover:shadow-lg hover:shadow-violet-100 ${
         selected ? "border-violet-400 ring-2 ring-violet-200" : "border-gray-200"
       }`}
     >

@@ -73,6 +73,9 @@ function EditorBody({ profile }: { profile: ProfileResponse }) {
     if (touched.has("contact.location")) {
       next.contact.location = values.contact.location;
     }
+    if (touched.has("contact.country")) {
+      next.contact.country = values.contact.country ?? "";
+    }
     if (touched.has("preferences.target_location")) {
       next.preferences.target_location = values.preferences.target_location;
     }

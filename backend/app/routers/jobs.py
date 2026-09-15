@@ -11,6 +11,7 @@ from app.schemas.job_search import (
     JobSearchRequest,
     JobSearchStartResponse,
     JobSearchStatusResponse,
+    JobSearchSummary,
     SourceEnableRequest,
     SourceInfoResponse,
 )
@@ -35,6 +36,14 @@ async def start_job_search(
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> JobSearchStartResponse:
     return await ingestion.start_search(session, background_tasks, payload)
+
+
+@router.get("/jobs/searches", response_model=list[JobSearchSummary])
+async def list_job_searches(
+    profile_id: uuid.UUID,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> list[JobSearchSummary]:
+    return await ingestion.list_profile_searches(session, profile_id)
 
 
 @router.get("/jobs/searches/{search_id}", response_model=JobSearchStatusResponse)

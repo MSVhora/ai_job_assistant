@@ -102,6 +102,14 @@ export function ProfileReviewForm({
           />
           <TextField label="Phone" name="contact.phone" placeholder="+1 555 000 0000" badge={aiBadge} />
           <TextField label="Location" name="contact.location" placeholder="Berlin, Germany" badge={aiBadge} />
+          <TextField
+            label="Country code"
+            name="contact.country"
+            placeholder="in"
+            hint="ISO 3166-1 alpha-2, e.g. in."
+            error={errors.contact?.country?.message}
+            badge={aiBadge}
+          />
         </div>
         <div className="mt-5">
           <div className="mb-2 flex items-center justify-between">

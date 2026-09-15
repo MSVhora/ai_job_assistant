@@ -72,7 +72,7 @@ Actor input (AI-search mode, `urls` empty):
 | Keywords (NL) | `keywords` | already used; carries title/skills/salary NL |
 | Location | `location` / `geoId` | location used; **`geoId` new** |
 | Radius | `distance` (miles) | **new** |
-| Freshness | `datePosted` (`anyTime`/`past24h`/`pastWeek`/`pastMonth`) | **new** (M2); replaces hardcoded `anyTime` |
+| Freshness | `datePosted` (`anyTime`/`past24Hours`/`pastWeek`/`pastMonth`) | **new** (M2); replaces hardcoded `anyTime` |
 | Under 10 applicants | `under10Applicants` | **new**; survives LinkedIn's AI search as a real filter |
 | Company targeting | `companyIds` | **new**; advanced (user supplies IDs) |
 | Experience / job type / workplace | ❌ no dedicated fields since Aug 2026 — folded into NL keywords via `autoConvertToAiSearch` (already true) | documented, not a filter field |
@@ -127,7 +127,7 @@ Backend:
   Both mappers set `posted_at` consistently for D4 grace checks.
 - `JobSearchRequest.max_days_old: int | None` (1–90, shared filter) → `JobSearchQuery`;
   Adzuna sends `max_days_old`; LinkedIn maps to nearest `datePosted` bucket
-  (≤1 → `past24h`, ≤7 → `pastWeek`, ≤30 → `pastMonth`, else `anyTime`).
+  (≤1 → `past24Hours`, ≤7 → `pastWeek`, ≤30 → `pastMonth`, else `anyTime`).
 - Read-side freshness service filter (shared by matches and search results):
   exclude `is_closed` or `expires_at < now()`; when `expires_at` is null, exclude
   `posted_at < now() - settings.stale_posting_days` (default 45, in `Settings`,
@@ -201,6 +201,23 @@ options; OpenAPI types regenerated (`npm run generate:api`).
 | #27 | Freshness at query time: `max_days_old` → Adzuna / `datePosted` → LinkedIn + form field (M2) | v3 |
 | #28 | Source filter capabilities: declarations, validation, connector mapping (M3) | v3 |
 | #29 | Capability-driven search UI: ui primitives + generic per-source filter form (M3) | v3 |
+| #30 | Search initiation stepper (one source per run, parallel runs OK) + profile country persistence fix | v3 |
+
+### Scope addition (owner, 2026-09-15 — issue #30)
+
+Post-plan addition, owner-approved in
+[v3-issue-030-search-stepper-ui-and-country-persistence.md](v3-issue-030-search-stepper-ui-and-country-persistence.md):
+
+1. **Search initiation as a stepper, one source per run.** The Global configuration
+   dialog (delivered through #29) is replaced by a Start-search button + 4-step
+   wizard (profile → source → details → advanced filters). `JobSearchRequest`
+   moves from `sources: list[str]` to a required single `source`; parallel runs on
+   different sources remain allowed (no concurrency guard). All capability-driven
+   filter UI from #28/#29 is reused unchanged in step 4.
+2. **Bug fix:** chat-set `contact.country` is silently wiped by any manual profile
+   save — the frontend form model (`profile-schema.ts`) omits the field, so
+   `toProfilePayload()` rebuilds `contact` without it and the backend defaults it
+   back to `None`. Fix is frontend-only; no migration.
 
 Process fixes adopted from the v1/v2 retro: each issue's plan doc
 (`v3-issue-0NN-*.md`) is written and reviewed **before** implementation; each GitHub

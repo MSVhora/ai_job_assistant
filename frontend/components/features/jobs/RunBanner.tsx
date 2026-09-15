@@ -26,13 +26,11 @@ export function RunBanner({
   profileId,
   onDismiss,
 }: {
-  searchId: string | null;
+  searchId: string;
   profileId: string | null;
   onDismiss: () => void;
 }) {
   const status = useJobSearchStatus(searchId, profileId);
-
-  if (searchId === null) return null;
 
   const active = status.isPending || (status.data?.status === "pending" || status.data?.status === "running");
   const tone = status.data !== undefined ? (STATUS_STYLES[status.data.status] ?? "border-gray-200 bg-white") : "border-violet-200 bg-violet-50/80";

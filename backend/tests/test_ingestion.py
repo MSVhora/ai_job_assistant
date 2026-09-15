@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 import pytest
 from fakes import FakeJobSource, fake_posting, install_aembedding, seed_profile_light
 from fastapi import BackgroundTasks
+from pydantic import ValidationError
 from sqlalchemy import select
 
 from app.adapters.job_sources import registry
@@ -13,19 +14,22 @@ from app.core.db import session_factory
 from app.core.errors import (
     JobSourceNotEnabledError,
     MissingProfileIdError,
-    NoJobSourcesConfiguredError,
     ProfileNotFoundError,
     UnknownJobSourceError,
 )
 from app.models import JobPosting, JobSearch, Match, SearchPosting, SourceState
 from app.schemas.job_search import JobSearchRequest
-from app.services.ingestion import _selected_sources, run_search, start_search
+from app.services.ingestion import _selected_source, run_search, start_search
 
 pytestmark = pytest.mark.usefixtures("clean_tables")
 
 
 def payload(**overrides: object) -> JobSearchRequest:
-    defaults: dict[str, object] = {"query": "python developer", "country": "de"}
+    defaults: dict[str, object] = {
+        "query": "python developer",
+        "country": "de",
+        "source": "adzuna",
+    }
     return JobSearchRequest(**{**defaults, **overrides})
 
 
@@ -39,9 +43,10 @@ async def acknowledge(name: str) -> None:
         await session.commit()
 
 
-async def selected(payload: JobSearchRequest) -> list[str]:
+async def selected(payload: JobSearchRequest) -> str:
     async with session_factory() as session:
-        return [source.name for source in await _selected_sources(session, payload)]
+        source = await _selected_source(session, payload)
+        return source.name
 
 
 async def create_run(payload: JobSearchRequest) -> uuid.UUID:
@@ -181,28 +186,8 @@ async def test_run_search_passes_query_to_connector(monkeypatch: pytest.MonkeyPa
     assert source.queries[0].results_wanted == 10
 
 
-async def test_failing_source_degrades_to_partial(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_failing_source_marks_run_failed(monkeypatch: pytest.MonkeyPatch) -> None:
     failing = FakeJobSource("adzuna", error=ConnectorError("rate limited"))
-    healthy = FakeJobSource("other", postings=[fake_posting("2")])
-    only_sources(monkeypatch, failing, healthy)
-
-    run = await create_run(payload())
-    await run_search(run, payload())
-
-    run_row = await get_run(run)
-    assert run_row.status.value == "partial"
-    results = run_row.results
-    assert results is not None and len(results) == 2
-    failed = next(item for item in results if item["source"] == "adzuna")
-    ok = next(item for item in results if item["source"] == "other")
-    assert failed["status"] == "failed"
-    assert "rate limited" in failed["warning"]
-    assert ok["status"] == "ok" and ok["count"] == 1
-    assert len(await get_postings()) == 1
-
-
-async def test_all_sources_failing_marks_run_failed(monkeypatch: pytest.MonkeyPatch) -> None:
-    failing = FakeJobSource("adzuna", error=ConnectorError("down"))
     only_sources(monkeypatch, failing)
 
     run = await create_run(payload())
@@ -210,6 +195,12 @@ async def test_all_sources_failing_marks_run_failed(monkeypatch: pytest.MonkeyPa
 
     run_row = await get_run(run)
     assert run_row.status.value == "failed"
+    results = run_row.results
+    assert results is not None and len(results) == 1
+    failed = results[0]
+    assert failed["source"] == "adzuna"
+    assert failed["status"] == "failed"
+    assert "rate limited" in failed["warning"]
     assert await get_postings() == []
 
 
@@ -241,8 +232,8 @@ async def test_run_marks_failed_when_background_selection_fails(
     scraper = FakeJobSource("apify_linkedin", disclosure_required=True)
     only_sources(monkeypatch, scraper)
 
-    run = await create_run(payload(sources=["apify_linkedin"]))
-    await run_search(run, payload(sources=["apify_linkedin"]))
+    run = await create_run(payload(source="apify_linkedin"))
+    await run_search(run, payload(source="apify_linkedin"))
 
     run_row = await get_run(run)
     assert run_row.status.value == "failed"
@@ -252,93 +243,65 @@ async def test_run_marks_failed_when_background_selection_fails(
     assert "not enabled" in results[0]["warning"]
 
 
-async def test_selected_sources_rejects_unknown_source() -> None:
+async def test_selected_source_rejects_unknown_source() -> None:
     with pytest.raises(UnknownJobSourceError):
-        await selected(payload(sources=["does_not_exist"]))
+        await selected(payload(source="does_not_exist"))
 
 
-async def test_selected_sources_rejects_when_none_configured(
+async def test_selected_source_rejects_unconfigured(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     only_sources(monkeypatch, FakeJobSource("adzuna", configured=False))
-    with pytest.raises(NoJobSourcesConfiguredError):
+    with pytest.raises(JobSourceNotEnabledError):
         await selected(payload())
 
 
-async def test_selected_sources_requires_acknowledgment_for_scraper(
+async def test_selected_source_requires_acknowledgment_for_scraper(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     scraper = FakeJobSource("apify_linkedin", disclosure_required=True)
     only_sources(monkeypatch, FakeJobSource("adzuna"), scraper)
 
-    assert await selected(payload()) == ["adzuna"]
+    assert await selected(payload()) == "adzuna"
     with pytest.raises(JobSourceNotEnabledError):
-        await selected(payload(sources=["apify_linkedin"]))
+        await selected(payload(source="apify_linkedin"))
 
     await acknowledge("apify_linkedin")
-    assert await selected(payload()) == ["adzuna", "apify_linkedin"]
-    assert await selected(payload(sources=["apify_linkedin"])) == ["apify_linkedin"]
+    assert await selected(payload()) == "adzuna"
+    assert await selected(payload(source="apify_linkedin")) == "apify_linkedin"
 
 
-async def test_selected_sources_filters_by_requested_names(
+async def test_selected_source_resolves_requested_name(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     only_sources(monkeypatch, FakeJobSource("adzuna"), FakeJobSource("other"))
 
-    assert await selected(payload(sources=["other"])) == ["other"]
+    assert await selected(payload(source="other")) == "other"
 
 
 async def test_run_search_sends_per_source_specs(monkeypatch: pytest.MonkeyPatch) -> None:
     adzuna = FakeJobSource("adzuna", postings=[fake_posting("1")])
-    scraper = FakeJobSource("apify_linkedin", postings=[fake_posting("2")])
-    only_sources(monkeypatch, adzuna, scraper)
+    only_sources(monkeypatch, adzuna)
 
-    run = await create_run(
-        payload(
-            sources=["adzuna", "apify_linkedin"],
-            source_queries={
-                "adzuna": {
-                    "title": "Senior Android Engineer",
-                    "skills": ["Kotlin"],
-                    "exclude": ["intern"],
-                },
-                "apify_linkedin": {
-                    "title": "Senior Android Engineer",
-                    "skills": ["Kotlin", "Java"],
-                },
+    request = payload(
+        source_queries={
+            "adzuna": {
+                "title": "Senior Android Engineer",
+                "skills": ["Kotlin"],
+                "exclude": ["intern"],
             },
-            salary_min=5000000,
-            location="Bangalore",
-        )
+        },
+        salary_min=5000000,
+        location="Bangalore",
     )
-    await run_search(
-        run,
-        payload(
-            sources=["adzuna", "apify_linkedin"],
-            source_queries={
-                "adzuna": {
-                    "title": "Senior Android Engineer",
-                    "skills": ["Kotlin"],
-                    "exclude": ["intern"],
-                },
-                "apify_linkedin": {
-                    "title": "Senior Android Engineer",
-                    "skills": ["Kotlin", "Java"],
-                },
-            },
-            salary_min=5000000,
-            location="Bangalore",
-        ),
-    )
+    run = await create_run(request)
+    await run_search(run, request)
 
     adzuna_query = adzuna.queries[0]
     assert adzuna_query.title_phrase == "Senior Android Engineer"
     assert adzuna_query.skills_any == ["Kotlin"]
     assert adzuna_query.exclude_any == ["intern"]
     assert adzuna_query.salary_min == 5000000
-    linkedin_query = scraper.queries[0]
-    assert linkedin_query.title_phrase == "Senior Android Engineer"
-    assert linkedin_query.exclude_any == []
 
     run_row = await get_run(run)
     assert run_row.status.value == "succeeded"
@@ -358,17 +321,9 @@ async def test_run_search_fails_when_no_effective_query(
     assert "no search query" in results[0]["warning"]
 
 
-async def test_validate_queries_rejects_unknown_override_source(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from app.services.ingestion import _validate_queries
-
-    only_sources(monkeypatch, FakeJobSource("adzuna"))
-    request = payload(query="python", source_queries={"mystery": {"title": "T"}})
-    async with session_factory() as session:
-        selected = await _selected_sources(session, request)
-        with pytest.raises(UnknownJobSourceError):
-            _validate_queries(request, selected)
+def test_request_rejects_source_queries_key_mismatch() -> None:
+    with pytest.raises(ValidationError, match="source_queries keys must match source"):
+        payload(source_queries={"mystery": {"title": "T"}})
 
 
 async def test_run_search_persists_embeddings(
@@ -521,9 +476,35 @@ async def test_run_search_skips_matching_when_profile_has_no_embedding(
     assert await get_postings() != []
 
 
+async def test_run_search_skips_matching_when_no_postings_ingested(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from fakes import install_acompletion
+
+    profile_id = await seed_profile()
+    source = FakeJobSource("adzuna", postings=[])
+    only_sources(monkeypatch, source)
+
+    async def fail_if_called(**kw: object) -> object:
+        raise AssertionError("rerank must not run when nothing was ingested")
+
+    install_acompletion(monkeypatch, fail_if_called)
+
+    run = await create_run(payload(profile_id=profile_id))
+    await run_search(run, payload(profile_id=profile_id))
+
+    run_row = await get_run(run)
+    assert run_row.status.value == "succeeded"
+    assert run_row.results is not None and run_row.results[0]["count"] == 0
+    assert run_row.matching is not None
+    assert run_row.matching["status"] == "skipped"
+    assert "no postings ingested" in run_row.matching["warning"]
+
+
 async def test_run_search_matching_failure_degrades(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+
     from fakes import ProviderError, install_acompletion
 
     profile_id = await seed_profile()

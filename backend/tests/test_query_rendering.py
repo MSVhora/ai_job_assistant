@@ -3,7 +3,7 @@ from app.services.query_rendering import build_connector_query
 
 
 def request(**overrides: object) -> JobSearchRequest:
-    defaults: dict[str, object] = {"country": "in"}
+    defaults: dict[str, object] = {"country": "in", "source": "adzuna"}
     return JobSearchRequest(**{**defaults, **overrides})  # type: ignore[arg-type]
 
 

@@ -2,7 +2,8 @@
 
 How AI Job Assistant fits together — components, data flows, and the database schema.
 For day-to-day usage see the [user guide](guide/README.md); for scope see the
-[v1 implementation plan](plans/v1/v1-implementation-plan.md).
+[v3 implementation plan](plans/v3/v3-implementation-plan.md) (earlier:
+[v1](plans/v1/v1-implementation-plan.md), [v2](plans/v2/v2-implementation-plan.md)).
 
 ## System overview (flow diagram)
 

@@ -181,8 +181,9 @@ freshness parameter:
 The shared filter is independent of the read-side layer above: a run with "Last week"
 still passes its results through the expiry filter (a scraper-reported old date is still
 excluded on read). Sources that support no freshness parameter simply ignore it, and the
-choice is recorded in the run's query echo for reproducibility. Setting the source's own
-`Date posted` advanced filter (below) overrides the derived bucket for that source.
+choice is recorded in the run's query echo for reproducibility. There is no separate
+LinkedIn "Date posted" advanced filter — the redundant declaration was removed in v3 #30
+(the buckets above are the single knob for LinkedIn freshness).
 
 ## Advanced per-source filters (live since #28)
 

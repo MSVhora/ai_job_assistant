@@ -18,7 +18,11 @@ A self-hosted, single-user, **BYOK** (bring-your-own-key) web app:
 
 ## Feature status
 
-The app is being built issue by issue (see [the v1 plan](../plans/v1/v1-implementation-plan.md)).
+The app is being built issue by issue (v1: [plan](../plans/v1/v1-implementation-plan.md), #1–#12;
+v2: [plan](../plans/v2/v2-implementation-plan.md), #13–#23 — UI restructure, branding, dialogs;
+v3: [plan](../plans/v3/v3-implementation-plan.md), #24–#30 — profile-scoped searches and matching
+corpus, posting expiry + freshness filters, capability-driven per-source filters and search UI,
+the Start-search stepper). All v1–v3 issues are done.
 Each guide marks what is **live now** vs **planned**:
 
 - Live: stack scaffold, health check (`GET /api/health`), resume upload + text extraction

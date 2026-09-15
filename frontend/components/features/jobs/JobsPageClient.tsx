@@ -6,7 +6,6 @@ import { useState } from "react";
 
 import { SearchResults } from "@/components/features/jobs/SearchResults";
 import { RunBanners } from "@/components/features/jobs/RunBanners";
-import { wizardDebug } from "@/components/features/jobs/wizard-debug";
 import { RebuildBanner } from "@/components/features/jobs/RebuildBanner";
 import {
   SearchStepperModal,
@@ -178,12 +177,7 @@ export function JobsPageClient() {
         </div>
         <div className="flex shrink-0 flex-col gap-2 border-t border-gray-100 p-3">
           <RebuildBanner profileId={activeProfileId} />
-          <StartSearchButton
-          onClick={() => {
-            wizardDebug("start-search trigger clicked (page level)");
-            setSearchOpen(true);
-          }}
-        />
+          <StartSearchButton onClick={() => setSearchOpen(true)} />
         </div>
       </aside>
 
@@ -262,7 +256,6 @@ export function JobsPageClient() {
         onSelectProfile={selectProfile}
         sources={enabled}
         onSearchStarted={(searchId) => {
-          wizardDebug("onSearchStarted (page level)", { searchId, currentSearchIds: searchIds });
           setSearchIds((current) => [...current, searchId]);
           setSelectedSearchId(searchId);
           setSearchOpen(false);

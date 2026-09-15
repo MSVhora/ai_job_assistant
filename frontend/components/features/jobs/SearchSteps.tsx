@@ -19,7 +19,6 @@ import { ProfileSelector } from "./ProfileSelector";
 import { SearchQueriesCard } from "./SearchQueriesCard";
 import { SourceFiltersForm } from "./SourceFiltersForm";
 import { POSTED_WITHIN_OPTIONS, type SearchFormValues } from "./search-form-schema";
-import { wizardDebug } from "./wizard-debug";
 
 export function ProfileStep({
   profiles,
@@ -40,10 +39,7 @@ export function ProfileStep({
         profiles={profiles}
         activeProfileId={activeProfileId}
         disabled={profilesPending || profilesError}
-        onSelect={(profileId) => {
-          wizardDebug("profile selected", { profileId, current: activeProfileId });
-          onSelectProfile(profileId);
-        }}
+        onSelect={onSelectProfile}
         id="stepper-profile"
         hint="Every search run is scoped to exactly one profile."
       />
@@ -82,10 +78,7 @@ export function SourceStep({
             className="accent-violet-600"
             disabled={!source.is_configured}
             checked={selectedSourceId === source.name}
-            onChange={() => {
-              wizardDebug("source selected", { source: source.name });
-              onSelect(source.name);
-            }}
+            onChange={() => onSelect(source.name)}
             aria-label={`Search ${source.name}`}
           />
           <span>{source.name}</span>

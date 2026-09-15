@@ -125,7 +125,7 @@ async def run_search(search_id: uuid.UUID, payload: JobSearchRequest) -> None:
         outcomes: list[SourceOutcome] = [outcome]
         run.results = [item.model_dump(mode="json") for item in outcomes]
         run.status = JobSearchStatus.succeeded if outcome.status == "ok" else JobSearchStatus.failed
-        run.matching = (await _run_matching(session, run.profile_id)).model_dump(mode="json")
+        run.matching = (await _matching_stage(session, run, outcome)).model_dump(mode="json")
         await session.commit()
 
     logger.info(
@@ -134,6 +134,24 @@ async def run_search(search_id: uuid.UUID, payload: JobSearchRequest) -> None:
         run.status.value,
         (time.monotonic() - started) * 1000,
     )
+
+
+async def _matching_stage(
+    session: AsyncSession, run: JobSearch, outcome: SourceOutcome
+) -> MatchingOutcome:
+    """Re-score the profile corpus after ingestion — only when it can have changed."""
+    if outcome.status != "ok" or outcome.count == 0:
+        logger.info(
+            "ingestion.matching skipped search_id=%s source_outcome=%s count=%d",
+            run.id,
+            outcome.status,
+            outcome.count,
+        )
+        return MatchingOutcome(
+            status="skipped",
+            warning="no postings ingested by this run — matches kept as-is",
+        )
+    return await _run_matching(session, run.profile_id)
 
 
 async def _run_matching(session: AsyncSession, profile_id: uuid.UUID) -> MatchingOutcome:

@@ -476,9 +476,35 @@ async def test_run_search_skips_matching_when_profile_has_no_embedding(
     assert await get_postings() != []
 
 
+async def test_run_search_skips_matching_when_no_postings_ingested(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from fakes import install_acompletion
+
+    profile_id = await seed_profile()
+    source = FakeJobSource("adzuna", postings=[])
+    only_sources(monkeypatch, source)
+
+    async def fail_if_called(**kw: object) -> object:
+        raise AssertionError("rerank must not run when nothing was ingested")
+
+    install_acompletion(monkeypatch, fail_if_called)
+
+    run = await create_run(payload(profile_id=profile_id))
+    await run_search(run, payload(profile_id=profile_id))
+
+    run_row = await get_run(run)
+    assert run_row.status.value == "succeeded"
+    assert run_row.results is not None and run_row.results[0]["count"] == 0
+    assert run_row.matching is not None
+    assert run_row.matching["status"] == "skipped"
+    assert "no postings ingested" in run_row.matching["warning"]
+
+
 async def test_run_search_matching_failure_degrades(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+
     from fakes import ProviderError, install_acompletion
 
     profile_id = await seed_profile()

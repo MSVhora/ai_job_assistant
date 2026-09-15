@@ -196,6 +196,18 @@ export function SearchStepperModal({
     start.mutate(payload, { onSuccess: (data) => onSearchStarted(data.search_id) });
   });
 
+  // Submissions only come from the review step's button in principle, but
+  // implicit submit events (Enter in any input at any step) land on the form
+  // too. They advance the wizard instead of ever starting a run early.
+  const onFormSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (step < LAST_STEP) {
+      void advance();
+      return;
+    }
+    void submit();
+  };
+
   const currency = structured?.preferences?.currency ?? null;
   const goingBack = () => setStep((current) => Math.max(current - 1, 1));
 
@@ -207,7 +219,7 @@ export function SearchStepperModal({
       description="One profile and one source per run — you can start other searches while this one runs."
     >
       <FormProvider {...form}>
-        <form onSubmit={submit} className="flex flex-col gap-5" noValidate>
+        <form onSubmit={onFormSubmit} className="flex flex-col gap-5" noValidate>
           <ol aria-label="Steps" className="flex flex-wrap items-center gap-2 text-xs">
             {STEP_LABELS.map((label, index) => {
               const number = index + 1;

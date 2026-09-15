@@ -37,7 +37,7 @@ sources are fine. The wizard has four steps:
 
 Freshness has a single knob: **Posted within** (step 3) is the shared day-filter —
 sent exactly on Adzuna and converted to the closest `datePosted` bucket on LinkedIn
-(`anyTime`/`past24h`/`pastWeek`/`pastMonth`). There is no separate LinkedIn date filter
+(`anyTime`/`past24Hours`/`pastWeek`/`pastMonth`). There is no separate LinkedIn date filter
 (the redundant override was removed in v3 #30); the read-side expiry filter applies on
 top either way.
 
@@ -176,7 +176,7 @@ freshness parameter:
 | Source | Parameter | Mapping |
 |---|---|---|
 | Adzuna (official API) | `max_days_old` | exact day count |
-| Apify LinkedIn (scraper) | `datePosted` bucket | ≤1 day → `past24h`, ≤7 → `pastWeek`, ≤30 → `pastMonth`, wider/none → `anyTime` |
+| Apify LinkedIn (scraper) | `datePosted` bucket | ≤1 day → `past24Hours`, ≤7 → `pastWeek`, ≤30 → `pastMonth`, wider/none → `anyTime` |
 
 The shared filter is independent of the read-side layer above: a run with "Last week"
 still passes its results through the expiry filter (a scraper-reported old date is still
@@ -210,7 +210,6 @@ in the same fields.
 | Adzuna (official API) | `title_only` | on/off toggle | Match the title phrase instead of the full description |
 | Adzuna (official API) | `distance_km` | integer | Distance from the location; only applied when a location is set |
 | Adzuna (official API) | `sort_by` | select: relevance / date / salary | Adzuna's result ordering |
-| Apify LinkedIn (scraper) | `date_posted` | select: anyTime / past24h / pastWeek / pastMonth | Overrides the "posted within" bucket derived from `max_days_old` |
 | Apify LinkedIn (scraper) | `distance_miles` | integer | Actor `distance` field (miles) |
 | Apify LinkedIn (scraper) | `under_10_applicants` | on/off toggle | Actor `under10Applicants` field |
 | Apify LinkedIn (scraper) | `company_ids` | list of LinkedIn company IDs | Multiselect-text; advanced targeting |

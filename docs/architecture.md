@@ -160,7 +160,7 @@ top. The filter is read-time only — the scoring corpus and rebuild cleanup are
 **Query-time freshness (v3 issue #27):** the search request accepts `max_days_old`
 (1–90), rendered by `query_rendering.py` into every connector query. Adzuna sends it
 directly (`max_days_old`); the LinkedIn actor input's `datePosted` resolves through the
-`{date_posted_bucket}` YAML placeholder (≤1 → `past24h`, ≤7 → `pastWeek`, ≤30 →
+`{date_posted_bucket}` YAML placeholder (≤1 → `past24Hours`, ≤7 → `pastWeek`, ≤30 →
 `pastMonth`, else `anyTime`). Sources without a native parameter ignore it; the value is
 echoed in the run's stored query.
 

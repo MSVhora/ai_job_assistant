@@ -90,11 +90,16 @@ class JobSearchQuery(BaseModel):
 
 
 def date_posted_bucket(max_days_old: int | None) -> str:
-    """Map the shared day-count freshness filter to a LinkedIn datePosted bucket."""
+    """Map the shared day-count freshness filter to a LinkedIn datePosted bucket.
+
+    The bucket values are the LinkedIn actor's accepted enum
+    (anyTime / past24Hours / pastWeek / pastMonth) — note the capital H on
+    past24Hours; anything else is rejected with a 400 at run creation.
+    """
     if max_days_old is None:
         return "anyTime"
     if max_days_old <= 1:
-        return "past24h"
+        return "past24Hours"
     if max_days_old <= 7:
         return "pastWeek"
     if max_days_old <= 30:

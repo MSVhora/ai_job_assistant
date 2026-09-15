@@ -72,7 +72,7 @@ Actor input (AI-search mode, `urls` empty):
 | Keywords (NL) | `keywords` | already used; carries title/skills/salary NL |
 | Location | `location` / `geoId` | location used; **`geoId` new** |
 | Radius | `distance` (miles) | **new** |
-| Freshness | `datePosted` (`anyTime`/`past24h`/`pastWeek`/`pastMonth`) | **new** (M2); replaces hardcoded `anyTime` |
+| Freshness | `datePosted` (`anyTime`/`past24Hours`/`pastWeek`/`pastMonth`) | **new** (M2); replaces hardcoded `anyTime` |
 | Under 10 applicants | `under10Applicants` | **new**; survives LinkedIn's AI search as a real filter |
 | Company targeting | `companyIds` | **new**; advanced (user supplies IDs) |
 | Experience / job type / workplace | ❌ no dedicated fields since Aug 2026 — folded into NL keywords via `autoConvertToAiSearch` (already true) | documented, not a filter field |
@@ -127,7 +127,7 @@ Backend:
   Both mappers set `posted_at` consistently for D4 grace checks.
 - `JobSearchRequest.max_days_old: int | None` (1–90, shared filter) → `JobSearchQuery`;
   Adzuna sends `max_days_old`; LinkedIn maps to nearest `datePosted` bucket
-  (≤1 → `past24h`, ≤7 → `pastWeek`, ≤30 → `pastMonth`, else `anyTime`).
+  (≤1 → `past24Hours`, ≤7 → `pastWeek`, ≤30 → `pastMonth`, else `anyTime`).
 - Read-side freshness service filter (shared by matches and search results):
   exclude `is_closed` or `expires_at < now()`; when `expires_at` is null, exclude
   `posted_at < now() - settings.stale_posting_days` (default 45, in `Settings`,

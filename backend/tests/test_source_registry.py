@@ -20,7 +20,7 @@ from app.adapters.job_sources.config import (
     ("max_days_old", "bucket"),
     [
         (None, "anyTime"),
-        (1, "past24h"),
+        (1, "past24Hours"),
         (2, "pastWeek"),
         (7, "pastWeek"),
         (8, "pastMonth"),

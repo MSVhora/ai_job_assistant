@@ -1,6 +1,6 @@
 # Issue #30 — Search initiation stepper (one source per run) + profile country persistence fix
 
-**Status:** Done (branch `v3/30-search-stepper-and-country-fix`, commit 2439ab3)
+**Status:** Done (merged — branch `v3/30-search-stepper-and-country-fix`; implementation notes: single freshness knob replaced the declared LinkedIn `date_posted` filter, run banners persist across refresh via `GET /api/jobs/searches?profile_id=`, matching stage skips when a run ingests nothing, LinkedIn `datePosted` bucket corrected to `past24Hours` per the actor's real enum, premature submits gated to the review step)
 **Tracks:** GitHub issue #30 (milestone `v3`, scope addition — beyond the original M1–M3 breakdown)
 **Plan of record:** [v3-implementation-plan.md](v3-implementation-plan.md) §4 M3 frontend (extends it); §6 issue table gains #30
 **Depends on:** #28 (merged — `SourceFilterDecl` declarations + backend options validation), #29 (merged — `SourceFiltersForm`, ui primitives, vitest), #24/#25 (merged — profile-scoped searches, `?profile=` URL param)

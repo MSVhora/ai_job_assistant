@@ -1,6 +1,6 @@
 # Issue #34 — Adzuna dialect: what_and, title_only pass, salary_include_unknown, pagination + quota budget (M2)
 
-**Status:** Proposed (owner decisions ⚠ marked in Locked decisions; contract booleans resolved: optional filters only, no auto-derivation)
+**Status:** Implemented (branch `v4/34-adzuna-dialect-multi-pass`; implementation notes: the contract/type filter became a single optional `job_type` select after owner review — Adzuna ANDs its booleans, so four independently-checkable boxes could silently zero out a search; 396 tests green with `TEST_DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/ai_job_assistant_test`)
 **Tracks:** GitHub issue #34 (milestone `v4`, Phase B / M2)
 **Plan of record:** [v4-search-relevance-plan.md](v4-search-relevance-plan.md) Problem 3
 **Depends on:** #31 (merged — grounded, hash-cached specs), #32 (merged — YOE/seniority in profile), #33 (merged — `TermPlan` transport with the `what_and` slot reserved, pinned `[]` until this issue)

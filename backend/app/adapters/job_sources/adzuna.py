@@ -107,6 +107,13 @@ _SORT_BY_OPTIONS = (
     SourceFilterOption(value="salary", label="Salary"),
 )
 
+_JOB_TYPE_OPTIONS = (
+    SourceFilterOption(value="full_time", label="Full-time"),
+    SourceFilterOption(value="part_time", label="Part-time"),
+    SourceFilterOption(value="contract", label="Contract"),
+    SourceFilterOption(value="permanent", label="Permanent"),
+)
+
 _FILTERS = [
     SourceFilterDecl(
         key="title_only",
@@ -115,28 +122,11 @@ _FILTERS = [
         help_text="Match the title phrase only instead of the full description",
     ),
     SourceFilterDecl(
-        key="full_time",
-        label="Full-time only",
-        type="boolean",
-        help_text="Adzuna contract filter: keep full-time postings",
-    ),
-    SourceFilterDecl(
-        key="part_time",
-        label="Part-time only",
-        type="boolean",
-        help_text="Adzuna contract filter: keep part-time postings",
-    ),
-    SourceFilterDecl(
-        key="contract",
-        label="Contract only",
-        type="boolean",
-        help_text="Adzuna contract filter: keep contract postings",
-    ),
-    SourceFilterDecl(
-        key="permanent",
-        label="Permanent only",
-        type="boolean",
-        help_text="Adzuna contract filter: keep permanent postings",
+        key="job_type",
+        label="Job type (optional)",
+        type="select",
+        options=list(_JOB_TYPE_OPTIONS),
+        help_text="Restrict to one Adzuna contract filter instead of a contradictory mix",
     ),
     SourceFilterDecl(
         key="distance_km",
@@ -153,16 +143,14 @@ _FILTERS = [
     ),
 ]
 
-_CONTRACT_BOOL_KEYS = ("full_time", "part_time", "contract", "permanent")
-
 
 def _apply_options(params: dict[str, str], query: JobSearchQuery) -> None:
     title_only = query.options.get("title_only")
     if title_only is True:
         params["title_only"] = "true"
-    for key in _CONTRACT_BOOL_KEYS:
-        if query.options.get(key) is True:
-            params[key] = "true"
+    job_type = query.options.get("job_type")
+    if type(job_type) is str and job_type in {option.value for option in _JOB_TYPE_OPTIONS}:
+        params[job_type] = "true"
     distance_km = query.options.get("distance_km")
     if type(distance_km) is int and query.location:
         params["distance"] = str(distance_km)

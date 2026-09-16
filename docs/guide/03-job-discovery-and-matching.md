@@ -221,7 +221,7 @@ in the same fields.
 | Source | Filter | Values / form | Notes |
 |---|---|---|---|
 | Adzuna (official API) | `title_only` | on/off toggle | Match the title phrase instead of the full description |
-| Adzuna (official API) | `full_time` / `part_time` / `contract` / `permanent` | on/off toggles | Adzuna contract filters, applied only when switched on |
+| Adzuna (official API) | `job_type` | select: full-time / part-time / contract / permanent (optional) | Adzuna contract filters — one at a time, so contradictory mixes are impossible |
 | Adzuna (official API) | `distance_km` | integer | Distance from the location; only applied when a location is set |
 | Adzuna (official API) | `sort_by` | select: relevance / date / salary | Adzuna's result ordering |
 | Apify LinkedIn (scraper) | `distance_miles` | integer | Actor `distance` field (miles) |

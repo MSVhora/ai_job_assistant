@@ -192,20 +192,21 @@ def test_filters_declared_capabilities() -> None:
     keys = [decl.key for decl in source.filters()]
     assert keys == [
         "title_only",
+        "job_type",
+        "distance_km",
+        "sort_by",
+    ]
+    job_type = source.filters()[1]
+    assert job_type.type == "select"
+    assert job_type.required is False
+    assert job_type.options is not None
+    assert [option.value for option in job_type.options] == [
         "full_time",
         "part_time",
         "contract",
         "permanent",
-        "distance_km",
-        "sort_by",
     ]
-    booleans = [
-        decl
-        for decl in source.filters()
-        if decl.key in {"full_time", "part_time", "contract", "permanent"}
-    ]
-    assert all(decl.type == "boolean" and decl.required is False for decl in booleans)
-    sort_by = source.filters()[6]
+    sort_by = source.filters()[3]
     assert sort_by.options is not None
     assert [option.value for option in sort_by.options] == ["relevance", "date", "salary"]
 
@@ -445,7 +446,7 @@ async def test_search_dedupes_title_pass_by_external_id(
     ]
 
 
-async def test_search_maps_contract_booleans_only_when_true(
+async def test_search_maps_job_type_select_to_one_contract_param(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[dict[str, str]] = []
@@ -454,18 +455,31 @@ async def test_search_maps_contract_booleans_only_when_true(
     source = _mock_source(monkeypatch, httpx.MockTransport(handler))
 
     await source.search(
-        JobSearchQuery(
-            query="python",
-            country="de",
-            options={"full_time": True, "permanent": True, "part_time": False},
-        )
+        JobSearchQuery(query="python", country="de", options={"job_type": "full_time"})
     )
 
     params = calls[0]
     assert params["full_time"] == "true"
-    assert params["permanent"] == "true"
     assert "part_time" not in params
     assert "contract" not in params
+    assert "permanent" not in params
+
+
+async def test_search_omits_contract_params_when_job_type_unset(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[dict[str, str]] = []
+    handler = _recording_handler(calls, _fixture())
+    monkeypatch.setattr("app.adapters.retry.asyncio.sleep", _no_delay)
+    source = _mock_source(monkeypatch, httpx.MockTransport(handler))
+
+    await source.search(JobSearchQuery(query="python", country="de"))
+
+    params = calls[0]
+    assert "full_time" not in params
+    assert "part_time" not in params
+    assert "contract" not in params
+    assert "permanent" not in params
 
 
 async def test_search_fetches_page_two_when_page_one_full(

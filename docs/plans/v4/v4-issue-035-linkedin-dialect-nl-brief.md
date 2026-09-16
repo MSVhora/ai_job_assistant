@@ -1,6 +1,6 @@
 # Issue #35 — LinkedIn dialect: NL brief composition, NL exclusions, limitPerSource cap, geoId pass (M3)
 
-**Status:** Planned
+**Status:** Implemented (branch `v4/35-linkedin-dialect-nl-brief`; implementation notes: `SeniorityLevel`/`RemotePreference` moved to a new `app/schemas/enums.py` to avoid the profile↔job_search schema import cycle; profile re-exports keep existing importers unchanged — 404 tests green)
 **Tracks:** GitHub issue #35 (milestone `v4`, Phase C / M3)
 **Plan of record:** [v4-search-relevance-plan.md](v4-search-relevance-plan.md) Problem 5
 **Depends on:** #31 (merged — profile-resolved request defaults, `location ← preferences.target_location`, `country ← contact.country`), #32 (merged — seniority parsed/derived on the profile), #33 (merged — `TermPlan` transport; LinkedIn keywords precedence pinned), #34 (merged — `le=100` results cap, multi-pass connector pattern)

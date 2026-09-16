@@ -4,6 +4,7 @@ import time
 import uuid
 from typing import Any
 
+from fastapi import BackgroundTasks
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,7 +21,7 @@ from app.schemas.gap_fill import (
 )
 from app.schemas.profile import Preferences, RemotePreference, SeniorityLevel, StructuredProfile
 from app.services import embedding, matching
-from app.services.profile_service import _next_timestamp, diff_profiles
+from app.services.profile_service import _next_timestamp, diff_profiles, schedule_query_refresh
 
 logger = logging.getLogger(__name__)
 
@@ -274,7 +275,10 @@ async def _llm_turn(
 
 
 async def run_gap_fill_turn(
-    session: AsyncSession, profile_id: uuid.UUID, payload: GapFillRequest
+    session: AsyncSession,
+    background_tasks: BackgroundTasks,
+    profile_id: uuid.UUID,
+    payload: GapFillRequest,
 ) -> GapFillResponse:
     started = time.monotonic()
     profile = await session.get(Profile, profile_id)
@@ -315,6 +319,8 @@ async def run_gap_fill_turn(
         await matching.rescore_matches(session, profile, invalidate_rationales=True)
 
     remaining = missing_fields(updated)
+    if applied and not remaining:
+        schedule_query_refresh(background_tasks, profile_id)
     logger.info(
         "profile.gap_fill profile_id=%s duration_ms=%.0f applied=%d "
         "missing_before=%d missing_after=%d",

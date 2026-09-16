@@ -341,3 +341,87 @@ async def test_gap_fill_survives_embedding_failure(
         assert profile is not None
         assert profile.embedding is None
         assert profile.structured_profile["preferences"]["target_location"] == "Amsterdam"
+
+
+async def test_completed_applying_turn_schedules_query_refresh(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import app.services.gap_fill as gap_fill_module
+
+    scheduled: list[uuid.UUID] = []
+    monkeypatch.setattr(
+        gap_fill_module,
+        "schedule_query_refresh",
+        lambda tasks, profile_id: scheduled.append(profile_id),
+    )
+    profile_id = await create_profile("Bare", VALID_PROFILE)
+    install_acompletion(
+        monkeypatch,
+        lambda **kw: llm_response(
+            turn(
+                {
+                    "target_location": "Amsterdam",
+                    "remote_preference": "remote",
+                    "salary_min": 70000,
+                    "salary_max": 90000,
+                    "currency": "eur",
+                    "seniority": "senior",
+                    "work_authorization": "EU citizen",
+                },
+                "All set.",
+            )
+        ),
+    )
+
+    response = await client.post(f"/api/profiles/{profile_id}/gap-fill", json={"messages": []})
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "complete"
+    assert [str(item) for item in scheduled] == [profile_id]
+
+
+async def test_in_progress_turn_does_not_schedule_query_refresh(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import app.services.gap_fill as gap_fill_module
+
+    scheduled: list[uuid.UUID] = []
+    monkeypatch.setattr(
+        gap_fill_module,
+        "schedule_query_refresh",
+        lambda tasks, profile_id: scheduled.append(profile_id),
+    )
+    profile_id = await create_profile("Bare", VALID_PROFILE)
+    install_acompletion(
+        monkeypatch,
+        lambda **kw: llm_response(
+            turn({"target_location": "Amsterdam"}, "Where next?"),
+        ),
+    )
+
+    response = await client.post(f"/api/profiles/{profile_id}/gap-fill", json={"messages": []})
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "in_progress"
+    assert scheduled == []
+
+
+async def test_no_missing_fields_turn_does_not_schedule_query_refresh(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import app.services.gap_fill as gap_fill_module
+
+    scheduled: list[uuid.UUID] = []
+    monkeypatch.setattr(
+        gap_fill_module,
+        "schedule_query_refresh",
+        lambda tasks, profile_id: scheduled.append(profile_id),
+    )
+    profile_id = await create_profile("Full", {**VALID_PROFILE, "preferences": FULL_PREFS})
+    install_acompletion(monkeypatch, lambda **kw: llm_response(turn({}, "should not be called")))
+
+    response = await client.post(f"/api/profiles/{profile_id}/gap-fill", json={"messages": []})
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "complete"
+    assert scheduled == []

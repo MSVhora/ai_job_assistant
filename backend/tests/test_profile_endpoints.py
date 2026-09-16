@@ -716,3 +716,101 @@ async def test_rebuild_matches_endpoint_lifecycle(client: AsyncClient) -> None:
     assert final_body["corpus_count"] == 1
     assert final_body["scored_count"] == 1
     assert final_body["stale_count"] == 0
+
+
+PROFILE_WITH_PREFS = dict(
+    VALID_PROFILE
+    | {
+        "contact": {**VALID_PROFILE["contact"], "country": "de"},
+        "preferences": {
+            "target_location": "Berlin",
+            "salary_min": 50000,
+            "salary_max": 90000,
+            "currency": "EUR",
+        },
+    }
+)
+
+
+async def test_profile_response_exposes_missing_fields(client: AsyncClient) -> None:
+    created = (await create_profile(client, "Data", VALID_PROFILE)).json()
+
+    fetched = await client.get(f"/api/profiles/{created['profile_id']}")
+    assert fetched.status_code == 200
+    body = fetched.json()
+    assert isinstance(body["missing_fields"], list)
+
+
+async def test_create_profile_stores_queries_input_hash(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("ADZUNA_APP_ID", "id")
+    monkeypatch.setenv("ADZUNA_APP_KEY", "key")
+    from app.core.config import get_settings
+
+    get_settings.cache_clear()
+    try:
+        created = (await create_profile(client, "Android", VALID_PROFILE)).json()
+        async with session_factory() as session:
+            profile = await session.get(Profile, uuid.UUID(created["profile_id"]))
+        assert profile is not None
+        assert profile.queries_input_hash is not None
+    finally:
+        get_settings.cache_clear()
+
+
+async def test_save_schedule_query_refresh_on_content_change(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("ADZUNA_APP_ID", "id")
+    monkeypatch.setenv("ADZUNA_APP_KEY", "key")
+    from app.core.config import get_settings
+
+    get_settings.cache_clear()
+    try:
+        created = (await create_profile(client, "Android", VALID_PROFILE)).json()
+        profile_id = created["profile_id"]
+        async with session_factory() as session:
+            row = await session.get(Profile, uuid.UUID(profile_id))
+            row.queries_input_hash = "stale-but-different"
+            await session.commit()
+
+        saved = await client.patch(
+            f"/api/profiles/{profile_id}",
+            json={"structured_profile": with_headline(VALID_PROFILE, "Lead Data Analyst")},
+        )
+        assert saved.status_code == 200
+        async with session_factory() as session:
+            row = await session.get(Profile, uuid.UUID(profile_id))
+        assert row.queries_input_hash is None
+    finally:
+        get_settings.cache_clear()
+
+
+async def test_rename_only_save_skips_query_refresh(client: AsyncClient) -> None:
+    created = (await create_profile(client, "Android", VALID_PROFILE)).json()
+    profile_id = created["profile_id"]
+    async with session_factory() as session:
+        row = await session.get(Profile, uuid.UUID(profile_id))
+        row.queries_input_hash = "kept-hash"
+        await session.commit()
+
+    saved = await client.patch(f"/api/profiles/{profile_id}", json={"name": "Renamed"})
+    assert saved.status_code == 200
+    async with session_factory() as session:
+        row = await session.get(Profile, uuid.UUID(profile_id))
+    assert row.queries_input_hash == "kept-hash"
+
+
+async def test_save_with_unchanged_content_keeps_hash(client: AsyncClient) -> None:
+    created = (await create_profile(client, "Android", VALID_PROFILE)).json()
+    profile_id = created["profile_id"]
+
+    saved = await client.patch(
+        f"/api/profiles/{profile_id}", json={"structured_profile": VALID_PROFILE}
+    )
+    assert saved.status_code == 200
+    async with session_factory() as session:
+        row = await session.get(Profile, uuid.UUID(profile_id))
+        stored_hash = row.queries_input_hash
+    assert stored_hash is not None

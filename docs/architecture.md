@@ -104,7 +104,8 @@ sequenceDiagram
     participant D as Postgres + pgvector
 
     B->>A: POST /api/jobs/search (one source per run, with profile_id and filters)
-    A-->>B: background run accepted
+    A->>A: resolve omitted filters from the profile (country, location, salary — request values always win)
+    A-->>B: background run accepted (resolved payload echoed on the run)
     A->>D: job_search row (status + per-source outcomes)
     A->>C: query the run's single source (freshness: Adzuna max_days_old, LinkedIn datePosted bucket)
     C-->>A: raw postings (failures skip + warn)
@@ -188,9 +189,17 @@ Search queries are **profile data**: a second LLM call at extraction drafts per-
 specs (`{title, skills, exclude}` per enabled source) into `resume.search_queries`; saving a
 profile copies them; `POST /api/profiles/{id}/search-queries` regenerates from the current
 content (temperature 0.8 + anti-repeat instruction, so Regenerate observably changes the
-result). Generated specs are stamped `prompt_version` (`search_query_v2` since #28: the
-prompt includes each source's declared option fields and the generated options are
-restricted to those keys).
+result). Generated specs are stamped `prompt_version` (`search_query_v3` since #31).
+
+Since #31, generation consumes the **full profile** (skills, preferences, country,
+summary — a shared digest builder also feeds the embedding, kept byte-identical) and is
+cached by a content hash: `profile.queries_input_hash` = SHA-256 over the canonical
+structured profile + enabled source names + filter declarations + `prompt_version`.
+Automatic generation (extraction, background-refresh after a content-changing profile
+save or a completed gap-fill turn) runs at temperature 0 and fires only when the stored
+hash no longer matches the recomputed one; the manual regenerate endpoint always forces a
+hot variant and rewrites the hash. Refresh runs happen in background tasks that open
+fresh sessions — never in the request path.
 
 ## Source filter capabilities (v3 issue #28)
 

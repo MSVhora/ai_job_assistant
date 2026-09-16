@@ -50,11 +50,14 @@ export function ProfileEditor({ profileId }: { profileId: string }) {
   return <EditorBody profile={profileQuery.data} />;
 }
 
-function EditorBody({ profile }: { profile: ProfileResponse }) {
+export function EditorBody({ profile }: { profile: ProfileResponse }) {
   const updateProfile = useUpdateProfile();
   const renameProfile = useUpdateProfile();
   const [renaming, setRenaming] = useState(false);
   const [nameInput, setNameInput] = useState(profile.name);
+  // Server-owned list of still-missing gap-fill fields; the chat section renders
+  // only while it is non-empty and collapses the moment a turn completes.
+  const [missingFields, setMissingFields] = useState<string[]>(profile.missing_fields ?? []);
   const form = useForm<ProfileFormValues>({
     resolver: standardSchemaResolver(profileFormSchema),
     defaultValues: toFormValues(profile.structured_profile),
@@ -62,6 +65,7 @@ function EditorBody({ profile }: { profile: ProfileResponse }) {
   });
 
   const applyGapFill = (data: GapFillResponse) => {
+    setMissingFields(data.missing_fields.map((field) => field.key));
     const values = toFormValues(data.structured_profile);
     const touched = new Set(data.applied_fields.map((field) => field.field));
     const current = form.getValues();
@@ -161,7 +165,9 @@ function EditorBody({ profile }: { profile: ProfileResponse }) {
         )}
       </div>
 
-      <GapFillChat profileId={profile.profile_id} onApplied={applyGapFill} />
+      {missingFields.length > 0 && (
+        <GapFillChat profileId={profile.profile_id} onApplied={applyGapFill} />
+      )}
       <FormProvider {...form}>
         <ProfileReviewForm
           highlightAi={false}

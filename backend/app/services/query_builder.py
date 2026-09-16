@@ -1,3 +1,5 @@
+import hashlib
+import json
 import logging
 import uuid
 from datetime import UTC, datetime
@@ -25,8 +27,10 @@ from app.services import sources as sources_service
 
 logger = logging.getLogger(__name__)
 
-PROMPT_VERSION = "search_query_v2"
+PROMPT_VERSION = "search_query_v3"
+DEFAULT_GENERATION_TEMPERATURE = 0.0
 GENERATION_TEMPERATURE = 0.8
+MAX_CONTEXT_CHARS = 2500
 
 QUERY_SYSTEM = (
     "You write job-search query specs for a candidate. For every source listed in the "
@@ -83,19 +87,58 @@ def serialize(stored: StoredSearchQueries) -> dict[str, object]:
     return stored.model_dump(mode="json")
 
 
-def _candidate_context(profile: StructuredProfile) -> str:
+def _preference_lines(profile: StructuredProfile) -> list[str]:
+    """Preference facts not already covered by the shared profile digest."""
     preferences = profile.preferences
+    if preferences is None:
+        return []
     lines: list[str] = []
-    if preferences is not None and preferences.target_title:
-        lines.append(f"target title: {preferences.target_title}")
-    if profile.headline:
-        lines.append(f"headline: {profile.headline}")
-    if profile.skills:
-        lines.append(f"skills: {', '.join(profile.skills[:12])}")
-    if preferences is not None and preferences.seniority is not None:
-        lines.append(f"seniority: {preferences.seniority}")
-    body = "\n".join(lines) if lines else "(no title or skills captured yet)"
+    if preferences.remote_preference:
+        lines.append(f"remote preference: {preferences.remote_preference}")
+    if preferences.salary_min is not None or preferences.salary_max is not None:
+        band = []
+        if preferences.salary_min is not None:
+            band.append(f"{preferences.salary_min:g}+")
+        if preferences.salary_max is not None:
+            band.append(f"up to {preferences.salary_max:g}")
+        currency = preferences.currency or ""
+        lines.append(f"salary band: {' '.join(band)} {currency}".strip())
+    return lines
+
+
+def _candidate_context(profile: StructuredProfile) -> str:
+    from app.services.embedding import profile_digest_parts
+
+    lines = profile_digest_parts(profile)
+    if profile.contact.country:
+        lines.append(f"country: {profile.contact.country}")
+    lines.extend(_preference_lines(profile))
+    body = "\n".join(lines)[:MAX_CONTEXT_CHARS] if lines else "(no title or skills captured yet)"
     return f"Candidate context:\n{body}"
+
+
+def compute_queries_input_hash(
+    structured: StructuredProfile,
+    source_names: list[str],
+    declarations: dict[str, list[SourceFilterDecl]] | None,
+) -> str:
+    """SHA-256 over exactly the inputs the generation prompt consumes.
+
+    Profile content + which sources need specs + which filter declarations the
+    prompt advertises + the prompt version itself (bumping PROMPT_VERSION
+    invalidates every stored hash).
+    """
+    canonical = {
+        "structured_profile": structured.model_dump(mode="json"),
+        "source_names": sorted(source_names),
+        "declarations": {
+            name: [decl.model_dump(mode="json") for decl in decls]
+            for name, decls in sorted((declarations or {}).items())
+        },
+        "prompt_version": PROMPT_VERSION,
+    }
+    payload = json.dumps(canonical, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def _strip_undeclared_options(
@@ -120,11 +163,22 @@ async def generate_queries(
     *,
     declarations: dict[str, list[SourceFilterDecl]] | None = None,
     previous: dict[str, SourceQuerySpec] | None = None,
+    temperature: float | None = None,
 ) -> StoredSearchQueries:
+    """Generate per-source query specs.
+
+    temperature=None resolves by semantics: variant generation (previous block
+    present — fresh alternatives) runs hot at 0.8; persisted default specs run
+    at 0 for reproducibility.
+    """
     if not is_llm_configured():
         raise LLMQueryGenerationError("LLM provider is not configured")
     if not sources:
         raise LLMQueryGenerationError("no sources requested")
+
+    effective_temperature = (
+        temperature if temperature is not None else (GENERATION_TEMPERATURE if previous else 0.0)
+    )
 
     context = _candidate_context(profile)
     context += _options_block(declarations)
@@ -146,7 +200,7 @@ async def generate_queries(
             prompt,
             schema=_GeneratedQueries,
             system=QUERY_SYSTEM,
-            temperature=GENERATION_TEMPERATURE,
+            temperature=effective_temperature,
         )
     except LLMError as exc:
         logger.warning("query generation failed: %s", exc)
@@ -191,8 +245,10 @@ async def regenerate_for_profile(
         names,
         declarations=declaration_map,
         previous=stored.queries if stored else None,
+        temperature=GENERATION_TEMPERATURE,
     )
     profile.search_queries = serialize(result)
+    profile.queries_input_hash = compute_queries_input_hash(structured, names, declaration_map)
     await session.flush()
 
     logger.info(
@@ -205,3 +261,47 @@ async def regenerate_for_profile(
         generated_at=result.generated_at,
         generated_by=result.generated_by,
     )
+
+
+async def ensure_queries_fresh(session: AsyncSession, profile_id: uuid.UUID) -> bool:
+    """Regenerate the persisted specs when the stored hash no longer matches the
+    profile's current inputs; never fails the caller.
+
+    Returns True when a (re)generation happened. A hash hit means the stored
+    specs already reflect exactly what the prompt would consume — the LLM call
+    is skipped entirely.
+    """
+    profile = await session.get(Profile, profile_id)
+    if profile is None:
+        logger.warning("queries.ensure skipped: profile %s missing", profile_id)
+        return False
+    enabled = await sources_service.enabled_sources(session)
+    if not enabled:
+        logger.warning("queries.ensure skipped: no enabled sources")
+        return False
+    structured = StructuredProfile.model_validate(profile.structured_profile)
+    declaration_map = {source.name: source.filters() for source in enabled}
+    source_names = [source.name for source in enabled]
+    current_hash = compute_queries_input_hash(structured, source_names, declaration_map)
+    if profile.queries_input_hash == current_hash:
+        logger.info("queries.ensure cache hit profile_id=%s", profile_id)
+        return False
+    known = set(source_names)
+    names = sorted(known)
+    try:
+        result = await generate_queries(
+            structured,
+            names,
+            declarations=declaration_map,
+            temperature=DEFAULT_GENERATION_TEMPERATURE,
+        )
+    except LLMQueryGenerationError as exc:
+        logger.warning(
+            "queries.ensure failed profile_id=%s: %s (kept stored specs)", profile_id, exc
+        )
+        return False
+    profile.search_queries = serialize(result)
+    profile.queries_input_hash = current_hash
+    await session.flush()
+    logger.info("queries.ensured profile_id=%s sources=%s", profile_id, names)
+    return True

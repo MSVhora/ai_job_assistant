@@ -49,8 +49,19 @@ Supporting details that carry over from earlier versions:
   "Senior Android Engineer role with Kotlin and Java". Since the classic keyword search is
   being retired, a **Regenerate** button re-runs the LLM against your profile's *current*
   content whenever you want a fresh variant.
-- **Stale queries are flagged, never silently reused** — if you edit the profile after the
-  queries were generated, the page says "Queries are stale — press Regenerate."
+- **Queries refresh themselves when their inputs change** — generation consumes the full
+  profile (skills, preferences, country, summary) and v4 tracks a content hash of those
+  inputs. When you save an edited profile, or a gap-fill chat turn completes your
+  preferences, the backend regenerates the stored queries in the background — nothing to
+  press. Manual **Regenerate** always forces a fresh variant; unchanged profiles never
+  pay for an LLM call. Default (automatic) generation runs at temperature 0, so the
+  stored specs are reproducible; only the manual regenerate asks the LLM for a creative
+  variant.
+- **Filters self-resolve from your profile** — if the request omits location, country, or
+  the salary band, the backend fills each one from the profile (`contact.country`,
+  `preferences.target_location`, `preferences.salary_min/max/currency`) before searching;
+  anything the request sends explicitly still wins. The run status echo shows the
+  *resolved* payload, so you always see what was actually searched.
 - **Filters travel as filters** — location, country, salary band (min/max), and result count are
   structured fields, mapped to each source's native parameters (e.g. Adzuna's
   `salary_min`); they are never glued into the query text (except LinkedIn's salary

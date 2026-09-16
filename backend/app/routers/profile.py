@@ -47,9 +47,10 @@ async def get_profile(
 async def update_profile(
     profile_id: uuid.UUID,
     payload: ProfileUpdate,
+    background_tasks: BackgroundTasks,
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> ProfileResponse:
-    return await profile_service.save_profile(session, profile_id, payload)
+    return await profile_service.save_profile(session, background_tasks, profile_id, payload)
 
 
 @router.patch("/profiles/{profile_id}/preferences", response_model=StoredPreferences)
@@ -65,9 +66,10 @@ async def update_profile_preferences(
 async def gap_fill_profile(
     profile_id: uuid.UUID,
     payload: GapFillRequest,
+    background_tasks: BackgroundTasks,
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> GapFillResponse:
-    return await gap_fill.run_gap_fill_turn(session, profile_id, payload)
+    return await gap_fill.run_gap_fill_turn(session, background_tasks, profile_id, payload)
 
 
 @router.post("/profiles/{profile_id}/search-queries", response_model=SearchQueriesResponse)

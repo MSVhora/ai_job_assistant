@@ -49,9 +49,12 @@ docs/plans/         # versioned implementation plans (v1/, v2/, v3/ per-version 
 
 ## Git workflow
 
-- **One branch per issue.** Create `v{N}/{issue-number}-{slug}` (e.g. `v3/24-profile-scoped-searches`) before starting an issue; docs-only changes may go straight to `main`.
-- **Merge on close, not before.** When the issue is tested, reviewed, and complete: merge the branch into `main`, `git pull`, then delete the branch (local + remote).
-- Never commit directly to `main` for issue work; keep the milestone-commit message convention.
+- **Milestone branch, one per version.** At milestone start, cut `v{N}/milestone` (e.g. `v4/milestone`) from `main`. This is the integration target for the whole milestone; `main` only receives the milestone as one reviewed unit.
+- **One branch per issue (off the milestone branch).** Create `v{N}/{issue-number}-{slug}` (e.g. `v4/31-query-builder-cache`) from `v{N}/milestone` before starting an issue; docs-only changes may go straight to `main`.
+- **Merge issues into the milestone branch on close, not before.** When the issue is tested and complete: merge its branch into `v{N}/milestone`, then delete the issue branch (local + remote). Run the lint/test gates before each merge so the milestone branch is always green.
+- **Milestone merge needs owner review.** When every issue in the milestone is done and tested: merge `v{N}/milestone` into `main` with `--no-ff` (one recoverable milestone commit), `git pull`, then delete the milestone branch (local + remote).
+- Never commit directly to `main` for issue work; never rebase the milestone branch mid-milestone (keeps tested states testable); keep the milestone-commit message convention.
+
 
 ## Definition of done (before reporting a task complete)
 

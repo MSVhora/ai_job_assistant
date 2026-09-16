@@ -824,6 +824,8 @@ export interface components {
             currency?: string | null;
             /** Seniority */
             seniority?: ("intern" | "junior" | "mid" | "senior" | "staff" | "lead" | "principal" | "manager" | "director" | "executive") | null;
+            /** Seniority Source */
+            seniority_source?: ("user" | "derived") | null;
             /** Work Authorization */
             work_authorization?: string | null;
         };
@@ -1217,6 +1219,8 @@ export interface components {
              */
             extra_sections: components["schemas"]["ExtraSection"][];
             preferences?: components["schemas"]["Preferences"] | null;
+            /** Years Of Experience */
+            years_of_experience?: number | null;
         };
         /** ValidationError */
         ValidationError: {

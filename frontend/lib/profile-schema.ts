@@ -97,10 +97,13 @@ export const profileFormSchema = z
     ),
     extra_sections: z.array(
       z.object({
-        title: z.string().min(1, "Section title is required"),
+        title: z.string(),
         entries: z.array(z.string()),
       }),
     ),
+    // Server-derived display value (issue #32); read back from the API but
+    // never sent — the backend recomputes it on every save.
+    years_of_experience: z.string(),
     preferences: z.object({
       target_title: z.string(),
       target_location: z.string(),
@@ -109,6 +112,8 @@ export const profileFormSchema = z
       salary_max: numericText,
       currency: z.string(),
       seniority: seniority,
+      // Server-managed provenance for seniority; display-only here.
+      seniority_source: z.string(),
       work_authorization: z.string(),
     }),
   })
@@ -140,6 +145,7 @@ const defaultPreferences = {
   salary_max: "",
   currency: "",
   seniority: "" as (typeof seniority)["options"][number],
+  seniority_source: "",
   work_authorization: "",
 };
 
@@ -199,6 +205,7 @@ export function toFormValues(profile: StructuredProfile): ProfileFormValues {
       title: section.title,
       entries: section.entries ?? [],
     })),
+    years_of_experience: profile.years_of_experience?.toString() ?? "",
     preferences: profile.preferences
       ? {
           target_title: profile.preferences.target_title ?? "",
@@ -210,6 +217,7 @@ export function toFormValues(profile: StructuredProfile): ProfileFormValues {
           currency: profile.preferences.currency ?? "",
           seniority: (profile.preferences.seniority ??
             "") as (typeof seniority)["options"][number],
+          seniority_source: profile.preferences.seniority_source ?? "",
           work_authorization: profile.preferences.work_authorization ?? "",
         }
       : { ...defaultPreferences },

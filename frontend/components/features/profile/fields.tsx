@@ -19,6 +19,10 @@ export function AiExtractedBadge() {
   return <Badge variant="ai">AI-extracted</Badge>;
 }
 
+export function DerivedFromExperienceBadge() {
+  return <Badge variant="warn">Derived from experience</Badge>;
+}
+
 const iconProps = {
   fill: "none",
   stroke: "currentColor",
@@ -359,6 +363,7 @@ export function TextField({
   placeholder,
   type,
   hint,
+  readOnly,
 }: {
   label: string;
   name: string;
@@ -367,6 +372,7 @@ export function TextField({
   placeholder?: string;
   type?: string;
   hint?: string;
+  readOnly?: boolean;
 }) {
   const { register } = useFormContext<ProfileFormValues>();
   return (
@@ -374,6 +380,7 @@ export function TextField({
       <Input
         id={name}
         type={type}
+        readOnly={readOnly}
         {...register(name as FieldPath<ProfileFormValues>)}
         placeholder={placeholder}
       />
@@ -390,16 +397,18 @@ export function SelectField({
   options,
   error,
   badge,
+  hint,
 }: {
   label: string;
   name: string;
   options: readonly { value: string; label: string }[];
   error?: string;
   badge?: ReactNode;
+  hint?: string;
 }) {
   const { register } = useFormContext<ProfileFormValues>();
   return (
-    <Field label={label} htmlFor={name} error={error} badge={badge}>
+    <Field label={label} htmlFor={name} error={error} badge={badge} hint={hint}>
       <select id={name} className={SELECT_STYLES} {...register(name as FieldPath<ProfileFormValues>)}>
         <option value="">Not set</option>
         {options.map((option) => (

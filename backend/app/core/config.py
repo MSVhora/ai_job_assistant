@@ -37,6 +37,14 @@ class Settings(BaseSettings):
     # expiry become stale after this many days since posting.
     stale_posting_days: Annotated[int, Field(ge=1)] = 45
 
+    # Seniority derivation bands from years_of_experience (issue #32): a YOE
+    # below the next band's threshold maps down. 0-1 → junior, 2-4 → mid,
+    # 5-7 → senior, 8-11 → staff, 12+ → principal (defaults).
+    seniority_band_mid: Annotated[int, Field(ge=0)] = 2
+    seniority_band_senior: Annotated[int, Field(ge=0)] = 5
+    seniority_band_staff: Annotated[int, Field(ge=0)] = 8
+    seniority_band_principal: Annotated[int, Field(ge=0)] = 12
+
     @field_validator(
         "gemini_api_key", "adzuna_app_id", "adzuna_app_key", "apify_token", mode="before"
     )

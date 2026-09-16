@@ -205,7 +205,12 @@ async def test_inverted_salary_band_dropped(
     assert [field["field"] for field in body["applied_fields"]] == ["preferences.target_location"]
     assert "preferences.salary_band" in [field["key"] for field in body["missing_fields"]]
     revisions = await fetch_revisions(profile_id)
-    assert set(revisions[0].diff) == {"preferences.target_location"}
+    assert set(revisions[0].diff) == {
+        "preferences.target_location",
+        "years_of_experience",
+        "preferences.seniority",
+        "preferences.seniority_source",
+    }
 
 
 async def test_answers_for_present_fields_are_ignored(
@@ -425,3 +430,53 @@ async def test_no_missing_fields_turn_does_not_schedule_query_refresh(
     assert response.status_code == 200
     assert response.json()["status"] == "complete"
     assert scheduled == []
+
+
+async def test_seniority_answer_is_marked_user_set(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    profile_id = await create_profile("Bare", VALID_PROFILE)
+    install_acompletion(
+        monkeypatch,
+        lambda **kw: llm_response(turn({"seniority": "senior"}, "Noted, senior it is.")),
+    )
+
+    response = await client.post(
+        f"/api/profiles/{profile_id}/gap-fill",
+        json={"messages": [{"role": "user", "content": "senior level"}]},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert "preferences.seniority" in [field["field"] for field in body["applied_fields"]]
+    stored = body["structured_profile"]["preferences"]
+    assert stored["seniority"] == "senior"
+    assert stored["seniority_source"] == "user"
+
+    fetched = await client.get(f"/api/profiles/{profile_id}")
+    fetched_prefs = fetched.json()["structured_profile"]["preferences"]
+    assert fetched_prefs["seniority"] == "senior"
+    assert fetched_prefs["seniority_source"] == "user"
+    assert "preferences.seniority" not in fetched.json()["missing_fields"]
+
+
+async def test_derived_seniority_drops_from_missing_fields(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    profile_id = await create_profile("Bare", VALID_PROFILE)
+    install_acompletion(
+        monkeypatch,
+        lambda **kw: llm_response(turn({"target_location": "Berlin"}, "Berlin it is.")),
+    )
+
+    first = await client.post(
+        f"/api/profiles/{profile_id}/gap-fill",
+        json={"messages": [{"role": "user", "content": "Berlin"}]},
+    )
+    assert "preferences.seniority" not in [field["key"] for field in first.json()["missing_fields"]]
+
+    fetched = await client.get(f"/api/profiles/{profile_id}")
+    prefs = fetched.json()["structured_profile"]["preferences"]
+    assert prefs["seniority"] == "junior"
+    assert prefs["seniority_source"] == "derived"
+    assert "preferences.seniority" not in fetched.json()["missing_fields"]

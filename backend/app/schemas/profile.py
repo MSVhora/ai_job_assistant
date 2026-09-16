@@ -110,6 +110,11 @@ class Preferences(BaseModel):
     salary_max: float | None = Field(default=None, ge=0)
     currency: str | None = None
     seniority: SeniorityLevel | None = None
+    # Server-managed provenance for seniority (issue #32): "derived" when filled
+    # from years_of_experience by apply_derived_fields, "user" when the user
+    # picked (or answered in chat) a value. None on legacy rows; treated as
+    # user-set — derivation never overwrites those.
+    seniority_source: Literal["user", "derived"] | None = None
     work_authorization: str | None = Field(default=None, max_length=200)
 
 
@@ -125,6 +130,10 @@ class StructuredProfile(BaseModel):
     awards: list[AwardItem] = []
     extra_sections: list[ExtraSection] = []
     preferences: Preferences | None = None
+    # Whole years of career span, derived deterministically from the verbatim
+    # experience date strings by apply_derived_fields (issue #32). Server-managed:
+    # never sent by the client; recomputed on every extraction/profile save.
+    years_of_experience: int | None = Field(default=None, ge=0)
 
     @model_validator(mode="after")
     def require_some_content(self) -> "StructuredProfile":

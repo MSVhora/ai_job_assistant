@@ -14,6 +14,8 @@ from app.adapters.job_sources.base import (
     RawJobPosting,
     SourceFilterDecl,
 )
+from app.schemas.profile import StructuredProfile
+from app.services import profile_derivation
 
 VALID_PROFILE: dict[str, Any] = {
     "contact": {
@@ -34,8 +36,8 @@ VALID_PROFILE: dict[str, Any] = {
             "company": "Acme Corp",
             "title": "Senior Data Analyst",
             "start_date": "Mar 2021",
-            "end_date": None,
-            "is_current": True,
+            "end_date": "Dec 2022",
+            "is_current": False,
             "bullets": ["Led reporting", "Built dashboards"],
         }
     ],
@@ -58,6 +60,13 @@ VALID_PROFILE: dict[str, Any] = {
         {"title": "Languages", "entries": ["English - native", "German - fluent"]},
     ],
 }
+
+
+def derived_valid_profile() -> dict[str, Any]:
+    """VALID_PROFILE as the extraction/save pipeline stores it post-#32."""
+    profile = StructuredProfile.model_validate(VALID_PROFILE)
+    profile_derivation.apply_derived_fields(profile)
+    return profile.model_dump(mode="json")
 
 
 def llm_response(

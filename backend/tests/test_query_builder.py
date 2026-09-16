@@ -75,6 +75,23 @@ def profile() -> StructuredProfile:
     return StructuredProfile.model_validate(VALID_PROFILE)
 
 
+async def test_candidate_context_includes_yoe(monkeypatch: pytest.MonkeyPatch) -> None:
+    calls = install_acompletion(monkeypatch, lambda **kw: queries_response())
+    structured = StructuredProfile.model_validate(
+        {
+            **VALID_PROFILE,
+            "years_of_experience": 7,
+            "preferences": {"seniority": "senior"},
+        }
+    )
+
+    await generate_queries(structured, ["adzuna"])
+
+    prompt = calls[0]["messages"][1]["content"]
+    assert "Years of experience: 7" in prompt
+    assert "Seniority: senior" in prompt
+
+
 async def test_generate_queries_produces_stamped_specs(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -97,6 +97,10 @@ export function EditorBody({ profile }: { profile: ProfileResponse }) {
     }
     if (touched.has("preferences.seniority")) {
       next.preferences.seniority = values.preferences.seniority;
+      // Derived-seniority provenance and the YOE display value are re-derived
+      // server-side on every apply; keep the read-only fields in sync.
+      next.preferences.seniority_source = values.preferences.seniority_source;
+      next.years_of_experience = values.years_of_experience;
     }
     if (touched.has("preferences.work_authorization")) {
       next.preferences.work_authorization = values.preferences.work_authorization;
@@ -127,6 +131,8 @@ export function EditorBody({ profile }: { profile: ProfileResponse }) {
             <p className="text-xs text-gray-500">
               {profile.source_resume_filename ? `From ${profile.source_resume_filename} · ` : ""}
               Updated {new Date(profile.updated_at).toLocaleString()}
+              {profile.structured_profile.years_of_experience != null &&
+                ` · ~${profile.structured_profile.years_of_experience} yrs experience`}
             </p>
           </div>
         )}

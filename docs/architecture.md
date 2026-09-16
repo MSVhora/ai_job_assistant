@@ -201,6 +201,15 @@ hash no longer matches the recomputed one; the manual regenerate endpoint always
 hot variant and rewrites the hash. Refresh runs happen in background tasks that open
 fresh sessions — never in the request path.
 
+Since #32, the profile carries deterministic derived experience signals: `years_of_experience`
+is parsed from the verbatim experience date strings purely in Python (no LLM), and when the
+user never set `preferences.seniority`, it is filled from YOE via Settings band thresholds
+(`SENIORITY_BAND_*`), stamped `seniority_source: "derived"`. Derivation re-runs on every
+extraction/create/save and after applied gap-fill turns; user-set values are never overwritten
+and legacy provenance is treated as user-set. Both values join the shared digest builder, so
+they reach the query-generation prompt and the profile embedding (old profiles re-embed
+opportunistically on their next save); the rerank prompt picks them up via #37.
+
 ## Source filter capabilities (v3 issue #28)
 
 Each `JobSource` declares its advanced filters in one schema (`SourceFilterDecl`: key,

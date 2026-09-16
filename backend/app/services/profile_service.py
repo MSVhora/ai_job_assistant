@@ -25,7 +25,7 @@ from app.schemas.profile import (
     parse_stored_preferences,
 )
 from app.schemas.resume import DraftProfileResponse
-from app.services import embedding, matching, query_builder
+from app.services import embedding, matching, profile_derivation, query_builder
 from app.services.resume_service import get_or_create_candidate
 
 logger = logging.getLogger(__name__)
@@ -209,9 +209,33 @@ def _first_save_revisions(
     ]
 
 
+def _resolve_seniority_source(payload: ProfileCreate | ProfileUpdate, profile: Profile) -> None:
+    """Server-managed provenance for seniority (issue #32).
+
+    The client's `seniority_source` value is always discarded. A payload
+    seniority that differs from the stored one (or newly appears) is a user
+    change → "user". A matching one keeps the stored provenance: "derived"
+    stays derived and re-tracks later YOE changes, legacy None stays None and
+    is never touched by the fallback.
+    """
+    structured = payload.structured_profile
+    if structured is None or structured.preferences is None:
+        return
+    prefs = structured.preferences
+    stored = StructuredProfile.model_validate(profile.structured_profile)
+    stored_prefs = stored.preferences
+    stored_seniority = stored_prefs.seniority if stored_prefs else None
+    if prefs.seniority != stored_seniority:
+        prefs.seniority_source = "user" if prefs.seniority is not None else None
+    else:
+        prefs.seniority_source = stored_prefs.seniority_source if stored_prefs else None
+
+
 async def create_profile(session: AsyncSession, payload: ProfileCreate) -> ProfileResponse:
     candidate = await get_or_create_candidate(session)
-    new_profile = payload.structured_profile.model_dump(mode="json")
+    structured = payload.structured_profile
+    profile_derivation.apply_derived_fields(structured)
+    new_profile = structured.model_dump(mode="json")
     draft = None
     draft_queries: dict[str, Any] | None = None
     if payload.source_resume_id is not None:
@@ -228,7 +252,7 @@ async def create_profile(session: AsyncSession, payload: ProfileCreate) -> Profi
         structured_profile=new_profile,
         search_queries=draft_queries,
         source_resume_id=payload.source_resume_id,
-        queries_input_hash=await _hash_for_current_sources(session, payload.structured_profile),
+        queries_input_hash=await _hash_for_current_sources(session, structured),
     )
     session.add(profile)
     await session.flush()
@@ -264,7 +288,10 @@ async def save_profile(
     last_revision: ProfileRevision | None = None
     content_changed = False
     if payload.structured_profile is not None:
-        new_profile = payload.structured_profile.model_dump(mode="json")
+        _resolve_seniority_source(payload, profile)
+        structured = payload.structured_profile
+        profile_derivation.apply_derived_fields(structured)
+        new_profile = structured.model_dump(mode="json")
         if payload.source_resume_id is not None:
             resume = await session.get(Resume, payload.source_resume_id)
             if resume is None or resume.candidate_id != profile.candidate_id:
@@ -292,7 +319,7 @@ async def save_profile(
         await session.flush()
         await matching.rescore_matches(session, profile, invalidate_rationales=True)
         await session.flush()
-        new_hash = await _hash_for_current_sources(session, payload.structured_profile)
+        new_hash = await _hash_for_current_sources(session, structured)
         if content_changed and new_hash is not None and new_hash != profile.queries_input_hash:
             schedule_query_refresh(background_tasks, profile.id)
             profile.queries_input_hash = None

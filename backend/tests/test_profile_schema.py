@@ -11,7 +11,7 @@ def test_full_profile_validates() -> None:
     assert profile.contact.full_name == "Jane Doe"
     assert profile.contact.email == "jane@example.com"
     assert profile.experience[0].company == "Acme Corp"
-    assert profile.experience[0].is_current is True
+    assert profile.experience[0].is_current is False
     assert profile.education[0].degree == "MSc"
     assert profile.certifications[0].issuer == "AWS"
 

@@ -19,7 +19,7 @@ from app.models import Resume
 from app.schemas.job_search import StoredSearchQueries
 from app.schemas.profile import StructuredProfile
 from app.schemas.resume import DraftProfileResponse
-from app.services import query_builder
+from app.services import profile_derivation, query_builder
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +101,7 @@ async def extract_resume_profile(
         raise LLMExtractionError(str(exc)) from exc
 
     profile = _enrich_link_labels(result.data)
+    profile_derivation.apply_derived_fields(profile)
     parsed_at = datetime.now(UTC)
     resume.draft_profile = profile.model_dump(mode="json")
     resume.parse_version = f"{settings.llm_model}+{PROFILE_PROMPT_VERSION}"

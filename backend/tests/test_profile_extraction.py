@@ -72,7 +72,7 @@ async def test_extract_returns_draft_and_persists_parse_artifact(
     assert body["resume_id"] == uploaded["resume_id"]
     assert body["candidate_id"] == uploaded["candidate_id"]
     assert body["draft_profile"]["contact"]["full_name"] == "Jane Doe"
-    assert body["draft_profile"]["experience"][0]["is_current"] is True
+    assert body["draft_profile"]["experience"][0]["is_current"] is False
     assert body["draft_profile"]["contact"]["links"][0]["label"] == "LinkedIn"
     assert body["draft_profile"]["contact"]["links"][1]["label"] == "GitHub"
     assert body["draft_profile"]["contact"]["links"][2]["label"] == "Website"

@@ -59,6 +59,24 @@ def test_profile_embed_text_includes_matching_fields() -> None:
     assert "Work authorization: EU citizen" in text
 
 
+def test_profile_embed_text_includes_years_of_experience_when_present() -> None:
+    profile = StructuredProfile.model_validate(
+        {
+            **VALID_PROFILE,
+            "years_of_experience": 7,
+            "preferences": FULL_PREFS,
+        }
+    )
+    assert "Years of experience: 7" in profile_embed_text(profile)
+
+
+def test_profile_embed_text_omits_yoe_line_when_absent() -> None:
+    text = profile_embed_text(
+        StructuredProfile.model_validate({**VALID_PROFILE, "preferences": FULL_PREFS})
+    )
+    assert "Years of experience" not in text
+
+
 def test_profile_embed_text_caps_length() -> None:
     profile = StructuredProfile.model_validate({**VALID_PROFILE, "summary": "y" * 10_000})
     assert len(profile_embed_text(profile)) == MAX_EMBED_CHARS

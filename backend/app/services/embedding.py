@@ -37,6 +37,10 @@ def profile_digest_parts(profile: StructuredProfile) -> list[str]:
         parts.append(f"Skills: {', '.join(profile.skills)}")
     if preferences and preferences.seniority:
         parts.append(f"Seniority: {preferences.seniority}")
+    # Issue #32: YOE joins as a new part — existing profiles re-embed
+    # opportunistically on the next save/apply (amended byte-stability note above).
+    if profile.years_of_experience is not None:
+        parts.append(f"Years of experience: {profile.years_of_experience}")
     if profile.summary:
         parts.append(f"Summary: {profile.summary}")
     roles = [

@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 import pytest
-from fakes import VALID_PROFILE
+from fakes import VALID_PROFILE, derived_valid_profile
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy import select
 
@@ -75,7 +75,7 @@ def with_headline(profile: dict[str, Any], headline: str) -> dict[str, Any]:
 async def test_create_profile_from_unchanged_draft_writes_single_ai_extraction_revision(
     client: AsyncClient,
 ) -> None:
-    inserted = await insert_resume_with_draft(VALID_PROFILE)
+    inserted = await insert_resume_with_draft(derived_valid_profile())
 
     response = await create_profile(client, "Android", VALID_PROFILE, inserted["resume_id"])
 
@@ -94,7 +94,7 @@ async def test_create_profile_from_unchanged_draft_writes_single_ai_extraction_r
 
 
 async def test_create_profile_with_corrections_writes_two_revisions(client: AsyncClient) -> None:
-    inserted = await insert_resume_with_draft(VALID_PROFILE)
+    inserted = await insert_resume_with_draft(derived_valid_profile())
 
     response = await create_profile(
         client,
@@ -135,7 +135,7 @@ async def test_create_profile_without_resume_ref_writes_manual_edit_baseline(
 async def test_two_profiles_from_same_draft_have_independent_revisions(
     client: AsyncClient,
 ) -> None:
-    inserted = await insert_resume_with_draft(VALID_PROFILE)
+    inserted = await insert_resume_with_draft(derived_valid_profile())
     android = await create_profile(client, "Android", VALID_PROFILE, inserted["resume_id"])
     swe = await create_profile(
         client,
@@ -244,7 +244,7 @@ async def test_no_change_content_patch_writes_empty_diff_revision(client: AsyncC
 async def test_delete_profile_cascades_revisions_and_keeps_other_profiles(
     client: AsyncClient,
 ) -> None:
-    inserted = await insert_resume_with_draft(VALID_PROFILE)
+    inserted = await insert_resume_with_draft(derived_valid_profile())
     first = await create_profile(client, "Android", VALID_PROFILE, inserted["resume_id"])
     second = await create_profile(client, "SWE", VALID_PROFILE, inserted["resume_id"])
     first_id = first.json()["profile_id"]
@@ -814,3 +814,76 @@ async def test_save_with_unchanged_content_keeps_hash(client: AsyncClient) -> No
         row = await session.get(Profile, uuid.UUID(profile_id))
         stored_hash = row.queries_input_hash
     assert stored_hash is not None
+
+
+async def test_create_derives_yoe_and_seniority(client: AsyncClient) -> None:
+    body = (await create_profile(client, "Android", VALID_PROFILE)).json()
+
+    structured = body["structured_profile"]
+    assert structured["years_of_experience"] == 1
+    assert structured["preferences"]["seniority"] == "junior"
+    assert structured["preferences"]["seniority_source"] == "derived"
+    assert "preferences.seniority" not in body["missing_fields"]
+
+
+async def test_save_roundtrips_derived_seniority_without_client_provenance(
+    client: AsyncClient,
+) -> None:
+    created = (await create_profile(client, "Android", VALID_PROFILE)).json()
+    profile_id = created["profile_id"]
+
+    saved = await client.patch(
+        f"/api/profiles/{profile_id}", json={"structured_profile": VALID_PROFILE}
+    )
+
+    assert saved.status_code == 200
+    structured = saved.json()["structured_profile"]
+    assert structured["years_of_experience"] == 1
+    assert structured["preferences"]["seniority"] == "junior"
+    assert structured["preferences"]["seniority_source"] == "derived"
+    revisions = await fetch_revisions(profile_id)
+    assert revisions[-1].diff == {}
+
+
+async def test_manual_seniority_edit_becomes_user_set(client: AsyncClient) -> None:
+    created = (await create_profile(client, "Android", VALID_PROFILE)).json()
+    profile_id = created["profile_id"]
+
+    corrected = {
+        **VALID_PROFILE,
+        "preferences": {**(created["structured_profile"]["preferences"]), "seniority": "senior"},
+    }
+    saved = await client.patch(
+        f"/api/profiles/{profile_id}", json={"structured_profile": corrected}
+    )
+    structured = saved.json()["structured_profile"]
+    assert structured["preferences"]["seniority"] == "senior"
+    assert structured["preferences"]["seniority_source"] == "user"
+
+    later = {
+        **corrected,
+        "experience": corrected["experience"],
+        "headline": "Android Lead",
+    }
+    resaved = await client.patch(f"/api/profiles/{profile_id}", json={"structured_profile": later})
+    structured = resaved.json()["structured_profile"]
+    assert structured["headline"] == "Android Lead"
+    # The user-set value survives subsequent saves untouched.
+    assert structured["preferences"]["seniority"] == "senior"
+    assert structured["preferences"]["seniority_source"] == "user"
+
+
+async def test_save_rederives_seniority_when_dates_change(client: AsyncClient) -> None:
+    created = (await create_profile(client, "Android", VALID_PROFILE)).json()
+    profile_id = created["profile_id"]
+
+    updated_experience = [{**VALID_PROFILE["experience"][0], "end_date": "Dec 2024"}]
+    saved = await client.patch(
+        f"/api/profiles/{profile_id}",
+        json={"structured_profile": {**VALID_PROFILE, "experience": updated_experience}},
+    )
+
+    structured = saved.json()["structured_profile"]
+    assert structured["years_of_experience"] == 3
+    assert structured["preferences"]["seniority"] == "mid"
+    assert structured["preferences"]["seniority_source"] == "derived"

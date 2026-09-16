@@ -9,7 +9,10 @@ def request(**overrides: object) -> JobSearchRequest:
 
 def test_adzuna_title_with_query_combines_terms_but_drops_what() -> None:
     spec = SourceQuerySpec(
-        title="Senior Android Engineer", skills=["Kotlin", "Java"], exclude=["intern"]
+        title="Senior Android Engineer",
+        skills_all=["Kotlin", "Compose"],
+        skills=["Java"],
+        exclude=["intern"],
     )
 
     query = build_connector_query("adzuna", spec, "mobile kotlin", request())
@@ -17,9 +20,20 @@ def test_adzuna_title_with_query_combines_terms_but_drops_what() -> None:
     plan = query.term_plan
     assert plan is not None
     assert plan.what_phrase == "Senior Android Engineer"
-    assert plan.what_or == ["Kotlin", "Java"]
+    assert plan.what_and == ["Kotlin", "Compose"]
+    assert plan.what_or == ["Java"]
     assert plan.what_exclude == ["intern"]
     assert plan.what is None
+
+
+def test_adzuna_legacy_spec_without_skills_all_keeps_empty_what_and() -> None:
+    spec = SourceQuerySpec(title="Senior Android Engineer", skills=["Kotlin", "Java"])
+
+    query = build_connector_query("adzuna", spec, None, request())
+
+    plan = query.term_plan
+    assert plan is not None
+    assert plan.what_or == ["Kotlin", "Java"]
     assert plan.what_and == []
 
 

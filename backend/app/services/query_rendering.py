@@ -53,9 +53,12 @@ def _render_adzuna_plan(
 ) -> TermPlan:
     # Precedence: what_phrase + what_and/what_or combined; what only when no
     # phrase. A spec under a title never carries its query to the API.
+    # skills_all (must-have stack) -> what_and; skills (nice-to-haves) ->
+    # what_or; legacy specs without skills_all render what_and=[].
     title = spec.title if spec is not None else None
     return TermPlan(
         what_phrase=title,
+        what_and=(spec.skills_all or []) if spec is not None else [],
         what_or=(spec.skills or []) if spec is not None else [],
         what_exclude=(spec.exclude or []) if spec is not None else [],
         what=effective_query if not title else None,

@@ -27,7 +27,7 @@ from app.services import sources as sources_service
 
 logger = logging.getLogger(__name__)
 
-PROMPT_VERSION = "search_query_v3"
+PROMPT_VERSION = "search_query_v4"
 DEFAULT_GENERATION_TEMPERATURE = 0.0
 GENERATION_TEMPERATURE = 0.8
 MAX_CONTEXT_CHARS = 2500
@@ -35,13 +35,15 @@ MAX_CONTEXT_CHARS = 2500
 QUERY_SYSTEM = (
     "You write job-search query specs for a candidate. For every source listed in the "
     "request, produce: title = an exact job-title phrase including seniority when known; "
-    "skills = up to 3 short, high-signal skill keywords (single words or short tool names); "
+    "skills_all = up to 3 short must-have stack keywords from the resume's core toolset "
+    "(single words or short tool names; omit or leave empty when no clear must-have core "
+    "exists); skills = up to 3 short nice-to-have or adjacent skill keywords; "
     "exclude = up to 2 terms that would pull in wrong-level results (may be an empty list). "
-    "Never include a location or salary in title, skills, or exclude - those travel as "
-    "structured filters. Use only the provided candidate context; never invent skills. "
-    "Fill the per-source options dict only with advanced filter keys the source declares "
-    "(and only with the allowed values for select fields); omit options entirely rather "
-    "than inventing keys."
+    "Never include a location or salary in title, skills_all, skills, or exclude - those "
+    "travel as structured filters. Use only the provided candidate context; never invent "
+    "skills. Fill the per-source options dict only with advanced filter keys the source "
+    "declares (and only with the allowed values for select fields); omit options entirely "
+    "rather than inventing keys."
 )
 
 _FILTER_TYPE_LABELS = {

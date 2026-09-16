@@ -25,7 +25,14 @@ def _clean_terms(values: list[str] | None) -> list[str] | None:
 
 
 class SourceQuerySpec(BaseModel):
+    """Per-source query spec from the LLM or the profile's stored queries.
+
+    `skills_all` = must-have stack keywords (maps to Adzuna `what_and`);
+    `skills` = nice-to-have / adjacent keywords (`skills_any`, → `what_or`).
+    """
+
     title: str | None = Field(default=None, max_length=_MAX_TITLE)
+    skills_all: list[str] | None = Field(default=None, max_length=_MAX_SKILLS)
     skills: list[str] | None = Field(default=None, max_length=_MAX_SKILLS)
     exclude: list[str] | None = Field(default=None, max_length=_MAX_EXCLUDE)
     query: str | None = Field(default=None, max_length=_MAX_QUERY)
@@ -38,13 +45,13 @@ class SourceQuerySpec(BaseModel):
             return None
         return value.strip() or None
 
-    @field_validator("skills", "exclude", mode="after")
+    @field_validator("skills_all", "skills", "exclude", mode="after")
     @classmethod
     def _strip_terms(cls, values: list[str] | None) -> list[str] | None:
         return _clean_terms(values)
 
     def has_content(self) -> bool:
-        return bool(self.title or self.query or self.skills or self.options)
+        return bool(self.title or self.query or self.skills_all or self.skills or self.options)
 
 
 class StoredSearchQueries(BaseModel):
@@ -78,7 +85,7 @@ class JobSearchRequest(BaseModel):
     source_queries: dict[str, SourceQuerySpec] | None = Field(default=None, max_length=1)
     location: str | None = Field(default=None, max_length=200)
     country: str | None = Field(default=None, min_length=2, max_length=2, pattern=r"^[A-Za-z]{2}$")
-    results_wanted: int = Field(default=50, ge=1, le=50)
+    results_wanted: int = Field(default=50, ge=1, le=100)
     max_days_old: int | None = Field(default=None, ge=1, le=90)
     salary_min: float | None = Field(default=None, ge=0)
     salary_max: float | None = Field(default=None, ge=0)

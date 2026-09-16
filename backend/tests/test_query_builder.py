@@ -104,7 +104,7 @@ async def test_generate_queries_produces_stamped_specs(
     assert stored.queries["adzuna"].exclude == ["intern"]
     assert stored.queries["apify_linkedin"].exclude is None
     assert stored.generated_by == "gemini/gemini-2.5-flash"
-    assert stored.prompt_version == "search_query_v3"
+    assert stored.prompt_version == "search_query_v4"
     assert calls[0]["temperature"] == 0.0
     prompt = calls[0]["messages"][1]["content"]
     assert "Senior Data Analyst" in prompt

@@ -6,6 +6,7 @@ export type OptionValues = Record<string, string | boolean>;
 
 export type QueryFieldValues = {
   title: string;
+  skills_all: string;
   skills: string;
   exclude: string;
   options: OptionValues;
@@ -67,11 +68,12 @@ export function makeSearchFormSchema(source: SourceInfo | null) {
     optionSchemas.set(decl.key, optionSchemaFor(decl));
   }
   return z.object({
-    query: z
-      .object({
-        title: z.string().max(80, "Keep the title under 80 characters"),
-        skills: z.string(),
-        exclude: z.string(),
+      query: z
+        .object({
+          title: z.string().max(80, "Keep the title under 80 characters"),
+          skills_all: z.string(),
+          skills: z.string(),
+          exclude: z.string(),
         options: z.record(z.string(), z.union([z.string(), z.boolean()])),
       })
       .superRefine((query, ctx) => {
@@ -122,12 +124,12 @@ export function makeSearchFormSchema(source: SourceInfo | null) {
       .number()
       .int("Whole number only")
       .min(1, "At least 1 result")
-      .max(50, "Up to 50 results per search"),
+      .max(100, "Up to 100 results per search"),
   });
 }
 
 export function emptyQueryFields(): QueryFieldValues {
-  return { title: "", skills: "", exclude: "", options: {} };
+  return { title: "", skills_all: "", skills: "", exclude: "", options: {} };
 }
 
 export function splitList(value: string): string[] {
@@ -237,10 +239,12 @@ export function toSearchRequest(
   }
   const fields = values.query ?? emptyQueryFields();
   const title = fields.title.trim();
+  const skillsAll = splitList(fields.skills_all);
   const skills = splitList(fields.skills);
   const exclude = source?.supports_exclusions ? splitList(fields.exclude) : [];
   const options = source !== null ? coerceOptions(fields, source.filters ?? []) : {};
-  const hasSpec = title !== "" || skills.length > 0 || Object.keys(options).length > 0;
+  const hasSpec =
+    title !== "" || skillsAll.length > 0 || skills.length > 0 || Object.keys(options).length > 0;
   if (missing.length === 0 && !hasSpec) {
     missing.push(values.source);
   }
@@ -251,6 +255,7 @@ export function toSearchRequest(
   const spec = hasSpec
     ? {
         title: title || undefined,
+        skills_all: skillsAll.length > 0 ? skillsAll : undefined,
         skills: skills.length > 0 ? skills : undefined,
         exclude: exclude.length > 0 ? exclude : undefined,
         options: Object.keys(options).length > 0 ? options : undefined,

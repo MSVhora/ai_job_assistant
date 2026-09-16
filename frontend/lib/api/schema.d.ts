@@ -1131,10 +1131,18 @@ export interface components {
             /** Warning */
             warning?: string | null;
         };
-        /** SourceQuerySpec */
+        /**
+         * SourceQuerySpec
+         * @description Per-source query spec from the LLM or the profile's stored queries.
+         *
+         *     `skills_all` = must-have stack keywords (maps to Adzuna `what_and`);
+         *     `skills` = nice-to-have / adjacent keywords (`skills_any`, → `what_or`).
+         */
         SourceQuerySpec: {
             /** Title */
             title?: string | null;
+            /** Skills All */
+            skills_all?: string[] | null;
             /** Skills */
             skills?: string[] | null;
             /** Exclude */

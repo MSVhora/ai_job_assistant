@@ -237,6 +237,16 @@ resolution. Unknown sources keep the plain free-text pass-through (`query`). The
 normative precedence tables live in the `TermPlan`/connector docstrings and in
 `services/query_rendering.py`; test_query_rendering.py locks the matrix per source.
 `job_search.query` stores exactly what was sent, and the run status echoes it.
+`what_and` is filled from the spec's must-have `skills_all` list (v4 issue #34).
+
+Adzuna runs are **multi-pass within a call budget** (v4 issue #34): the connector
+issues a broad pass and, when a title phrase exists and `title_only` was not
+explicitly set, a `title_only` pass — deduped by `external_id` (broad pass wins)
+— and paginates to page 2 only when a page fills its 50 rows and
+`results_wanted` exceeds what is collected. Calls per run = Σ(sub-queries ×
+pages), capped by `max_adzuna_calls_per_run` (default 4) with a stop-and-log,
+never a run failure. With no salary floor set the connector also sends
+`salary_include_unknown=1`.
 
 ## Database schema (v1, ER diagram)
 

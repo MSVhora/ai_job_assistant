@@ -100,7 +100,7 @@ class JobSearchQuery(BaseModel):
     term_plan: TermPlan | None = None
     location: str | None = None
     country: str
-    results_wanted: int = Field(default=50, ge=1, le=50)
+    results_wanted: int = Field(default=50, ge=1, le=100)
     max_days_old: int | None = Field(default=None, ge=1, le=90)
     salary_min: float | None = Field(default=None, ge=0)
     salary_max: float | None = Field(default=None, ge=0)

@@ -164,7 +164,7 @@ export function DetailsStep({
           htmlFor="job-results"
           error={errors.results_wanted?.message}
         >
-          <Input id="job-results" type="number" min={1} max={50} {...form.register("results_wanted")} />
+          <Input id="job-results" type="number" min={1} max={100} {...form.register("results_wanted")} />
         </Field>
         <Field
           label="Posted within"
@@ -225,6 +225,7 @@ export function ReviewSummary({
   const values = useWatch({ control });
   const query = values?.query ?? {};
   const title = query.title?.trim();
+  const skillsAll = query.skills_all?.trim();
   const skills = query.skills?.trim();
   const exclude = source.supports_exclusions ? (query.exclude?.trim() ?? "") : null;
   const postedWithin =
@@ -240,6 +241,10 @@ export function ReviewSummary({
     { label: "Profile", value: profileName ?? "—" },
     { label: "Source", value: source.name },
     { label: "Search title", value: title === undefined || title === "" ? "—" : title },
+    {
+      label: "Must-have skills",
+      value: skillsAll === undefined || skillsAll === "" ? "—" : skillsAll,
+    },
     { label: "Include skills", value: skills === undefined || skills === "" ? "—" : skills },
     {
       label: "Exclude skills",

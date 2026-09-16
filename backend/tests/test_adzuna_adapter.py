@@ -52,8 +52,10 @@ def _mock_source(
     handler: httpx.MockTransport,
 ) -> AdzunaJobSource:
     _configure(monkeypatch)
-    client = httpx.AsyncClient(transport=handler)
-    return AdzunaJobSource(client_factory=lambda: client)
+    # A fresh client per call: the connector's budget-gated multi-pass loop
+    # makes more than one HTTP call per run, and a shared client cannot be
+    # reopened after close.
+    return AdzunaJobSource(client_factory=lambda: httpx.AsyncClient(transport=handler))
 
 
 def test_normalize_maps_full_posting() -> None:
@@ -188,8 +190,22 @@ def test_filters_declared_capabilities() -> None:
     source = AdzunaJobSource()
 
     keys = [decl.key for decl in source.filters()]
-    assert keys == ["title_only", "distance_km", "sort_by"]
-    sort_by = source.filters()[2]
+    assert keys == [
+        "title_only",
+        "full_time",
+        "part_time",
+        "contract",
+        "permanent",
+        "distance_km",
+        "sort_by",
+    ]
+    booleans = [
+        decl
+        for decl in source.filters()
+        if decl.key in {"full_time", "part_time", "contract", "permanent"}
+    ]
+    assert all(decl.type == "boolean" and decl.required is False for decl in booleans)
+    sort_by = source.filters()[6]
     assert sort_by.options is not None
     assert [option.value for option in sort_by.options] == ["relevance", "date", "salary"]
 
@@ -238,10 +254,15 @@ async def test_search_raises_when_not_configured(monkeypatch: pytest.MonkeyPatch
 async def test_search_sends_structured_params_for_spec(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    seen: dict[str, object] = {}
+    broad: dict[str, str] = {}
+    titles: dict[str, str] = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
-        seen["url"] = str(request.url)
+        params = _request_params(str(request.url))
+        if "title_only" in params:
+            titles.update(params)
+        else:
+            broad.update(params)
         return httpx.Response(200, json=_fixture())
 
     monkeypatch.setattr("app.adapters.retry.asyncio.sleep", _no_delay)
@@ -250,6 +271,7 @@ async def test_search_sends_structured_params_for_spec(
     query = JobSearchQuery(
         term_plan=TermPlan(
             what_phrase="Senior Android Engineer",
+            what_and=["kotlin", "compose"],
             what_or=["Kotlin", "Java"],
             what_exclude=["intern"],
         ),
@@ -258,13 +280,17 @@ async def test_search_sends_structured_params_for_spec(
     )
     postings = await source.search(query)
 
-    params = _request_params(str(seen["url"]))
-    assert params["what_phrase"] == "Senior Android Engineer"
-    assert params["what_or"] == "Kotlin Java"
-    assert params["what_exclude"] == "intern"
-    assert params["salary_min"] == "5000000"
-    assert "what" not in params
-    assert len(postings) == 3
+    assert broad["what_phrase"] == "Senior Android Engineer"
+    assert broad["what_and"] == "kotlin compose"
+    assert broad["what_or"] == "Kotlin Java"
+    assert broad["what_exclude"] == "intern"
+    assert broad["salary_min"] == "5000000"
+    assert "what" not in broad
+    assert "title_only" not in broad
+    assert titles["title_only"] == "true"
+    assert titles["what_phrase"] == "Senior Android Engineer"
+    # Page-1 fixture is not full, so no pagination and exactly 2 calls.
+    assert len(postings) == len({p.external_id for p in postings})
 
 
 async def test_search_maps_free_text_what_from_plan(
@@ -309,3 +335,211 @@ def test_is_configured_reflects_settings(monkeypatch: pytest.MonkeyPatch) -> Non
     assert AdzunaJobSource().is_configured() is True
     _configure(monkeypatch, app_id=None)
     assert AdzunaJobSource().is_configured() is False
+
+
+def _page_fixture(count: int, first_id: int = 90_000_000) -> dict[str, object]:
+    results = [
+        {
+            "id": first_id + index,
+            "title": f"Engineer {index}",
+            "redirect_url": f"https://adzuna.test/land/{first_id + index}",
+            "created": "2026-08-30T10:22:10+00:00",
+            "description": "Build things",
+        }
+        for index in range(count)
+    ]
+    return {"count": count, "page": 1, "results": results}
+
+
+def _recording_handler(calls: list[dict[str, str]], fixture: dict[str, object]):
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(_request_params(str(request.url)))
+        return httpx.Response(200, json=fixture)
+
+    return handler
+
+
+async def test_search_salary_include_unknown_when_no_salary_floor(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[dict[str, str]] = []
+    handler = _recording_handler(calls, _fixture())
+    monkeypatch.setattr("app.adapters.retry.asyncio.sleep", _no_delay)
+    source = _mock_source(monkeypatch, httpx.MockTransport(handler))
+
+    await source.search(JobSearchQuery(query="python", country="de"))
+
+    assert calls[0]["salary_include_unknown"] == "1"
+    assert "salary_min" not in calls[0]
+
+
+async def test_search_omits_salary_include_unknown_when_floor_set(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[dict[str, str]] = []
+    handler = _recording_handler(calls, _fixture())
+    monkeypatch.setattr("app.adapters.retry.asyncio.sleep", _no_delay)
+    source = _mock_source(monkeypatch, httpx.MockTransport(handler))
+
+    await source.search(JobSearchQuery(query="python", country="de", salary_min=60000))
+
+    assert "salary_include_unknown" not in calls[0]
+    assert calls[0]["salary_min"] == "60000"
+
+
+async def test_search_single_call_with_explicit_title_only(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[dict[str, str]] = []
+    handler = _recording_handler(calls, _fixture())
+    monkeypatch.setattr("app.adapters.retry.asyncio.sleep", _no_delay)
+    source = _mock_source(monkeypatch, httpx.MockTransport(handler))
+
+    await source.search(
+        JobSearchQuery(
+            country="de",
+            term_plan=TermPlan(what_phrase="Backend Engineer", what_or=["Python"]),
+            options={"title_only": True},
+        )
+    )
+
+    assert len(calls) == 1
+    assert calls[0]["title_only"] == "true"
+
+
+async def test_search_single_call_without_title_phrase(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[dict[str, str]] = []
+    handler = _recording_handler(calls, _fixture())
+    monkeypatch.setattr("app.adapters.retry.asyncio.sleep", _no_delay)
+    source = _mock_source(monkeypatch, httpx.MockTransport(handler))
+
+    await source.search(JobSearchQuery(query="python", country="de"))
+
+    assert len(calls) == 1
+
+
+async def test_search_dedupes_title_pass_by_external_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[dict[str, str]] = []
+    handler = _recording_handler(calls, _fixture())
+    monkeypatch.setattr("app.adapters.retry.asyncio.sleep", _no_delay)
+    source = _mock_source(monkeypatch, httpx.MockTransport(handler))
+
+    postings = await source.search(
+        JobSearchQuery(
+            country="de",
+            term_plan=TermPlan(what_phrase="Data Engineer", what_or=["SQL"]),
+        )
+    )
+
+    # Same fixture on both passes: 6 raw results collapse to 3 unique ids.
+    assert len(calls) == 2
+    assert len(postings) == 3
+    assert [posting.external_id for posting in postings] == [
+        "5862011801",
+        "5861903807",
+        "5860000001",
+    ]
+
+
+async def test_search_maps_contract_booleans_only_when_true(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[dict[str, str]] = []
+    handler = _recording_handler(calls, _fixture())
+    monkeypatch.setattr("app.adapters.retry.asyncio.sleep", _no_delay)
+    source = _mock_source(monkeypatch, httpx.MockTransport(handler))
+
+    await source.search(
+        JobSearchQuery(
+            query="python",
+            country="de",
+            options={"full_time": True, "permanent": True, "part_time": False},
+        )
+    )
+
+    params = calls[0]
+    assert params["full_time"] == "true"
+    assert params["permanent"] == "true"
+    assert "part_time" not in params
+    assert "contract" not in params
+
+
+async def test_search_fetches_page_two_when_page_one_full(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    urls: list[str] = []
+    page2 = _page_fixture(50, first_id=91_000_000)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        url = str(request.url)
+        if "/search/2" in url:
+            return httpx.Response(200, json=page2)
+        urls.append(url)
+        return httpx.Response(200, json=_page_fixture(50))
+
+    monkeypatch.setattr("app.adapters.retry.asyncio.sleep", _no_delay)
+    source = _mock_source(monkeypatch, httpx.MockTransport(handler))
+
+    postings = await source.search(JobSearchQuery(query="python", country="de", results_wanted=100))
+
+    assert urls and all("/search/1" in url for url in urls)
+    assert len(postings) == 100
+    ids = [posting.external_id for posting in postings]
+    assert len(ids) == len(set(ids))
+    assert ids[0] == "90000000"
+    assert ids[50] == "91000000"
+
+
+async def test_search_no_page_two_when_page_not_full(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[dict[str, str]] = []
+    handler = _recording_handler(calls, _page_fixture(30))
+    monkeypatch.setattr("app.adapters.retry.asyncio.sleep", _no_delay)
+    source = _mock_source(monkeypatch, httpx.MockTransport(handler))
+
+    postings = await source.search(JobSearchQuery(query="python", country="de"))
+
+    assert len(calls) == 1
+    assert len(postings) == 30
+
+
+async def test_search_no_page_two_when_results_wanted_met(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[dict[str, str]] = []
+    handler = _recording_handler(calls, _page_fixture(50))
+    monkeypatch.setattr("app.adapters.retry.asyncio.sleep", _no_delay)
+    source = _mock_source(monkeypatch, httpx.MockTransport(handler))
+
+    postings = await source.search(JobSearchQuery(query="python", country="de"))
+
+    assert len(calls) == 1
+    assert len(postings) == 50
+
+
+async def test_search_stops_when_budget_exhausted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = get_settings()
+    monkeypatch.setattr(settings, "max_adzuna_calls_per_run", 2)
+    calls: list[dict[str, str]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(_request_params(str(request.url)))
+        first_id = 91_000_000 if "/search/2" in str(request.url) else 90_000_000
+        return httpx.Response(200, json=_page_fixture(50, first_id=first_id))
+
+    monkeypatch.setattr("app.adapters.retry.asyncio.sleep", _no_delay)
+    source = _mock_source(monkeypatch, httpx.MockTransport(handler))
+
+    postings = await source.search(JobSearchQuery(query="python", country="de", results_wanted=100))
+
+    assert len(calls) == 2
+    assert len(postings) == 100
+    ids = [posting.external_id for posting in postings]
+    assert len(ids) == len(set(ids))

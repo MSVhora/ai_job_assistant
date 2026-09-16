@@ -57,6 +57,7 @@ async def seed_postings(
         if found_by is not None:
             search = JobSearch(
                 profile_id=found_by,
+                source="adzuna",
                 status=JobSearchStatus.succeeded,
                 query={"profile_id": str(found_by)},
             )

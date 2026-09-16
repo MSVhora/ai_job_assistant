@@ -236,3 +236,118 @@ async def test_migration_0015_expiry_roundtrip(migration_0014: None) -> None:
     async with session_factory() as session:
         conn = await session.connection()
         assert await _expiry_columns(conn) == {}
+
+
+@pytest.fixture
+async def migration_0016(migrated_database: None):
+    await migrate("downgrade", "0016")
+    yield
+    await migrate("upgrade", "head")
+
+
+async def test_migration_0017_source_backfill_and_index(migration_0016: None) -> None:
+    profile_id = uuid.uuid4()
+    marker_new = uuid.uuid4()
+    marker_legacy = uuid.uuid4()
+    marker_unrecoverable = uuid.uuid4()
+    async with session_factory() as session:
+        conn = await session.connection()
+        await conn.execute(text("INSERT INTO candidate (id) VALUES (:id)"), {"id": uuid.uuid4()})
+        candidate = (await conn.execute(text("SELECT id FROM candidate LIMIT 1"))).scalar_one()
+        await conn.execute(
+            text(
+                "INSERT INTO profile (id, candidate_id, name, structured_profile) "
+                "VALUES (:id, :cid, 'Owner', '{}')"
+            ),
+            {"id": profile_id, "cid": candidate},
+        )
+        await conn.execute(
+            text(
+                "INSERT INTO job_search (id, profile_id, status, query) VALUES "
+                "(:id, :profile_id, 'succeeded', :query)"
+            ),
+            {
+                "id": marker_new,
+                "profile_id": profile_id,
+                "query": json.dumps({"query": "python dev", "source": "adzuna"}),
+            },
+        )
+        await conn.execute(
+            text(
+                "INSERT INTO job_search (id, profile_id, status, query) VALUES "
+                "(:id, :profile_id, 'succeeded', :query)"
+            ),
+            {
+                "id": marker_legacy,
+                "profile_id": profile_id,
+                "query": json.dumps({"query": "python dev", "sources": ["apify_linkedin"]}),
+            },
+        )
+        await conn.execute(
+            text(
+                "INSERT INTO job_search (id, profile_id, status, query) VALUES "
+                "(:id, :profile_id, 'succeeded', :query)"
+            ),
+            {
+                "id": marker_unrecoverable,
+                "profile_id": profile_id,
+                "query": json.dumps({"query": "python dev", "sources": None}),
+            },
+        )
+        await conn.commit()
+
+    await migrate("upgrade", "head")
+
+    async with session_factory() as session:
+        conn = await session.connection()
+        nullable = (
+            await conn.execute(
+                text(
+                    "SELECT is_nullable FROM information_schema.columns "
+                    "WHERE table_name='job_search' AND column_name='source'"
+                )
+            )
+        ).scalar_one()
+        assert nullable == "NO"
+        source_rows = (
+            await conn.execute(
+                text("SELECT id::text, source FROM job_search WHERE id = ANY(:ids)"),
+                {"ids": [str(marker_new), str(marker_legacy), str(marker_unrecoverable)]},
+            )
+        ).all()
+        sources = {row[0]: row[1] for row in source_rows}
+        assert sources[str(marker_new)] == "adzuna"
+        assert sources[str(marker_legacy)] == "apify_linkedin"
+        assert marker_unrecoverable not in sources
+
+        index_names = {
+            row[0]
+            for row in await conn.execute(
+                text("SELECT indexname FROM pg_indexes WHERE tablename='job_search'")
+            )
+        }
+        assert "uq_job_search_active_run" in index_names
+
+        partial = (
+            await conn.execute(
+                text(
+                    "SELECT indexdef FROM pg_indexes "
+                    "WHERE tablename='job_search' AND indexname='uq_job_search_active_run'"
+                )
+            )
+        ).scalar_one()
+        assert "'pending'" in partial and "'running'" in partial
+
+    await migrate("downgrade", "0016")
+
+    async with session_factory() as session:
+        conn = await session.connection()
+        remaining = (
+            await conn.execute(
+                text(
+                    "SELECT count(*) FROM information_schema.columns "
+                    "WHERE table_name='job_search' AND column_name='source'"
+                )
+            )
+        ).scalar_one()
+        assert remaining == 0

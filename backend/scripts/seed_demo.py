@@ -256,6 +256,7 @@ async def seed(count: int, *, rerank: bool) -> None:
         postings = (await session.execute(sa.select(JobPosting))).scalars().all()
         search = JobSearch(
             profile_id=profile.id,
+            source="adzuna",
             status=JobSearchStatus.succeeded,
             query={"profile_id": str(profile.id)},
         )

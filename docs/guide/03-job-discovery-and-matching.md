@@ -344,6 +344,7 @@ sequenceDiagram
     U->>B: click Start search
     U->>B: wizard: profile, then one source, then details, then filters
     B->>A: POST /api/jobs/search (one source per run)
+    A->>D: a run for this profile + source already active? → 409 (wizard shows the active run)
     A->>I: start background run
     A-->>B: run accepted (search happens async)
     I->>C: query each enabled source
@@ -363,6 +364,16 @@ sequenceDiagram
 
 Searches run in the background — you can navigate away; results appear when the run
 finishes.
+
+### One active run per profile + source
+
+Firing the same source twice for the same profile (double billed results, double quota
+burn) is prevented server-side: `POST /api/jobs/search` answers **409 Conflict** with the
+active run's id. The Start search wizard shows *"A search for this profile and source is
+already running"* and a **Go to active run** button that attaches you to that run's banner.
+Different sources for the same profile can still run at the same time. If a run gets stuck
+(crash, restart), a sweeper marks it failed after `MAX_RUN_AGE_MINUTES` (default 30) so you
+can start a new one.
 
 ### Rate limits and retries
 

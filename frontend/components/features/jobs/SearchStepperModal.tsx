@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { useStartJobSearch } from "@/hooks/use-job-search";
 import { useProfile } from "@/hooks/use-profiles";
-import type { ProfileSummary, SourceInfo } from "@/lib/api";
+import { DuplicateRunError, type ProfileSummary, type SourceInfo } from "@/lib/api";
 
 import { DetailsStep, ProfileStep, ReviewSummary, SourceStep } from "./SearchSteps";
 import {
@@ -236,6 +236,8 @@ export function SearchStepperModal({
     setStep((current) => Math.max(current - 1, 1));
   };
 
+  const duplicateRunError =
+    start.error instanceof DuplicateRunError ? start.error : null;
 
   return (
     <Modal
@@ -333,9 +335,29 @@ export function SearchStepperModal({
               {form.formState.errors.root.message}
             </p>
           )}
-          {start.isError && (
+          {start.isError && duplicateRunError !== null && (
+            <div role="alert" className="flex flex-col gap-2 text-xs text-red-600">
+              <span>A search for this profile and source is already running.</span>
+              {duplicateRunError.activeSearchId !== null && (
+                <button
+                  type="button"
+                  className="self-start rounded-lg border border-red-200 px-3 py-1.5 font-semibold text-red-700 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
+                  onClick={() => {
+                    const activeId = duplicateRunError.activeSearchId;
+                    if (activeId !== null) {
+                      onSearchStarted(activeId);
+                      onOpenChange(false);
+                    }
+                  }}
+                >
+                  Go to active run
+                </button>
+              )}
+            </div>
+          )}
+          {start.isError && duplicateRunError === null && (
             <p role="alert" className="text-xs text-red-600">
-              {start.error.message}
+              {start.error?.message}
             </p>
           )}
         </form>

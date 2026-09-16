@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     max_apify_results_per_run: Annotated[int, Field(ge=1, le=1000)] = 250
 
     rerank_top_n: int = 10
+    # Issue #36: runs stuck in pending/running for longer than this are
+    # marked failed by the start_search sweeper, releasing the active-run
+    # (profile, source) lock.
+    max_run_age_minutes: Annotated[int, Field(ge=1)] = 30
     match_weight_vector: float = 0.4
     match_weight_role_fit: float = 0.4
     match_weight_company_fit: float = 0.2

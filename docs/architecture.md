@@ -105,6 +105,8 @@ sequenceDiagram
 
     B->>A: POST /api/jobs/search (one source per run, with profile_id and filters)
     A->>A: resolve omitted filters from the profile (country, location, salary — request values always win)
+    A->>D: sweep runs stuck in pending/running past MAX_RUN_AGE_MINUTES → marked failed (lock released)
+    A->>D: active-run check — a non-terminal run for the same (profile, source)? → 409 + active run id
     A-->>B: background run accepted (resolved payload echoed on the run)
     A->>D: job_search row (status + per-source outcomes)
     A->>C: query the run's single source (freshness: Adzuna max_days_old, LinkedIn datePosted bucket)
@@ -131,9 +133,17 @@ explicitly, since they outlive the request scope.
 
 **One source per run (v3 issue #30):** `JobSearchRequest.source` is a required single
 source (no more `sources` list); `source_queries` may only refine that source (mismatched
-keys → 422). The UI's Start search wizard enforces the same shape; parallel runs on other
-sources are allowed (no concurrency guard — runs are independent). With a single source a
+keys → 422). The UI's Start search wizard enforces the same shape. With a single source a
 run is `succeeded` or `failed` — the `partial` status remains only for older stored rows.
+
+**One active run per (profile, source) (v4 issue #36):** a partial unique index
+`uq_job_search_active_run ON job_search (profile_id, source) WHERE status IN ('pending',
+'running')` (enforcement survives multi-worker; `job_search.source` was backfilled from the
+query echo in migration 0017) rejects a duplicate start; `start_search` returns **409
+Conflict with the active run's id** (`{"detail", "active_search_id"}`), and the wizard
+offers a "Go to active run" button wired into the run banner. Runs on *other* sources for
+the same profile stay concurrent. Runs stuck past `MAX_RUN_AGE_MINUTES` (default 30) are
+marked failed by a sweeper at the top of `start_search`, releasing the lock.
 
 **Profile scoping (v3 issue #24):** every search is owned by a profile —
 `JobSearchRequest.profile_id` is required (400 when absent, 404 for an unknown profile),

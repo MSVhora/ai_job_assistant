@@ -12,7 +12,7 @@ from app.adapters.job_sources.base import (
     RawJobPosting,
     TermPlan,
 )
-from app.adapters.job_sources.config import ActorConfig
+from app.adapters.job_sources.config import ActorConfig, build_actor_input
 from app.core.config import get_settings
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -142,6 +142,29 @@ def test_normalize_keeps_missing_or_malformed_expire_at_null() -> None:
 
     assert missing.expires_at is None
     assert malformed.expires_at is None
+
+
+def test_source_declares_nl_exclusion_support() -> None:
+    assert ApifyActorSource(CONFIG).supports_exclusions is True
+
+
+def test_results_wanted_passes_through_to_limit_per_source(monkeypatch: pytest.MonkeyPatch) -> None:
+    query = JobSearchQuery(country="us", results_wanted=10, term_plan=TermPlan(keywords="k"))
+
+    input = build_actor_input(CONFIG, query)
+
+    assert input["limitPerSource"] == 10
+
+
+def test_results_wanted_clamped_by_max_apify_results_per_run(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(get_settings(), "max_apify_results_per_run", 25)
+    query = JobSearchQuery(country="us", results_wanted=100, term_plan=TermPlan(keywords="k"))
+
+    input = build_actor_input(CONFIG, query)
+
+    assert input["limitPerSource"] == 25
 
 
 async def test_search_builds_input_and_reads_dataset(

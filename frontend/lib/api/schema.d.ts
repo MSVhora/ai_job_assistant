@@ -605,7 +605,9 @@ export interface components {
          *     when present, may only refine that source (extra keys are rejected).
          *
          *     Shared filters left None are resolved server-side from the profile (issue
-         *     #31) — the request may omit them.
+         *     #31) — the request may omit them. `seniority` is filled from
+         *     `preferences.seniority` (issue #32) and feeds only the LinkedIn NL brief;
+         *     the profile review UI is the correction surface.
          */
         JobSearchRequest: {
             /** Query */
@@ -635,6 +637,8 @@ export interface components {
             salary_max?: number | null;
             /** Salary Currency */
             salary_currency?: string | null;
+            /** Seniority */
+            seniority?: ("intern" | "junior" | "mid" | "senior" | "staff" | "lead" | "principal" | "manager" | "director" | "executive") | null;
         };
         /** JobSearchStartResponse */
         JobSearchStartResponse: {

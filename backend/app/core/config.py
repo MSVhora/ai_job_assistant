@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     # multi-pass runs inside Adzuna's free tier (25/min, 250/day).
     max_adzuna_calls_per_run: Annotated[int, Field(ge=1, le=8)] = 4
     apify_token: str | None = None
+    # Issue #35: per-run billed-results cap for Apify actors (they bill per
+    # result via limitPerSource); a guard above the request schema cap (100).
+    max_apify_results_per_run: Annotated[int, Field(ge=1, le=1000)] = 250
 
     rerank_top_n: int = 10
     match_weight_vector: float = 0.4

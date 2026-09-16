@@ -63,6 +63,8 @@ def resolve_profile_defaults(payload: JobSearchRequest, profile: Profile) -> Job
             update["salary_max"] = preferences.salary_max
         if payload.salary_currency is None:
             update["salary_currency"] = preferences.currency
+        if payload.seniority is None and preferences.seniority is not None:
+            update["seniority"] = preferences.seniority
     return payload.model_copy(update=update)
 
 

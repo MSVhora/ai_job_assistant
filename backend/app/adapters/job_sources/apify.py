@@ -40,9 +40,10 @@ def _require_terms(query: JobSearchQuery) -> JobSearchQuery:
 
     The rendering layer already guarantees terms for dialect sources; the
     precedence tables (normative copy in ``services/query_rendering.py``):
-    a user-typed request query overrides the synthesized NL string
-    (``term_plan.keywords``); otherwise keywords are composed from title +
-    skills. No decisions are made here.
+    a user-typed request query overrides the synthesized NL brief
+    (``term_plan.keywords``); otherwise the brief is composed from title +
+    skills (+ profile seniority), with a ``not …`` exclusion clause appended
+    to whichever keywords won. No decisions are made here.
     """
     plan = query.term_plan
     if plan is None:
@@ -71,7 +72,7 @@ def _load_mapper(source_name: str) -> MapperFn:
 class ApifyActorSource:
     is_official_api = False
     disclosure_required = True
-    supports_exclusions = False
+    supports_exclusions = True
 
     def __init__(self, config: ActorConfig, client_factory: ClientFactory | None = None) -> None:
         self._config = config

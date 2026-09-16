@@ -98,17 +98,83 @@ def test_linkedin_title_only_composes_nl_keywords() -> None:
     assert plan.keywords == "Senior Android Engineer with Kotlin and Java"
 
 
-def test_linkedin_nl_keywords_appends_salary() -> None:
+def test_linkedin_nl_brief_includes_profile_seniority() -> None:
     query = build_connector_query(
         "apify_linkedin",
-        SourceQuerySpec(title="Senior Android Engineer"),
+        SourceQuerySpec(title="Backend Engineer", skills=["Python", "Rust"]),
+        None,
+        request(seniority="senior"),
+    )
+
+    plan = query.term_plan
+    assert plan is not None
+    assert plan.keywords == "Backend Engineer with Python and Rust, senior level"
+
+
+def test_linkedin_nl_brief_omits_level_phrase_without_seniority() -> None:
+    query = build_connector_query(
+        "apify_linkedin",
+        SourceQuerySpec(title="Backend Engineer", skills=["Python"]),
+        None,
+        request(),
+    )
+
+    plan = query.term_plan
+    assert plan is not None
+    assert plan.keywords == "Backend Engineer with Python"
+
+
+def test_linkedin_nl_brief_drops_salary_text() -> None:
+    query = build_connector_query(
+        "apify_linkedin",
+        SourceQuerySpec(title="Senior Android Engineer", skills=["Kotlin"]),
         None,
         request(salary_min=5000000, salary_currency="inr"),
     )
 
     plan = query.term_plan
     assert plan is not None
-    assert plan.keywords == "Senior Android Engineer, offering INR 5000000 or more"
+    assert plan.keywords == "Senior Android Engineer with Kotlin"
+    assert "offering" not in plan.keywords
+
+
+def test_linkedin_nl_exclusions_appended_to_brief() -> None:
+    query = build_connector_query(
+        "apify_linkedin",
+        SourceQuerySpec(title="Backend Engineer", skills=["Python"], exclude=["intern"]),
+        None,
+        request(seniority="mid"),
+    )
+
+    plan = query.term_plan
+    assert plan is not None
+    assert plan.keywords == "Backend Engineer with Python, mid level not intern"
+
+
+def test_linkedin_exclusions_appended_to_override_query() -> None:
+    query = build_connector_query(
+        "apify_linkedin",
+        SourceQuerySpec(title="Backend Engineer", exclude=["intern", "contract"]),
+        "backend python",
+        request(),
+    )
+
+    plan = query.term_plan
+    assert plan is not None
+    assert plan.keywords == "backend python not intern and contract"
+
+
+def test_linkedin_empty_exclusions_leave_keywords_intact() -> None:
+    query = build_connector_query(
+        "apify_linkedin",
+        SourceQuerySpec(title="Backend Engineer"),
+        None,
+        request(),
+    )
+
+    plan = query.term_plan
+    assert plan is not None
+    assert plan.keywords == "Backend Engineer"
 
 
 def test_linkedin_query_only_passes_user_query_through() -> None:

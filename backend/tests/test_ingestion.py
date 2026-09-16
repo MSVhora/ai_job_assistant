@@ -622,6 +622,7 @@ PROFILE_WITH_PREFS = dict(
             "salary_max": 90000,
             "currency": "EUR",
             "remote_preference": "hybrid",
+            "seniority": "senior",
         },
     }
 )
@@ -674,12 +675,15 @@ async def test_start_search_resolves_omitted_fields_from_profile(
     assert run_row.query["location"] == "Berlin"
     assert run_row.query["salary_min"] == 50000
     assert run_row.query["salary_currency"] == "EUR"
+    assert run_row.query["seniority"] == "senior"
 
 
 async def test_start_search_request_values_win() -> None:
     profile_id = await seed_profile_with_prefs()
 
-    request = payload(profile_id=profile_id, country="fr", location="Munich", salary_min=100)
+    request = payload(
+        profile_id=profile_id, country="fr", location="Munich", salary_min=100, seniority="mid"
+    )
     async with session_factory() as session:
         response = await start_search(session, BackgroundTasks(), request)
         await session.commit()
@@ -689,6 +693,7 @@ async def test_start_search_request_values_win() -> None:
     assert run_row.query["location"] == "Munich"
     assert run_row.query["salary_min"] == 100
     assert run_row.query["salary_max"] == 90000
+    assert run_row.query["seniority"] == "mid"
 
 
 async def test_start_search_without_country_anywhere_rejects() -> None:

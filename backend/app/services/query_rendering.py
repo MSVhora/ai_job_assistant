@@ -71,11 +71,15 @@ def _render_linkedin_plan(
     request: JobSearchRequest,
 ) -> TermPlan:
     # Precedence: a user-typed request query overrides the synthesized NL
-    # string; spec.query only carries through when there is no title to
-    # synthesize the keywords from.
+    # brief; spec.query only carries through when there is no title to
+    # synthesize from. NL exclusions ("not …") are the post-Aug-2026 LinkedIn
+    # exclusion channel and are appended to whichever keywords won; there is
+    # no salary text in keywords (issue #35).
     keywords = (
         base_query or _natural_keywords(spec, request) or (spec.query if spec is not None else None)
     )
+    if keywords is not None:
+        keywords = _with_exclusion_note(keywords, spec)
     return TermPlan(
         keywords=keywords,
         location=request.location,
@@ -83,18 +87,19 @@ def _render_linkedin_plan(
     )
 
 
-def _format_amount(value: float) -> str:
-    if float(value).is_integer():
-        return str(int(value))
-    return f"{value:f}".rstrip("0").rstrip(".")
+def _with_exclusion_note(keywords: str, spec: SourceQuerySpec | None) -> str:
+    exclude = (spec.exclude or []) if spec is not None else []
+    if not exclude:
+        return keywords
+    return f"{keywords} not {' and '.join(exclude)}"
 
 
 def _natural_keywords(spec: SourceQuerySpec | None, request: JobSearchRequest) -> str | None:
-    """LinkedIn AI-search natural-language keywords from a structured spec.
+    """LinkedIn AI-search semantic brief from a structured spec (issue #35).
 
-    Exclusions are dropped: the actor input has no exclusion field and
-    LinkedIn's AI search has no exclusion filter (composition content is
-    reworked in the LinkedIn-dialect issue, not here).
+    Grammar: ``"{title} with {skills}, {seniority} level"`` — skills from the
+    spec (up to 3 validated terms), seniority from the profile via the
+    request. The level phrase is omitted when no seniority is available.
     """
     title = spec.title if spec is not None else None
     if not title:
@@ -103,9 +108,8 @@ def _natural_keywords(spec: SourceQuerySpec | None, request: JobSearchRequest) -
     skills = (spec.skills or []) if spec is not None else []
     if skills:
         keywords += f" with {' and '.join(skills)}"
-    if request.salary_min is not None:
-        currency = f" {request.salary_currency}" if request.salary_currency else ""
-        keywords += f", offering{currency} {_format_amount(request.salary_min)} or more"
+    if request.seniority:
+        keywords += f", {request.seniority} level"
     return keywords
 
 

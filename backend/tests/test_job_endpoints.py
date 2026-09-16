@@ -58,6 +58,7 @@ async def test_search_start_and_status_flow(
         "salary_min": None,
         "salary_max": None,
         "salary_currency": None,
+        "seniority": None,
         "source": "adzuna",
     }
     assert status["results"] == [{"source": "adzuna", "status": "ok", "count": 1, "warning": None}]

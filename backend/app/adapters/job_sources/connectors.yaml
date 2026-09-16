@@ -12,7 +12,7 @@ sources:
       under10Applicants: "{option:under_10_applicants}"
       companyIds: "{option:company_ids}"
       geoId: "{option:geo_id}"
-      autoConvertToAiSearch: true
+      autoConvertToAiSearch: false
       scrapeCompany: false
     filters:
       - key: distance_miles
@@ -30,4 +30,4 @@ sources:
       - key: geo_id
         label: Geo ID
         type: text
-        help_text: LinkedIn geoId for the location, overrides the location field
+        help_text: LinkedIn geoId for the location, overrides the location field; preferred deterministic form

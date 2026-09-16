@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.adapters.job_sources.base import SourceFilterDecl, SourceFilterValue
 from app.models import JobPosting, JobType, RemoteType
+from app.schemas.enums import SeniorityLevel
 
 JobSearchStatusLiteral = Literal["pending", "running", "succeeded", "partial", "failed"]
 
@@ -76,7 +77,9 @@ class JobSearchRequest(BaseModel):
     when present, may only refine that source (extra keys are rejected).
 
     Shared filters left None are resolved server-side from the profile (issue
-    #31) — the request may omit them.
+    #31) — the request may omit them. `seniority` is filled from
+    `preferences.seniority` (issue #32) and feeds only the LinkedIn NL brief;
+    the profile review UI is the correction surface.
     """
 
     query: str | None = Field(default=None, min_length=1, max_length=_MAX_QUERY)
@@ -90,6 +93,7 @@ class JobSearchRequest(BaseModel):
     salary_min: float | None = Field(default=None, ge=0)
     salary_max: float | None = Field(default=None, ge=0)
     salary_currency: str | None = Field(default=None, pattern=r"^[A-Za-z]{3}$")
+    seniority: SeniorityLevel | None = None
 
     @field_validator("query", "location", mode="after")
     @classmethod

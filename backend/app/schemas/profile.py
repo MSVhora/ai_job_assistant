@@ -4,24 +4,10 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
+from app.schemas.enums import RemotePreference, SeniorityLevel
 from app.schemas.job_search import StoredSearchQueries
 
 RevisionSourceLiteral = Literal["ai_extraction", "manual_edit", "gap_fill", "reupload_merge"]
-
-RemotePreference = Literal["remote", "hybrid", "onsite", "flexible"]
-
-SeniorityLevel = Literal[
-    "intern",
-    "junior",
-    "mid",
-    "senior",
-    "staff",
-    "lead",
-    "principal",
-    "manager",
-    "director",
-    "executive",
-]
 
 
 class SourceLink(BaseModel):

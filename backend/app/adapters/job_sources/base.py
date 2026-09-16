@@ -54,9 +54,12 @@ class TermPlan(BaseModel):
     - adzuna: ``what_phrase`` when a title exists, ``what_or``/``what_and``
       combined with it, ``what_exclude`` always, and ``what`` (free text)
       only when there is no ``what_phrase``.
-    - linkedin (apify_ actors): ``keywords`` is the natural-language string;
-      a user-typed request query overrides it. ``date_posted`` is the
-      freshness bucket.
+    - linkedin (apify_ actors): ``keywords`` is the NL semantic brief
+      (``"{title} with {skills}, {seniority} level"``, issue #35); a
+      user-typed request query overrides it, and the spec's exclude terms
+      become an appended ``not …`` clause in either case (the only
+      exclusion channel post-Aug-2026). No salary text. ``date_posted`` is
+      the freshness bucket.
     """
 
     what_and: list[str] = Field(default_factory=list)

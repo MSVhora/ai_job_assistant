@@ -226,10 +226,13 @@ declaration + mapper, with no changes to search logic.
 Searches are **filter-first, precedence-in-rendering** (v4 issue #33): the renderer builds
 a per-source **term plan** (`TermPlan`, carried on `JobSearchQuery`) whose slots are named
 after Adzuna's params (`what_phrase`, `what_and`, `what_or`, `what_exclude`, `what`) plus
-the LinkedIn slots (`keywords` NL string, `date_posted` bucket). Adzuna precedence:
+the LinkedIn slots (`keywords` NL brief, `date_posted` bucket). Adzuna precedence:
 `what_phrase` + `what_and`/`what_or` combined; `what` only when no phrase. LinkedIn
-precedence: a user-typed request `query` overrides the synthesized NL
-`"{title} with {skills}"` (+ salary mention; it has no exclusion or salary filter). The
+precedence (v4 issue #35): a user-typed request `query` overrides the synthesized NL
+brief `"{title} with {skills}, {seniority} level"` (seniority resolved from the
+profile; no salary text); the spec's exclude terms are appended as a `not …` clause
+in either case — NL is the only LinkedIn exclusion channel post-Aug-2026, and
+`limitPerSource` is clamped by `MAX_APIFY_RESULTS_PER_RUN`. The
 connectors act as mechanical plan→param mappers (dumb guard when a plan is empty);
 connectors.yaml apify actors consume `keywords: "{keywords}"`,
 `location: "{location}"`, `datePosted: "{date_posted_bucket}"` with plan-first

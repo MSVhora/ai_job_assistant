@@ -1,6 +1,6 @@
 # Issue #32 — Parse years of experience; derive seniority fallback (M1)
 
-**Status:** Planned
+**Status:** Done (merged — branch `v4/32-parse-yoe-derive-seniority`; implementation notes: deterministic parser as planned; gap-fill derivation gated on a non-empty `applied` list so no-op turns stay no-ops and don't half-persist; legacy rows with seniority set but `seniority_source: None` are treated as user-set and never re-derived; YOE shown in the profile header subtitle ("~N yrs experience") in addition to the read-only review-form field; fixture `VALID_PROFILE` switched to fixed past dates so derived values are time-independent)
 **Tracks:** GitHub issue #32 (milestone `v4`, Phase A / M1)
 **Plan of record:** [v4-search-relevance-plan.md](v4-search-relevance-plan.md) Problem 2
 **Depends on:** #31 (merged — `profile_digest_parts()` shared helper, `ensure_queries_fresh` background regeneration, full-profile query context)

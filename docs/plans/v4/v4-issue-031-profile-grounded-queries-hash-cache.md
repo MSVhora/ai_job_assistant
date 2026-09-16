@@ -1,6 +1,6 @@
 # Issue #31 — Ground query generation in the full profile + content-hash cache (M1)
 
-**Status:** Planned (owner decisions locked 2026-09-16 — see table)
+**Status:** Done (merged — branch `v4/31-profile-grounded-queries-hash-cache`; implementation notes: migration numbered `0016` because `c3f4cc09d71f` already claims revision id `0015`; `PROMPT_VERSION` reused as the query-builder version constant (bumped to `search_query_v3`) instead of a second hash constant; `profile_digest_parts()` extracted into `embedding.py` with the embedding text kept byte-identical; gap-fill chat additionally hidden client-side for complete profiles via the new `ProfileResponse.missing_fields` key list, and the chat collapses when `applyGapFill` receives an empty list)
 **Tracks:** GitHub issue #31 (milestone `v4`, Phase A)
 **Plan of record:** [v4-search-relevance-plan.md](v4-search-relevance-plan.md) Problem 1
 **Depends on:** #30 (merged — single-source `JobSearchRequest`, wizard prefills shared fields from the profile)

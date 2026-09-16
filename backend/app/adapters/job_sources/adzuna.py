@@ -58,17 +58,31 @@ def _default_client() -> httpx.AsyncClient:
 
 
 def _apply_search_terms(params: dict[str, str], query: JobSearchQuery) -> None:
-    if query.title_phrase:
-        params["what_phrase"] = query.title_phrase
-        if query.skills_any:
-            params["what_or"] = " ".join(query.skills_any)
-        if query.exclude_any:
-            params["what_exclude"] = " ".join(query.exclude_any)
-        return
-    if query.query:
-        params["what"] = query.query
-        return
-    raise ConnectorError("adzuna search needs a query or a title phrase")
+    """Map the rendering layer's term plan onto Adzuna's search params.
+
+    Precedence table (normative copy in ``services/query_rendering.py``):
+    ``what_phrase`` when a title exists; ``what_and``/``what_or`` combined
+    with it; ``what_exclude`` whenever set; ``what`` (free text) only when
+    there is no ``what_phrase``. No decisions are made here.
+    """
+    plan = query.term_plan
+    if plan is None:
+        if query.query:
+            params["what"] = query.query
+            return
+        raise ConnectorError("adzuna search needs a query or a title phrase")
+    if plan.what_phrase:
+        params["what_phrase"] = plan.what_phrase
+    if plan.what_and:
+        params["what_and"] = " ".join(plan.what_and)
+    if plan.what_or:
+        params["what_or"] = " ".join(plan.what_or)
+    if plan.what_exclude:
+        params["what_exclude"] = " ".join(plan.what_exclude)
+    if not plan.what_phrase and plan.what:
+        params["what"] = plan.what
+    if not any(key in params for key in ("what", "what_phrase", "what_and", "what_or")):
+        raise ConnectorError("adzuna search needs a query or a title phrase")
 
 
 def _apply_salary_filter(params: dict[str, str], query: JobSearchQuery) -> None:

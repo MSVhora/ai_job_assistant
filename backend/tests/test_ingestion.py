@@ -182,7 +182,8 @@ async def test_run_search_passes_query_to_connector(monkeypatch: pytest.MonkeyPa
     await run_search(run, payload(location="Berlin", results_wanted=10))
 
     assert len(source.queries) == 1
-    assert source.queries[0].query == "python developer"
+    assert source.queries[0].term_plan is not None
+    assert source.queries[0].term_plan.what == "python developer"
     assert source.queries[0].location == "Berlin"
     assert source.queries[0].country == "de"
     assert source.queries[0].results_wanted == 10
@@ -300,9 +301,10 @@ async def test_run_search_sends_per_source_specs(monkeypatch: pytest.MonkeyPatch
     await run_search(run, request)
 
     adzuna_query = adzuna.queries[0]
-    assert adzuna_query.title_phrase == "Senior Android Engineer"
-    assert adzuna_query.skills_any == ["Kotlin"]
-    assert adzuna_query.exclude_any == ["intern"]
+    assert adzuna_query.term_plan is not None
+    assert adzuna_query.term_plan.what_phrase == "Senior Android Engineer"
+    assert adzuna_query.term_plan.what_or == ["Kotlin"]
+    assert adzuna_query.term_plan.what_exclude == ["intern"]
     assert adzuna_query.salary_min == 5000000
 
     run_row = await get_run(run)

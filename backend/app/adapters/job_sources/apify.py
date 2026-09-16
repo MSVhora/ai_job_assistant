@@ -35,36 +35,23 @@ def _default_client() -> httpx.AsyncClient:
     return httpx.AsyncClient(timeout=_TIMEOUT_S)
 
 
-def _format_amount(value: float) -> str:
-    if float(value).is_integer():
-        return str(int(value))
-    return f"{value:f}".rstrip("0").rstrip(".")
+def _require_terms(query: JobSearchQuery) -> JobSearchQuery:
+    """Guard against hand-built queries with no rendered terms at all.
 
-
-def _natural_keywords(query: JobSearchQuery) -> str | None:
-    """LinkedIn-style natural-language keywords from a structured spec.
-
-    Exclusions are dropped: the actor input has no exclusion field and LinkedIn's
-    AI search has no exclusion filter (capability table in the queries plan).
+    The rendering layer already guarantees terms for dialect sources; the
+    precedence tables (normative copy in ``services/query_rendering.py``):
+    a user-typed request query overrides the synthesized NL string
+    (``term_plan.keywords``); otherwise keywords are composed from title +
+    skills. No decisions are made here.
     """
-    if not query.title_phrase:
-        return None
-    keywords = query.title_phrase
-    if query.skills_any:
-        keywords += f" with {' and '.join(query.skills_any)}"
-    if query.salary_min is not None:
-        currency = f" {query.salary_currency}" if query.salary_currency else ""
-        keywords += f", offering{currency} {_format_amount(query.salary_min)} or more"
-    return keywords
-
-
-def _with_effective_query(query: JobSearchQuery) -> JobSearchQuery:
-    keywords = _natural_keywords(query)
-    if keywords is None:
+    plan = query.term_plan
+    if plan is None:
         if not query.query:
             raise ConnectorError("search needs a query or a title phrase")
         return query
-    return query.model_copy(update={"query": keywords})
+    if plan.keywords:
+        return query
+    raise ConnectorError("search needs a query or a title phrase")
 
 
 def _load_mapper(source_name: str) -> MapperFn:
@@ -104,7 +91,7 @@ class ApifyActorSource:
             raise ConnectorError(f"{self.name} token is not configured")
 
         started = time.perf_counter()
-        effective = _with_effective_query(query)
+        effective = _require_terms(query)
         async with self._client_factory() as client:
             run = await self._request_json(
                 client,

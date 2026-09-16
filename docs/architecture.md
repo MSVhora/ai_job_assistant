@@ -223,11 +223,20 @@ native parameters — Adzuna in `_apply_options`, YAML sources via
 when unset). `query_rendering.py` stays the single render seam; a new source = a
 declaration + mapper, with no changes to search logic.
 
-Searches are **filter-first**: the renderer maps each spec to the source's native
-capabilities — Adzuna gets `what_phrase` + `what_or` + `what_exclude` + `salary_min`,
-LinkedIn gets a natural-language keywords line (+ salary mention; it has no exclusion or
-salary filter). `job_search.query` stores exactly what was sent, and the run status echoes
-it.
+Searches are **filter-first, precedence-in-rendering** (v4 issue #33): the renderer builds
+a per-source **term plan** (`TermPlan`, carried on `JobSearchQuery`) whose slots are named
+after Adzuna's params (`what_phrase`, `what_and`, `what_or`, `what_exclude`, `what`) plus
+the LinkedIn slots (`keywords` NL string, `date_posted` bucket). Adzuna precedence:
+`what_phrase` + `what_and`/`what_or` combined; `what` only when no phrase. LinkedIn
+precedence: a user-typed request `query` overrides the synthesized NL
+`"{title} with {skills}"` (+ salary mention; it has no exclusion or salary filter). The
+connectors act as mechanical plan→param mappers (dumb guard when a plan is empty);
+connectors.yaml apify actors consume `keywords: "{keywords}"`,
+`location: "{location}"`, `datePosted: "{date_posted_bucket}"` with plan-first
+resolution. Unknown sources keep the plain free-text pass-through (`query`). The
+normative precedence tables live in the `TermPlan`/connector docstrings and in
+`services/query_rendering.py`; test_query_rendering.py locks the matrix per source.
+`job_search.query` stores exactly what was sent, and the run status echoes it.
 
 ## Database schema (v1, ER diagram)
 

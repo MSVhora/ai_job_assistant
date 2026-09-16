@@ -99,6 +99,7 @@ async def seed_matched_profile(
             postings.append(posting)
         search = JobSearch(
             profile_id=profile_id,
+            source="adzuna",
             status=JobSearchStatus.succeeded,
             query={"profile_id": str(profile_id)},
         )
@@ -163,6 +164,7 @@ async def seed_subscored_profile(
             postings.append(posting)
         search = JobSearch(
             profile_id=profile_id,
+            source="adzuna",
             status=JobSearchStatus.succeeded,
             query={"profile_id": str(profile_id)},
         )

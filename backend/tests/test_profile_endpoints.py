@@ -649,6 +649,7 @@ async def test_rebuild_matches_endpoint_lifecycle(client: AsyncClient) -> None:
         await session.flush()
         search = JobSearch(
             profile_id=profile_id,
+            source="adzuna",
             status=JobSearchStatus.succeeded,
             query={"profile_id": str(profile_id)},
         )

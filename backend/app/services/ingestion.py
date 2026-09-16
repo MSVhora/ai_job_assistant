@@ -1,12 +1,14 @@
 import logging
 import time
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from fastapi import BackgroundTasks
 from pydantic import ValidationError
-from sqlalchemy import select
+from sqlalchemy import func, select, update
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.job_sources import registry
@@ -17,9 +19,11 @@ from app.adapters.job_sources.base import (
     validate_source_options,
 )
 from app.adapters.llm import LLMError
+from app.core.config import get_settings
 from app.core.db import session_factory
 from app.core.errors import (
     DomainError,
+    DuplicateRunError,
     JobPostingNotFoundError,
     JobSearchNotFoundError,
     JobSourceNotEnabledError,
@@ -102,20 +106,105 @@ async def _require_profile(session: AsyncSession, profile_id: uuid.UUID | None) 
     return profile
 
 
+ACTIVE_STATUSES = (JobSearchStatus.pending, JobSearchStatus.running)
+_ABANDONED_WARNING = "run abandoned — in-flight lock released"
+
+
+async def _sweep_stale_runs(session: AsyncSession) -> int:
+    """Mark runs stuck in pending/running longer than max_run_age_minutes
+    failed, releasing the one-active-run-per-(profile, source) lock (#36)."""
+    settings = get_settings()
+    cutoff = datetime.now(UTC) - timedelta(minutes=settings.max_run_age_minutes)
+    stored_result = func.jsonb_build_array(
+        func.jsonb_build_object(
+            "source",
+            func.coalesce(
+                func.jsonb_extract_path_text(JobSearch.query, "source"),
+                func.jsonb_extract_path_text(
+                    func.jsonb_extract_path(JobSearch.query, "sources"), "0"
+                ),
+                "unknown",
+            ),
+            "status",
+            "failed",
+            "count",
+            0,
+            "warning",
+            _ABANDONED_WARNING,
+        )
+    ).cast(JSONB)
+    result = await session.execute(
+        update(JobSearch)
+        .where(JobSearch.status.in_(ACTIVE_STATUSES), JobSearch.updated_at < cutoff)
+        .values(status=JobSearchStatus.failed, results=stored_result, updated_at=func.now())
+    )
+    swept = result.rowcount
+    if swept:
+        logger.info(
+            "ingestion.sweep swept=%d max_run_age_minutes=%d",
+            swept,
+            settings.max_run_age_minutes,
+        )
+    return swept
+
+
+def _select_active_run(profile_id: uuid.UUID, source_name: str):
+    return (
+        select(JobSearch)
+        .where(
+            JobSearch.profile_id == profile_id,
+            JobSearch.source == source_name,
+            JobSearch.status.in_(ACTIVE_STATUSES),
+        )
+        .order_by(JobSearch.updated_at.desc())
+        .limit(1)
+    )
+
+
+async def _raise_if_duplicate_run(
+    session: AsyncSession, profile_id: uuid.UUID, source_name: str
+) -> None:
+    row = (await session.execute(_select_active_run(profile_id, source_name))).scalar_one_or_none()
+    if row is not None:
+        logger.warning(
+            "ingestion.duplicate profile_id=%s source=%s active_search=%s",
+            profile_id,
+            source_name,
+            row.id,
+        )
+        raise DuplicateRunError(active_search_id=row.id)
+
+
 async def start_search(
     session: AsyncSession, background_tasks: BackgroundTasks, payload: JobSearchRequest
 ) -> JobSearchStartResponse:
     profile = await _require_profile(session, payload.profile_id)
+    profile_id = profile.id
     resolved = resolve_profile_defaults(payload, profile)
     source = await _selected_source(session, resolved)
     _validate_queries(resolved, source)
+    await _sweep_stale_runs(session)
+    await _raise_if_duplicate_run(session, profile_id, resolved.source)
     run = JobSearch(
         status=JobSearchStatus.pending,
-        profile_id=payload.profile_id,
+        profile_id=profile_id,
+        source=resolved.source,
         query=resolved.model_dump(mode="json"),
     )
-    session.add(run)
-    await session.flush()
+    try:
+        async with session.begin_nested():
+            session.add(run)
+            await session.flush()
+    except IntegrityError as exc:
+        row = (
+            await session.execute(_select_active_run(profile_id, resolved.source))
+        ).scalar_one_or_none()
+        logger.warning(
+            "ingestion.duplicate profile_id=%s source=%s raced the active-run index",
+            profile_id,
+            resolved.source,
+        )
+        raise DuplicateRunError(active_search_id=row.id if row is not None else None) from exc
     background_tasks.add_task(run_search, run.id, resolved)
     logger.info("ingestion.start search_id=%s source=%s", run.id, source.name)
     return JobSearchStartResponse(search_id=run.id, status=run.status.value)

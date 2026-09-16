@@ -234,6 +234,20 @@ options — Adzuna maps both to native params), `results_wanted`, and `location`
 LLM-generated per-source specs may fill option fields the source declares
 (`search_query_v2` specs); invented keys are dropped rather than stored.
 
+### How terms reach each source (v4 issue #33)
+
+Search text is rendered per source with a fixed, test-locked **precedence
+table** — the connectors only map the rendered term plan onto their API
+params, they never decide combinations:
+
+- **Adzuna**: when the spec has a title, it becomes `what_phrase` and is
+  combined with `what_or`/`what_and` (skills) and `what_exclude`; the
+  free-text query is only sent as `what` when there is **no** title.
+- **LinkedIn**: a user-typed request `query` **overrides** the synthesized
+  natural-language keywords (`"{title} with {skills}"`, plus the salary
+  mention when a salary floor is set); otherwise the synthesis wins. A spec
+  `query` only carries through when there is no title to synthesize from.
+
 ## How matching content is prepared (live since #9)
 
 - **Job descriptions are embedded at ingest** — every normalized posting gets a vector

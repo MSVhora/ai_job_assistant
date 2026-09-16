@@ -296,7 +296,8 @@ async def test_search_accepts_per_source_specs_and_salary(
 
     assert response.status_code == 202
     query = source.queries[0]
-    assert query.title_phrase == "Senior Android Engineer"
+    assert query.term_plan is not None
+    assert query.term_plan.what_phrase == "Senior Android Engineer"
     assert query.salary_min == 5000000
     assert query.location == "Bangalore"
 

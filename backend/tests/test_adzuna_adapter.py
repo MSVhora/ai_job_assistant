@@ -7,7 +7,12 @@ import httpx
 import pytest
 
 from app.adapters.job_sources.adzuna import AdzunaJobSource
-from app.adapters.job_sources.base import ConnectorError, JobSearchQuery, RawJobPosting
+from app.adapters.job_sources.base import (
+    ConnectorError,
+    JobSearchQuery,
+    RawJobPosting,
+    TermPlan,
+)
 from app.core.config import get_settings
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -243,10 +248,11 @@ async def test_search_sends_structured_params_for_spec(
     source = _mock_source(monkeypatch, httpx.MockTransport(handler))
 
     query = JobSearchQuery(
-        query="",
-        title_phrase="Senior Android Engineer",
-        skills_any=["Kotlin", "Java"],
-        exclude_any=["intern"],
+        term_plan=TermPlan(
+            what_phrase="Senior Android Engineer",
+            what_or=["Kotlin", "Java"],
+            what_exclude=["intern"],
+        ),
         country="in",
         salary_min=5000000,
     )
@@ -259,6 +265,30 @@ async def test_search_sends_structured_params_for_spec(
     assert params["salary_min"] == "5000000"
     assert "what" not in params
     assert len(postings) == 3
+
+
+async def test_search_maps_free_text_what_from_plan(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen["url"] = str(request.url)
+        return httpx.Response(200, json=_fixture())
+
+    monkeypatch.setattr("app.adapters.retry.asyncio.sleep", _no_delay)
+    source = _mock_source(monkeypatch, httpx.MockTransport(handler))
+
+    query = JobSearchQuery(
+        term_plan=TermPlan(what="android developer", what_and=["kotlin", "compose"]),
+        country="in",
+    )
+    await source.search(query)
+
+    params = _request_params(str(seen["url"]))
+    assert params["what"] == "android developer"
+    assert params["what_and"] == "kotlin compose"
+    assert "what_phrase" not in params
 
 
 async def test_search_requires_terms_when_no_query_or_title(

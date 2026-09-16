@@ -20,7 +20,13 @@ def job_embed_text(title: str, description: str | None) -> str | None:
     return f"{title.strip()}\n{body}"[:MAX_EMBED_CHARS]
 
 
-def profile_embed_text(profile: StructuredProfile) -> str:
+def profile_digest_parts(profile: StructuredProfile) -> list[str]:
+    """Shared compact-profile building blocks (embedding text + query context).
+
+    The parts that this returns are byte-stable — the embedding text joins them
+    unchanged, so editing display-only concerns here silently changes embedding
+    inputs. Add new parts carefully and re-embed if any existing part changes.
+    """
     preferences = profile.preferences
     parts: list[str] = []
     target_title = preferences.target_title if preferences else None
@@ -44,7 +50,11 @@ def profile_embed_text(profile: StructuredProfile) -> str:
         parts.append(f"Preferred location: {preferences.target_location}")
     if preferences and preferences.work_authorization:
         parts.append(f"Work authorization: {preferences.work_authorization}")
-    return "\n".join(parts)[:MAX_EMBED_CHARS]
+    return parts
+
+
+def profile_embed_text(profile: StructuredProfile) -> str:
+    return "\n".join(profile_digest_parts(profile))[:MAX_EMBED_CHARS]
 
 
 async def embed_texts(texts: list[str]) -> list[list[float]]:

@@ -11,6 +11,7 @@ from fakes import (
     install_acompletion,
     llm_response,
 )
+from fastapi import BackgroundTasks
 from sqlalchemy import select
 
 from app.core.config import Settings
@@ -291,6 +292,7 @@ async def test_rescore_with_invalidation_clears_llm_state_without_llm_calls(
     async with session_factory() as session:
         await save_profile(
             session,
+            BackgroundTasks(),
             profile_id,
             ProfileUpdate(structured_profile=modified),
         )

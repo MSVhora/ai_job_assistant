@@ -1,8 +1,9 @@
 import uuid
 from datetime import UTC, datetime
+from typing import Any
 
 import pytest
-from fakes import FakeJobSource, fake_posting, install_aembedding, seed_profile_light
+from fakes import VALID_PROFILE, FakeJobSource, fake_posting, install_aembedding, seed_profile_light
 from fastapi import BackgroundTasks
 from pydantic import ValidationError
 from sqlalchemy import select
@@ -14,6 +15,7 @@ from app.core.db import session_factory
 from app.core.errors import (
     JobSourceNotEnabledError,
     MissingProfileIdError,
+    MissingSearchCountryError,
     ProfileNotFoundError,
     UnknownJobSourceError,
 )
@@ -606,3 +608,100 @@ async def test_get_search_postings_filters_stale_or_expired() -> None:
         seen = await get_search_postings(session, run, run_row.profile_id)
 
     assert {summary.title for summary in seen} == {"Fresh"}
+
+
+PROFILE_WITH_PREFS = dict(
+    VALID_PROFILE
+    | {
+        "contact": {**VALID_PROFILE["contact"], "country": "de"},
+        "preferences": {
+            "target_location": "Berlin",
+            "salary_min": 50000,
+            "salary_max": 90000,
+            "currency": "EUR",
+            "remote_preference": "hybrid",
+        },
+    }
+)
+
+
+async def seed_profile_with_prefs() -> Any:
+    from app.core.db import session_factory
+    from app.models import Candidate, Profile
+    from app.schemas.profile import StructuredProfile
+
+    async with session_factory() as session:
+        result = await session.execute(select(Candidate).limit(1))
+        candidate = result.scalars().first()
+        if candidate is None:
+            candidate = Candidate()
+            session.add(candidate)
+            await session.flush()
+        profile = Profile(
+            candidate_id=candidate.id,
+            name="Prefilled",
+            structured_profile=StructuredProfile.model_validate(PROFILE_WITH_PREFS).model_dump(
+                mode="json"
+            ),
+        )
+        session.add(profile)
+        await session.commit()
+        return profile.id
+
+
+async def test_start_search_resolves_omitted_fields_from_profile(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    only_sources(monkeypatch, FakeJobSource("adzuna"))
+    profile_id = await seed_profile_with_prefs()
+
+    request = payload(
+        profile_id=profile_id,
+        country=None,
+        location=None,
+        salary_min=None,
+        salary_currency=None,
+        query="python developer",
+    )
+    async with session_factory() as session:
+        response = await start_search(session, BackgroundTasks(), request)
+        await session.commit()
+
+    run_row = await get_run(response.search_id)
+    assert run_row.query["country"] == "de"
+    assert run_row.query["location"] == "Berlin"
+    assert run_row.query["salary_min"] == 50000
+    assert run_row.query["salary_currency"] == "EUR"
+
+
+async def test_start_search_request_values_win() -> None:
+    profile_id = await seed_profile_with_prefs()
+
+    request = payload(profile_id=profile_id, country="fr", location="Munich", salary_min=100)
+    async with session_factory() as session:
+        response = await start_search(session, BackgroundTasks(), request)
+        await session.commit()
+
+    run_row = await get_run(response.search_id)
+    assert run_row.query["country"] == "fr"
+    assert run_row.query["location"] == "Munich"
+    assert run_row.query["salary_min"] == 100
+    assert run_row.query["salary_max"] == 90000
+
+
+async def test_start_search_without_country_anywhere_rejects() -> None:
+    profile_id = await seed_profile_with_prefs()
+    from app.core.db import session_factory
+    from app.models import Profile
+
+    async with session_factory() as session:
+        row = await session.get(Profile, profile_id)
+        structured = dict(PROFILE_WITH_PREFS)
+        structured["contact"] = {k: v for k, v in structured["contact"].items() if k != "country"}
+        row.structured_profile = structured
+        await session.commit()
+
+    request = payload(profile_id=profile_id, country=None)
+    async with session_factory() as session:
+        with pytest.raises(MissingSearchCountryError):
+            await start_search(session, BackgroundTasks(), request)

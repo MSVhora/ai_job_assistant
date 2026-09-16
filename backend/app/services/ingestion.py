@@ -24,6 +24,7 @@ from app.core.errors import (
     JobSearchNotFoundError,
     JobSourceNotEnabledError,
     MissingProfileIdError,
+    MissingSearchCountryError,
     MissingSearchQueryError,
     ProfileNotFoundError,
     UnknownJobSourceError,
@@ -39,10 +40,30 @@ from app.schemas.job_search import (
     MatchingOutcome,
     SourceOutcome,
 )
+from app.schemas.profile import StructuredProfile
 from app.services import embedding, matching, query_rendering
 from app.services import sources as sources_service
 
 logger = logging.getLogger(__name__)
+
+
+def resolve_profile_defaults(payload: JobSearchRequest, profile: Profile) -> JobSearchRequest:
+    """Fill omitted shared filters from the profile; request values always win."""
+    structured = StructuredProfile.model_validate(profile.structured_profile)
+    preferences = structured.preferences
+    if payload.country is None and structured.contact.country is None:
+        raise MissingSearchCountryError()
+    update: dict[str, object] = {"country": payload.country or structured.contact.country}
+    if payload.location is None and preferences is not None:
+        update["location"] = preferences.target_location
+    if preferences is not None:
+        if payload.salary_min is None:
+            update["salary_min"] = preferences.salary_min
+        if payload.salary_max is None:
+            update["salary_max"] = preferences.salary_max
+        if payload.salary_currency is None:
+            update["salary_currency"] = preferences.currency
+    return payload.model_copy(update=update)
 
 
 def _validate_queries(payload: JobSearchRequest, source: JobSource) -> None:
@@ -82,17 +103,18 @@ async def _require_profile(session: AsyncSession, profile_id: uuid.UUID | None) 
 async def start_search(
     session: AsyncSession, background_tasks: BackgroundTasks, payload: JobSearchRequest
 ) -> JobSearchStartResponse:
-    await _require_profile(session, payload.profile_id)
-    source = await _selected_source(session, payload)
-    _validate_queries(payload, source)
+    profile = await _require_profile(session, payload.profile_id)
+    resolved = resolve_profile_defaults(payload, profile)
+    source = await _selected_source(session, resolved)
+    _validate_queries(resolved, source)
     run = JobSearch(
         status=JobSearchStatus.pending,
         profile_id=payload.profile_id,
-        query=payload.model_dump(mode="json"),
+        query=resolved.model_dump(mode="json"),
     )
     session.add(run)
     await session.flush()
-    background_tasks.add_task(run_search, run.id, payload)
+    background_tasks.add_task(run_search, run.id, resolved)
     logger.info("ingestion.start search_id=%s source=%s", run.id, source.name)
     return JobSearchStartResponse(search_id=run.id, status=run.status.value)
 

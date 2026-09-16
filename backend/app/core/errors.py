@@ -77,6 +77,11 @@ class MissingSearchQueryError(DomainError):
     default_detail = "no search query provided for a selected source"
 
 
+class MissingSearchCountryError(DomainError):
+    status_code = 400
+    default_detail = "no country provided by the request or the profile"
+
+
 class MissingProfileIdError(DomainError):
     status_code = 400
     default_detail = "profile_id is required"

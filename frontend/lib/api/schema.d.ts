@@ -603,6 +603,9 @@ export interface components {
          * JobSearchRequest
          * @description One search run targets exactly one source (`source`); `source_queries`,
          *     when present, may only refine that source (extra keys are rejected).
+         *
+         *     Shared filters left None are resolved server-side from the profile (issue
+         *     #31) — the request may omit them.
          */
         JobSearchRequest: {
             /** Query */
@@ -618,7 +621,7 @@ export interface components {
             /** Location */
             location?: string | null;
             /** Country */
-            country: string;
+            country?: string | null;
             /**
              * Results Wanted
              * @default 50
@@ -857,6 +860,8 @@ export interface components {
              */
             updated_at: string;
             last_revision?: components["schemas"]["RevisionSummary"] | null;
+            /** Missing Fields */
+            missing_fields?: string[];
         };
         /** ProfileSummary */
         ProfileSummary: {

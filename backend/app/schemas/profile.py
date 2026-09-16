@@ -201,6 +201,10 @@ class ProfileResponse(BaseModel):
     source_resume_filename: str | None
     updated_at: datetime
     last_revision: RevisionSummary | None = None
+    # Keys-only list of gap-fill-able fields the profile still lacks (issue #31).
+    # Computed server-side from the stored structured profile; the frontend uses
+    # the emptiness to hide the gap-fill chat entirely for complete profiles.
+    missing_fields: list[str] = Field(default_factory=list)
 
 
 class ProfileSummary(BaseModel):

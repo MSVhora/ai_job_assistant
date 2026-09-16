@@ -90,6 +90,10 @@ def _apply_salary_filter(params: dict[str, str], query: JobSearchQuery) -> None:
         params["salary_min"] = str(int(query.salary_min))
     if query.salary_max is not None:
         params["salary_max"] = str(int(query.salary_max))
+    if query.salary_min is None:
+        # No salary floor: include postings that don't publish salary, instead
+        # of silently biasing results to companies that do (issue #34).
+        params["salary_include_unknown"] = "1"
 
 
 def _apply_freshness(params: dict[str, str], query: JobSearchQuery) -> None:
@@ -103,12 +107,26 @@ _SORT_BY_OPTIONS = (
     SourceFilterOption(value="salary", label="Salary"),
 )
 
+_JOB_TYPE_OPTIONS = (
+    SourceFilterOption(value="full_time", label="Full-time"),
+    SourceFilterOption(value="part_time", label="Part-time"),
+    SourceFilterOption(value="contract", label="Contract"),
+    SourceFilterOption(value="permanent", label="Permanent"),
+)
+
 _FILTERS = [
     SourceFilterDecl(
         key="title_only",
         label="Title-only search",
         type="boolean",
         help_text="Match the title phrase only instead of the full description",
+    ),
+    SourceFilterDecl(
+        key="job_type",
+        label="Job type (optional)",
+        type="select",
+        options=list(_JOB_TYPE_OPTIONS),
+        help_text="Restrict to one Adzuna contract filter instead of a contradictory mix",
     ),
     SourceFilterDecl(
         key="distance_km",
@@ -130,6 +148,9 @@ def _apply_options(params: dict[str, str], query: JobSearchQuery) -> None:
     title_only = query.options.get("title_only")
     if title_only is True:
         params["title_only"] = "true"
+    job_type = query.options.get("job_type")
+    if type(job_type) is str and job_type in {option.value for option in _JOB_TYPE_OPTIONS}:
+        params[job_type] = "true"
     distance_km = query.options.get("distance_km")
     if type(distance_km) is int and query.location:
         params["distance"] = str(distance_km)
@@ -139,6 +160,26 @@ def _apply_options(params: dict[str, str], query: JobSearchQuery) -> None:
 
 
 class AdzunaJobSource:
+    """Adzuna official-API connector.
+
+    Search runs as a multi-pass run inside Adzuna's API dialect:
+
+    - Pass 1 renders the term plan (``what_phrase`` + ``what_and``/``what_or``
+      combined; ``what`` only when no phrase — normative precedence in
+      ``services/query_rendering.py``).
+    - Pass 2 (``title_only=true``) fires automatically when a title phrase
+      exists and the user has not explicitly set ``title_only``, adding
+      title-precision recall; merged results dedupe by ``external_id`` with
+      the broad pass winning.
+    - Pagination follows page 2 only when a page returns a full 50 rows and
+      ``results_wanted`` is larger than what has been collected.
+
+    Budget formula: **calls per run = Σ (sub-queries × pages)**. Every call
+    beyond the first is gated on ``max_adzuna_calls_per_run`` (free tier:
+    25/min, 250/day, 1000/wk, 2500/mo); when the budget is exhausted the run
+    stops and logs rather than failing.
+    """
+
     name = "adzuna"
     is_official_api = True
     disclosure_required = False
@@ -159,10 +200,11 @@ class AdzunaJobSource:
         if not self.is_configured():
             raise ConnectorError("adzuna credentials are not configured")
 
+        results_per_page = min(query.results_wanted, _MAX_RESULTS_PER_PAGE)
         params: dict[str, str] = {
             "app_id": settings.adzuna_app_id or "",
             "app_key": settings.adzuna_app_key or "",
-            "results_per_page": str(min(query.results_wanted, _MAX_RESULTS_PER_PAGE)),
+            "results_per_page": str(results_per_page),
             "content-type": "application/json",
         }
         _apply_search_terms(params, query)
@@ -171,10 +213,56 @@ class AdzunaJobSource:
         _apply_options(params, query)
         if query.location:
             params["where"] = query.location
-        url = f"{_BASE_URL}/v1/api/jobs/{query.country}/search/1"
+        url = f"{_BASE_URL}/v1/api/jobs/{query.country}/search"
 
         start = time.perf_counter()
-        data = await self._get_json(url, params)
+        postings = await self._multi_pass_search(url, params, query, results_per_page)
+        logger.info(
+            "job_source.search source=adzuna duration_ms=%.0f fetched=%d country=%s",
+            (time.perf_counter() - start) * 1000,
+            len(postings),
+            query.country,
+        )
+        return postings
+
+    async def _multi_pass_search(
+        self, url: str, params: dict[str, str], query: JobSearchQuery, results_per_page: int
+    ) -> list[RawJobPosting]:
+        plan = query.term_plan
+        passes: list[dict[str, str]] = [{}]
+        if plan is not None and plan.what_phrase and query.options.get("title_only") is not True:
+            passes.append({"title_only": "true"})
+
+        budget = get_settings().max_adzuna_calls_per_run
+        calls = 0
+        total_fetched = 0
+        merged: dict[str, RawJobPosting] = {}
+        for pass_params in passes:
+            page = 1
+            while True:
+                calls += 1
+                data = await self._get_json(url + f"/{page}", params | pass_params)
+                page_results = self._extract_postings(data)
+                total_fetched += len(page_results)
+                for posting in page_results:
+                    merged.setdefault(posting.external_id, posting)
+                full_page = len(page_results) >= results_per_page
+                more = full_page and len(merged) < query.results_wanted and calls < budget
+                if not more:
+                    break
+                page += 1
+        logger.info(
+            "job_source.search source=adzuna multipass passes=%d calls=%d budget=%d "
+            "raw_fetched=%d deduped=%d",
+            len(passes),
+            calls,
+            budget,
+            total_fetched,
+            len(merged),
+        )
+        return list(merged.values())[: query.results_wanted]
+
+    def _extract_postings(self, data: dict[str, Any]) -> list[RawJobPosting]:
         results = data.get("results")
         postings: list[RawJobPosting] = []
         if isinstance(results, list):
@@ -185,12 +273,6 @@ class AdzunaJobSource:
                 if not external_id:
                     continue
                 postings.append(RawJobPosting(external_id=external_id, payload=item))
-        logger.info(
-            "job_source.search source=adzuna duration_ms=%.0f fetched=%d country=%s",
-            (time.perf_counter() - start) * 1000,
-            len(postings),
-            query.country,
-        )
         return postings
 
     def normalize(self, raw: RawJobPosting) -> JobPostingData:

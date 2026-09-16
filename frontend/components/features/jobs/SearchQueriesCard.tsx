@@ -83,7 +83,18 @@ export function SearchQueriesCard({
           />
         </Field>
         <Field
-          label="Skills (comma-separated)"
+          label="Must-have skills (comma-separated)"
+          htmlFor="query-skills-all"
+          hint="Sent as all-of keywords where the source supports it (Adzuna)."
+        >
+          <Input
+            id="query-skills-all"
+            {...form.register("query.skills_all")}
+            placeholder={seed?.skills.slice(0, 2).join(", ") || "Kotlin, Compose"}
+          />
+        </Field>
+        <Field
+          label="Nice-to-have skills (comma-separated)"
           htmlFor="query-skills"
           hint="Sent as any-of keywords where the source supports it."
         >

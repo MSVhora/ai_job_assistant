@@ -28,6 +28,7 @@ const STEP_FIELDS: (keyof SearchFormValues | string)[][] = [
   ["source"],
   [
     "query.title",
+    "query.skills_all",
     "query.skills",
     "query.exclude",
     "location",
@@ -137,6 +138,7 @@ export function SearchStepperModal({
     form.reset({
       query: {
         title: stored?.title ?? seeded.title,
+        skills_all: (stored?.skills_all ?? []).join(", "),
         skills: (stored?.skills ?? seeded.skills).join(", "),
         exclude: (stored?.exclude ?? []).join(", "),
         options: optionsFromStored(stored?.options, selectedSource),

@@ -26,6 +26,9 @@ class Settings(BaseSettings):
 
     adzuna_app_id: str | None = None
     adzuna_app_key: str | None = None
+    # Issue #34: max HTTP calls per Adzuna run (Σ sub-queries × pages) — keeps
+    # multi-pass runs inside Adzuna's free tier (25/min, 250/day).
+    max_adzuna_calls_per_run: Annotated[int, Field(ge=1, le=8)] = 4
     apify_token: str | None = None
 
     rerank_top_n: int = 10

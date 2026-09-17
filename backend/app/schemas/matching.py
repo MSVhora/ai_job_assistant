@@ -1,3 +1,4 @@
+import enum
 import uuid
 from datetime import datetime
 from typing import Literal
@@ -11,12 +12,29 @@ _MAX_LOCATION = 200
 _MAX_RATIONALE = 600
 
 MatchSort = Literal["final_score", "vector_score", "posted_at"]
+MatchListStatus = Literal["active", "saved", "dismissed", "all"]
+
+
+class MatchSignalKind(enum.StrEnum):
+    open = "open"
+    save = "save"
+    unsave = "unsave"
+    dismiss = "dismiss"
+    undismiss = "undismiss"
+
+
+class MatchSignalRequest(BaseModel):
+    kind: MatchSignalKind
+
 
 __all__ = [
     "MatchFilters",
     "MatchQueryParams",
     "MatchRebuildStatusResponse",
     "MatchResponse",
+    "MatchSignalKind",
+    "MatchSignalRequest",
+    "MatchListStatus",
     "MatchSort",
     "RerankItem",
     "RerankResult",
@@ -71,6 +89,7 @@ class MatchQueryParams(MatchFilters):
         ),
     )
     sort: MatchSort = "final_score"
+    status: MatchListStatus = "active"
     limit: int = Field(default=50, ge=1, le=200)
     offset: int = Field(default=0, ge=0)
 
@@ -99,3 +118,7 @@ class MatchResponse(BaseModel):
     rationale: str | None = Field(default=None, max_length=_MAX_RATIONALE)
     created_at: datetime
     updated_at: datetime
+    first_opened_at: datetime | None = None
+    clicked_apply_at: datetime | None = None
+    saved_at: datetime | None = None
+    dismissed_at: datetime | None = None

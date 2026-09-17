@@ -62,10 +62,12 @@ export function MatchList({
   onFiltersChange: (filters: MatchFilterValues) => void;
 }) {
   const [page, setPage] = useState(0);
+  const [status, setStatus] = useState<"active" | "saved" | "dismissed" | "all">("active");
   const matches = useMatches(profileId, {
     limit: MATCH_PAGE_SIZE,
     offset: page * MATCH_PAGE_SIZE,
     priority,
+    status,
     ...filters,
   });
   const list = matches.data?.items ?? [];
@@ -74,6 +76,12 @@ export function MatchList({
 
   function changePage(next: number) {
     setPage(next);
+    selection.clear();
+  }
+
+  function changeStatus(next: "active" | "saved" | "dismissed" | "all") {
+    setStatus(next);
+    setPage(0);
     selection.clear();
   }
 
@@ -155,15 +163,43 @@ export function MatchList({
           Page {page + 1} of {pageCount}
         </span>
       </div>
+      <nav aria-label="Match views" className="flex gap-1.5 border-b border-gray-100 px-5 pb-3 sm:px-6">
+        {(
+          [
+            ["active", "Active"],
+            ["saved", "Saved"],
+            ["dismissed", "Dismissed"],
+            ["all", "All"],
+          ] as const
+        ).map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => changeStatus(value)}
+            aria-pressed={status === value}
+            className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 ${
+              status === value
+                ? "bg-violet-600 text-white shadow-sm"
+                : "text-gray-500 hover:bg-violet-50 hover:text-violet-700"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
       <div className="scrollbar-hidden min-h-0 flex-1 overflow-y-auto p-5 sm:p-6">
         {list.length === 0 ? (
           <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-violet-200 bg-violet-50/40 px-4 py-8 text-center">
             <p className="max-w-md text-sm text-gray-600">
-              {filtersActive
-                ? "No postings match the current filters. Clear them to see every ranked match for this profile."
-                : "No matches for this profile yet. Run a search to fetch postings — matches appear here when the run finishes."}
+              {status === "saved"
+                ? "Nothing saved yet. Use Save on a match card to keep it here."
+                : status === "dismissed"
+                  ? "No dismissed matches. Dismissed matches are hidden from the default view."
+                  : filtersActive
+                    ? "No postings match the current filters. Clear them to see every ranked match for this profile."
+                    : "No matches for this profile yet. Run a search to fetch postings — matches appear here when the run finishes."}
             </p>
-            {filtersActive && (
+            {filtersActive && status === "active" && (
               <button
                 type="button"
                 onClick={() => {
@@ -188,6 +224,7 @@ export function MatchList({
                   key={match.id}
                   match={match}
                   rank={page * MATCH_PAGE_SIZE + index + 1}
+                  profileId={profileId}
                   selected={selection.match?.id === match.id}
                   onOpenDetails={() => selection.toggle(match)}
                 />

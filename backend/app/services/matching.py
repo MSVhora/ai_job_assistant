@@ -28,6 +28,7 @@ from app.models import JobPosting, JobSearch, Match, Profile, SearchPosting
 from app.schemas.job_search import JobPostingSummary, MatchingOutcome
 from app.schemas.matching import (
     MatchFilters,
+    MatchListStatus,
     MatchQueryParams,
     MatchResponse,
     RerankItem,
@@ -75,6 +76,19 @@ def ranked_postings_query(
         .order_by(distance.asc())
     )
     return _apply_posting_filters(query, filters)
+
+
+def _apply_status_filter[RowT](query: Select[RowT], status: MatchListStatus) -> Select[RowT]:
+    """Issue #39 engagement-status view: `active` (the default view) hides
+    dismissed matches; `saved`/`dismissed` are their respective buckets; `all`
+    is everything."""
+    if status == "active":
+        return query.where(Match.dismissed_at.is_(None))
+    if status == "saved":
+        return query.where(Match.dismissed_at.is_(None), Match.saved_at.is_not(None))
+    if status == "dismissed":
+        return query.where(Match.dismissed_at.is_not(None))
+    return query
 
 
 def freshness_condition() -> ColumnElement[bool]:
@@ -369,7 +383,7 @@ def _parse_profile(profile: Profile) -> StructuredProfile | None:
         return None
 
 
-def _signal_skills(structured: StructuredProfile | None) -> list[str]:
+def signal_skills(structured: StructuredProfile | None) -> list[str]:
     if structured is None:
         return []
     ordered: dict[str, None] = {}
@@ -411,7 +425,7 @@ async def rescore_matches(
         return 0
     settings = get_settings()
     structured = _parse_profile(profile)
-    skills = _signal_skills(structured)
+    skills = signal_skills(structured)
     pref_min, pref_max, pref_currency = _salary_preferences(structured)
     vector_value = case(
         (JobPosting.embedding.is_(None), None),
@@ -609,9 +623,9 @@ async def _rerank_top_matches(
             scored_count=scored_count,
             warning="structured profile failed validation; re-rank skipped",
         )
-    signal_skills = _signal_skills(structured)
+    matched_skills = signal_skills(structured)
 
-    prompt = _rerank_prompt(structured, [posting for _, posting in candidates], signal_skills)
+    prompt = _rerank_prompt(structured, [posting for _, posting in candidates], matched_skills)
     try:
         result = await parse_structured(prompt, schema=RerankResult, system=_RERANK_SYSTEM)
     except LLMError as exc:
@@ -740,6 +754,7 @@ async def count_matches(session: AsyncSession, params: MatchQueryParams) -> int:
         .where(Match.profile_id == params.profile_id)
     )
     query = _apply_posting_filters(query, params)
+    query = _apply_status_filter(query, params.status)
     return int((await session.execute(query)).scalar_one())
 
 
@@ -767,6 +782,7 @@ async def list_matches(session: AsyncSession, params: MatchQueryParams) -> list[
         .where(Match.profile_id == params.profile_id)
     )
     query = _apply_posting_filters(query, params)
+    query = _apply_status_filter(query, params.status)
     if custom:
         query = query.order_by(effective.desc(), JobPosting.posted_at.desc().nulls_last())
     else:
@@ -787,6 +803,10 @@ async def list_matches(session: AsyncSession, params: MatchQueryParams) -> list[
             rationale=match.rationale,
             created_at=match.created_at,
             updated_at=match.updated_at,
+            first_opened_at=match.first_opened_at,
+            clicked_apply_at=match.clicked_apply_at,
+            saved_at=match.saved_at,
+            dismissed_at=match.dismissed_at,
         )
         for match, posting, effective_score in rows
     ]

@@ -24,7 +24,7 @@ export const DEFAULT_MATCH_FILTERS: MatchFilterValues = {
 
 export function useMatches(
   profileId: string | null,
-  params: Pick<MatchListParams, "limit" | "offset" | "priority"> & MatchFilterValues,
+  params: Pick<MatchListParams, "limit" | "offset" | "priority" | "status"> & MatchFilterValues,
 ) {
   return useQuery({
     queryKey: ["matches", profileId, params],

@@ -62,6 +62,10 @@ class Settings(BaseSettings):
     # signal (the array is bound into every rescore pass).
     match_skill_signal_skills: Annotated[int, Field(ge=1)] = 25
 
+    # Issue #39 tune-my-queries: max aggregated terms per category per signal
+    # bucket in the LLM prompt (keeps the manual call's prompt bounded).
+    tune_query_top_terms: Annotated[int, Field(ge=1)] = 10
+
     # Issue #38: pg_trgm title similarity threshold for cross-source canonical
     # grouping (1.0 = exact titles only, the honest "disable").
     posting_dedupe_similarity: Annotated[float, Field(ge=0.0, le=1.0)] = 0.92

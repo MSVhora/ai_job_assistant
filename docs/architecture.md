@@ -378,6 +378,10 @@ erDiagram
         real company_fit "LLM re-rank 0-10, null when not re-ranked"
         real final_score "weighted blend (vector, skill, recency, salary + LLM verdicts; issue #37) — fallback rows renormalize skill+recency+salary"
         text rationale "LLM why-this-matches, top N only; cleared when profile content changes"
+        timestamptz first_opened_at "first job-detail open, first-write-wins (issue #39)"
+        timestamptz clicked_apply_at "first apply-URL redirect click via /api/matches/{id}/apply (issue #39)"
+        timestamptz saved_at "explicit one-click save; unsave clears it (issue #39)"
+        timestamptz dismissed_at "explicit dismiss — hides the match from the default list; undismiss clears (issue #39)"
         timestamptz created_at
         timestamptz updated_at
     }
@@ -410,7 +414,13 @@ resume-derived preferences inside `structured_profile`, and is deliberately
 revision-free. Preferences extracted from the resume stay inside the profile's
 `structured_profile`; the matching work (#10) reads blend weights from `Settings`
 (`MATCH_WEIGHT_*` in `.env.example`) and stores the re-rank sub-scores on `match` so the
-slider re-weights without an LLM call. Multi-profile moved the opposite way — from v2
+slider re-weights without an LLM call. Engagement timestamps (#39) land on `match`
+as nullable timestamptz (`first_opened_at`, `clicked_apply_at`, `saved_at`,
+`dismissed_at`): implicit signals ride existing behavior (detail open; the apply
+redirect endpoint), the two explicit ones are one-click and reversible, and a manual
+`tune-queries` pass aggregates them to rewrite stored query specs. The stored
+`queries_input_hash` is overwritten with the current-inputs hash at tune time so the
+freshness guard cannot revert the tuned specs. Multi-profile moved the opposite way — from v2
 into v1 (issue #6, owner decision 2026-09-01): `profile` is now the home of
 `structured_profile` and the revision audit.
 

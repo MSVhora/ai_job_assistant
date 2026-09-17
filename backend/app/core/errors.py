@@ -130,6 +130,18 @@ class JobSourceNotFoundError(DomainError):
     default_detail = "job source not found"
 
 
+class MatchNotFoundError(DomainError):
+    status_code = 404
+    default_detail = "match not found"
+
+
+class NoTunableSignalsError(DomainError):
+    """Tune-my-queries has no engagement signals to learn from (#39)."""
+
+    status_code = 409
+    default_detail = "no engagement signals yet — open, save, or dismiss some matches first"
+
+
 class DisclosureNotAcknowledgedError(DomainError):
     status_code = 409
     default_detail = "disclosure must be acknowledged before enabling this source"

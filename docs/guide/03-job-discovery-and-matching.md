@@ -450,8 +450,9 @@ mapper module — no core changes.
 - **"Why this matches"** — a generated explanation on the top matches, so you can judge
   the ranking instead of trusting a black box; expand it on each match card
 - **Filters** — location, remote, job type, posting date, a sort selector (best
-  match / similarity / newest), and the priority slider (below); all applied to the
-  stored matches at read time
+  match / similarity / newest), the priority slider (below), and the view tabs above
+  the list (Active / Saved / Dismissed / All, #39); all applied to the stored matches
+  at read time
 - **Profile scope** — the sidebar's "Searching as profile" selector scopes every search
   run and the match list to one profile track (the same selector is also in the Global
   configuration dialog; both always show the same track)
@@ -478,6 +479,37 @@ trajectory.
 - **Server defaults still exist** — the slider's default position matches the
   `MATCH_WEIGHT_*` values in `.env`. Changing those env values applies to new score
   writes; the per-profile slider position (once moved) overrides them at read time.
+
+## Engagement signals (issue #39)
+
+The app records how you engage with matches, with zero required effort — the signals
+come from actions you already take:
+
+- **Opened** (`first_opened_at`) — recorded the first time you open a match's job
+  details; repeats are ignored.
+- **Apply clicked** (`clicked_apply_at`) — apply links route through the backend
+  (`/api/matches/{id}/apply`), which records the click and then redirects you to the
+  external posting. The first click wins, so a dead link never fabricates a signal.
+- **Saved** (`saved_at`) — the card's Save button (one click, undoable by toggling).
+- **Dismissed** (`dismissed_at`) — hides a match from the Active view. Use the
+  **Dismissed** tab on the match list to restore it (or regret it in Saved/All).
+
+These timestamps never touch scoring — they feed the "Tune my queries" action only.
+
+## Tune my queries (issue #39)
+
+The queries card offers a manual, confirm-gated **Tune my queries** action. It
+aggregates your engagement signals — which titles, companies, and of your profile's
+top skills appear in *clicked-or-saved* matches vs *never-opened* matches vs
+*dismissed* matches — and rewrites the stored query specs for every enabled source in
+one LLM call (a few thousand tokens; your API key pays, so the dialog asks you to
+confirm first).
+
+- **It cannot be silently reverted** — after tuning, the stored query hash matches the
+  profile's current inputs, so the automatic freshness regeneration skips until the
+  profile actually changes; the hot **Regenerate** button remains available as usual.
+- **Nothing automatic** — tuning only runs when you press the button. Application
+  status tracking is deliberately not part of this feature.
 
 ## Privacy
 

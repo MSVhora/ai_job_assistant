@@ -239,3 +239,26 @@ export async function regenerateSearchQueries(
     { method: "POST", body: JSON.stringify(sources ? { sources } : {}) },
   );
 }
+
+export type MatchSignalKind = components["schemas"]["MatchSignalRequest"]["kind"];
+
+export async function recordMatchSignal(
+  matchId: string,
+  kind: MatchSignalKind,
+): Promise<MatchResponse> {
+  return apiFetch<MatchResponse>(`/api/matches/${encodeURIComponent(matchId)}/signals`, {
+    method: "POST",
+    body: JSON.stringify({ kind }),
+  });
+}
+
+export function applyMatchUrl(matchId: string): string {
+  return `/api/matches/${encodeURIComponent(matchId)}/apply`;
+}
+
+export async function tuneSearchQueries(profileId: string): Promise<SearchQueriesResponse> {
+  return apiFetch<SearchQueriesResponse>(
+    `/api/profiles/${encodeURIComponent(profileId)}/tune-queries`,
+    { method: "POST" },
+  );
+}

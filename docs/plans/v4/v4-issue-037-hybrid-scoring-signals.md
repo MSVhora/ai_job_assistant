@@ -11,7 +11,10 @@ cap at 1.0; the rerank pool roughly kept the old cosine ordering on identical fi
 plus a `posted_at desc` tiebreak; `_profile_digest` now wraps the shared
 `profile_digest_parts` and appends rerank-only salary/remote lines (embedding inputs
 untouched); `.env`/`.env.example` migrated to the new `MATCH_WEIGHT_*` block with the
-startup sum-1.0 validator; full suite green (424 tests), frontend lint+build green)
+startup sum-1.0 validator; full suite green (424 tests), frontend lint+build green.
+Follow-ups in the same branch: doubled percent sign fixed on the match card / detail
+panel (`scorePercent` already appends `%`); priority slider now commits the match-list
+refetch 250ms after the drag settles (`usePrioritySetting.listValue`), instant visual only.
 **Tracks:** GitHub issue #37 (milestone `v4`, Phase E — scoring, Problems 7 + 8)
 **Plan of record:** [v4-search-relevance-plan.md](v4-search-relevance-plan.md) Problems 7–8
 **Depends on:** #31–#36 as merged (one source per run, hash-cached queries, YOE/seniority on

@@ -45,7 +45,7 @@ from app.schemas.job_search import (
     SourceOutcome,
 )
 from app.schemas.profile import StructuredProfile
-from app.services import embedding, matching, query_rendering
+from app.services import embedding, matching, posting_dedupe, query_rendering
 from app.services import sources as sources_service
 
 logger = logging.getLogger(__name__)
@@ -293,6 +293,7 @@ async def _run_source(
 
     persisted = 0
     skipped = 0
+    persisted_ids: list[uuid.UUID] = []
     normalized: list[JobPostingData] = []
     for raw in raw_postings:
         try:
@@ -311,8 +312,12 @@ async def _run_source(
         logger.warning("ingestion source=%s embedding failed: %s", source.name, exc)
 
     for data, vector in zip(normalized, embeddings, strict=True):
-        await _upsert_posting(session, source.name, data, search_id, vector)
+        posting_id = await _upsert_posting(
+            session, source.name, data, search_id, vector, payload.country
+        )
+        persisted_ids.append(posting_id)
     persisted = len(normalized)
+    await posting_dedupe.dedupe_postings(session, persisted_ids)
     await session.commit()
 
     warning = f"{skipped} posting(s) skipped (un-mappable)" if skipped else None
@@ -341,7 +346,8 @@ async def _upsert_posting(
     data: JobPostingData,
     search_id: uuid.UUID,
     embedding_vector: list[float] | None,
-) -> None:
+    country: str | None,
+) -> uuid.UUID:
     stmt = (
         pg_insert(JobPosting)
         .values(
@@ -351,6 +357,7 @@ async def _upsert_posting(
             company=data.company,
             url=data.url,
             location=data.location,
+            country=country,
             job_type=data.job_type,
             remote_type=data.remote_type,
             description=data.description,
@@ -373,6 +380,7 @@ async def _upsert_posting(
             "company": stmt.excluded.company,
             "url": stmt.excluded.url,
             "location": stmt.excluded.location,
+            "country": stmt.excluded.country,
             "job_type": stmt.excluded.job_type,
             "remote_type": stmt.excluded.remote_type,
             "description": stmt.excluded.description,
@@ -393,6 +401,7 @@ async def _upsert_posting(
         .values(search_id=search_id, posting_id=posting_id)
         .on_conflict_do_nothing(constraint="uq_search_posting_search_posting")
     )
+    return posting_id
 
 
 async def _require_owned_search(

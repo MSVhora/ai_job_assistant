@@ -136,6 +136,25 @@ async def test_upsert_is_idempotent_for_same_search(monkeypatch: pytest.MonkeyPa
     assert await get_associations() == {(run, postings[0].id)}
 
 
+async def test_upsert_stores_and_refreshes_country(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Issue #38: the run's resolved country is the dedupe grouping key."""
+    only_sources(monkeypatch, FakeJobSource("adzuna", postings=[fake_posting("1")]))
+    run = await create_run(payload())
+    await run_search(run, payload())
+
+    postings = await get_postings()
+    assert len(postings) == 1
+    assert postings[0].country == "de"
+
+    only_sources(monkeypatch, FakeJobSource("adzuna", postings=[fake_posting("1")]))
+    run_2 = await create_run(payload(country="fr"))
+    await run_search(run_2, payload(country="fr"))
+
+    postings = await get_postings()
+    assert len(postings) == 1
+    assert postings[0].country == "fr"
+
+
 async def test_upsert_refreshes_expiry_on_refetch(monkeypatch: pytest.MonkeyPatch) -> None:
     from datetime import timedelta
 

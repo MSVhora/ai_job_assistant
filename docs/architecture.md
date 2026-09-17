@@ -114,6 +114,7 @@ sequenceDiagram
     A->>A: normalize + dedupe (source, external_id) — upsert refresh
     A->>G: embed descriptions
     A->>D: upsert postings + embeddings + search_posting rows (append-only)
+    A->>D: cross-source dedupe pass — trigram+company+country grouping → canonical_id, merge rules (issue #38)
     A->>D: hard filters + cosine → top N
     A->>G: re-rank top N + rationale
     A->>D: store matches
@@ -348,9 +349,12 @@ erDiagram
         text company
         text url "posting click-through link"
         text location
+        text country "run's resolved 2-letter country — dedupe grouping key (issue #38); null for pre-#38 rows"
         text job_type "native enum, nullable"
         text remote_type "native enum, nullable"
         text description
+        uuid canonical_id FK "self-FK: null = own canonical; duplicates point at the canonical row (issue #38) — trigram-merged, matches collapse onto it"
+        jsonb source_urls "merged record [{source, url}] of duplicates folded into this canonical row (issue #38)"
         timestamptz posted_at
         timestamptz expires_at "source-reported (LinkedIn expireAt); null when unknown"
         boolean is_closed "not null, default false; future seam — no producing source yet (v3 #26)"

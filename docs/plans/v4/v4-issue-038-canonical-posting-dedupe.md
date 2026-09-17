@@ -1,6 +1,20 @@
 # Issue #38 — Cross-source posting dedupe / canonical grouping (M5 / Phase E)
 
-**Status:** Planned (branch `v4/38-canonical-posting-dedupe`, cut from `v4/milestone` per AGENTS.md workflow)
+**Status:** Implemented (branch `v4/38-canonical-posting-dedupe`; implementation notes: the
+dedupe candidate lookup uses `title % :title` with `set_config('pg_trgm.similarity_threshold', …)`
+per transaction (an explicit `similarity() >=` comparison would be sequential) plus a tuple
+`(fetched_at, id) < (self)` comparison so only "would beat self" rows are candidates — the
+canonical choice falls out of the candidate ordering; company normalization strips
+punctuation *then* drops trailing corporate-suffix tokens repeatedly, and a NULL/blank
+company never matches anything; `rescore_matches` keeps signals per corpus row and prefers
+the row whose `id == coalesce(canonical_id, id)` when collapsing (canonical's own merged
+text drives the scores), then bulk-deletes this profile's matches pointing at any
+duplicate; pre-existing test-ordering pollution between `test_migrations.py` and
+`test_ingestion.py` (leftover committed rows in the migration tests) predates this issue —
+the 0019 test cleans up after itself. `TEST_DATABASE_URL=postgresql+asyncpg://
+postgres:postgres@localhost:5432/ai_job_assistant_test` runs the full suite green
+(448 tests); autogenerate drift-check on a migrated test DB produces an empty migration
+(model↔0019 parity); frontend lint+build green)
 **Tracks:** GitHub issue #38 (milestone `v4`, Phase E — scoring, Problem 9)
 **Plan of record:** [v4-search-relevance-plan.md](v4-search-relevance-plan.md) Problem 9
 **Depends on:** #37 (hybrid scoring) — its plan explicitly reserves pg_trgm and the `canonical_id`

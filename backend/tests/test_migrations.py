@@ -360,6 +360,85 @@ async def migration_0017(migrated_database: None):
     await migrate("upgrade", "head")
 
 
+async def test_migration_0019_dedupe_columns_and_trgm(migration_0017: None) -> None:
+    canonical_id = uuid.uuid4()
+    duplicate_id = uuid.uuid4()
+
+    await migrate("upgrade", "head")
+
+    async with session_factory() as session:
+        conn = await session.connection()
+        columns = {
+            row[0]
+            for row in await conn.execute(
+                text(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_name='job_posting' AND column_name IN "
+                    "('canonical_id', 'source_urls', 'country')"
+                )
+            )
+        }
+        assert columns == {"canonical_id", "source_urls", "country"}
+        assert (
+            await conn.execute(text("SELECT count(*) FROM pg_extension WHERE extname='pg_trgm'"))
+        ).scalar_one() == 1
+        index_names = {
+            row[0]
+            for row in await conn.execute(
+                text("SELECT indexname FROM pg_indexes WHERE tablename='job_posting'")
+            )
+        }
+        assert "ix_job_posting_title_trgm" in index_names
+        assert "ix_job_posting_canonical_id" in index_names
+
+        await conn.execute(
+            text(
+                "INSERT INTO job_posting (id, source, external_id, title, raw_payload, country) "
+                "VALUES (:id, 'adzuna', 'canon', 'Backend Engineer', '{}', 'de')"
+            ),
+            {"id": canonical_id},
+        )
+        await conn.execute(
+            text(
+                "INSERT INTO job_posting (id, source, external_id, title, raw_payload, "
+                "canonical_id, source_urls) VALUES (:id, 'apify_linkedin', 'dup', "
+                "'Backend Engineer', '{}', :canonical, CAST(:urls AS jsonb))"
+            ),
+            {
+                "id": duplicate_id,
+                "canonical": canonical_id,
+                "urls": '[{"source": "apify_linkedin", "url": null}]',
+            },
+        )
+        await session.commit()
+
+    async with session_factory() as session:
+        conn = await session.connection()
+        await conn.execute(
+            text("DELETE FROM job_posting WHERE id = ANY(:ids)"),
+            {"ids": [str(canonical_id), str(duplicate_id)]},
+        )
+        await session.commit()
+
+    await migrate("downgrade", "0018")
+
+    async with session_factory() as session:
+        conn = await session.connection()
+        remaining = {
+            row[0]
+            for row in await conn.execute(
+                text(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_name='job_posting'"
+                )
+            )
+        }
+        assert {"canonical_id", "source_urls", "country"}.isdisjoint(remaining)
+        assert (
+            await conn.execute(text("SELECT count(*) FROM pg_extension WHERE extname='pg_trgm'"))
+        ).scalar_one() == 0
+
+
 async def test_migration_0018_hybrid_columns_and_fallback_row_downgrade(
     migration_0017: None,
 ) -> None:

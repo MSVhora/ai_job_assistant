@@ -300,6 +300,26 @@ params, they never decide combinations:
   is no ANN index (HNSW/ivfflat) yet: at single-user scale a sequential scan is fast
   enough.
 
+### Cross-source duplicates are merged (canonical grouping, #38)
+
+Deduping has two lines of defense:
+
+1. **`(source, external_id)`** — a source re-finding its own posting refreshes the
+   existing row in place (no duplicate within a source).
+2. **Canonical grouping (#38)** — after each run ingests, the new postings are compared
+   against older rows and grouped when they describe the same job: same country (the
+   run's resolved country), same *normalized* company (punctuation and corporate
+   suffixes like Ltd/Inc/GmbH are ignored), and a pg_trgm title similarity of at least
+   `POSTING_DEDUPE_SIMILARITY` (0.92 by default; `1.0` = exact titles only). The
+   oldest row becomes the **canonical posting**; the duplicate points at it and
+   contributes its data: the canonical keeps the freshest `posted_at`, the richest
+   description, and a merged `source_urls` record of where the job was seen.
+
+Matches collapse onto the canonical posting, so the same job found via Adzuna and
+LinkedIn is **one entry** on the dashboard, not two competing rows. Grouping is
+opportunistic: pairs that existed before this feature collapse the next time a source
+re-finds one of them — there is no one-time backfill.
+
 ## How matches are scored (live since #10, hybrid since #37)
 
 - **Every posting in your scoped corpus gets a SQL signal pass** (no LLM needed):
@@ -315,6 +335,10 @@ params, they never decide combinations:
   All four are recomputed in one bulk SQL statement after each search and on profile saves.
 - **Postings without an embedding are no longer excluded** — they score on
   skill + recency + salary (renormalized to the same 0–1 scale) instead of being excluded.
+- **Duplicate postings score once** — when a cross-source duplicate was grouped under a
+  canonical posting (#38 above), only the canonical row gets a match; stale match rows
+  pointing at the duplicate are removed on the next re-score (a "why this matches" lost
+  that way is regenerated on the following re-rank).
 - **The top postings get an LLM re-rank** — the postings with the highest *hybrid* score
   (the same weighted blend, chosen over stored sub-scores — not cosine alone since #37)
   *that don't already have a rationale* are sent to your LLM (one batched call) which
@@ -369,6 +393,7 @@ sequenceDiagram
     I->>I: normalize + de-duplicate
     I->>G: embed job descriptions
     I->>D: store postings + embeddings
+    I->>D: group cross-source duplicates<br/>under the canonical posting (#38)
     I->>D: hard filters + hybrid signals (cosine, skill overlap,<br/>recency, salary fit) → ranked candidates
     I->>G: re-rank top N by hybrid score, generate rationale
     I->>D: store matches

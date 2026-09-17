@@ -398,8 +398,12 @@ async def rescore_matches(
     (`search_posting → job_search.profile_id`) — never the global corpus —
     and since #37 it includes un-embedded postings (`vector_score` stays
     None; final_score renormalizes over skill + recency + salary). One bulk
-    SQL pass computes all signals; one upsert writes `match`. Existing
-    re-rank verdicts are blended into the fresh final_score unless
+    SQL pass computes all signals; one upsert writes `match`. Since #38,
+    cross-source duplicates are collapsed onto their canonical posting
+    (match rows key on `coalesce(canonical_id, id)` representatives; stale
+    matches pointing at duplicates are deleted — a lost rationale re-derives
+    when the canonical row re-enters the rerank pool). Existing re-rank
+    verdicts are blended into the fresh final_score unless
     `invalidate_rationales` clears them. Returns the number of scored
     postings; 0 when the profile has no embedding.
     """
@@ -418,25 +422,43 @@ async def rescore_matches(
     result = await session.execute(
         select(
             JobPosting.id,
+            func.coalesce(JobPosting.canonical_id, JobPosting.id).label("representative_id"),
             vector_value.label("vector_score"),
             _skill_score_expression(skills).label("skill_score"),
             _recency_expression().label("recency_score"),
             _salary_score_expression(pref_min, pref_max, pref_currency).label("salary_score"),
         ).where(scoped_corpus_exists(profile.id))
     )
+    rows_by_representative: dict[
+        uuid.UUID, tuple[uuid.UUID, tuple[float | None, float, float, float]]
+    ] = {}
+    for posting_id, rep_id, vector_score, skill_score, recency_score, salary_score in result.all():
+        signals = (
+            float(vector_score) if vector_score is not None else None,
+            float(skill_score or 0.0),
+            float(recency_score or 0.0),
+            float(salary_score or 0.0),
+        )
+        current = rows_by_representative.get(rep_id)
+        if current is None or (current[0] != rep_id and posting_id == rep_id):
+            rows_by_representative[rep_id] = (posting_id, signals)
+    await session.execute(
+        delete(Match).where(
+            Match.profile_id == profile.id,
+            Match.job_posting_id.in_(
+                select(JobPosting.id).where(JobPosting.canonical_id.is_not(None))
+            ),
+        )
+    )
     rows = []
     fallback_count = 0
-    for posting_id, vector_score, skill_score, recency_score, salary_score in result.all():
-        vector = float(vector_score) if vector_score is not None else None
-        skill = float(skill_score or 0.0)
-        recency = float(recency_score or 0.0)
-        salary = float(salary_score or 0.0)
+    for rep_id, (_, (vector, skill, recency, salary)) in rows_by_representative.items():
         if vector is None:
             fallback_count += 1
         rows.append(
             {
                 "profile_id": profile.id,
-                "job_posting_id": posting_id,
+                "job_posting_id": rep_id,
                 "vector_score": vector,
                 "skill_score": skill,
                 "recency_score": recency,

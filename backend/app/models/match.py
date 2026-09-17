@@ -38,6 +38,15 @@ class Match(Base):
     role_fit: Mapped[float | None] = mapped_column(Float, nullable=True)
     company_fit: Mapped[float | None] = mapped_column(Float, nullable=True)
     final_score: Mapped[float] = mapped_column(Float)
+    # Issue #39 engagement signals: first-write-wins timestamps recorded by
+    # /api/matches/{id}/signals and the /apply redirect; unsave/undismiss NULL
+    # them back. Never touch scoring — they feed query tuning only.
+    first_opened_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    clicked_apply_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    saved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    dismissed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     rationale: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(

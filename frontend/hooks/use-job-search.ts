@@ -8,6 +8,7 @@ import {
   listProfileSearches,
   regenerateSearchQueries,
   startJobSearch,
+  tuneSearchQueries,
   type JobSearchRequest,
 } from "@/lib/api";
 const ACTIVE_STATUSES = new Set(["pending", "running"]);
@@ -65,6 +66,17 @@ export function useRegenerateQueries() {
       regenerateSearchQueries(profileId, sources),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["profile"] });
+    },
+  });
+}
+
+export function useTuneQueries() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (profileId: string) => tuneSearchQueries(profileId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["profile"] });
+      void queryClient.invalidateQueries({ queryKey: ["matches"] });
     },
   });
 }

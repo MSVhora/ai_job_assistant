@@ -513,3 +513,41 @@ async def test_migration_0018_hybrid_columns_and_fallback_row_downgrade(
         }
         assert str(posting_fallback) not in remaining
         assert str(posting_kept) in remaining
+
+
+async def test_migration_0020_engagement_signal_columns(migration_0017: None) -> None:
+    signal_columns = {"first_opened_at", "clicked_apply_at", "saved_at", "dismissed_at"}
+
+    await migrate("upgrade", "head")
+
+    async with session_factory() as session:
+        conn = await session.connection()
+        columns = {
+            row[0]
+            for row in await conn.execute(
+                text("SELECT column_name FROM information_schema.columns WHERE table_name='match'")
+            )
+        }
+        assert signal_columns <= columns
+        nullable = {
+            row[0]: row[1]
+            for row in await conn.execute(
+                text(
+                    "SELECT column_name, is_nullable FROM information_schema.columns "
+                    "WHERE table_name='match'"
+                )
+            )
+        }
+        assert all(nullable[name] == "YES" for name in signal_columns)
+
+    await migrate("downgrade", "0019")
+
+    async with session_factory() as session:
+        conn = await session.connection()
+        columns = {
+            row[0]
+            for row in await conn.execute(
+                text("SELECT column_name FROM information_schema.columns WHERE table_name='match'")
+            )
+        }
+        assert signal_columns.isdisjoint(columns)

@@ -455,3 +455,130 @@ async def test_out_of_range_priority_returns_422(client: AsyncClient) -> None:
 
     assert too_high.status_code == 422
     assert too_low.status_code == 422
+
+
+async def _match_ids_by_title(client: AsyncClient, profile_id: uuid.UUID) -> dict[str, str]:
+    body = (await get_matches(client, profile_id, status="all")).json()
+    return {row["job_posting"]["title"]: row["id"] for row in body}
+
+
+async def _signal(client: AsyncClient, match_id: str, kind: str) -> Any:
+    return await client.post(f"/api/matches/{match_id}/signals", json={"kind": kind})
+
+
+async def test_open_signal_sets_first_opened_once(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    profile_id, _ = await seed_matched_profile(monkeypatch)
+    match_id = (await _match_ids_by_title(client, profile_id))["Berlin Analyst"]
+
+    first = await _signal(client, match_id, "open")
+    assert first.status_code == 200
+    assert first.json()["first_opened_at"] is not None
+    opened_at = first.json()["first_opened_at"]
+
+    second = await _signal(client, match_id, "open")
+    assert second.json()["first_opened_at"] == opened_at
+
+
+async def test_save_unsave_roundtrip(client: AsyncClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    profile_id, _ = await seed_matched_profile(monkeypatch)
+    match_id = (await _match_ids_by_title(client, profile_id))["Amsterdam Contract"]
+
+    saved = await _signal(client, match_id, "save")
+    assert saved.json()["saved_at"] is not None
+
+    unsaved = await _signal(client, match_id, "unsave")
+    assert unsaved.json()["saved_at"] is None
+
+
+async def test_dismiss_undismiss_roundtrip(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    profile_id, _ = await seed_matched_profile(monkeypatch)
+    match_id = (await _match_ids_by_title(client, profile_id))["Undated Berlin"]
+
+    dismissed = await _signal(client, match_id, "dismiss")
+    assert dismissed.json()["dismissed_at"] is not None
+
+    restored = await _signal(client, match_id, "undismiss")
+    assert restored.json()["dismissed_at"] is None
+
+
+async def test_signal_on_unknown_match_returns_404(client: AsyncClient) -> None:
+    response = await _signal(client, str(uuid.uuid4()), "open")
+    assert response.status_code == 404
+
+
+async def test_signal_rejects_unknown_kind(client: AsyncClient) -> None:
+    response = await _signal(client, str(uuid.uuid4()), "poke")
+    assert response.status_code == 422
+
+
+async def test_apply_redirect_records_click_once(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    profile_id, postings = await seed_matched_profile(monkeypatch)
+    async with session_factory() as session:
+        linked = await session.get(JobPosting, postings[0].id)
+        assert linked is not None
+        linked.url = "https://jobs.example.com/1"
+        await session.commit()
+    match_id = (await _match_ids_by_title(client, profile_id))["Berlin Analyst"]
+
+    response = await client.get(f"/api/matches/{match_id}/apply")
+    assert response.status_code == 302
+    assert response.headers["location"] == "https://jobs.example.com/1"
+
+    body = (await get_matches(client, profile_id, status="all")).json()
+    matched = next(row for row in body if row["id"] == match_id)
+    clicked_at = matched["clicked_apply_at"]
+    assert clicked_at is not None
+
+    await client.get(f"/api/matches/{match_id}/apply")
+    body = (await get_matches(client, profile_id, status="all")).json()
+    assert next(row for row in body if row["id"] == match_id)["clicked_apply_at"] == clicked_at
+
+
+async def test_apply_redirect_404_without_url_touches_no_signal(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    profile_id, postings = await seed_matched_profile(monkeypatch)
+    assert postings[1].url is None
+    match_id = (await _match_ids_by_title(client, profile_id))["Amsterdam Contract"]
+
+    response = await client.get(f"/api/matches/{match_id}/apply")
+
+    assert response.status_code == 404
+    body = (await get_matches(client, profile_id, status="all")).json()
+    assert next(row for row in body if row["id"] == match_id)["clicked_apply_at"] is None
+
+
+async def test_status_filter_buckets(client: AsyncClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    profile_id, _ = await seed_matched_profile(monkeypatch)
+    ids = await _match_ids_by_title(client, profile_id)
+
+    saved = await _signal(client, ids["Berlin Analyst"], "save")
+    assert saved.status_code == 200
+    await _signal(client, ids["Amsterdam Contract"], "dismiss")
+
+    default = (await get_matches(client, profile_id)).json()
+    assert {row["job_posting"]["title"] for row in default} == {"Berlin Analyst", "Undated Berlin"}
+
+    saved_view = (await get_matches(client, profile_id, status="saved")).json()
+    assert [row["job_posting"]["title"] for row in saved_view] == ["Berlin Analyst"]
+
+    dismissed_view = (await get_matches(client, profile_id, status="dismissed")).json()
+    assert [row["job_posting"]["title"] for row in dismissed_view] == ["Amsterdam Contract"]
+
+    all_view = (await get_matches(client, profile_id, status="all")).json()
+    assert {row["job_posting"]["title"] for row in all_view} == {
+        "Berlin Analyst",
+        "Amsterdam Contract",
+        "Undated Berlin",
+    }
+
+    restored = await _signal(client, ids["Amsterdam Contract"], "undismiss")
+    assert restored.status_code == 200
+    default_after = (await get_matches(client, profile_id)).json()
+    assert len(default_after) == 3

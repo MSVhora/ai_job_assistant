@@ -5,7 +5,7 @@ import { toast } from "sonner";
 
 import { useProfile, useUpdatePreferences } from "@/hooks/use-profiles";
 
-const PERSIST_DEBOUNCE_MS = 400;
+const COMMIT_DEBOUNCE_MS = 250;
 
 export type PrioritySetting = ReturnType<typeof usePrioritySetting>;
 
@@ -13,6 +13,7 @@ export function usePrioritySetting(profileId: string | null) {
   const profile = useProfile(profileId);
   const updatePreferences = useUpdatePreferences();
   const [override, setOverride] = useState<number | undefined>(undefined);
+  const [committed, setCommitted] = useState<number | undefined>(undefined);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stored = profile.data?.preferences?.priority;
   const value = override ?? stored;
@@ -28,6 +29,7 @@ export function usePrioritySetting(profileId: string | null) {
     setOverride(next);
     if (timer.current !== null) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
+      setCommitted(next);
       if (profileId === null) return;
       updatePreferences.mutate(
         { profileId, payload: { priority: next } },
@@ -39,8 +41,8 @@ export function usePrioritySetting(profileId: string | null) {
           },
         },
       );
-    }, PERSIST_DEBOUNCE_MS);
+    }, COMMIT_DEBOUNCE_MS);
   };
 
-  return { value, change, disabled: profile.isPending };
+  return { value, listValue: committed, change, disabled: profile.isPending };
 }

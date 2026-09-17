@@ -123,6 +123,19 @@ def vector_scores(
     return {posting.id: cosine(profile_embedding, posting.embedding) for posting in postings}
 
 
+def expected_base(vector: float, *, days_old: int | None) -> float:
+    """Mirror of the #37 base final under default Settings for these fixtures."""
+    recency = 0.5 if days_old is None else math.exp(-days_old / 14.0)
+    return max(0.0, min(1.0, 0.35 * vector + 0.25 * (2 / 3) + 0.15 * recency + 0.05 * 0.5))
+
+
+def posting_age_days(posting: JobPosting) -> int | None:
+    if posting.posted_at is None:
+        return None
+    age = datetime.now(UTC) - posting.posted_at
+    return max(0, round(age.total_seconds() / 86400.0))
+
+
 async def get_matches(client: AsyncClient, profile_id: uuid.UUID, **params: Any) -> Any:
     query = {"profile_id": str(profile_id), **{k: str(v) for k, v in params.items()}}
     return await client.get("/api/matches", params=query)
@@ -216,10 +229,13 @@ async def test_list_matches_ranks_and_embeds_posting(
     finals = [row["final_score"] for row in body]
     assert finals == sorted(finals, reverse=True)
     by_posting = {row["job_posting"]["id"]: row for row in body}
+    days_by_id = {posting.id: posting_age_days(posting) for posting in postings}
     for posting in postings:
         row = by_posting[str(posting.id)]
         assert row["vector_score"] == pytest.approx(scores[posting.id], abs=1e-6)
-        assert row["final_score"] == pytest.approx(row["vector_score"], abs=1e-6)
+        assert row["final_score"] == pytest.approx(
+            expected_base(scores[posting.id], days_old=days_by_id[posting.id]), abs=1e-6
+        )
         assert row["job_posting"]["title"] == posting.title
         assert row["job_posting"]["source"] == "adzuna"
         assert row["created_at"] is not None
@@ -318,7 +334,11 @@ async def test_limit_and_offset_page(client: AsyncClient, monkeypatch: pytest.Mo
         profile_embedding = stored.embedding
         assert profile_embedding is not None
     scores = vector_scores(profile_embedding, postings)
-    ranked = sorted(postings, key=lambda p: -scores[p.id])
+    ranked = sorted(
+        postings,
+        key=lambda p: expected_base(scores[p.id], days_old=posting_age_days(p)),
+        reverse=True,
+    )
 
     page = await get_matches(client, profile_id, limit=1, offset=1)
 
@@ -365,9 +385,16 @@ async def test_custom_priority_response_scores_match_order_and_math(
     finals = [row["final_score"] for row in body]
     assert finals == sorted(finals, reverse=True)
     vector_score = body[0]["vector_score"]
-    assert body[0]["job_posting"]["title"] == "Company Heavy"
-    assert body[0]["final_score"] == pytest.approx(0.4 * vector_score + 0.6 * 0.9, abs=1e-6)
-    assert body[1]["final_score"] == pytest.approx(0.4 * vector_score + 0.6 * 0.1, abs=1e-6)
+    posted_by_title = {"Company Heavy": 2, "Role Heavy": 1}
+    vector_by_title = {"Company Heavy": vector_score, "Role Heavy": vector_score}
+    signals = 0.25 * (2.0 / 3.0) + 0.05 * 0.5
+    for row in body:
+        title = row["job_posting"]["title"]
+        recency = math.exp(-posted_by_title[title] / 14.0)
+        company_mass = 0.2 * (0.9 if title == "Company Heavy" else 0.1)
+        assert row["final_score"] == pytest.approx(
+            0.35 * vector_by_title[title] + signals + 0.15 * recency + company_mass, abs=1e-6
+        )
     for row in body:
         assert row["role_fit"] is not None
         assert row["rationale"] is not None
@@ -379,7 +406,7 @@ async def test_default_priority_matches_no_param_response(
     profile_id, _ = await seed_subscored_profile(monkeypatch)
 
     without = (await get_matches(client, profile_id)).json()
-    explicit_default = (await get_matches(client, profile_id, priority=0.6666666667)).json()
+    explicit_default = (await get_matches(client, profile_id, priority=0.75000000001)).json()
 
     assert [row["job_posting"]["id"] for row in without] == [
         row["job_posting"]["id"] for row in explicit_default

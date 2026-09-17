@@ -351,3 +351,86 @@ async def test_migration_0017_source_backfill_and_index(migration_0016: None) ->
             )
         ).scalar_one()
         assert remaining == 0
+
+
+@pytest.fixture
+async def migration_0017(migrated_database: None):
+    await migrate("downgrade", "0017")
+    yield
+    await migrate("upgrade", "head")
+
+
+async def test_migration_0018_hybrid_columns_and_fallback_row_downgrade(
+    migration_0017: None,
+) -> None:
+    profile_id = uuid.uuid4()
+    posting_kept = uuid.uuid4()
+    posting_fallback = uuid.uuid4()
+    match_kept = uuid.uuid4()
+    match_fallback = uuid.uuid4()
+
+    await migrate("upgrade", "head")
+
+    async with session_factory() as session:
+        conn = await session.connection()
+        await conn.execute(text("INSERT INTO candidate (id) VALUES (:id)"), {"id": uuid.uuid4()})
+        candidate = (await conn.execute(text("SELECT id FROM candidate LIMIT 1"))).scalar_one()
+        await conn.execute(
+            text(
+                "INSERT INTO profile (id, candidate_id, name, structured_profile) "
+                "VALUES (:id, :cid, 'Owner', '{}')"
+            ),
+            {"id": profile_id, "cid": candidate},
+        )
+        for posting_id, ext in (
+            (posting_kept, f"kept-{posting_kept}"),
+            (posting_fallback, f"fallback-{posting_fallback}"),
+        ):
+            await conn.execute(
+                text(
+                    "INSERT INTO job_posting (id, source, external_id, title, raw_payload) "
+                    "VALUES (:id, 'adzuna', :ext, 'Un-embedded', '{}')"
+                ),
+                {"id": posting_id, "ext": ext},
+            )
+        await conn.execute(
+            text(
+                "INSERT INTO match (id, profile_id, job_posting_id, vector_score, final_score) "
+                "VALUES (:id, :pid, :jpid, 0.5, 0.5)"
+            ),
+            {"id": match_kept, "pid": profile_id, "jpid": posting_kept},
+        )
+        await conn.execute(
+            text(
+                "INSERT INTO match (id, profile_id, job_posting_id, vector_score, final_score, "
+                "skill_score) VALUES (:id, :pid, :jpid, NULL, 0.9, 0.9)"
+            ),
+            {"id": match_fallback, "pid": profile_id, "jpid": posting_fallback},
+        )
+        await conn.commit()
+
+    await migrate("downgrade", "0017")
+
+    async with session_factory() as session:
+        conn = await session.connection()
+        columns = {
+            row[0]
+            for row in await conn.execute(
+                text("SELECT column_name FROM information_schema.columns WHERE table_name='match'")
+            )
+        }
+        assert {"skill_score", "recency_score", "salary_score"}.isdisjoint(columns)
+        nullable = (
+            await conn.execute(
+                text(
+                    "SELECT is_nullable FROM information_schema.columns "
+                    "WHERE table_name='match' AND column_name='vector_score'"
+                )
+            )
+        ).scalar_one()
+        assert nullable == "NO"
+        remaining = {
+            str(row[0]) for row in await conn.execute(text("SELECT job_posting_id FROM match"))
+        }
+        assert str(posting_fallback) not in remaining
+        assert str(posting_kept) in remaining

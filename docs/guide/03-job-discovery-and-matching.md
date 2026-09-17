@@ -287,9 +287,10 @@ params, they never decide combinations:
 - **Hard filters run in SQL before ranking** — the freshness filter (above), location
   (case-insensitive substring), remote type, job type, and posted-within; a posting
   without a known posting date is excluded when a posted-within filter is active.
-- **Ranking is pgvector cosine distance** (`embedding <=> profile_vector`) — every
-  embeddable posting is scored against the profile after each search run and stored in the
-  `match` table (upsert, so repeat runs refresh scores instead of duplicating rows).
+- **Ranking is a hybrid blend (#37)** — after each search run, every posting in the
+  scoped corpus gets SQL-computed signals (cosine `vector_score`, `skill_score`,
+  `recency_score`, `salary_score`; see "How matches are scored" below) and is stored in
+  the `match` table (upsert, so repeat runs refresh scores instead of duplicating rows).
 - **Storage facts** — embeddings live in `vector(768)` columns on `job_posting` and
   `profile`, pinned to Gemini `gemini-embedding-001` with `EMBEDDING_DIMENSIONS=768`
   (the model's native output is 3072; the API truncates it via `dimensions`). Google
@@ -299,19 +300,35 @@ params, they never decide combinations:
   is no ANN index (HNSW/ivfflat) yet: at single-user scale a sequential scan is fast
   enough.
 
-## How matches are scored (live since #10)
+## How matches are scored (live since #10, hybrid since #37)
 
-- **Every embeddable posting gets a `vector_score`** — clamped cosine similarity
-  (1 − distance) between the posting vector and your profile vector, computed in SQL and
-  stored per (profile, posting) after each search run.
-- **The top postings get an LLM re-rank** — the postings with the highest vector score
+- **Every posting in your scoped corpus gets a SQL signal pass** (no LLM needed):
+  - **`vector_score`** — clamped cosine similarity (1 − distance) between the posting
+    vector and your profile vector. Null when the posting never got an embedding.
+  - **`skill_score`** — the share of your top `MATCH_SKILL_SIGNAL_SKILLS` skills (25 by
+    default) that appear word-bounded in the posting's title + description.
+  - **`recency_score`** — `exp(-days_since_posting / MATCH_RECENCY_DECAY_DAYS)` (14 by
+    default); postings with an unknown date stay at a neutral 0.5.
+  - **`salary_score`** — 1.0 when the posting band overlaps your preferred salary band,
+    decaying to 0 as it drifts out; 1.0 when the band or currency is unknown, 0.5 when
+    your profile states no salary preference.
+  All four are recomputed in one bulk SQL statement after each search and on profile saves.
+- **Postings without an embedding are no longer excluded** — they score on
+  skill + recency + salary (renormalized to the same 0–1 scale) instead of being excluded.
+- **The top postings get an LLM re-rank** — the postings with the highest *hybrid* score
+  (the same weighted blend, chosen over stored sub-scores — not cosine alone since #37)
   *that don't already have a rationale* are sent to your LLM (one batched call) which
   returns a role-fit score (0–10), a company-fit score (0–10), and a "why this matches"
-  rationale. The cap is `RERANK_TOP_N` (10 by default).
-- **`final_score`** — for re-ranked postings: `0.4 × vector_score + 0.4 × role_fit/10 +
-  0.2 × company_fit/10` (server defaults `MATCH_WEIGHT_VECTOR`, `MATCH_WEIGHT_ROLE_FIT`,
-  `MATCH_WEIGHT_COMPANY_FIT` in `.env`; the priority slider overrides the role/company
-  split per profile at read time). Everything else keeps `final_score = vector_score`.
+  rationale. The prompt now also sees the profile's salary band, remote preference, and,
+  per posting, the concrete skill overlap. The cap is `RERANK_TOP_N` (10 by default).
+- **`final_score`** — a weighted blend:
+  `match_weight_vector × vector_score + match_weight_skill × skill_score +
+  match_weight_recency × recency_score + match_weight_salary × salary_score +
+  match_weight_role_fit × role_fit/10 + match_weight_company_fit × company_fit/10`
+  (defaults `0.35 / 0.25 / 0.15 / 0.15 / 0.05 / 0.05` in `.env`; the weights must sum to
+  1.0 and startup fails fast if your env drifts). The priority slider still overrides
+  only the role/company split per profile at read time. Re-ranked postings add the LLM
+  verdicts on top of the SQL base; everything else keeps the SQL blend.
 - **Repeat searches are cheap** — postings whose rationale is still valid are not sent to
   the LLM again; a search that adds nothing new to the top costs zero LLM tokens. The run
   banner shows the matching stage's outcome, including the re-rank token usage.
@@ -320,7 +337,7 @@ params, they never decide combinations:
   call on the save path). The next search re-ranks the new top N against the updated
   profile.
 - **Re-rank failure degrades gracefully** — if the LLM call fails, matches are still
-  ranked by vector score; the rationale is simply missing, and the run reports a
+  ranked by the hybrid score; the rationale is simply missing, and the run reports a
   "re-rank unavailable" warning.
 - **`GET /api/matches` reads stored matches** — the dashboard filters (location, remote,
   job type, posted-within) and sort (best match / similarity / newest) are applied at
@@ -352,8 +369,8 @@ sequenceDiagram
     I->>I: normalize + de-duplicate
     I->>G: embed job descriptions
     I->>D: store postings + embeddings
-    I->>D: hard filters + cosine similarity → top candidates
-    I->>G: re-rank top N, generate rationale
+    I->>D: hard filters + hybrid signals (cosine, skill overlap,<br/>recency, salary fit) → ranked candidates
+    I->>G: re-rank top N by hybrid score, generate rationale
     I->>D: store matches
     U->>B: open dashboard
     B->>A: GET /api/matches
@@ -402,9 +419,9 @@ mapper module — no core changes.
 
 ## Reading the results
 
-- **Rank** — `final_score`: a blend of vector similarity and the LLM's role-fit and
-  company-fit ratings for re-ranked postings, plain similarity otherwise (see "How
-  matches are scored" above)
+- **Rank** — `final_score`: the weighted blend of vector similarity, skill overlap,
+  recency, and salary fit, plus the LLM's role-fit and company-fit ratings on re-ranked
+  postings (see "How matches are scored" above)
 - **"Why this matches"** — a generated explanation on the top matches, so you can judge
   the ranking instead of trusting a black box; expand it on each match card
 - **Filters** — location, remote, job type, posting date, a sort selector (best

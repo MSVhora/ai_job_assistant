@@ -89,7 +89,10 @@ class RerankResult(BaseModel):
 class MatchResponse(BaseModel):
     id: uuid.UUID
     job_posting: JobPostingSummary
-    vector_score: float
+    vector_score: float | None = None
+    skill_score: float | None = None
+    recency_score: float | None = None
+    salary_score: float | None = None
     role_fit: float | None = None
     company_fit: float | None = None
     final_score: float

@@ -92,7 +92,7 @@ export function MatchCard({
         <div className="flex shrink-0 flex-col items-end gap-1.5">
           <span
             className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 px-2.5 py-1 text-xs font-bold text-white shadow-md shadow-violet-200"
-            title={`Vector ${scorePercent(match.vector_score)}${match.role_fit !== null && match.role_fit !== undefined ? ` · role fit ${match.role_fit}/10` : ""}${match.company_fit !== null && match.company_fit !== undefined ? ` · company fit ${match.company_fit}/10` : ""}`}
+            title={`Vector ${match.vector_score !== null && match.vector_score !== undefined ? scorePercent(match.vector_score) : "–"}${match.role_fit !== null && match.role_fit !== undefined ? ` · role fit ${match.role_fit}/10` : ""}${match.company_fit !== null && match.company_fit !== undefined ? ` · company fit ${match.company_fit}/10` : ""}`}
           >
             <SparkleIcon />
             {scorePercent(match.final_score)}% match

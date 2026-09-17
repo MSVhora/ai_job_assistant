@@ -366,10 +366,13 @@ erDiagram
         uuid id PK
         uuid profile_id FK "matching unit is the profile (owner decision 2026-09-02); CASCADE on profile or posting delete"
         uuid job_posting_id FK
-        real vector_score "clamped cosine similarity (1 - distance), SQL-computed"
+        real vector_score "clamped cosine similarity (1 - distance), SQL-computed; null for un-embedded postings (issue #37 fallback)"
+        real skill_score "top-skill word-boundary hit fraction over title+description, SQL (issue #37)"
+        real recency_score "exp(-days_since_posting/match_recency_decay_days), 0.5 for unknown dates (issue #37)"
+        real salary_score "salary-band fit: 1.0 unknown, 0.5 without a preference band (issue #37)"
         real role_fit "LLM re-rank 0-10, null when not re-ranked; stored so #11 can re-weight without an LLM call"
         real company_fit "LLM re-rank 0-10, null when not re-ranked"
-        real final_score "weighted blend when re-ranked, vector_score otherwise"
+        real final_score "weighted blend (vector, skill, recency, salary + LLM verdicts; issue #37) — fallback rows renormalize skill+recency+salary"
         text rationale "LLM why-this-matches, top N only; cleared when profile content changes"
         timestamptz created_at
         timestamptz updated_at

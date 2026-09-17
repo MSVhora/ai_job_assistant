@@ -762,7 +762,13 @@ export interface components {
             id: string;
             job_posting: components["schemas"]["JobPostingSummary"];
             /** Vector Score */
-            vector_score: number;
+            vector_score?: number | null;
+            /** Skill Score */
+            skill_score?: number | null;
+            /** Recency Score */
+            recency_score?: number | null;
+            /** Salary Score */
+            salary_score?: number | null;
             /** Role Fit */
             role_fit?: number | null;
             /** Company Fit */

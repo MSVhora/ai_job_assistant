@@ -29,7 +29,12 @@ class Match(Base):
     job_posting_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("job_posting.id", ondelete="CASCADE"), index=True
     )
-    vector_score: Mapped[float] = mapped_column(Float)
+    # Issue #37: nullable when the posting never got embedded — fallback rows
+    # score on skill + recency + salary alone (weight-renormalized).
+    vector_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    skill_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    recency_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    salary_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     role_fit: Mapped[float | None] = mapped_column(Float, nullable=True)
     company_fit: Mapped[float | None] = mapped_column(Float, nullable=True)
     final_score: Mapped[float] = mapped_column(Float)

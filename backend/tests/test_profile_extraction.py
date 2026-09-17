@@ -72,7 +72,7 @@ async def test_extract_returns_draft_and_persists_parse_artifact(
     assert body["resume_id"] == uploaded["resume_id"]
     assert body["candidate_id"] == uploaded["candidate_id"]
     assert body["draft_profile"]["contact"]["full_name"] == "Jane Doe"
-    assert body["draft_profile"]["experience"][0]["is_current"] is True
+    assert body["draft_profile"]["experience"][0]["is_current"] is False
     assert body["draft_profile"]["contact"]["links"][0]["label"] == "LinkedIn"
     assert body["draft_profile"]["contact"]["links"][1]["label"] == "GitHub"
     assert body["draft_profile"]["contact"]["links"][2]["label"] == "Website"
@@ -204,9 +204,11 @@ async def test_transport_failure_detail_carries_cause_hint(
 
 def routed_handler(queries_payload: object):
     def handler(**kw: object) -> object:
-        if kw.get("temperature") == 0.8:
-            return llm_response(json.dumps(queries_payload))
-        return llm_response(json.dumps(VALID_PROFILE))
+        match kw.get("temperature"):
+            case 0.0:
+                return llm_response(json.dumps(queries_payload))
+            case _:
+                return llm_response(json.dumps(VALID_PROFILE))
 
     return handler
 
@@ -231,10 +233,10 @@ async def test_extract_generates_search_queries(
     assert response.status_code == 200
     body = response.json()
     assert body["search_queries"]["queries"]["adzuna"]["title"] == "Senior Data Analyst"
-    assert body["search_queries"]["prompt_version"] == "search_query_v2"
+    assert body["search_queries"]["prompt_version"] == "search_query_v4"
     temperatures = [call["temperature"] for call in calls]
-    assert 0.2 in temperatures and 0.8 in temperatures
-    query_prompt = next(call for call in calls if call["temperature"] == 0.8)
+    assert 0.2 in temperatures and 0.0 in temperatures
+    query_prompt = next(call for call in calls if call["temperature"] == 0.0)
     assert "resume text" not in query_prompt["messages"][1]["content"].lower()
     async with session_factory() as session:
         resume = await session.get(Resume, uuid.UUID(uploaded["resume_id"]))

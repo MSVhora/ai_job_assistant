@@ -1,9 +1,19 @@
+import math
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated
 
-from pydantic import Field, field_validator
+from pydantic import Field, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_MATCH_WEIGHTS = (
+    "match_weight_vector",
+    "match_weight_skill",
+    "match_weight_recency",
+    "match_weight_role_fit",
+    "match_weight_company_fit",
+    "match_weight_salary",
+)
 
 
 class Settings(BaseSettings):
@@ -26,16 +36,51 @@ class Settings(BaseSettings):
 
     adzuna_app_id: str | None = None
     adzuna_app_key: str | None = None
+    # Issue #34: max HTTP calls per Adzuna run (Σ sub-queries × pages) — keeps
+    # multi-pass runs inside Adzuna's free tier (25/min, 250/day).
+    max_adzuna_calls_per_run: Annotated[int, Field(ge=1, le=8)] = 4
     apify_token: str | None = None
+    # Issue #35: per-run billed-results cap for Apify actors (they bill per
+    # result via limitPerSource); a guard above the request schema cap (100).
+    max_apify_results_per_run: Annotated[int, Field(ge=1, le=1000)] = 250
 
     rerank_top_n: int = 10
-    match_weight_vector: float = 0.4
-    match_weight_role_fit: float = 0.4
-    match_weight_company_fit: float = 0.2
+    # Issue #36: runs stuck in pending/running for longer than this are
+    # marked failed by the start_search sweeper, releasing the active-run
+    # (profile, source) lock.
+    max_run_age_minutes: Annotated[int, Field(ge=1)] = 30
+    match_weight_vector: float = 0.35
+    match_weight_skill: float = 0.25
+    match_weight_recency: float = 0.15
+    match_weight_role_fit: float = 0.15
+    match_weight_company_fit: float = 0.05
+    match_weight_salary: float = 0.05
+    # Issue #37: recency decay on posted_at — exp(-days/decay_days); unknown
+    # dates score 0.5 (neutral) so they keep surfacing.
+    match_recency_decay_days: Annotated[int, Field(ge=1)] = 14
+    # Issue #37: how many of the profile's top skills feed the SQL skill-hit
+    # signal (the array is bound into every rescore pass).
+    match_skill_signal_skills: Annotated[int, Field(ge=1)] = 25
+
+    # Issue #39 tune-my-queries: max aggregated terms per category per signal
+    # bucket in the LLM prompt (keeps the manual call's prompt bounded).
+    tune_query_top_terms: Annotated[int, Field(ge=1)] = 10
+
+    # Issue #38: pg_trgm title similarity threshold for cross-source canonical
+    # grouping (1.0 = exact titles only, the honest "disable").
+    posting_dedupe_similarity: Annotated[float, Field(ge=0.0, le=1.0)] = 0.92
 
     # Read-side freshness grace window (D4): postings without a source-reported
     # expiry become stale after this many days since posting.
     stale_posting_days: Annotated[int, Field(ge=1)] = 45
+
+    # Seniority derivation bands from years_of_experience (issue #32): a YOE
+    # below the next band's threshold maps down. 0-1 → junior, 2-4 → mid,
+    # 5-7 → senior, 8-11 → staff, 12+ → principal (defaults).
+    seniority_band_mid: Annotated[int, Field(ge=0)] = 2
+    seniority_band_senior: Annotated[int, Field(ge=0)] = 5
+    seniority_band_staff: Annotated[int, Field(ge=0)] = 8
+    seniority_band_principal: Annotated[int, Field(ge=0)] = 12
 
     @field_validator(
         "gemini_api_key", "adzuna_app_id", "adzuna_app_key", "apify_token", mode="before"
@@ -44,6 +89,28 @@ class Settings(BaseSettings):
     def _blank_to_none(cls, value: object) -> object:
         if isinstance(value, str) and value.strip() == "":
             return None
+        return value
+
+    @field_validator(
+        "match_weight_vector",
+        "match_weight_skill",
+        "match_weight_recency",
+        "match_weight_role_fit",
+        "match_weight_company_fit",
+        "match_weight_salary",
+        mode="after",
+    )
+    @classmethod
+    def _check_weight_sum(cls, value: float, info: ValidationInfo) -> float:
+        weights = {**info.data, info.field_name: value}
+        if not all(name in weights for name in _MATCH_WEIGHTS):
+            return value
+        total = sum(weights[name] for name in _MATCH_WEIGHTS)
+        if not math.isclose(total, 1.0, rel_tol=0.0, abs_tol=0.01):
+            raise ValueError(
+                f"match weights must sum to 1.0 (±0.01), got {total:.4f} from "
+                f"{ {name: weights[name] for name in _MATCH_WEIGHTS} }"
+            )
         return value
 
 

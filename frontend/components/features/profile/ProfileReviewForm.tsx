@@ -21,6 +21,7 @@ import { ExperienceSection, ProjectsSection } from "./ExperienceProjects";
 import {
   AiExtractedBadge,
   ContactIcon,
+  DerivedFromExperienceBadge,
   HeadlineIcon,
   PreferencesIcon,
   SectionCard,
@@ -66,9 +67,10 @@ export function ProfileReviewForm({
   savedRevisionSource: string | null;
   onSave: (profile: StructuredProfile) => void;
 }) {
-  const { register, control, formState, handleSubmit } = useFormContext<ProfileFormValues>();
+  const { register, control, formState, handleSubmit, watch } = useFormContext<ProfileFormValues>();
   const { fields, append, remove } = useFieldArray({ control, name: "contact.links" });
   const aiBadge = highlightAi ? <AiExtractedBadge /> : undefined;
+  const seniorityIsDerived = watch("preferences.seniority_source") === "derived";
   const errors = formState.errors;
 
   const submit = handleSubmit((values) => {
@@ -238,7 +240,18 @@ export function ProfileReviewForm({
             label="Seniority"
             name="preferences.seniority"
             options={SENIORITY_OPTIONS}
-            badge={aiBadge}
+            badge={seniorityIsDerived ? <DerivedFromExperienceBadge /> : aiBadge}
+            hint={
+              seniorityIsDerived
+                ? "Auto-filled from your experience dates. Pick a value to override it."
+                : undefined
+            }
+          />
+          <TextField
+            label="Years of experience"
+            name="years_of_experience"
+            readOnly
+            hint="Auto-estimated from your experience dates"
           />
           <TextField
             label="Work authorization"

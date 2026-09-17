@@ -65,3 +65,53 @@ describe("contact country round-trip", () => {
     expect(parsed.success).toBe(false);
   });
 });
+
+describe("derived experience fields (issue #32)", () => {
+  it("exposes years_of_experience and seniority_source in form values for display", () => {
+    const profile = {
+      ...baseProfile(),
+      years_of_experience: 7,
+      preferences: {
+        target_title: null,
+        target_location: null,
+        remote_preference: null,
+        salary_min: null,
+        salary_max: null,
+        currency: null,
+        seniority: "senior",
+        seniority_source: "derived",
+        work_authorization: null,
+      },
+    } as unknown as StructuredProfile;
+
+    const values = toFormValues(profile);
+    expect(values.years_of_experience).toBe("7");
+    expect(values.preferences.seniority_source).toBe("derived");
+    expect(values.preferences.seniority).toBe("senior");
+  });
+
+  it("never sends the server-derived fields in the save payload", () => {
+    const profile = {
+      ...baseProfile(),
+      years_of_experience: 7,
+      preferences: {
+        target_title: null,
+        target_location: null,
+        remote_preference: null,
+        salary_min: null,
+        salary_max: null,
+        currency: null,
+        seniority: "senior",
+        seniority_source: "derived",
+        work_authorization: null,
+      },
+    } as unknown as StructuredProfile;
+
+    const payload = toProfilePayload(toFormValues(profile)) as Record<string, unknown> & {
+      preferences: Record<string, unknown> | null;
+    };
+    expect("years_of_experience" in payload).toBe(false);
+    expect(payload.preferences !== null && "seniority_source" in payload.preferences).toBe(false);
+    expect(payload.preferences?.seniority).toBe("senior");
+  });
+});

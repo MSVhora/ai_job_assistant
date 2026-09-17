@@ -4,6 +4,7 @@ import time
 import uuid
 from typing import Any
 
+from fastapi import BackgroundTasks
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,8 +20,8 @@ from app.schemas.gap_fill import (
     RevisionSummary,
 )
 from app.schemas.profile import Preferences, RemotePreference, SeniorityLevel, StructuredProfile
-from app.services import embedding, matching
-from app.services.profile_service import _next_timestamp, diff_profiles
+from app.services import embedding, matching, profile_derivation
+from app.services.profile_service import _next_timestamp, diff_profiles, schedule_query_refresh
 
 logger = logging.getLogger(__name__)
 
@@ -247,6 +248,7 @@ def _apply_answers(
             record("preferences.currency", answers.currency.upper())
     if "preferences.seniority" in missing_keys and answers.seniority is not None:
         prefs.seniority = answers.seniority
+        prefs.seniority_source = "user"
         record("preferences.seniority", answers.seniority)
     if "preferences.work_authorization" in missing_keys and answers.work_authorization is not None:
         prefs.work_authorization = answers.work_authorization
@@ -274,7 +276,10 @@ async def _llm_turn(
 
 
 async def run_gap_fill_turn(
-    session: AsyncSession, profile_id: uuid.UUID, payload: GapFillRequest
+    session: AsyncSession,
+    background_tasks: BackgroundTasks,
+    profile_id: uuid.UUID,
+    payload: GapFillRequest,
 ) -> GapFillResponse:
     started = time.monotonic()
     profile = await session.get(Profile, profile_id)
@@ -299,6 +304,8 @@ async def run_gap_fill_turn(
     turn = await _llm_turn(current, missing, payload.messages)
     updated = current.model_copy(deep=True)
     applied = _apply_answers(updated, turn.answers, {field.key for field in missing})
+    if applied:
+        profile_derivation.apply_derived_fields(updated)
 
     revision: ProfileRevision | None = None
     if applied:
@@ -315,6 +322,8 @@ async def run_gap_fill_turn(
         await matching.rescore_matches(session, profile, invalidate_rationales=True)
 
     remaining = missing_fields(updated)
+    if applied and not remaining:
+        schedule_query_refresh(background_tasks, profile_id)
     logger.info(
         "profile.gap_fill profile_id=%s duration_ms=%.0f applied=%d "
         "missing_before=%d missing_after=%d",

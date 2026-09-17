@@ -229,7 +229,7 @@ export function JobsPageClient() {
         <MatchList
           profileId={activeProfileId}
           selection={selection}
-          priority={priority.value}
+          priority={priority.listValue}
           filters={filters}
           onFiltersChange={changeFilters}
         />

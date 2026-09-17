@@ -1,10 +1,12 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { FreshnessBadge } from "@/components/features/jobs/FreshnessBadge";
-import { getJobPosting, type MatchResponse } from "@/lib/api";
+import { useOpenMatchSignal } from "@/hooks/use-match-signals";
+import { applyMatchUrl, getJobPosting, type MatchResponse } from "@/lib/api";
 import { salaryLine, scorePercent } from "@/lib/salary";
 
 function SparkleIcon() {
@@ -69,6 +71,15 @@ export function JobDetailPanel({
     enabled: matchId !== null,
     staleTime: 60_000,
   });
+  const openSignal = useOpenMatchSignal();
+  const openedMatchIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const id = match?.id;
+    if (id === undefined || openedMatchIdRef.current === id) return;
+    openedMatchIdRef.current = id;
+    void openSignal(id);
+  }, [match?.id, openSignal]);
 
   const posting = detail.data;
 
@@ -197,8 +208,8 @@ export function JobDetailPanel({
                   AI match breakdown
                 </h4>
                 <div className="flex flex-col gap-1.5">
-                  <ScoreRow label="Final score" value={`${scorePercent(match?.final_score ?? 0)}%`} />
-                  <ScoreRow label="Similarity" value={`${scorePercent(match?.vector_score ?? 0)}%`} />
+                  <ScoreRow label="Final score" value={scorePercent(match?.final_score ?? 0)} />
+                  <ScoreRow label="Similarity" value={scorePercent(match?.vector_score ?? 0)} />
                   {match?.role_fit != null && (
                     <ScoreRow label="Role fit" value={`${match.role_fit}/10`} />
                   )}
@@ -216,10 +227,10 @@ export function JobDetailPanel({
           )}
         </div>
 
-        {posting?.url && (
+        {posting?.url && match !== null && (
           <div className="border-t border-gray-100 p-4">
             <a
-              href={posting.url}
+              href={applyMatchUrl(match.id)}
               target="_blank"
               rel="noreferrer"
               className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-violet-200 transition-all hover:from-violet-700 hover:to-fuchsia-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"

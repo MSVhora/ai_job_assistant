@@ -15,7 +15,7 @@ from app.schemas.profile import (
     ProfileUpdate,
     StoredPreferences,
 )
-from app.services import gap_fill, match_rebuild, profile_service, query_builder
+from app.services import gap_fill, match_rebuild, profile_service, query_builder, query_tuner
 
 router = APIRouter(prefix="/api", tags=["profile"])
 
@@ -47,9 +47,10 @@ async def get_profile(
 async def update_profile(
     profile_id: uuid.UUID,
     payload: ProfileUpdate,
+    background_tasks: BackgroundTasks,
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> ProfileResponse:
-    return await profile_service.save_profile(session, profile_id, payload)
+    return await profile_service.save_profile(session, background_tasks, profile_id, payload)
 
 
 @router.patch("/profiles/{profile_id}/preferences", response_model=StoredPreferences)
@@ -65,9 +66,10 @@ async def update_profile_preferences(
 async def gap_fill_profile(
     profile_id: uuid.UUID,
     payload: GapFillRequest,
+    background_tasks: BackgroundTasks,
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> GapFillResponse:
-    return await gap_fill.run_gap_fill_turn(session, profile_id, payload)
+    return await gap_fill.run_gap_fill_turn(session, background_tasks, profile_id, payload)
 
 
 @router.post("/profiles/{profile_id}/search-queries", response_model=SearchQueriesResponse)
@@ -79,6 +81,14 @@ async def regenerate_search_queries(
     return await query_builder.regenerate_for_profile(
         session, profile_id, payload.sources if payload else None
     )
+
+
+@router.post("/profiles/{profile_id}/tune-queries", response_model=SearchQueriesResponse)
+async def tune_search_queries(
+    profile_id: uuid.UUID,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> SearchQueriesResponse:
+    return await query_tuner.tune_for_profile(session, profile_id)
 
 
 @router.post(

@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from fastapi import Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -77,6 +79,11 @@ class MissingSearchQueryError(DomainError):
     default_detail = "no search query provided for a selected source"
 
 
+class MissingSearchCountryError(DomainError):
+    status_code = 400
+    default_detail = "no country provided by the request or the profile"
+
+
 class MissingProfileIdError(DomainError):
     status_code = 400
     default_detail = "profile_id is required"
@@ -102,6 +109,17 @@ class JobSearchNotFoundError(DomainError):
     default_detail = "job search not found"
 
 
+class DuplicateRunError(DomainError):
+    """A non-terminal run for the same (profile, source) already exists (#36)."""
+
+    status_code = 409
+    default_detail = "a run for this profile and source is already active"
+
+    def __init__(self, detail: str | None = None, active_search_id: UUID | None = None) -> None:
+        super().__init__(detail)
+        self.active_search_id = active_search_id
+
+
 class JobPostingNotFoundError(DomainError):
     status_code = 404
     default_detail = "job posting not found"
@@ -110,6 +128,18 @@ class JobPostingNotFoundError(DomainError):
 class JobSourceNotFoundError(DomainError):
     status_code = 404
     default_detail = "job source not found"
+
+
+class MatchNotFoundError(DomainError):
+    status_code = 404
+    default_detail = "match not found"
+
+
+class NoTunableSignalsError(DomainError):
+    """Tune-my-queries has no engagement signals to learn from (#39)."""
+
+    status_code = 409
+    default_detail = "no engagement signals yet — open, save, or dismiss some matches first"
 
 
 class DisclosureNotAcknowledgedError(DomainError):
@@ -123,7 +153,10 @@ class JobSourceNotEnabledError(DomainError):
 
 
 async def domain_error_handler(_: Request, exc: DomainError) -> JSONResponse:
-    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+    body: dict[str, object] = {"detail": exc.detail}
+    if isinstance(exc, DuplicateRunError) and exc.active_search_id is not None:
+        body["active_search_id"] = str(exc.active_search_id)
+    return JSONResponse(status_code=exc.status_code, content=body)
 
 
 async def request_validation_error_handler(_: Request, exc: RequestValidationError) -> JSONResponse:

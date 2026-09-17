@@ -9,7 +9,7 @@ from sqlalchemy import select
 from app.adapters.job_sources import registry
 from app.core.db import session_factory
 from app.main import app
-from app.models import JobPosting, SearchPosting
+from app.models import JobPosting, JobSearch, SearchPosting
 
 pytestmark = pytest.mark.usefixtures("clean_tables")
 
@@ -58,6 +58,7 @@ async def test_search_start_and_status_flow(
         "salary_min": None,
         "salary_max": None,
         "salary_currency": None,
+        "seniority": None,
         "source": "adzuna",
     }
     assert status["results"] == [{"source": "adzuna", "status": "ok", "count": 1, "warning": None}]
@@ -101,6 +102,79 @@ async def test_search_without_profile_id_returns_400(client: AsyncClient) -> Non
     )
     assert response.status_code == 400
     assert "profile_id is required" in response.json()["detail"]
+
+
+async def test_search_duplicate_active_run_returns_409_with_active_id(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    profile_id = await seed_profile_light("Owner")
+    source = FakeJobSource("adzuna")
+    monkeypatch.setattr(registry, "all_sources", lambda: (source,))
+
+    async with session_factory() as session:
+        run = JobSearch(
+            profile_id=profile_id,
+            source="adzuna",
+            status="pending",
+            query={"profile_id": str(profile_id), "source": "adzuna"},
+        )
+        session.add(run)
+        await session.commit()
+    active_id = str(run.id)
+
+    second = await client.post(
+        "/api/jobs/search",
+        json={
+            "query": "data",
+            "profile_id": str(profile_id),
+            "country": "de",
+            "source": "adzuna",
+        },
+    )
+    assert second.status_code == 409
+    body = second.json()
+    assert body["detail"] == "a run for this profile and source is already active"
+    assert body["active_search_id"] == active_id
+
+
+async def test_search_other_source_allowed_while_active(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from datetime import UTC, datetime
+
+    from app.models import SourceState
+
+    linkedin = FakeJobSource("apify_linkedin")
+    adzuna = FakeJobSource("adzuna")
+    monkeypatch.setattr(registry, "all_sources", lambda: (adzuna, linkedin))
+
+    async with session_factory() as session:
+        session.add(SourceState(source_name="apify_linkedin", acknowledged_at=datetime.now(UTC)))
+        await session.commit()
+
+    profile_id = await seed_profile_light("Owner")
+    first = await client.post(
+        "/api/jobs/search",
+        json={
+            "query": "data",
+            "profile_id": str(profile_id),
+            "country": "de",
+            "source": "adzuna",
+        },
+    )
+    assert first.status_code == 202
+
+    second = await client.post(
+        "/api/jobs/search",
+        json={
+            "query": "data",
+            "profile_id": str(profile_id),
+            "country": "de",
+            "source": "apify_linkedin",
+        },
+    )
+    assert second.status_code == 202
+    assert second.json()["search_id"] != first.json()["search_id"]
 
 
 async def test_search_with_unknown_profile_returns_404(client: AsyncClient) -> None:
@@ -296,7 +370,8 @@ async def test_search_accepts_per_source_specs_and_salary(
 
     assert response.status_code == 202
     query = source.queries[0]
-    assert query.title_phrase == "Senior Android Engineer"
+    assert query.term_plan is not None
+    assert query.term_plan.what_phrase == "Senior Android Engineer"
     assert query.salary_min == 5000000
     assert query.location == "Bangalore"
 
@@ -445,11 +520,12 @@ async def test_list_searches_returns_recent_runs_for_profile(
             [
                 JobSearch(
                     profile_id=profile_id,
+                    source="adzuna",
                     status="succeeded",
                     query={},
                     created_at=datetime.now(UTC) - timedelta(minutes=5),
                 ),
-                JobSearch(profile_id=profile_id, status="pending", query={}),
+                JobSearch(profile_id=profile_id, source="adzuna", status="pending", query={}),
             ]
         )
         await session.commit()

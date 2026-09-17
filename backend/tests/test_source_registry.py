@@ -7,6 +7,7 @@ from app.adapters.job_sources.base import (
     ConnectorConfigError,
     JobSearchQuery,
     SourceFilterDecl,
+    TermPlan,
     date_posted_bucket,
 )
 from app.adapters.job_sources.config import (
@@ -201,6 +202,52 @@ def test_date_posted_bucket_placeholder_derives_from_shared_filter() -> None:
 
     derived = JobSearchQuery(query="x", country="us", max_days_old=7)
     assert build_actor_input(actor, derived) == {"datePosted": "pastWeek"}
+
+
+def test_build_actor_input_resolves_plan_keywords() -> None:
+    actor = ActorConfig(
+        name="apify_x", actor_id="a", external_id_field="id", input={"keywords": "{keywords}"}
+    )
+    query = JobSearchQuery(country="us", term_plan=TermPlan(keywords="python dev"))
+
+    assert build_actor_input(actor, query) == {"keywords": "python dev"}
+    assert build_actor_input(actor, JobSearchQuery(query="x", country="us")) == {}
+
+
+def test_build_actor_input_plan_wins_over_shared_filters() -> None:
+    actor = ActorConfig(
+        name="apify_x",
+        actor_id="a",
+        external_id_field="id",
+        input={
+            "keywords": "{keywords}",
+            "fallbackKeywords": "{query}",
+            "location": "{location}",
+            "datePosted": "{date_posted_bucket}",
+        },
+    )
+    query = JobSearchQuery(
+        query="generic",
+        location="typed",
+        country="us",
+        max_days_old=7,
+        term_plan=TermPlan(keywords="planned", location="Berlin", date_posted="pastMonth"),
+    )
+
+    assert build_actor_input(actor, query) == {
+        "keywords": "planned",
+        "fallbackKeywords": "generic",
+        "location": "Berlin",
+        "datePosted": "pastMonth",
+    }
+
+
+def test_keyword_placeholder_is_declared(tmp_path: Path) -> None:
+    content = VALID.replace('keywords: "{query}"', 'keywords: "{keywords}"')
+
+    actors = load_actor_configs(_write(tmp_path, content))
+
+    assert actors[0].input["keywords"] == "{keywords}"
 
 
 def test_rejects_option_placeholder_for_undeclared_filter(tmp_path: Path) -> None:

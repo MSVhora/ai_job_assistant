@@ -50,11 +50,14 @@ export function ProfileEditor({ profileId }: { profileId: string }) {
   return <EditorBody profile={profileQuery.data} />;
 }
 
-function EditorBody({ profile }: { profile: ProfileResponse }) {
+export function EditorBody({ profile }: { profile: ProfileResponse }) {
   const updateProfile = useUpdateProfile();
   const renameProfile = useUpdateProfile();
   const [renaming, setRenaming] = useState(false);
   const [nameInput, setNameInput] = useState(profile.name);
+  // Server-owned list of still-missing gap-fill fields; the chat section renders
+  // only while it is non-empty and collapses the moment a turn completes.
+  const [missingFields, setMissingFields] = useState<string[]>(profile.missing_fields ?? []);
   const form = useForm<ProfileFormValues>({
     resolver: standardSchemaResolver(profileFormSchema),
     defaultValues: toFormValues(profile.structured_profile),
@@ -62,6 +65,7 @@ function EditorBody({ profile }: { profile: ProfileResponse }) {
   });
 
   const applyGapFill = (data: GapFillResponse) => {
+    setMissingFields(data.missing_fields.map((field) => field.key));
     const values = toFormValues(data.structured_profile);
     const touched = new Set(data.applied_fields.map((field) => field.field));
     const current = form.getValues();
@@ -93,6 +97,10 @@ function EditorBody({ profile }: { profile: ProfileResponse }) {
     }
     if (touched.has("preferences.seniority")) {
       next.preferences.seniority = values.preferences.seniority;
+      // Derived-seniority provenance and the YOE display value are re-derived
+      // server-side on every apply; keep the read-only fields in sync.
+      next.preferences.seniority_source = values.preferences.seniority_source;
+      next.years_of_experience = values.years_of_experience;
     }
     if (touched.has("preferences.work_authorization")) {
       next.preferences.work_authorization = values.preferences.work_authorization;
@@ -123,6 +131,8 @@ function EditorBody({ profile }: { profile: ProfileResponse }) {
             <p className="text-xs text-gray-500">
               {profile.source_resume_filename ? `From ${profile.source_resume_filename} · ` : ""}
               Updated {new Date(profile.updated_at).toLocaleString()}
+              {profile.structured_profile.years_of_experience != null &&
+                ` · ~${profile.structured_profile.years_of_experience} yrs experience`}
             </p>
           </div>
         )}
@@ -161,7 +171,9 @@ function EditorBody({ profile }: { profile: ProfileResponse }) {
         )}
       </div>
 
-      <GapFillChat profileId={profile.profile_id} onApplied={applyGapFill} />
+      {missingFields.length > 0 && (
+        <GapFillChat profileId={profile.profile_id} onApplied={applyGapFill} />
+      )}
       <FormProvider {...form}>
         <ProfileReviewForm
           highlightAi={false}

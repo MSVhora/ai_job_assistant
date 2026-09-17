@@ -9,10 +9,18 @@ from app.adapters.job_sources.base import (
     SourceFilterDecl,
     date_posted_bucket,
 )
+from app.core.config import get_settings
 
 DEFAULT_CONFIG_PATH = Path(__file__).parent / "connectors.yaml"
 
-_PLACEHOLDER_KEYS = ("query", "location", "country", "results_wanted", "date_posted_bucket")
+_PLACEHOLDER_KEYS = (
+    "query",
+    "keywords",
+    "location",
+    "country",
+    "results_wanted",
+    "date_posted_bucket",
+)
 
 _OPTION_PLACEHOLDER_PREFIX = "option:"
 
@@ -41,6 +49,7 @@ def build_actor_input(actor: ActorConfig, query: JobSearchQuery) -> dict[str, ob
 
 
 def _resolve_value(value: object, query: JobSearchQuery) -> object:
+    plan = query.term_plan
     if isinstance(value, str) and value.startswith("{") and value.endswith("}"):
         token = value[1:-1]
         if token.startswith(_OPTION_PLACEHOLDER_PREFIX):
@@ -49,13 +58,22 @@ def _resolve_value(value: object, query: JobSearchQuery) -> object:
         match token:
             case "query":
                 return query.query
+            case "keywords":
+                if plan is not None and plan.keywords is not None:
+                    return plan.keywords
+                return _OMIT
             case "location":
+                if plan is not None and plan.location is not None:
+                    return plan.location
                 return query.location if query.location is not None else _OMIT
             case "country":
                 return query.country
             case "results_wanted":
-                return query.results_wanted
+                max_results = get_settings().max_apify_results_per_run
+                return min(query.results_wanted, max_results)
             case "date_posted_bucket":
+                if plan is not None and plan.date_posted is not None:
+                    return plan.date_posted
                 return date_posted_bucket(query.max_days_old)
     return value
 

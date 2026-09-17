@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, UniqueConstraint, func, text
+from sqlalchemy import DateTime, Enum, ForeignKey, Index, String, UniqueConstraint, func, text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -43,11 +43,23 @@ class JobSearchStatus(enum.StrEnum):
 
 class JobSearch(Base):
     __tablename__ = "job_search"
+    __table_args__ = (
+        Index(
+            "uq_job_search_active_run",
+            "profile_id",
+            "source",
+            unique=True,
+            postgresql_where=text("status IN ('pending', 'running')"),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     profile_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("profile.id", ondelete="CASCADE"), index=True
     )
+    # The one source this run targets (see the partial unique index over
+    # (profile_id, source) among non-terminal statuses — issue #36).
+    source: Mapped[str] = mapped_column(String(length=64), index=True)
     status: Mapped[JobSearchStatus] = mapped_column(
         Enum(JobSearchStatus, name="job_search_status", native_enum=True),
         default=JobSearchStatus.pending,

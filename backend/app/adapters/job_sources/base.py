@@ -45,6 +45,33 @@ def parse_datetime(value: object) -> datetime | None:
 
 SourceFilterValue = str | int | bool | list[str]
 
+
+class TermPlan(BaseModel):
+    """Per-source rendered search terms, produced by the rendering layer.
+
+    Precedence (decided in services/query_rendering.py, not in connectors):
+
+    - adzuna: ``what_phrase`` when a title exists, ``what_or``/``what_and``
+      combined with it, ``what_exclude`` always, and ``what`` (free text)
+      only when there is no ``what_phrase``.
+    - linkedin (apify_ actors): ``keywords`` is the NL semantic brief
+      (``"{title} with {skills}, {seniority} level"``, issue #35); a
+      user-typed request query overrides it, and the spec's exclude terms
+      become an appended ``not …`` clause in either case (the only
+      exclusion channel post-Aug-2026). No salary text. ``date_posted`` is
+      the freshness bucket.
+    """
+
+    what_and: list[str] = Field(default_factory=list)
+    what_or: list[str] = Field(default_factory=list)
+    what_phrase: str | None = None
+    what_exclude: list[str] = Field(default_factory=list)
+    what: str | None = None
+    keywords: str | None = None
+    location: str | None = None
+    date_posted: str | None = None
+
+
 _MAX_OPTION_LIST_ITEMS = 50
 _MAX_OPTION_ITEM_LEN = 200
 
@@ -65,13 +92,18 @@ class SourceFilterDecl(BaseModel):
 
 
 class JobSearchQuery(BaseModel):
+    """Connector-level query payload: shared filters plus the rendered terms.
+
+    ``term_plan`` carries the per-source term precedence decided in
+    ``services/query_rendering.py``; connectors map it mechanically onto
+    their API params and never make precedence decisions of their own.
+    """
+
     query: str = ""
-    title_phrase: str | None = None
-    skills_any: list[str] = Field(default_factory=list)
-    exclude_any: list[str] = Field(default_factory=list)
+    term_plan: TermPlan | None = None
     location: str | None = None
     country: str
-    results_wanted: int = Field(default=50, ge=1, le=50)
+    results_wanted: int = Field(default=50, ge=1, le=100)
     max_days_old: int | None = Field(default=None, ge=1, le=90)
     salary_min: float | None = Field(default=None, ge=0)
     salary_max: float | None = Field(default=None, ge=0)
@@ -82,11 +114,6 @@ class JobSearchQuery(BaseModel):
     @classmethod
     def _lowercase_country(cls, value: str) -> str:
         return value.strip().lower()
-
-    @field_validator("title_phrase", mode="after")
-    @classmethod
-    def _strip_title(cls, value: str | None) -> str | None:
-        return value.strip() if value else value
 
 
 def date_posted_bucket(max_days_old: int | None) -> str:

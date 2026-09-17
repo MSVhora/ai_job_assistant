@@ -1,4 +1,10 @@
-import { ApiError, ExtractionFailedError, apiFetch, apiFetchWithTotal } from "./client";
+import {
+  ApiError,
+  DuplicateRunError,
+  ExtractionFailedError,
+  apiFetch,
+  apiFetchWithTotal,
+} from "./client";
 import type { components, operations } from "./schema";
 
 export type HealthResponse = components["schemas"]["HealthResponse"];
@@ -31,7 +37,7 @@ export type StoredPreferences = components["schemas"]["StoredPreferences"];
 export type MatchListParams = operations["list_matches_api_matches_get"]["parameters"]["query"];
 export type MatchRebuildStatus = components["schemas"]["MatchRebuildStatusResponse"];
 
-export { ApiError, ExtractionFailedError, apiFetch, apiFetchWithTotal } from "./client";
+export { ApiError, DuplicateRunError, ExtractionFailedError, apiFetch, apiFetchWithTotal } from "./client";
 
 
 export async function getHealth(): Promise<HealthResponse> {
@@ -142,10 +148,27 @@ export async function enableSource(
 }
 
 export async function startJobSearch(payload: JobSearchRequest): Promise<JobSearchStart> {
-  return apiFetch<JobSearchStart>("/api/jobs/search", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+  try {
+    return await apiFetch<JobSearchStart>("/api/jobs/search", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  } catch (cause) {
+    if (cause instanceof ApiError && cause.status === 409 && isDuplicateRunBody(cause.body)) {
+      throw new DuplicateRunError(cause.body.active_search_id ?? null);
+    }
+    throw cause;
+  }
+}
+
+function isDuplicateRunBody(body: unknown): body is { active_search_id?: string } {
+  return (
+    typeof body === "object" &&
+    body !== null &&
+    "active_search_id" in body &&
+    (typeof (body as Record<string, unknown>).active_search_id === "string" ||
+      (body as Record<string, unknown>).active_search_id === null)
+  );
 }
 
 export async function listProfileSearches(profileId: string): Promise<JobSearchSummary[]> {
@@ -214,5 +237,28 @@ export async function regenerateSearchQueries(
   return apiFetch<SearchQueriesResponse>(
     `/api/profiles/${encodeURIComponent(profileId)}/search-queries`,
     { method: "POST", body: JSON.stringify(sources ? { sources } : {}) },
+  );
+}
+
+export type MatchSignalKind = components["schemas"]["MatchSignalRequest"]["kind"];
+
+export async function recordMatchSignal(
+  matchId: string,
+  kind: MatchSignalKind,
+): Promise<MatchResponse> {
+  return apiFetch<MatchResponse>(`/api/matches/${encodeURIComponent(matchId)}/signals`, {
+    method: "POST",
+    body: JSON.stringify({ kind }),
+  });
+}
+
+export function applyMatchUrl(matchId: string): string {
+  return `/api/matches/${encodeURIComponent(matchId)}/apply`;
+}
+
+export async function tuneSearchQueries(profileId: string): Promise<SearchQueriesResponse> {
+  return apiFetch<SearchQueriesResponse>(
+    `/api/profiles/${encodeURIComponent(profileId)}/tune-queries`,
+    { method: "POST" },
   );
 }

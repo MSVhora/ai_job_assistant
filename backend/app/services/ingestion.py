@@ -1,12 +1,14 @@
 import logging
 import time
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from fastapi import BackgroundTasks
 from pydantic import ValidationError
-from sqlalchemy import select
+from sqlalchemy import func, select, update
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.job_sources import registry
@@ -17,13 +19,16 @@ from app.adapters.job_sources.base import (
     validate_source_options,
 )
 from app.adapters.llm import LLMError
+from app.core.config import get_settings
 from app.core.db import session_factory
 from app.core.errors import (
     DomainError,
+    DuplicateRunError,
     JobPostingNotFoundError,
     JobSearchNotFoundError,
     JobSourceNotEnabledError,
     MissingProfileIdError,
+    MissingSearchCountryError,
     MissingSearchQueryError,
     ProfileNotFoundError,
     UnknownJobSourceError,
@@ -39,10 +44,32 @@ from app.schemas.job_search import (
     MatchingOutcome,
     SourceOutcome,
 )
-from app.services import embedding, matching, query_rendering
+from app.schemas.profile import StructuredProfile
+from app.services import embedding, matching, posting_dedupe, query_rendering
 from app.services import sources as sources_service
 
 logger = logging.getLogger(__name__)
+
+
+def resolve_profile_defaults(payload: JobSearchRequest, profile: Profile) -> JobSearchRequest:
+    """Fill omitted shared filters from the profile; request values always win."""
+    structured = StructuredProfile.model_validate(profile.structured_profile)
+    preferences = structured.preferences
+    if payload.country is None and structured.contact.country is None:
+        raise MissingSearchCountryError()
+    update: dict[str, object] = {"country": payload.country or structured.contact.country}
+    if payload.location is None and preferences is not None:
+        update["location"] = preferences.target_location
+    if preferences is not None:
+        if payload.salary_min is None:
+            update["salary_min"] = preferences.salary_min
+        if payload.salary_max is None:
+            update["salary_max"] = preferences.salary_max
+        if payload.salary_currency is None:
+            update["salary_currency"] = preferences.currency
+        if payload.seniority is None and preferences.seniority is not None:
+            update["seniority"] = preferences.seniority
+    return payload.model_copy(update=update)
 
 
 def _validate_queries(payload: JobSearchRequest, source: JobSource) -> None:
@@ -79,20 +106,106 @@ async def _require_profile(session: AsyncSession, profile_id: uuid.UUID | None) 
     return profile
 
 
+ACTIVE_STATUSES = (JobSearchStatus.pending, JobSearchStatus.running)
+_ABANDONED_WARNING = "run abandoned — in-flight lock released"
+
+
+async def _sweep_stale_runs(session: AsyncSession) -> int:
+    """Mark runs stuck in pending/running longer than max_run_age_minutes
+    failed, releasing the one-active-run-per-(profile, source) lock (#36)."""
+    settings = get_settings()
+    cutoff = datetime.now(UTC) - timedelta(minutes=settings.max_run_age_minutes)
+    stored_result = func.jsonb_build_array(
+        func.jsonb_build_object(
+            "source",
+            func.coalesce(
+                func.jsonb_extract_path_text(JobSearch.query, "source"),
+                func.jsonb_extract_path_text(
+                    func.jsonb_extract_path(JobSearch.query, "sources"), "0"
+                ),
+                "unknown",
+            ),
+            "status",
+            "failed",
+            "count",
+            0,
+            "warning",
+            _ABANDONED_WARNING,
+        )
+    ).cast(JSONB)
+    result = await session.execute(
+        update(JobSearch)
+        .where(JobSearch.status.in_(ACTIVE_STATUSES), JobSearch.updated_at < cutoff)
+        .values(status=JobSearchStatus.failed, results=stored_result, updated_at=func.now())
+    )
+    swept = result.rowcount
+    if swept:
+        logger.info(
+            "ingestion.sweep swept=%d max_run_age_minutes=%d",
+            swept,
+            settings.max_run_age_minutes,
+        )
+    return swept
+
+
+def _select_active_run(profile_id: uuid.UUID, source_name: str):
+    return (
+        select(JobSearch)
+        .where(
+            JobSearch.profile_id == profile_id,
+            JobSearch.source == source_name,
+            JobSearch.status.in_(ACTIVE_STATUSES),
+        )
+        .order_by(JobSearch.updated_at.desc())
+        .limit(1)
+    )
+
+
+async def _raise_if_duplicate_run(
+    session: AsyncSession, profile_id: uuid.UUID, source_name: str
+) -> None:
+    row = (await session.execute(_select_active_run(profile_id, source_name))).scalar_one_or_none()
+    if row is not None:
+        logger.warning(
+            "ingestion.duplicate profile_id=%s source=%s active_search=%s",
+            profile_id,
+            source_name,
+            row.id,
+        )
+        raise DuplicateRunError(active_search_id=row.id)
+
+
 async def start_search(
     session: AsyncSession, background_tasks: BackgroundTasks, payload: JobSearchRequest
 ) -> JobSearchStartResponse:
-    await _require_profile(session, payload.profile_id)
-    source = await _selected_source(session, payload)
-    _validate_queries(payload, source)
+    profile = await _require_profile(session, payload.profile_id)
+    profile_id = profile.id
+    resolved = resolve_profile_defaults(payload, profile)
+    source = await _selected_source(session, resolved)
+    _validate_queries(resolved, source)
+    await _sweep_stale_runs(session)
+    await _raise_if_duplicate_run(session, profile_id, resolved.source)
     run = JobSearch(
         status=JobSearchStatus.pending,
-        profile_id=payload.profile_id,
-        query=payload.model_dump(mode="json"),
+        profile_id=profile_id,
+        source=resolved.source,
+        query=resolved.model_dump(mode="json"),
     )
-    session.add(run)
-    await session.flush()
-    background_tasks.add_task(run_search, run.id, payload)
+    try:
+        async with session.begin_nested():
+            session.add(run)
+            await session.flush()
+    except IntegrityError as exc:
+        row = (
+            await session.execute(_select_active_run(profile_id, resolved.source))
+        ).scalar_one_or_none()
+        logger.warning(
+            "ingestion.duplicate profile_id=%s source=%s raced the active-run index",
+            profile_id,
+            resolved.source,
+        )
+        raise DuplicateRunError(active_search_id=row.id if row is not None else None) from exc
+    background_tasks.add_task(run_search, run.id, resolved)
     logger.info("ingestion.start search_id=%s source=%s", run.id, source.name)
     return JobSearchStartResponse(search_id=run.id, status=run.status.value)
 
@@ -180,6 +293,7 @@ async def _run_source(
 
     persisted = 0
     skipped = 0
+    persisted_ids: list[uuid.UUID] = []
     normalized: list[JobPostingData] = []
     for raw in raw_postings:
         try:
@@ -198,8 +312,12 @@ async def _run_source(
         logger.warning("ingestion source=%s embedding failed: %s", source.name, exc)
 
     for data, vector in zip(normalized, embeddings, strict=True):
-        await _upsert_posting(session, source.name, data, search_id, vector)
+        posting_id = await _upsert_posting(
+            session, source.name, data, search_id, vector, payload.country
+        )
+        persisted_ids.append(posting_id)
     persisted = len(normalized)
+    await posting_dedupe.dedupe_postings(session, persisted_ids)
     await session.commit()
 
     warning = f"{skipped} posting(s) skipped (un-mappable)" if skipped else None
@@ -228,7 +346,8 @@ async def _upsert_posting(
     data: JobPostingData,
     search_id: uuid.UUID,
     embedding_vector: list[float] | None,
-) -> None:
+    country: str | None,
+) -> uuid.UUID:
     stmt = (
         pg_insert(JobPosting)
         .values(
@@ -238,6 +357,7 @@ async def _upsert_posting(
             company=data.company,
             url=data.url,
             location=data.location,
+            country=country,
             job_type=data.job_type,
             remote_type=data.remote_type,
             description=data.description,
@@ -260,6 +380,7 @@ async def _upsert_posting(
             "company": stmt.excluded.company,
             "url": stmt.excluded.url,
             "location": stmt.excluded.location,
+            "country": stmt.excluded.country,
             "job_type": stmt.excluded.job_type,
             "remote_type": stmt.excluded.remote_type,
             "description": stmt.excluded.description,
@@ -280,6 +401,7 @@ async def _upsert_posting(
         .values(search_id=search_id, posting_id=posting_id)
         .on_conflict_do_nothing(constraint="uq_search_posting_search_posting")
     )
+    return posting_id
 
 
 async def _require_owned_search(

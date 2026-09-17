@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.adapters.job_sources.base import SourceFilterDecl, SourceFilterValue
 from app.models import JobPosting, JobType, RemoteType
+from app.schemas.enums import SeniorityLevel
 
 JobSearchStatusLiteral = Literal["pending", "running", "succeeded", "partial", "failed"]
 
@@ -25,7 +26,14 @@ def _clean_terms(values: list[str] | None) -> list[str] | None:
 
 
 class SourceQuerySpec(BaseModel):
+    """Per-source query spec from the LLM or the profile's stored queries.
+
+    `skills_all` = must-have stack keywords (maps to Adzuna `what_and`);
+    `skills` = nice-to-have / adjacent keywords (`skills_any`, → `what_or`).
+    """
+
     title: str | None = Field(default=None, max_length=_MAX_TITLE)
+    skills_all: list[str] | None = Field(default=None, max_length=_MAX_SKILLS)
     skills: list[str] | None = Field(default=None, max_length=_MAX_SKILLS)
     exclude: list[str] | None = Field(default=None, max_length=_MAX_EXCLUDE)
     query: str | None = Field(default=None, max_length=_MAX_QUERY)
@@ -38,13 +46,13 @@ class SourceQuerySpec(BaseModel):
             return None
         return value.strip() or None
 
-    @field_validator("skills", "exclude", mode="after")
+    @field_validator("skills_all", "skills", "exclude", mode="after")
     @classmethod
     def _strip_terms(cls, values: list[str] | None) -> list[str] | None:
         return _clean_terms(values)
 
     def has_content(self) -> bool:
-        return bool(self.title or self.query or self.skills or self.options)
+        return bool(self.title or self.query or self.skills_all or self.skills or self.options)
 
 
 class StoredSearchQueries(BaseModel):
@@ -66,19 +74,26 @@ class SearchQueriesResponse(BaseModel):
 
 class JobSearchRequest(BaseModel):
     """One search run targets exactly one source (`source`); `source_queries`,
-    when present, may only refine that source (extra keys are rejected)."""
+    when present, may only refine that source (extra keys are rejected).
+
+    Shared filters left None are resolved server-side from the profile (issue
+    #31) — the request may omit them. `seniority` is filled from
+    `preferences.seniority` (issue #32) and feeds only the LinkedIn NL brief;
+    the profile review UI is the correction surface.
+    """
 
     query: str | None = Field(default=None, min_length=1, max_length=_MAX_QUERY)
     profile_id: uuid.UUID | None = None
     source: str = Field(min_length=1)
     source_queries: dict[str, SourceQuerySpec] | None = Field(default=None, max_length=1)
     location: str | None = Field(default=None, max_length=200)
-    country: str = Field(min_length=2, max_length=2, pattern=r"^[A-Za-z]{2}$")
-    results_wanted: int = Field(default=50, ge=1, le=50)
+    country: str | None = Field(default=None, min_length=2, max_length=2, pattern=r"^[A-Za-z]{2}$")
+    results_wanted: int = Field(default=50, ge=1, le=100)
     max_days_old: int | None = Field(default=None, ge=1, le=90)
     salary_min: float | None = Field(default=None, ge=0)
     salary_max: float | None = Field(default=None, ge=0)
     salary_currency: str | None = Field(default=None, pattern=r"^[A-Za-z]{3}$")
+    seniority: SeniorityLevel | None = None
 
     @field_validator("query", "location", mode="after")
     @classmethod
@@ -90,8 +105,8 @@ class JobSearchRequest(BaseModel):
 
     @field_validator("country", mode="after")
     @classmethod
-    def _lowercase_country(cls, value: str) -> str:
-        return value.strip().lower()
+    def _lowercase_country(cls, value: str | None) -> str | None:
+        return value.strip().lower() if value else value
 
     @field_validator("salary_currency", mode="after")
     @classmethod

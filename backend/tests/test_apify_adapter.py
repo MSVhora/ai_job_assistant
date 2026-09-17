@@ -6,8 +6,13 @@ import httpx
 import pytest
 
 from app.adapters.job_sources.apify import ApifyActorSource
-from app.adapters.job_sources.base import ConnectorError, JobSearchQuery, RawJobPosting
-from app.adapters.job_sources.config import ActorConfig
+from app.adapters.job_sources.base import (
+    ConnectorError,
+    JobSearchQuery,
+    RawJobPosting,
+    TermPlan,
+)
+from app.adapters.job_sources.config import ActorConfig, build_actor_input
 from app.core.config import get_settings
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -22,7 +27,7 @@ CONFIG = ActorConfig(
     actor_id="hKByXkMQaC5Qt9UMN",
     external_id_field="id",
     input={
-        "keywords": "{query}",
+        "keywords": "{keywords}",
         "location": "{location}",
         "limitPerSource": "{results_wanted}",
         "datePosted": "{date_posted_bucket}",
@@ -139,6 +144,29 @@ def test_normalize_keeps_missing_or_malformed_expire_at_null() -> None:
     assert malformed.expires_at is None
 
 
+def test_source_declares_nl_exclusion_support() -> None:
+    assert ApifyActorSource(CONFIG).supports_exclusions is True
+
+
+def test_results_wanted_passes_through_to_limit_per_source(monkeypatch: pytest.MonkeyPatch) -> None:
+    query = JobSearchQuery(country="us", results_wanted=10, term_plan=TermPlan(keywords="k"))
+
+    input = build_actor_input(CONFIG, query)
+
+    assert input["limitPerSource"] == 10
+
+
+def test_results_wanted_clamped_by_max_apify_results_per_run(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(get_settings(), "max_apify_results_per_run", 25)
+    query = JobSearchQuery(country="us", results_wanted=100, term_plan=TermPlan(keywords="k"))
+
+    input = build_actor_input(CONFIG, query)
+
+    assert input["limitPerSource"] == 25
+
+
 async def test_search_builds_input_and_reads_dataset(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -161,7 +189,11 @@ async def test_search_builds_input_and_reads_dataset(
     source = _mock_source(monkeypatch, httpx.MockTransport(handler))
 
     postings = await source.search(
-        JobSearchQuery(query="data analyst", country="us", results_wanted=10)
+        JobSearchQuery(
+            country="us",
+            results_wanted=10,
+            term_plan=TermPlan(keywords="data analyst"),
+        )
     )
 
     assert seen["input"] == {
@@ -256,7 +288,9 @@ async def test_search_times_out_when_run_never_finishes(
         await source.search(JobSearchQuery(query="x", country="us"))
 
 
-async def test_search_builds_nl_keywords_from_spec(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_search_sends_plan_keywords_and_location(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     seen: dict[str, object] = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -276,21 +310,20 @@ async def test_search_builds_nl_keywords_from_spec(monkeypatch: pytest.MonkeyPat
     source = _mock_source(monkeypatch, httpx.MockTransport(handler))
 
     query = JobSearchQuery(
-        query="",
-        title_phrase="Senior Android Engineer",
-        skills_any=["Kotlin", "Java"],
-        exclude_any=["intern"],
+        term_plan=TermPlan(
+            keywords="Senior Android Engineer with Kotlin and Java",
+            location="Bangalore",
+            date_posted="pastWeek",
+        ),
         location="Bangalore",
         country="in",
-        salary_min=5000000,
-        salary_currency="INR",
+        max_days_old=7,
     )
     postings = await source.search(query)
 
-    assert seen["input"]["keywords"] == (
-        "Senior Android Engineer with Kotlin and Java, offering INR 5000000 or more"
-    )
+    assert seen["input"]["keywords"] == "Senior Android Engineer with Kotlin and Java"
     assert seen["input"]["location"] == "Bangalore"
+    assert seen["input"]["datePosted"] == "pastWeek"
     assert "exclude" not in json.dumps(seen["input"])
     assert postings == []
 

@@ -4,7 +4,8 @@ import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { FreshnessBadge } from "@/components/features/jobs/FreshnessBadge";
-import type { MatchResponse } from "@/lib/api";
+import { useMatchSignal } from "@/hooks/use-match-signals";
+import { applyMatchUrl, type MatchResponse } from "@/lib/api";
 import { salaryLine, scorePercent } from "@/lib/salary";
 
 function SparkleIcon() {
@@ -34,11 +35,13 @@ function CompanyAvatar({ name }: { name: string }) {
 export function MatchCard({
   match,
   rank,
+  profileId = null,
   selected = false,
   onOpenDetails,
 }: {
   match: MatchResponse;
   rank: number;
+  profileId?: string | null;
   selected?: boolean;
   onOpenDetails?: () => void;
 }) {
@@ -46,6 +49,14 @@ export function MatchCard({
   const posting = match.job_posting;
   const salary = salaryLine(posting.salary_min, posting.salary_max, posting.currency);
   const detailsId = `match-rationale-${match.id}`;
+  const signal = useMatchSignal(profileId);
+  const saved = match.saved_at !== null && match.saved_at !== undefined;
+  const dismissed = match.dismissed_at !== null && match.dismissed_at !== undefined;
+
+  const sendSignal = (kind: "save" | "unsave" | "dismiss" | "undismiss") => {
+    if (profileId === null || signal.isPending) return;
+    signal.mutate({ matchId: match.id, kind });
+  };
 
   return (
     <li
@@ -92,10 +103,10 @@ export function MatchCard({
         <div className="flex shrink-0 flex-col items-end gap-1.5">
           <span
             className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 px-2.5 py-1 text-xs font-bold text-white shadow-md shadow-violet-200"
-            title={`Vector ${scorePercent(match.vector_score)}${match.role_fit !== null && match.role_fit !== undefined ? ` · role fit ${match.role_fit}/10` : ""}${match.company_fit !== null && match.company_fit !== undefined ? ` · company fit ${match.company_fit}/10` : ""}`}
+            title={`Vector ${match.vector_score !== null && match.vector_score !== undefined ? scorePercent(match.vector_score) : "–"}${match.role_fit !== null && match.role_fit !== undefined ? ` · role fit ${match.role_fit}/10` : ""}${match.company_fit !== null && match.company_fit !== undefined ? ` · company fit ${match.company_fit}/10` : ""}`}
           >
             <SparkleIcon />
-            {scorePercent(match.final_score)}% match
+            {scorePercent(match.final_score)} match
           </span>
           {posting.posted_at && (
             <span className="text-[11px] text-gray-500">
@@ -143,7 +154,7 @@ export function MatchCard({
         )}
         {posting.url ? (
           <a
-            href={posting.url}
+            href={applyMatchUrl(match.id)}
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-violet-200 transition-all hover:from-violet-700 hover:to-fuchsia-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
@@ -157,6 +168,35 @@ export function MatchCard({
         ) : (
           <span className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-2 text-xs font-medium text-gray-400">
             No link available
+          </span>
+        )}
+        {profileId !== null && (
+          <span className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => sendSignal(saved ? "unsave" : "save")}
+              aria-pressed={saved}
+              disabled={signal.isPending}
+              aria-label={saved ? `Remove ${posting.title} from saved` : `Save ${posting.title}`}
+              className={`rounded-lg px-2 py-1 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 disabled:cursor-not-allowed disabled:opacity-50 ${
+                saved
+                  ? "bg-violet-100 text-violet-700"
+                  : "text-gray-500 hover:bg-violet-50 hover:text-violet-700"
+              }`}
+            >
+              {saved ? "Saved" : "Save"}
+            </button>
+            <button
+              type="button"
+              onClick={() => sendSignal(dismissed ? "undismiss" : "dismiss")}
+              disabled={signal.isPending}
+              aria-label={
+                dismissed ? `Restore ${posting.title} to the list` : `Dismiss ${posting.title}`
+              }
+              className="rounded-lg px-2 py-1 text-xs font-semibold text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {dismissed ? "Restore" : "Dismiss"}
+            </button>
           </span>
         )}
       </div>

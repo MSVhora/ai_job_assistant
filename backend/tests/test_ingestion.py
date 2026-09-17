@@ -1,8 +1,9 @@
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import pytest
-from fakes import FakeJobSource, fake_posting, install_aembedding, seed_profile_light
+from fakes import VALID_PROFILE, FakeJobSource, fake_posting, install_aembedding, seed_profile_light
 from fastapi import BackgroundTasks
 from pydantic import ValidationError
 from sqlalchemy import select
@@ -12,14 +13,22 @@ from app.adapters.job_sources.base import ConnectorError
 from app.adapters.llm import LLMError
 from app.core.db import session_factory
 from app.core.errors import (
+    DuplicateRunError,
     JobSourceNotEnabledError,
     MissingProfileIdError,
+    MissingSearchCountryError,
     ProfileNotFoundError,
     UnknownJobSourceError,
 )
-from app.models import JobPosting, JobSearch, Match, SearchPosting, SourceState
+from app.models import JobPosting, JobSearch, JobSearchStatus, Match, SearchPosting, SourceState
 from app.schemas.job_search import JobSearchRequest
-from app.services.ingestion import _selected_source, run_search, start_search
+from app.services import ingestion
+from app.services.ingestion import (
+    _ABANDONED_WARNING,
+    _selected_source,
+    run_search,
+    start_search,
+)
 
 pytestmark = pytest.mark.usefixtures("clean_tables")
 
@@ -53,7 +62,9 @@ async def create_run(payload: JobSearchRequest) -> uuid.UUID:
     async with session_factory() as session:
         profile_id = payload.profile_id or await seed_profile_light()
         stored = payload.model_copy(update={"profile_id": profile_id})
-        run = JobSearch(profile_id=profile_id, query=stored.model_dump(mode="json"))
+        run = JobSearch(
+            profile_id=profile_id, source=stored.source, query=stored.model_dump(mode="json")
+        )
         session.add(run)
         await session.commit()
         return run.id
@@ -125,6 +136,25 @@ async def test_upsert_is_idempotent_for_same_search(monkeypatch: pytest.MonkeyPa
     assert await get_associations() == {(run, postings[0].id)}
 
 
+async def test_upsert_stores_and_refreshes_country(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Issue #38: the run's resolved country is the dedupe grouping key."""
+    only_sources(monkeypatch, FakeJobSource("adzuna", postings=[fake_posting("1")]))
+    run = await create_run(payload())
+    await run_search(run, payload())
+
+    postings = await get_postings()
+    assert len(postings) == 1
+    assert postings[0].country == "de"
+
+    only_sources(monkeypatch, FakeJobSource("adzuna", postings=[fake_posting("1")]))
+    run_2 = await create_run(payload(country="fr"))
+    await run_search(run_2, payload(country="fr"))
+
+    postings = await get_postings()
+    assert len(postings) == 1
+    assert postings[0].country == "fr"
+
+
 async def test_upsert_refreshes_expiry_on_refetch(monkeypatch: pytest.MonkeyPatch) -> None:
     from datetime import timedelta
 
@@ -180,7 +210,8 @@ async def test_run_search_passes_query_to_connector(monkeypatch: pytest.MonkeyPa
     await run_search(run, payload(location="Berlin", results_wanted=10))
 
     assert len(source.queries) == 1
-    assert source.queries[0].query == "python developer"
+    assert source.queries[0].term_plan is not None
+    assert source.queries[0].term_plan.what == "python developer"
     assert source.queries[0].location == "Berlin"
     assert source.queries[0].country == "de"
     assert source.queries[0].results_wanted == 10
@@ -298,9 +329,10 @@ async def test_run_search_sends_per_source_specs(monkeypatch: pytest.MonkeyPatch
     await run_search(run, request)
 
     adzuna_query = adzuna.queries[0]
-    assert adzuna_query.title_phrase == "Senior Android Engineer"
-    assert adzuna_query.skills_any == ["Kotlin"]
-    assert adzuna_query.exclude_any == ["intern"]
+    assert adzuna_query.term_plan is not None
+    assert adzuna_query.term_plan.what_phrase == "Senior Android Engineer"
+    assert adzuna_query.term_plan.what_or == ["Kotlin"]
+    assert adzuna_query.term_plan.what_exclude == ["intern"]
     assert adzuna_query.salary_min == 5000000
 
     run_row = await get_run(run)
@@ -606,3 +638,212 @@ async def test_get_search_postings_filters_stale_or_expired() -> None:
         seen = await get_search_postings(session, run, run_row.profile_id)
 
     assert {summary.title for summary in seen} == {"Fresh"}
+
+
+PROFILE_WITH_PREFS = dict(
+    VALID_PROFILE
+    | {
+        "contact": {**VALID_PROFILE["contact"], "country": "de"},
+        "preferences": {
+            "target_location": "Berlin",
+            "salary_min": 50000,
+            "salary_max": 90000,
+            "currency": "EUR",
+            "remote_preference": "hybrid",
+            "seniority": "senior",
+        },
+    }
+)
+
+
+async def seed_profile_with_prefs() -> Any:
+    from app.core.db import session_factory
+    from app.models import Candidate, Profile
+    from app.schemas.profile import StructuredProfile
+
+    async with session_factory() as session:
+        result = await session.execute(select(Candidate).limit(1))
+        candidate = result.scalars().first()
+        if candidate is None:
+            candidate = Candidate()
+            session.add(candidate)
+            await session.flush()
+        profile = Profile(
+            candidate_id=candidate.id,
+            name="Prefilled",
+            structured_profile=StructuredProfile.model_validate(PROFILE_WITH_PREFS).model_dump(
+                mode="json"
+            ),
+        )
+        session.add(profile)
+        await session.commit()
+        return profile.id
+
+
+async def test_start_search_resolves_omitted_fields_from_profile(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    only_sources(monkeypatch, FakeJobSource("adzuna"))
+    profile_id = await seed_profile_with_prefs()
+
+    request = payload(
+        profile_id=profile_id,
+        country=None,
+        location=None,
+        salary_min=None,
+        salary_currency=None,
+        query="python developer",
+    )
+    async with session_factory() as session:
+        response = await start_search(session, BackgroundTasks(), request)
+        await session.commit()
+
+    run_row = await get_run(response.search_id)
+    assert run_row.query["country"] == "de"
+    assert run_row.query["location"] == "Berlin"
+    assert run_row.query["salary_min"] == 50000
+    assert run_row.query["salary_currency"] == "EUR"
+    assert run_row.query["seniority"] == "senior"
+
+
+async def test_start_search_request_values_win() -> None:
+    profile_id = await seed_profile_with_prefs()
+
+    request = payload(
+        profile_id=profile_id, country="fr", location="Munich", salary_min=100, seniority="mid"
+    )
+    async with session_factory() as session:
+        response = await start_search(session, BackgroundTasks(), request)
+        await session.commit()
+
+    run_row = await get_run(response.search_id)
+    assert run_row.query["country"] == "fr"
+    assert run_row.query["location"] == "Munich"
+    assert run_row.query["salary_min"] == 100
+    assert run_row.query["salary_max"] == 90000
+    assert run_row.query["seniority"] == "mid"
+
+
+async def test_start_search_without_country_anywhere_rejects() -> None:
+    profile_id = await seed_profile_with_prefs()
+    from app.core.db import session_factory
+    from app.models import Profile
+
+    async with session_factory() as session:
+        row = await session.get(Profile, profile_id)
+        structured = dict(PROFILE_WITH_PREFS)
+        structured["contact"] = {k: v for k, v in structured["contact"].items() if k != "country"}
+        row.structured_profile = structured
+        await session.commit()
+
+    request = payload(profile_id=profile_id, country=None)
+    async with session_factory() as session:
+        with pytest.raises(MissingSearchCountryError):
+            await start_search(session, BackgroundTasks(), request)
+
+
+async def _start(payload_obj: JobSearchRequest):
+    async with session_factory() as session:
+        response = await start_search(session, BackgroundTasks(), payload_obj)
+        await session.commit()
+        return response
+
+
+async def test_start_search_stamps_source_on_run(monkeypatch: pytest.MonkeyPatch) -> None:
+    only_sources(monkeypatch, FakeJobSource("adzuna"))
+    profile_id = await seed_profile_with_prefs()
+
+    response = await _start(payload(profile_id=profile_id))
+    run_row = await get_run(response.search_id)
+    assert run_row.source == "adzuna"
+
+
+async def test_start_search_rejects_active_duplicate(monkeypatch: pytest.MonkeyPatch) -> None:
+    only_sources(monkeypatch, FakeJobSource("adzuna"))
+    profile_id = await seed_profile_with_prefs()
+    first = await _start(payload(profile_id=profile_id))
+
+    with pytest.raises(DuplicateRunError) as excinfo:
+        await _start(payload(profile_id=profile_id))
+    assert excinfo.value.active_search_id == first.search_id
+
+
+async def test_start_search_allows_run_after_terminal_status(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    only_sources(monkeypatch, FakeJobSource("adzuna"))
+    profile_id = await seed_profile_with_prefs()
+    first = await _start(payload(profile_id=profile_id))
+
+    async with session_factory() as session:
+        stored = await session.get(JobSearch, first.search_id)
+        assert stored is not None
+        stored.status = JobSearchStatus.succeeded
+        await session.commit()
+
+    second = await _start(payload(profile_id=profile_id))
+    assert second.search_id != first.search_id
+
+
+async def test_start_search_allows_other_source(monkeypatch: pytest.MonkeyPatch) -> None:
+    only_sources(
+        monkeypatch,
+        FakeJobSource("adzuna", postings=[fake_posting("1")]),
+        FakeJobSource("apify_linkedin", postings=[fake_posting("2")]),
+    )
+    await acknowledge("adzuna")
+    await acknowledge("apify_linkedin")
+    profile_id = await seed_profile_with_prefs()
+    first = await _start(payload(profile_id=profile_id))
+
+    second = await _start(payload(profile_id=profile_id, source="apify_linkedin"))
+    assert second.search_id != first.search_id
+
+
+async def test_sweeper_reclaims_stuck_run(monkeypatch: pytest.MonkeyPatch) -> None:
+    only_sources(monkeypatch, FakeJobSource("adzuna"))
+    profile_id = await seed_profile_with_prefs()
+    stuck = await _start(payload(profile_id=profile_id))
+
+    async with session_factory() as session:
+        stored = await session.get(JobSearch, stuck.search_id)
+        assert stored is not None
+        stored.updated_at = datetime.now(UTC) - timedelta(days=1)
+        await session.commit()
+
+    second = await _start(payload(profile_id=profile_id))
+    assert second.search_id != stuck.search_id
+
+    reclaimed = await get_run(stuck.search_id)
+    assert reclaimed.status.value == "failed"
+    assert reclaimed.results is not None
+    assert reclaimed.results[0]["warning"] == _ABANDONED_WARNING
+
+
+async def test_sweeper_spares_fresh_runs(monkeypatch: pytest.MonkeyPatch) -> None:
+    only_sources(monkeypatch, FakeJobSource("adzuna"))
+    profile_id = await seed_profile_with_prefs()
+    active = await _start(payload(profile_id=profile_id))
+
+    with pytest.raises(DuplicateRunError):
+        await _start(payload(profile_id=profile_id))
+
+    untouched = await get_run(active.search_id)
+    assert untouched.status.value == "pending"
+    assert untouched.results is None
+
+
+async def test_duplicate_run_error_from_index_race(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The pre-flight SELECT is advisory; the index is the enforcement."""
+    only_sources(monkeypatch, FakeJobSource("adzuna"))
+    profile_id = await seed_profile_with_prefs()
+
+    async def _no_preflight(session: object, profile_id_: object, source_name_: object) -> None:
+        return None
+
+    monkeypatch.setattr(ingestion, "_raise_if_duplicate_run", _no_preflight)
+    first = await _start(payload(profile_id=profile_id))
+
+    with pytest.raises(DuplicateRunError) as excinfo:
+        await _start(payload(profile_id=profile_id))
+    assert excinfo.value.active_search_id == first.search_id

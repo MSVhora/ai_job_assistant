@@ -4,24 +4,10 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
+from app.schemas.enums import RemotePreference, SeniorityLevel
 from app.schemas.job_search import StoredSearchQueries
 
 RevisionSourceLiteral = Literal["ai_extraction", "manual_edit", "gap_fill", "reupload_merge"]
-
-RemotePreference = Literal["remote", "hybrid", "onsite", "flexible"]
-
-SeniorityLevel = Literal[
-    "intern",
-    "junior",
-    "mid",
-    "senior",
-    "staff",
-    "lead",
-    "principal",
-    "manager",
-    "director",
-    "executive",
-]
 
 
 class SourceLink(BaseModel):
@@ -110,6 +96,11 @@ class Preferences(BaseModel):
     salary_max: float | None = Field(default=None, ge=0)
     currency: str | None = None
     seniority: SeniorityLevel | None = None
+    # Server-managed provenance for seniority (issue #32): "derived" when filled
+    # from years_of_experience by apply_derived_fields, "user" when the user
+    # picked (or answered in chat) a value. None on legacy rows; treated as
+    # user-set — derivation never overwrites those.
+    seniority_source: Literal["user", "derived"] | None = None
     work_authorization: str | None = Field(default=None, max_length=200)
 
 
@@ -125,6 +116,10 @@ class StructuredProfile(BaseModel):
     awards: list[AwardItem] = []
     extra_sections: list[ExtraSection] = []
     preferences: Preferences | None = None
+    # Whole years of career span, derived deterministically from the verbatim
+    # experience date strings by apply_derived_fields (issue #32). Server-managed:
+    # never sent by the client; recomputed on every extraction/profile save.
+    years_of_experience: int | None = Field(default=None, ge=0)
 
     @model_validator(mode="after")
     def require_some_content(self) -> "StructuredProfile":
@@ -201,6 +196,10 @@ class ProfileResponse(BaseModel):
     source_resume_filename: str | None
     updated_at: datetime
     last_revision: RevisionSummary | None = None
+    # Keys-only list of gap-fill-able fields the profile still lacks (issue #31).
+    # Computed server-side from the stored structured profile; the frontend uses
+    # the emptiness to hide the gap-fill chat entirely for complete profiles.
+    missing_fields: list[str] = Field(default_factory=list)
 
 
 class ProfileSummary(BaseModel):

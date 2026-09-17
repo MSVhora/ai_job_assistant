@@ -134,11 +134,21 @@ Nothing in the flow dead-ends — every failure has an explicit recovery path:
    with AI-extracted fields highlighted. You choose the destination: merge into an existing
    profile, or save as a new one (named — e.g. "Senior Android Developer" vs "Senior
    Software Engineer"). Every correction lands in that profile's `profile_revision` trail.
+   Years of experience are auto-estimated deterministically from the verbatim experience
+   date strings at extraction and on every save (issue #32) — shown read-only in the
+   review form. If seniority was never set by you, it is derived from those years and
+   marked with a "Derived from experience" badge; picking a value in the dropdown overrides
+   it and the server then treats it as user-set (never re-derived).
 3. **Fill the gaps** *(live)* — on the profile page, a short chat asks *only* about genuinely
     missing fields (typically: country, target location, remote preference, salary band, seniority,
     work authorization). Answers are pydantic-validated before anything is saved, each applied turn
     lands in `profile_revision` with source `gap_fill`, and the editor form stays in sync with
-    what the chat saved.
+    what the chat saved. A seniority the backend derived from experience does not count as
+    missing — it already fills the value via the badge-visible fallback (issue #32). The chat is only shown while something is genuinely missing: a
+    profile with no gaps never renders it at all (the profile response carries the
+    server-computed `missing_fields` list), so there's no dead-end "start the chat to hear
+    you're all set" flow. When a conversation *completes* your preferences, the backend
+    regenerates the stored search queries in the background (issue #31) — no action needed.
     The manual-edit form carries the country too: the **Country code** field in the Contact
     section (ISO 3166-1 alpha-2, e.g. `de`) round-trips with every save, so a country the
     chat set survives later manual edits (fixed in v3 #30 — it used to be silently wiped).

@@ -95,7 +95,7 @@ export function MatchCard({
             title={`Vector ${match.vector_score !== null && match.vector_score !== undefined ? scorePercent(match.vector_score) : "–"}${match.role_fit !== null && match.role_fit !== undefined ? ` · role fit ${match.role_fit}/10` : ""}${match.company_fit !== null && match.company_fit !== undefined ? ` · company fit ${match.company_fit}/10` : ""}`}
           >
             <SparkleIcon />
-            {scorePercent(match.final_score)}% match
+            {scorePercent(match.final_score)} match
           </span>
           {posting.posted_at && (
             <span className="text-[11px] text-gray-500">

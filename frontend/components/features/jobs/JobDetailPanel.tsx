@@ -197,8 +197,8 @@ export function JobDetailPanel({
                   AI match breakdown
                 </h4>
                 <div className="flex flex-col gap-1.5">
-                  <ScoreRow label="Final score" value={`${scorePercent(match?.final_score ?? 0)}%`} />
-                  <ScoreRow label="Similarity" value={`${scorePercent(match?.vector_score ?? 0)}%`} />
+                  <ScoreRow label="Final score" value={scorePercent(match?.final_score ?? 0)} />
+                  <ScoreRow label="Similarity" value={scorePercent(match?.vector_score ?? 0)} />
                   {match?.role_fit != null && (
                     <ScoreRow label="Role fit" value={`${match.role_fit}/10`} />
                   )}

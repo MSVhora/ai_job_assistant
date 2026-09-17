@@ -407,7 +407,7 @@ sequenceDiagram
 Searches run in the background — you can navigate away; results appear when the run
 finishes.
 
-### One active run per profile + source
+### One active run per profile + source (issue #36)
 
 Firing the same source twice for the same profile (double billed results, double quota
 burn) is prevented server-side: `POST /api/jobs/search` answers **409 Conflict** with the

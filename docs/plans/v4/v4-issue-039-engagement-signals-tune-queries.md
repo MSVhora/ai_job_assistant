@@ -1,6 +1,22 @@
 # Issue #39 — Engagement signals + on-demand tune-my-queries (M6 / Phase F)
 
-**Status:** Planned (branch `v4/39-engagement-signals-tune-queries`, cut from `v4/milestone`)
+**Status:** Implemented (branch `v4/39-engagement-signals-tune-queries`; implementation notes:
+the status views (Active / Saved / Dismissed / All) landed as tabs in the match-list
+header rather than the filter panel — they are list views, not posting filters, and
+`saved` excludes dismissed rows so bucket precedence is visible in the UI too; the
+apply redirect returns 404 and records nothing when the posting URL is missing
+(verified); a first-write-wins flush expires `updated_at` via `onupdate`, so
+`record_match_signal` refreshes the match inside the greenlet before building
+`MatchResponse` (raw attribute access raised `MissingGreenlet`); tuning filters
+zero-count skills out of the bucket aggregates; the tuner keys the overwritten hash
+on the *enabled* source list so `ensure_queries_fresh` stays a cache hit; deletion of
+`c3f4cc09d71f`-era note — migration head was `0019`, so this issue's migration is
+`0020`; full suite green (462 tests), frontend lint+build green.
+**Plan-of-record deltas** (flagged, per the house rule): `saved_at`/`dismissed_at`
+required net-new endpoints + card UI (the "existing save action" in the plan-of-record
+did not exist); apply links moved through a server-side redirect endpoint that records
+`clicked_apply_at`; no `estimate_cost` exists in the wrapper, so cost awareness is the
+confirm dialog + logged/returned token usage rather than a price table.
 **Tracks:** GitHub issue #39 (milestone `v4`, Phase F — feedback loop, Problem 10)
 **Plan of record:** [v4-search-relevance-plan.md](v4-search-relevance-plan.md) Problem 10
 **Depends on:** #31 (`queries_input_hash` guard — tuning must leave a matching hash),

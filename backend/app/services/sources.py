@@ -20,10 +20,10 @@ async def enable_source(
 ) -> SourceInfoResponse:
     source = registry.get_source(name)
     if source is None:
-        raise JobSourceNotFoundError()
+        raise JobSourceNotFoundError
     if source.disclosure_required:
         if not acknowledged_disclosure:
-            raise DisclosureNotAcknowledgedError()
+            raise DisclosureNotAcknowledgedError
         await _acknowledge(session, name)
     return _source_info(source, await _acknowledged_names(session))
 

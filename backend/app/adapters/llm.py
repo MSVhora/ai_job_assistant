@@ -84,7 +84,8 @@ async def _completion_with_retry(
     except Exception as exc:
         reason = _failure_reason(exc)
         logger.warning("llm.generate failed (%s): %s", type(exc).__name__, reason)
-        raise LLMError(f"llm generation failed: {reason}") from exc
+        msg = f"llm generation failed: {reason}"
+        raise LLMError(msg) from exc
 
 
 async def generate(
@@ -139,7 +140,8 @@ async def embed(texts: list[str]) -> EmbeddingResult:
     except Exception as exc:
         reason = _failure_reason(exc)
         logger.warning("llm.embed failed (%s): %s", type(exc).__name__, reason)
-        raise LLMError(f"llm embedding failed: {reason}") from exc
+        msg = f"llm embedding failed: {reason}"
+        raise LLMError(msg) from exc
 
     duration_ms = (time.perf_counter() - start) * 1000
     usage = response.usage
@@ -197,10 +199,11 @@ async def parse_structured[ModelT: BaseModel](
         try:
             data = schema.model_validate_json(_extract_json(repair.text))
         except ValidationError as repair_exc:
-            raise LLMError(
+            msg = (
                 "structured output failed validation after repair: "
                 f"{_format_validation_errors(repair_exc)}"
-            ) from repair_exc
+            )
+            raise LLMError(msg) from repair_exc
         prompt_tokens = first.prompt_tokens + repair.prompt_tokens
         completion_tokens = first.completion_tokens + repair.completion_tokens
 

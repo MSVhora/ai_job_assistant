@@ -67,10 +67,9 @@ def _remote_type(payload: dict[str, object]) -> RemoteType | None:
 
 
 def _posted_at(payload: dict[str, object]) -> datetime | None:
-    parsed = parse_datetime(payload.get("postedAtTimestamp")) or parse_datetime(
+    return parse_datetime(payload.get("postedAtTimestamp")) or parse_datetime(
         payload.get("postedAt")
     )
-    return parsed
 
 
 def _expires_at(payload: dict[str, object]) -> datetime | None:
@@ -81,7 +80,8 @@ def normalize(raw: RawJobPosting) -> JobPostingData:
     payload = raw.payload
     title = clean_text(payload.get("title"))
     if title is None:
-        raise ConnectorError("linkedin posting has no title")
+        msg = "linkedin posting has no title"
+        raise ConnectorError(msg)
     description = clean_text(payload.get("descriptionText")) or clean_text(
         payload.get("descriptionHtml")
     )
@@ -103,4 +103,5 @@ def normalize(raw: RawJobPosting) -> JobPostingData:
             raw_payload=payload,
         )
     except ValidationError as exc:
-        raise ConnectorError(f"linkedin posting failed normalization: {exc}") from exc
+        msg = f"linkedin posting failed normalization: {exc}"
+        raise ConnectorError(msg) from exc

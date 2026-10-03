@@ -29,16 +29,16 @@ class MatchSignalRequest(BaseModel):
 
 __all__ = [
     "MatchFilters",
+    "MatchListStatus",
     "MatchQueryParams",
     "MatchRebuildStatusResponse",
     "MatchResponse",
     "MatchSignalKind",
     "MatchSignalRequest",
-    "MatchListStatus",
     "MatchSort",
+    "MatchingOutcome",
     "RerankItem",
     "RerankResult",
-    "MatchingOutcome",
 ]
 
 

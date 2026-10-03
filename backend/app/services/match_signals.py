@@ -64,7 +64,7 @@ async def _load_match(session: AsyncSession, match_id: uuid.UUID) -> tuple[Match
         )
     ).first()
     if row is None:
-        raise MatchNotFoundError()
+        raise MatchNotFoundError
     return row[0], row[1]
 
 
@@ -102,7 +102,8 @@ async def resolve_apply_target(session: AsyncSession, match_id: uuid.UUID) -> st
     """
     match, posting = await _load_match(session, match_id)
     if not posting.url:
-        raise MatchNotFoundError("job posting has no external apply URL")
+        msg = "job posting has no external apply URL"
+        raise MatchNotFoundError(msg)
     if match.clicked_apply_at is None:
         match.clicked_apply_at = datetime.now(UTC)
         logger.info("match.signal kind=apply_clicked match_id=%s", match_id)

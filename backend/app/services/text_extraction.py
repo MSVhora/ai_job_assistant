@@ -22,7 +22,7 @@ def sniff_file_type(filename: str, head: bytes) -> SupportedKind:
         return "pdf"
     if extension == ".docx" and head.startswith(_ZIP_MAGIC):
         return "docx"
-    raise UnsupportedFileTypeError()
+    raise UnsupportedFileTypeError
 
 
 def extract_pdf(data: bytes) -> tuple[str, int]:
@@ -32,7 +32,8 @@ def extract_pdf(data: bytes) -> tuple[str, int]:
             page_texts = [page.extract_text() or "" for page in pdf.pages]
     except Exception as exc:
         logger.warning("pdf text extraction failed", exc_info=True)
-        raise TextExtractionError("file could not be parsed as a PDF") from exc
+        msg = "file could not be parsed as a PDF"
+        raise TextExtractionError(msg) from exc
     return "\n\n".join(t for t in page_texts if t.strip()), page_count
 
 
@@ -41,7 +42,8 @@ def extract_docx(data: bytes) -> str:
         document = Document(io.BytesIO(data))
     except Exception as exc:
         logger.warning("docx text extraction failed", exc_info=True)
-        raise TextExtractionError("file could not be parsed as a DOCX") from exc
+        msg = "file could not be parsed as a DOCX"
+        raise TextExtractionError(msg) from exc
     parts = [p.text for p in document.paragraphs if p.text.strip()]
     for table in document.tables:
         for row in table.rows:

@@ -169,7 +169,7 @@ async def list_profiles(session: AsyncSession) -> list[ProfileSummary]:
 async def get_profile(session: AsyncSession, profile_id: uuid.UUID) -> ProfileResponse:
     profile = await session.get(Profile, profile_id)
     if profile is None:
-        raise ProfileNotFoundError()
+        raise ProfileNotFoundError
     filename = await _resume_filename(session, profile.source_resume_id)
     revision = await _latest_revision(session, profile.id)
     return _profile_response(profile, filename, revision)
@@ -241,7 +241,7 @@ async def create_profile(session: AsyncSession, payload: ProfileCreate) -> Profi
     if payload.source_resume_id is not None:
         resume = await session.get(Resume, payload.source_resume_id)
         if resume is None or resume.candidate_id != candidate.id:
-            raise ResumeNotFoundError()
+            raise ResumeNotFoundError
         if resume.draft_profile is not None:
             draft = _normalized(resume.draft_profile)
         draft_queries = resume.search_queries
@@ -279,7 +279,7 @@ async def save_profile(
 ) -> ProfileResponse:
     profile = await session.get(Profile, profile_id)
     if profile is None:
-        raise ProfileNotFoundError()
+        raise ProfileNotFoundError
 
     renamed = payload.name is not None and payload.name.strip() != profile.name
     if renamed:
@@ -295,7 +295,7 @@ async def save_profile(
         if payload.source_resume_id is not None:
             resume = await session.get(Resume, payload.source_resume_id)
             if resume is None or resume.candidate_id != profile.candidate_id:
-                raise ResumeNotFoundError()
+                raise ResumeNotFoundError
             profile.source_resume_id = resume.id
 
         source = (
@@ -348,7 +348,7 @@ async def update_preferences(
     """
     profile = await session.get(Profile, profile_id)
     if profile is None:
-        raise ProfileNotFoundError()
+        raise ProfileNotFoundError
     profile.preferences = payload.model_dump(mode="json")
     await session.flush()
     await session.refresh(profile)
@@ -361,7 +361,7 @@ async def update_preferences(
 async def delete_profile(session: AsyncSession, profile_id: uuid.UUID) -> None:
     profile = await session.get(Profile, profile_id)
     if profile is None:
-        raise ProfileNotFoundError()
+        raise ProfileNotFoundError
     await session.execute(delete(ProfileRevision).where(ProfileRevision.profile_id == profile.id))
     await session.delete(profile)
     await session.flush()
@@ -371,9 +371,9 @@ async def delete_profile(session: AsyncSession, profile_id: uuid.UUID) -> None:
 async def get_resume_draft(session: AsyncSession, resume_id: uuid.UUID) -> DraftProfileResponse:
     resume = await session.get(Resume, resume_id)
     if resume is None:
-        raise ResumeNotFoundError()
+        raise ResumeNotFoundError
     if resume.draft_profile is None or resume.parse_version is None or resume.parsed_at is None:
-        raise ResumeDraftUnavailableError()
+        raise ResumeDraftUnavailableError
     return DraftProfileResponse(
         resume_id=resume.id,
         candidate_id=resume.candidate_id,

@@ -284,7 +284,7 @@ async def run_gap_fill_turn(
     started = time.monotonic()
     profile = await session.get(Profile, profile_id)
     if profile is None:
-        raise ProfileNotFoundError()
+        raise ProfileNotFoundError
     current = StructuredProfile.model_validate(profile.structured_profile)
 
     missing = missing_fields(current)
@@ -299,7 +299,7 @@ async def run_gap_fill_turn(
         )
 
     if not is_llm_configured():
-        raise LLMNotConfiguredError()
+        raise LLMNotConfiguredError
 
     turn = await _llm_turn(current, missing, payload.messages)
     updated = current.model_copy(deep=True)

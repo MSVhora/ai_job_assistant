@@ -161,13 +161,14 @@ async def tune_for_profile(session: AsyncSession, profile_id: uuid.UUID) -> Sear
     """Rewrite the profile's stored query specs from engagement signals."""
     profile = await session.get(Profile, profile_id)
     if profile is None:
-        raise ProfileNotFoundError()
+        raise ProfileNotFoundError
     if not is_llm_configured():
-        raise LLMQueryGenerationError("LLM provider is not configured")
+        msg = "LLM provider is not configured"
+        raise LLMQueryGenerationError(msg)
 
     enabled = await sources_service.enabled_sources(session)
     if not enabled:
-        raise NoJobSourcesConfiguredError()
+        raise NoJobSourcesConfiguredError
     names = sorted(source.name for source in enabled)
     declaration_map = {source.name: source.filters() for source in enabled}
 
@@ -181,7 +182,7 @@ async def tune_for_profile(session: AsyncSession, profile_id: uuid.UUID) -> Sear
         )
     )
     if not engaged:
-        raise NoTunableSignalsError()
+        raise NoTunableSignalsError
 
     buckets = await aggregate_signal_buckets(session, profile_id, signal_skills(structured))
 
@@ -218,7 +219,8 @@ async def tune_for_profile(session: AsyncSession, profile_id: uuid.UUID) -> Sear
 
     missing = [name for name in names if name not in result.data.queries]
     if missing:
-        raise LLMQueryGenerationError(f"query tuning missing sources: {', '.join(missing)}")
+        msg = f"query tuning missing sources: {', '.join(missing)}"
+        raise LLMQueryGenerationError(msg)
 
     tuned = StoredSearchQueries(
         queries=_strip_undeclared_options(

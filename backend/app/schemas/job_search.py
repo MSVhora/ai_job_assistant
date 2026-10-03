@@ -120,14 +120,16 @@ class JobSearchRequest(BaseModel):
             and self.salary_max is not None
             and self.salary_min > self.salary_max
         ):
-            raise ValueError("salary_min must be <= salary_max")
+            msg = "salary_min must be <= salary_max"
+            raise ValueError(msg)
         return self
 
     @model_validator(mode="after")
     def _source_queries_match_source(self) -> "JobSearchRequest":
         for name in self.source_queries or {}:
             if name != self.source:
-                raise ValueError("source_queries keys must match source")
+                msg = "source_queries keys must match source"
+                raise ValueError(msg)
         return self
 
 

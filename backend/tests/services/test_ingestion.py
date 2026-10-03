@@ -227,7 +227,8 @@ async def test_failing_source_marks_run_failed(monkeypatch: pytest.MonkeyPatch) 
     run_row = await get_run(run)
     assert run_row.status.value == "failed"
     results = run_row.results
-    assert results is not None and len(results) == 1
+    assert results is not None
+    assert len(results) == 1
     failed = results[0]
     assert failed["source"] == "adzuna"
     assert failed["status"] == "failed"
@@ -240,7 +241,8 @@ async def test_unmappable_postings_are_skipped_with_warning(
 ) -> None:
     class BadNormalizer(FakeJobSource):
         def normalize(self, raw: object) -> object:
-            raise ConnectorError("no title")
+            msg = "no title"
+            raise ConnectorError(msg)
 
     source = BadNormalizer("adzuna", postings=[fake_posting("1"), fake_posting("2")])
     only_sources(monkeypatch, source)
@@ -518,7 +520,8 @@ async def test_run_search_skips_matching_when_no_postings_ingested(
     only_sources(monkeypatch, source)
 
     async def fail_if_called(**kw: object) -> object:
-        raise AssertionError("rerank must not run when nothing was ingested")
+        msg = "rerank must not run when nothing was ingested"
+        raise AssertionError(msg)
 
     install_acompletion(monkeypatch, fail_if_called)
 
@@ -527,7 +530,8 @@ async def test_run_search_skips_matching_when_no_postings_ingested(
 
     run_row = await get_run(run)
     assert run_row.status.value == "succeeded"
-    assert run_row.results is not None and run_row.results[0]["count"] == 0
+    assert run_row.results is not None
+    assert run_row.results[0]["count"] == 0
     assert run_row.matching is not None
     assert run_row.matching["status"] == "skipped"
     assert "no postings ingested" in run_row.matching["warning"]

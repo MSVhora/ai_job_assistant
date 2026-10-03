@@ -107,10 +107,11 @@ class Settings(BaseSettings):
             return value
         total = sum(weights[name] for name in _MATCH_WEIGHTS)
         if not math.isclose(total, 1.0, rel_tol=0.0, abs_tol=0.01):
-            raise ValueError(
+            msg = (
                 f"match weights must sum to 1.0 (±0.01), got {total:.4f} from "
                 f"{ {name: weights[name] for name in _MATCH_WEIGHTS} }"
             )
+            raise ValueError(msg)
         return value
 
 

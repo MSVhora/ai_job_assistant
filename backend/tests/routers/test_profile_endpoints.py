@@ -143,7 +143,8 @@ async def test_two_profiles_from_same_draft_have_independent_revisions(
         with_headline(VALID_PROFILE, "Full-Stack Engineer"),
         inserted["resume_id"],
     )
-    assert android.status_code == 201 and swe.status_code == 201
+    assert android.status_code == 201
+    assert swe.status_code == 201
     android_id = android.json()["profile_id"]
     swe_id = swe.json()["profile_id"]
 

@@ -82,15 +82,18 @@ def load_actor_configs(path: Path = DEFAULT_CONFIG_PATH) -> list[ActorConfig]:
     try:
         raw = yaml.safe_load(path.read_text())
     except OSError as exc:
-        raise ConnectorConfigError(f"cannot read connector config {path}: {exc}") from exc
+        msg = f"cannot read connector config {path}: {exc}"
+        raise ConnectorConfigError(msg) from exc
     try:
         config = ConnectorsConfig.model_validate(raw)
     except (ValidationError, TypeError) as exc:
-        raise ConnectorConfigError(f"invalid connector config {path}: {exc}") from exc
+        msg = f"invalid connector config {path}: {exc}"
+        raise ConnectorConfigError(msg) from exc
     names = [actor.name for actor in config.sources]
     duplicates = {name for name in names if names.count(name) > 1}
     if duplicates:
-        raise ConnectorConfigError(f"duplicate source names in config: {sorted(duplicates)}")
+        msg = f"duplicate source names in config: {sorted(duplicates)}"
+        raise ConnectorConfigError(msg)
     for actor in config.sources:
         _validate_placeholders(actor)
     return config.sources
@@ -107,15 +110,17 @@ def _validate_placeholders(actor: ActorConfig) -> None:
         if stripped.startswith(_OPTION_PLACEHOLDER_PREFIX):
             option_key = stripped.removeprefix(_OPTION_PLACEHOLDER_PREFIX)
             if option_key not in declared_option_keys:
-                raise ConnectorConfigError(
+                msg = (
                     f"actor {actor.name}: placeholder {{{stripped}}} declares no filter; "
                     f"declared filters: {_describe_filters(actor)}"
                 )
+                raise ConnectorConfigError(msg)
         elif stripped not in _PLACEHOLDER_KEYS:
-            raise ConnectorConfigError(
+            msg = (
                 f"actor {actor.name}: unknown placeholder {{{stripped}}} "
                 f"(supported: {_PLACEHOLDER_KEYS} or {{option:<declared filter key>}})"
             )
+            raise ConnectorConfigError(msg)
 
 
 def _describe_filters(actor: ActorConfig) -> str:

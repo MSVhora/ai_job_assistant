@@ -68,10 +68,11 @@ async def embed_texts(texts: list[str]) -> list[list[float]]:
     expected_dim = get_settings().embedding_dimensions
     for vector in result.vectors:
         if len(vector) != expected_dim:
-            raise LLMError(
+            msg = (
                 f"embedding dimension mismatch: got {len(vector)}, expected {expected_dim} "
                 f"(embedding_model changed without a column migration?)"
             )
+            raise LLMError(msg)
     return result.vectors
 
 

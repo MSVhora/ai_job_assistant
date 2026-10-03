@@ -67,7 +67,8 @@ def test_normalize_maps_full_posting() -> None:
     assert data.company == "Markant Gruppe"
     assert data.location == "Offenburg, Ortenaukreis"
     assert data.url == "https://www.adzuna.de/land/ad/5862011801"
-    assert data.job_type is not None and data.job_type.value == "full_time"
+    assert data.job_type is not None
+    assert data.job_type.value == "full_time"
     assert data.remote_type is None
     assert data.description == "Lead the data platform team. SQL Python"
     assert data.posted_at == datetime(2026, 8, 30, 10, 22, 10, tzinfo=UTC)
@@ -83,7 +84,8 @@ def test_normalize_maps_minimal_posting_from_contract_type() -> None:
 
     assert data.title == "Backend Engineer"
     assert data.company == "STRATEC SE"
-    assert data.job_type is not None and data.job_type.value == "contract"
+    assert data.job_type is not None
+    assert data.job_type.value == "contract"
     assert data.salary_min is None
     assert data.salary_max is None
     assert data.posted_at is not None
@@ -500,7 +502,8 @@ async def test_search_fetches_page_two_when_page_one_full(
 
     postings = await source.search(JobSearchQuery(query="python", country="de", results_wanted=100))
 
-    assert urls and all("/search/1" in url for url in urls)
+    assert urls
+    assert all("/search/1" in url for url in urls)
     assert len(postings) == 100
     ids = [posting.external_id for posting in postings]
     assert len(ids) == len(set(ids))

@@ -56,7 +56,7 @@ def resolve_profile_defaults(payload: JobSearchRequest, profile: Profile) -> Job
     structured = StructuredProfile.model_validate(profile.structured_profile)
     preferences = structured.preferences
     if payload.country is None and structured.contact.country is None:
-        raise MissingSearchCountryError()
+        raise MissingSearchCountryError
     update: dict[str, object] = {"country": payload.country or structured.contact.country}
     if payload.location is None and preferences is not None:
         update["location"] = preferences.target_location
@@ -80,29 +80,32 @@ def _validate_queries(payload: JobSearchRequest, source: JobSource) -> None:
             return
     if payload.query:
         return
-    raise MissingSearchQueryError(f"no search query for source: {source.name}")
+    msg = f"no search query for source: {source.name}"
+    raise MissingSearchQueryError(msg)
 
 
 async def _selected_source(session: AsyncSession, payload: JobSearchRequest) -> JobSource:
     source = registry.get_source(payload.source)
     if source is None:
-        raise UnknownJobSourceError(f"unknown job source: {payload.source}")
+        msg = f"unknown job source: {payload.source}"
+        raise UnknownJobSourceError(msg)
     enabled = {
         enabled_source.name: enabled_source
         for enabled_source in await sources_service.enabled_sources(session)
     }
     selected = enabled.get(payload.source)
     if selected is None:
-        raise JobSourceNotEnabledError(f"job source is not enabled: {payload.source}")
+        msg = f"job source is not enabled: {payload.source}"
+        raise JobSourceNotEnabledError(msg)
     return selected
 
 
 async def _require_profile(session: AsyncSession, profile_id: uuid.UUID | None) -> Profile:
     if profile_id is None:
-        raise MissingProfileIdError()
+        raise MissingProfileIdError
     profile = await session.get(Profile, profile_id)
     if profile is None:
-        raise ProfileNotFoundError()
+        raise ProfileNotFoundError
     return profile
 
 
@@ -409,7 +412,7 @@ async def _require_owned_search(
 ) -> JobSearch:
     run = await session.get(JobSearch, search_id)
     if run is None or run.profile_id != profile_id:
-        raise JobSearchNotFoundError()
+        raise JobSearchNotFoundError
     return run
 
 
@@ -471,5 +474,5 @@ async def get_search_postings(
 async def get_posting_detail(session: AsyncSession, posting_id: uuid.UUID) -> JobPostingDetail:
     posting = await session.get(JobPosting, posting_id)
     if posting is None:
-        raise JobPostingNotFoundError()
+        raise JobPostingNotFoundError
     return JobPostingDetail.from_posting(posting)

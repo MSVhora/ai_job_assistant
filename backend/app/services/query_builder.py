@@ -174,9 +174,11 @@ async def generate_queries(
     at 0 for reproducibility.
     """
     if not is_llm_configured():
-        raise LLMQueryGenerationError("LLM provider is not configured")
+        msg = "LLM provider is not configured"
+        raise LLMQueryGenerationError(msg)
     if not sources:
-        raise LLMQueryGenerationError("no sources requested")
+        msg = "no sources requested"
+        raise LLMQueryGenerationError(msg)
 
     effective_temperature = (
         temperature if temperature is not None else (GENERATION_TEMPERATURE if previous else 0.0)
@@ -210,7 +212,8 @@ async def generate_queries(
 
     missing = [name for name in sources if name not in result.data.queries]
     if missing:
-        raise LLMQueryGenerationError(f"query generation missing sources: {', '.join(missing)}")
+        msg = f"query generation missing sources: {', '.join(missing)}"
+        raise LLMQueryGenerationError(msg)
 
     settings = get_settings()
     return StoredSearchQueries(
@@ -228,17 +231,18 @@ async def regenerate_for_profile(
 ) -> SearchQueriesResponse:
     profile = await session.get(Profile, profile_id)
     if profile is None:
-        raise ProfileNotFoundError()
+        raise ProfileNotFoundError
     structured = StructuredProfile.model_validate(profile.structured_profile)
 
     enabled = await sources_service.enabled_sources(session)
     if not enabled:
-        raise NoJobSourcesConfiguredError()
+        raise NoJobSourcesConfiguredError
     known = {source.name for source in enabled}
     names = sources if sources is not None else sorted(known)
     for name in names:
         if name not in known:
-            raise UnknownJobSourceError(f"job source is not enabled: {name}")
+            msg = f"job source is not enabled: {name}"
+            raise UnknownJobSourceError(msg)
 
     stored = parse_stored(profile.search_queries)
     declaration_map = {source.name: source.filters() for source in enabled}

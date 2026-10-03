@@ -48,11 +48,13 @@ def _require_terms(query: JobSearchQuery) -> JobSearchQuery:
     plan = query.term_plan
     if plan is None:
         if not query.query:
-            raise ConnectorError("search needs a query or a title phrase")
+            msg = "search needs a query or a title phrase"
+            raise ConnectorError(msg)
         return query
     if plan.keywords:
         return query
-    raise ConnectorError("search needs a query or a title phrase")
+    msg = "search needs a query or a title phrase"
+    raise ConnectorError(msg)
 
 
 def _load_mapper(source_name: str) -> MapperFn:
@@ -60,12 +62,12 @@ def _load_mapper(source_name: str) -> MapperFn:
     try:
         module = importlib.import_module(module_name)
     except ModuleNotFoundError as exc:
-        raise ConnectorConfigError(
-            f"actor {source_name!r} has no mapper module ({module_name})"
-        ) from exc
+        msg = f"actor {source_name!r} has no mapper module ({module_name})"
+        raise ConnectorConfigError(msg) from exc
     mapper = getattr(module, "normalize", None)
     if not callable(mapper):
-        raise ConnectorConfigError(f"mapper module {module_name} does not define normalize()")
+        msg = f"mapper module {module_name} does not define normalize()"
+        raise ConnectorConfigError(msg)
     return mapper
 
 
@@ -89,7 +91,8 @@ class ApifyActorSource:
     async def search(self, query: JobSearchQuery) -> list[RawJobPosting]:
         token = get_settings().apify_token
         if token is None:
-            raise ConnectorError(f"{self.name} token is not configured")
+            msg = f"{self.name} token is not configured"
+            raise ConnectorError(msg)
 
         started = time.perf_counter()
         effective = _require_terms(query)
@@ -103,12 +106,14 @@ class ApifyActorSource:
             )
             run_id = run.get("id")
             if not isinstance(run_id, str) or not run_id:
-                raise ConnectorError(f"{self.name}: actor run response has no id")
+                msg = f"{self.name}: actor run response has no id"
+                raise ConnectorError(msg)
 
             run = await self._wait_for_run(client, run_id, token)
             dataset_id = run.get("defaultDatasetId")
             if not isinstance(dataset_id, str) or not dataset_id:
-                raise ConnectorError(f"{self.name}: run has no default dataset")
+                msg = f"{self.name}: run has no default dataset"
+                raise ConnectorError(msg)
 
             items = await self._request_json(
                 client, "GET", f"/v2/datasets/{dataset_id}/items", token, params={"clean": "true"}
@@ -135,11 +140,11 @@ class ApifyActorSource:
             if status == "SUCCEEDED":
                 return run
             if status in _TERMINAL_FAILURES:
-                raise ConnectorError(f"{self.name}: actor run ended with status {status}")
+                msg = f"{self.name}: actor run ended with status {status}"
+                raise ConnectorError(msg)
             if time.monotonic() >= deadline:
-                raise ConnectorError(
-                    f"{self.name}: actor run did not finish within {_MAX_WAIT_S:.0f}s"
-                )
+                msg = f"{self.name}: actor run did not finish within {_MAX_WAIT_S:.0f}s"
+                raise ConnectorError(msg)
             await asyncio.sleep(_POLL_INTERVAL_S)
 
     def _to_raw_postings(self, items: object) -> list[RawJobPosting]:
@@ -174,11 +179,13 @@ class ApifyActorSource:
             if response.status_code < 400:
                 return _unwrap_json(response, self.name)
             if retryable_status(response.status_code):
+                msg = f"status {response.status_code}"
                 raise Transient(
-                    f"status {response.status_code}",
+                    msg,
                     retry_after_s=retry_after_header(response.headers.get("retry-after")),
                 )
-            raise ConnectorError(f"{self.name} request failed (status {response.status_code})")
+            msg = f"{self.name} request failed (status {response.status_code})"
+            raise ConnectorError(msg)
 
         try:
             return await with_retry(f"{self.name}", _call, is_retryable=_is_retryable)
@@ -189,7 +196,8 @@ class ApifyActorSource:
                 description = f"transport error: {exc}"
             else:
                 description = str(exc)
-            raise ConnectorError(f"{self.name} request failed ({description})") from exc
+            msg = f"{self.name} request failed ({description})"
+            raise ConnectorError(msg) from exc
 
 
 def _is_retryable(exc: Exception) -> bool:
@@ -200,7 +208,8 @@ def _unwrap_json(response: httpx.Response, source_name: str) -> dict[str, Any]:
     try:
         payload: object = response.json()
     except ValueError as exc:
-        raise ConnectorError(f"{source_name} returned invalid JSON") from exc
+        msg = f"{source_name} returned invalid JSON"
+        raise ConnectorError(msg) from exc
     if isinstance(payload, list):
         return {"items": payload}
     if isinstance(payload, dict) and isinstance(payload.get("data"), dict):

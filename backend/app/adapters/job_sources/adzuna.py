@@ -70,7 +70,8 @@ def _apply_search_terms(params: dict[str, str], query: JobSearchQuery) -> None:
         if query.query:
             params["what"] = query.query
             return
-        raise ConnectorError("adzuna search needs a query or a title phrase")
+        msg = "adzuna search needs a query or a title phrase"
+        raise ConnectorError(msg)
     if plan.what_phrase:
         params["what_phrase"] = plan.what_phrase
     if plan.what_and:
@@ -82,7 +83,8 @@ def _apply_search_terms(params: dict[str, str], query: JobSearchQuery) -> None:
     if not plan.what_phrase and plan.what:
         params["what"] = plan.what
     if not any(key in params for key in ("what", "what_phrase", "what_and", "what_or")):
-        raise ConnectorError("adzuna search needs a query or a title phrase")
+        msg = "adzuna search needs a query or a title phrase"
+        raise ConnectorError(msg)
 
 
 def _apply_salary_filter(params: dict[str, str], query: JobSearchQuery) -> None:
@@ -198,7 +200,8 @@ class AdzunaJobSource:
     async def search(self, query: JobSearchQuery) -> list[RawJobPosting]:
         settings = get_settings()
         if not self.is_configured():
-            raise ConnectorError("adzuna credentials are not configured")
+            msg = "adzuna credentials are not configured"
+            raise ConnectorError(msg)
 
         results_per_page = min(query.results_wanted, _MAX_RESULTS_PER_PAGE)
         params: dict[str, str] = {
@@ -279,7 +282,8 @@ class AdzunaJobSource:
         payload = raw.payload
         title = clean_text(payload.get("title"))
         if title is None:
-            raise ConnectorError("adzuna posting has no title")
+            msg = "adzuna posting has no title"
+            raise ConnectorError(msg)
         company = payload.get("company")
         location = payload.get("location")
         try:
@@ -301,7 +305,8 @@ class AdzunaJobSource:
                 raw_payload=payload,
             )
         except ValidationError as exc:
-            raise ConnectorError(f"adzuna posting failed normalization: {exc}") from exc
+            msg = f"adzuna posting failed normalization: {exc}"
+            raise ConnectorError(msg) from exc
 
     async def _get_json(self, url: str, params: dict[str, str]) -> dict[str, Any]:
         def _describe(exc: Exception) -> str:
@@ -316,19 +321,23 @@ class AdzunaJobSource:
                         try:
                             return response.json()
                         except ValueError as exc:
-                            raise ConnectorError("adzuna returned invalid JSON") from exc
+                            msg = "adzuna returned invalid JSON"
+                            raise ConnectorError(msg) from exc
                     if retryable_status(response.status_code):
+                        msg = f"status {response.status_code}"
                         raise Transient(
-                            f"status {response.status_code}",
+                            msg,
                             retry_after_s=retry_after_header(response.headers.get("retry-after")),
                         )
-                    raise ConnectorError(f"adzuna request failed (status {response.status_code})")
+                    msg = f"adzuna request failed (status {response.status_code})"
+                    raise ConnectorError(msg)
 
                 return await with_retry("adzuna", _call, is_retryable=_is_retryable)
         except ConnectorError:
             raise
         except (httpx.HTTPError, Transient) as exc:
-            raise ConnectorError(f"adzuna request failed ({_describe(exc)})") from exc
+            msg = f"adzuna request failed ({_describe(exc)})"
+            raise ConnectorError(msg) from exc
 
 
 def _is_retryable(exc: Exception) -> bool:

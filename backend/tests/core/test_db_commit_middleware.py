@@ -39,13 +39,15 @@ async def test_unhandled_error_rolls_back_pending_writes() -> None:
         async def inner_app(scope: dict, receive, send) -> None:
             scope["db_session"].add(Candidate())
             await scope["db_session"].flush()
-            raise RuntimeError("boom")
+            msg = "boom"
+            raise RuntimeError(msg)
 
         async def receive() -> dict:
             return {"type": "http.request"}
 
         async def send(message: dict) -> None:
-            raise AssertionError("error responses must not be sent for unhandled errors")
+            msg = "error responses must not be sent for unhandled errors"
+            raise AssertionError(msg)
 
         with pytest.raises(RuntimeError):
             await DbCommitMiddleware(inner_app)(scope, receive, send)

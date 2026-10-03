@@ -25,6 +25,10 @@ dev = [
     "pytest-asyncio>=0.23",
     "httpx>=0.27",
     "ruff>=0.4",
+    "pyright>=1.1.380",
+    "pytest-cov>=5.0",
+    "pip-audit>=2.7",
+    "pre-commit>=3.7",
 ]
 
 [tool.setuptools.packages.find]
@@ -35,9 +39,35 @@ line-length = 100
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B"]
+select = ["ALL"]
+ignore = [
+    "D",       # docstring rules: the standard asks for comments only on non-obvious decisions
+    "COM812",  # trailing comma: conflicts with the formatter
+    "ISC001",  # implicit string concat: conflicts with the formatter
+    "CPY",     # copyright header: not wanted in a self-hosted app
+    "FAST001", # the API standard requires an explicit response_model on every route
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "ANN", "PLR2004", "SLF001", "ARG", "INP001"]
+"alembic/**" = ["INP001", "N999"]
+"scripts/**" = ["INP001", "T201"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"os.getenv".msg = "Read configuration through app.core.config.Settings."
+"os.environ".msg = "Read configuration through app.core.config.Settings."
+"openai".msg = "Call models through app.adapters.llm."
+"anthropic".msg = "Call models through app.adapters.llm."
+"google.generativeai".msg = "Call models through app.adapters.llm."
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = [".", "tests"]
+
+[tool.pyright]
+include = ["app"]
+pythonVersion = "3.12"
+typeCheckingMode = "strict"
+venvPath = "."
+venv = ".venv"

@@ -152,7 +152,8 @@ async def test_tune_rewrites_queries_and_hashes(monkeypatch: pytest.MonkeyPatch)
 
     async with session_factory() as session:
         stored = await session.get(Profile, profile_id)
-        assert stored is not None and stored.queries_input_hash is not None
+        assert stored is not None
+        assert stored.queries_input_hash is not None
         # hash now matches current inputs → ensure_queries_fresh must not
         # silently revert the tuned specs
         monkeypatch.setattr(
@@ -163,7 +164,8 @@ async def test_tune_rewrites_queries_and_hashes(monkeypatch: pytest.MonkeyPatch)
 
 
 async def _explode(*args: Any, **kwargs: Any) -> Any:
-    raise LLMQueryGenerationError("background regen must not run after tuning")
+    msg = "background regen must not run after tuning"
+    raise LLMQueryGenerationError(msg)
 
 
 async def test_tune_requires_signals() -> None:
@@ -206,7 +208,8 @@ async def test_tune_llm_failure_keeps_stored_specs(monkeypatch: pytest.MonkeyPat
         await session.commit()
 
     def _raise(**kw: Any) -> Any:
-        raise LLMError(" tunes are down")
+        msg = " tunes are down"
+        raise LLMError(msg)
 
     install_acompletion(monkeypatch, _raise)
 

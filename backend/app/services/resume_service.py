@@ -85,19 +85,20 @@ async def upload_resume(session: AsyncSession, file: UploadFile) -> ResumeUpload
     content_type = file.content_type or "application/octet-stream"
 
     if file.size is not None and file.size > max_bytes:
-        raise FileTooLargeError(f"file exceeds the {settings.resume_max_upload_mb} MB limit")
+        msg = f"file exceeds the {settings.resume_max_upload_mb} MB limit"
+        raise FileTooLargeError(msg)
     data = await file.read()
     if len(data) > max_bytes:
-        raise FileTooLargeError(f"file exceeds the {settings.resume_max_upload_mb} MB limit")
+        msg = f"file exceeds the {settings.resume_max_upload_mb} MB limit"
+        raise FileTooLargeError(msg)
 
     kind = sniff_file_type(filename, data[:8])
     candidate = await get_or_create_candidate(session)
 
     text, page_count = await asyncio.to_thread(_extract_from_bytes, data, kind)
     if not text.strip():
-        raise TextExtractionError(
-            "no readable text found — scanned or image-only PDFs are not supported"
-        )
+        msg = "no readable text found — scanned or image-only PDFs are not supported"
+        raise TextExtractionError(msg)
 
     destination = _save_file(settings.uploads_dir, data, kind)
     parsed_at = datetime.now(UTC)

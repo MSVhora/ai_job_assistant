@@ -63,7 +63,8 @@ def no_real_llm(monkeypatch: pytest.MonkeyPatch) -> None:
     from app.adapters.llm import LLMError
 
     async def _no_llm(**kwargs: object) -> object:
-        raise LLMError("LLM provider not faked in tests")
+        msg = "LLM provider not faked in tests"
+        raise LLMError(msg)
 
     monkeypatch.setattr(litellm, "acompletion", _no_llm)
 

@@ -22,7 +22,7 @@ _MONTHS = {
     "nov": 11,
     "dec": 12,
 }
-_PRESENT = re.compile(r"^(present|current|now|today|ongoing|current role|to date)$", re.I)
+_PRESENT = re.compile(r"^(present|current|now|today|ongoing|current role|to date)$", re.IGNORECASE)
 _MONTH_NAME = re.compile(r"^(?P<month>[A-Za-z]{3,9})\.?\s*,?\s*(?P<year>\d{4})$")
 _YEAR_ONLY = re.compile(r"^\d{4}$")
 _ISO_MONTH = re.compile(r"^(?P<year>\d{4})-(?P<month>\d{1,2})$")

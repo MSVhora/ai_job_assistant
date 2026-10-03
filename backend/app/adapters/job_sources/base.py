@@ -35,7 +35,7 @@ def parse_datetime(value: object) -> datetime | None:
         return None
     if isinstance(value, str):
         try:
-            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            parsed = datetime.fromisoformat(value)
         except ValueError:
             return None
         return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed
@@ -179,36 +179,41 @@ def _validate_option_value(decl: SourceFilterDecl, value: object) -> None:
     noun = f"filter '{decl.key}'"
     if decl.type == "number":
         if type(value) is not int:
-            raise InvalidSourceFilterError(f"{noun} must be an integer")
+            msg = f"{noun} must be an integer"
+            raise InvalidSourceFilterError(msg)
         return
     if decl.type == "boolean":
         if type(value) is not bool:
-            raise InvalidSourceFilterError(f"{noun} must be true or false")
+            msg = f"{noun} must be true or false"
+            raise InvalidSourceFilterError(msg)
         return
     if decl.type == "select":
         allowed = {option.value for option in decl.options or []}
         if type(value) is not str or value not in allowed:
             allowed_list = ", ".join(sorted(allowed))
-            raise InvalidSourceFilterError(f"{noun} must be one of: {allowed_list}")
+            msg = f"{noun} must be one of: {allowed_list}"
+            raise InvalidSourceFilterError(msg)
         return
     if decl.type == "multiselect":
         if not isinstance(value, list) or not value:
-            raise InvalidSourceFilterError(f"{noun} must be a non-empty list of strings")
+            msg = f"{noun} must be a non-empty list of strings"
+            raise InvalidSourceFilterError(msg)
         if any(type(item) is not str for item in value):
-            raise InvalidSourceFilterError(f"{noun} must be a non-empty list of strings")
+            msg = f"{noun} must be a non-empty list of strings"
+            raise InvalidSourceFilterError(msg)
         if len(value) > _MAX_OPTION_LIST_ITEMS:
-            raise InvalidSourceFilterError(
-                f"{noun} must have at most {_MAX_OPTION_LIST_ITEMS} entries"
-            )
+            msg = f"{noun} must have at most {_MAX_OPTION_LIST_ITEMS} entries"
+            raise InvalidSourceFilterError(msg)
         if any(len(item) == 0 or len(item) > _MAX_OPTION_ITEM_LEN for item in value):
-            raise InvalidSourceFilterError(
-                f"{noun} entries must be between 1 and {_MAX_OPTION_ITEM_LEN} characters"
-            )
+            msg = f"{noun} entries must be between 1 and {_MAX_OPTION_ITEM_LEN} characters"
+            raise InvalidSourceFilterError(msg)
         return
     if type(value) is not str or not value.strip():
-        raise InvalidSourceFilterError(f"{noun} must be a non-empty string")
+        msg = f"{noun} must be a non-empty string"
+        raise InvalidSourceFilterError(msg)
     if len(value) > _MAX_OPTION_ITEM_LEN:
-        raise InvalidSourceFilterError(f"{noun} must be at most {_MAX_OPTION_ITEM_LEN} characters")
+        msg = f"{noun} must be at most {_MAX_OPTION_ITEM_LEN} characters"
+        raise InvalidSourceFilterError(msg)
 
 
 def validate_source_options(
@@ -223,5 +228,6 @@ def validate_source_options(
     for key, value in options.items():
         decl = decls.get(key)
         if decl is None:
-            raise InvalidSourceFilterError(f"unknown filter '{key}' for source '{source_name}'")
+            msg = f"unknown filter '{key}' for source '{source_name}'"
+            raise InvalidSourceFilterError(msg)
         _validate_option_value(decl, value)

@@ -85,13 +85,13 @@ async def extract_resume_profile(
     started = time.monotonic()
     settings = get_settings()
     if not is_llm_configured():
-        raise LLMNotConfiguredError()
+        raise LLMNotConfiguredError
 
     resume = await session.get(Resume, resume_id)
     if resume is None:
-        raise ResumeNotFoundError()
+        raise ResumeNotFoundError
     if not (resume.extracted_text or "").strip():
-        raise ResumeTextUnavailableError()
+        raise ResumeTextUnavailableError
 
     prompt = _build_prompt(resume.extracted_text or "", settings.extraction_max_chars)
     try:

@@ -144,7 +144,7 @@ def skill_hit_terms(title: str | None, description: str | None, skills: list[str
 def _skill_score_expression(skills: list[str]) -> ColumnElement:
     """Top-skill word-boundary hit fraction over `title + description` (#37).
 
-    Each top skill contributes one `CASE … ~ '\m<skill>\M'` (word-anchored,
+    Each top skill contributes one `CASE … ~ '\\m<skill>\\M'` (word-anchored,
     case-insensitive regex); the sum normalizes by the skill count. Word
     anchors mirror `\\b` in the Python twin (`\\m`/`\\M` in PG; terms ending
     in non-word chars fail identically on both sides). No pg_trgm — that
@@ -199,10 +199,7 @@ def salary_fit_score(
     hi = float(pref_max) if pref_max is not None else float("inf")
     if max(post_lo, lo) <= min(post_hi, hi):
         return 1.0
-    if post_hi < lo:
-        gap = lo - post_hi
-    else:
-        gap = post_lo - hi
+    gap = lo - post_hi if post_hi < lo else post_lo - hi
     if pref_min is not None and pref_max is not None:
         width = max(hi - lo, 1.0)
     elif pref_max is None:
@@ -744,9 +741,9 @@ _SORT_ORDERS = {
 async def count_matches(session: AsyncSession, params: MatchQueryParams) -> int:
     profile = await session.get(Profile, params.profile_id)
     if profile is None:
-        raise ProfileNotFoundError()
+        raise ProfileNotFoundError
     if profile.embedding is None:
-        raise ProfileNotEmbeddedError()
+        raise ProfileNotEmbeddedError
     query: Select[tuple[int]] = (
         select(func.count())
         .select_from(Match)
@@ -761,9 +758,9 @@ async def count_matches(session: AsyncSession, params: MatchQueryParams) -> int:
 async def list_matches(session: AsyncSession, params: MatchQueryParams) -> list[MatchResponse]:
     profile = await session.get(Profile, params.profile_id)
     if profile is None:
-        raise ProfileNotFoundError()
+        raise ProfileNotFoundError
     if profile.embedding is None:
-        raise ProfileNotEmbeddedError()
+        raise ProfileNotEmbeddedError
 
     stored = parse_stored_preferences(profile.preferences)
     priority = (

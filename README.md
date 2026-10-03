@@ -55,7 +55,8 @@ A first successful match takes about five minutes (details in the [user guide](d
 | Where | Command |
 |---|---|
 | `backend/` | `uvicorn app.main:app --reload` |
-| `backend/` | `ruff check . && ruff format .` / `pytest` |
+| `backend/` | `ruff check . && ruff format . && pyright` / `pytest --cov=app` |
+| repo root | `pre-commit install` once; `pre-commit run --all-files` to check everything |
 | `frontend/` | `npm run dev` |
 | `frontend/` | `npm run lint` / `npm run build` / `npm test` (vitest) |
 | `frontend/` | `npm run generate:api` (regenerate API types from backend OpenAPI; backend must be running) |

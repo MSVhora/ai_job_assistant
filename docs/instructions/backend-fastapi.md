@@ -2,7 +2,7 @@
 
 Applies to everything under `backend/`.
 
-> **Target state.** Rules marked *(v5 #41)*, *(v5 #46)* or *(v5 #47)* describe tooling or behaviour that the
+> **Target state.** Rules marked *(v5 #46)* or *(v5 #47)* describe tooling or behaviour that the
 > [v5 plans](../plans/v5/v5-hardening-plan.md) bring the code up to. Until each lands, the code
 > may not yet comply; the plan for each gap exists and nothing here is aspirational filler.
 
@@ -41,13 +41,13 @@ Applies to everything under `backend/`.
 - **Logging**: stdlib logging with `key=value` messages (operation, duration, token counts for LLM calls). Never log resume content, API keys, tokens, or full prompts.
 - **Security**: file uploads size- and type-checked (magic bytes); paths built with `uuid` names, never user-supplied filenames; CORS restricted to configured origins with explicit methods and headers *(v5 #46)* — never `*` together with credentials in production.
 
-## Tooling (target gates)
+## Tooling (gates)
 
-- **Ruff** *(v5 #41)*: `select = ["ALL"]` with a short, documented ignore list in `pyproject.toml` (docstring rules, rules that conflict with the formatter). Tests get per-file ignores (`S101`, `ANN`, `PLR2004`). `ruff format` is the formatter.
-- **Types** *(v5 #41)*: pyright in `strict` mode on `app/`. No `Any` without a justified `# pyright: ignore[...]`/`ANN401` waiver.
-- **Coverage** *(v5 #41)*: `pytest --cov=app` with a fail-under threshold set from the measured baseline and only ever raised.
-- **Supply chain** *(v5 #41)*: dependencies locked; `pip-audit` clean (or each waiver documented).
-- **Hooks** *(v5 #41)*: `pre-commit` runs ruff, pyright, secret scanning (gitleaks) and a large-file check.
+- **Ruff**: `select = ["ALL"]` with a short, documented ignore list in `pyproject.toml`: docstring rules (`D`), formatter conflicts (`COM812`, `ISC001`), `CPY`, `FAST001` (every route keeps an explicit `response_model`) and the typographic-character rules (`RUF001-003`). Pylint/mccabe thresholds are set to the current maxima (`max-args = 6`, `max-branches = 13`, `max-returns = 8`, complexity 14) — lower them, never raise them. Tests get per-file ignores (`S101`, `ANN`, `PLR2004`, `SLF001`, `ARG`, `PLC0415`, …). `flake8-tidy-imports` bans `os.getenv`/`os.environ` and provider SDKs outside their one module. `ruff format` is the formatter.
+- **Types**: pyright in `strict` mode on `app/`. Untyped third-party values (litellm responses, JSON payloads) are narrowed through small helpers (`json_object`, `json_array`, `_token_counts`); the only `# pyright: ignore` comments are the two litellm call sites, each with its reason.
+- **Coverage**: `pytest --cov=app` with `fail_under` in `pyproject.toml` set from the measured baseline (90%, from a measured 90.6% with the DB tests included) and only ever raised.
+- **Supply chain**: dependencies locked in `uv.lock` (the Docker image installs with `uv sync --frozen --no-dev`); audit the lock with `uv export --frozen --no-hashes --no-emit-project -o /tmp/req.txt && pip-audit -r /tmp/req.txt --no-deps --disable-pip` — clean, or each waiver documented here.
+- **Hooks**: the root `.pre-commit-config.yaml` runs ruff (lint + format), pyright, gitleaks and a large-file check; install once with `pre-commit install`.
 - Gate command: `ruff check . && ruff format --check . && pyright && pytest --cov=app` (in `backend/`).
 
 ## Testing (pytest)

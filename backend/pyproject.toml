@@ -89,3 +89,11 @@ pythonVersion = "3.12"
 typeCheckingMode = "strict"
 venvPath = "."
 venv = ".venv"
+
+[tool.coverage.run]
+source = ["app"]
+
+[tool.coverage.report]
+fail_under = 90  # measured baseline (90.6%, DB tests included); only ever raise
+show_missing = true
+skip_covered = true

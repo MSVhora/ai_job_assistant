@@ -2,9 +2,6 @@
 
 Applies to `backend/tests/` and the colocated frontend tests.
 
-> **Target state.** The coverage gate *(v5 #41)* is brought into the code by the
-> [v5 plans](../plans/v5/v5-hardening-plan.md).
-
 ## Principles
 
 - A change is not done until its tests exist and the gate passes (see `AGENTS.md`, definition of done).
@@ -21,7 +18,7 @@ Applies to `backend/tests/` and the colocated frontend tests.
 - **Must cover**: schema validation failures, dedupe logic, connector mapper correctness with fixture payloads, error paths and graceful degradation, ownership checks (404 on mismatch), and **migration up/down**.
 - **Concurrency**: invariants that rely on the database (run guards, unique indexes) get a test that races two sessions and asserts the index, not the application check, is what stops the loser (see `test_duplicate_run_concurrency.py`).
 - **Async**: `asyncio_mode = "auto"`; do not create module-level asyncio primitives (semaphores, locks) that bind to one event loop.
-- **Coverage** *(v5 #41)*: `pytest --cov=app` with a fail-under threshold that is only raised.
+- **Coverage**: `pytest --cov=app` with a fail-under threshold that is only raised.
 - **Naming**: `test_<unit>_<behaviour>`; one behaviour per test; arrange/act/assert visible.
 
 ## Frontend (vitest + Testing Library)

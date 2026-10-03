@@ -7,7 +7,7 @@ Applies to all code, config and docs. The app is self-hosted, single-user and BY
 - Keys live only in `.env` (gitignored) and are documented, without values, in `.env.example`. Never commit secrets, real resumes or personal data (including fixtures, seed scripts and migrations).
 - Secrets are read only through `Settings`; they never reach the frontend (`NEXT_PUBLIC_*` is for public values only).
 - Never log API keys, tokens, `Authorization` headers, resume text or full prompts. Error handling strips secrets before anything is surfaced or logged.
-- Secret scanning runs in pre-commit *(v5 #41)*.
+- Secret scanning (gitleaks) runs in pre-commit.
 
 ## Data handling and the LLM
 

@@ -47,15 +47,23 @@ Regenerate types; no UI here (#53).
 
 ### Tests
 
-- `test_evidence_chunking.py` (pure, golden): expected chunk boundaries for the golden items (PR with 25 commits → capped at 20 deduped messages; bursts split by a 9-day gap; long README truncated at 4k chars; note paragraph overlap), cap enforcement via token counter, deterministic ordering, `contains_private` propagation.
-- `test_evidence_chunks_service.py` (Postgres, fake embedder): first run embeds N chunks; **second run with no changes → 0 embed calls**; editing one item changes exactly one chunk's hash and triggers exactly one embed; removed items delete their chunks; achievements referencing items are unaffected.
-- `test_evidence_notes.py`: CRUD, supersede-on-edit, URL validation, length caps, 404 on foreign ids.
-- `test_resume_ingest.py`: bullets become items/chunks; ingesting two profiles with the same bullet creates one item; re-ingest after a profile edit adds/supersedes correctly; `project_key` format.
+- `tests/services/test_evidence_chunking.py` (pure, golden): expected chunk boundaries for the golden items (PR with 25 commits → capped at 20 deduped messages; bursts split by a 9-day gap; long README truncated at 4k chars; note paragraph overlap), cap enforcement via token counter, deterministic ordering, `contains_private` propagation.
+- `tests/services/test_evidence_chunks_service.py` (Postgres, fake embedder): first run embeds N chunks; **second run with no changes → 0 embed calls**; editing one item changes exactly one chunk's hash and triggers exactly one embed; removed items delete their chunks; achievements referencing items are unaffected.
+- `tests/services/test_evidence_notes.py`: CRUD, supersede-on-edit, URL validation, length caps, 404 on foreign ids.
+- `tests/services/test_resume_ingest.py`: bullets become items/chunks; ingesting two profiles with the same bullet creates one item; re-ingest after a profile edit adds/supersedes correctly; `project_key` format.
 - Redaction wiring test: a chunk built from an item containing a token-shaped string and an email has neither in `chunk.text` but both still in the item body.
+
+### Standards from v5 (must hold from the first commit)
+
+- **Lint/types:** ruff `ALL` and pyright strict pass with no new `noqa`; untyped third-party values are narrowed through small typed helpers (the pattern in `adapters/llm.py`); a `# pyright: ignore` needs a reason comment. Functions stay within the configured limits (args 6, branches 13, returns 8, complexity 14).
+- **Coverage and layout:** the 90 % floor holds with `TEST_DATABASE_URL` set; new code ships with its tests in the mirrored folders (`tests/adapters/`, `tests/services/`, `tests/routers/`, `tests/db/`, `tests/core/`; recorded/golden suites in `tests/eval/`).
+- **Config:** every new `Settings` field appears in `.env.example` (the settings↔env guard test fails otherwise); no `os.getenv`/`os.environ` and no provider SDK imports outside their one module.
+- **API:** new routes keep `response_model` (binary downloads declare their media type instead), use only the CORS-allowed methods (`GET`, `POST`, `PATCH`, `DELETE`, `OPTIONS` — **never PUT**) and headers (`Content-Type`, `Accept`), raise `DomainError` subclasses (checked by `tests/core/test_error_contract.py`), and bound every list with the shared `pagination()` dependency and `X-Total-Count`.
+- **Privacy:** no resume/evidence text, prompts, tokens or keys in logs (extend `tests/routers/test_logging_privacy.py` for the new flows); LLM calls log `cost_usd=`; outbound HTTP has an explicit timeout.
 
 ### Gates / docs
 
-`ruff` + `pytest`; `docs/guide/04-evidence-and-resume.md` documents notes, links, resume ingestion, what "filtered" means and how to restore an item.
+the backend gate (`ruff check . && ruff format --check . && pyright && pytest --cov=app` with a scratch `TEST_DATABASE_URL`) and `pre-commit run --all-files`; `docs/guide/04-evidence-and-resume.md` documents notes, links, resume ingestion, what "filtered" means and how to restore an item.
 
 ## Risks
 

@@ -51,6 +51,14 @@ Only small additions if the UI needs them (`GET /api/resume-documents?profile_id
 - Manual script recorded in the PR: create from paste (2 pages) and from a match (1 page); review shows data with no PDF; private marks visible on the right bullets and **absent** from every copy format; Plain/Markdown/JSON Resume copies paste cleanly; add a "not included" bullet (re-fit) and remove one; omitted overlapping role → Include anyway; comment on one section → Apply → only that section changes; a comment asking for unsupported content is rejected with "Add a note"; conflict "Edit in profile" and "Keep as is"; Generate PDF → page count ≤ target, downloads; unfittable state lists items; out-of-order PDF responses ignored.
 - Hook tests for the request-id guard where the repo has frontend tests; otherwise documented manual script (current frontend practice).
 
+### Standards from v5 (must hold from the first commit)
+
+- **Gate:** `npm run lint && npm run format:check && npm run typecheck && npm test && npm run build` in `frontend/`; Prettier (width 100) with the Tailwind plugin.
+- **Components ≤ 200 lines** (ESLint `max-lines` is an error in `app/` and `components/`): split into subcomponents and hooks from the start.
+- **Types:** no `any`, no `!` on API data (use TanStack Query's `skipToken` for nullable ids); optional props are declared `?: T | undefined`; payloads omit empty keys instead of sending `undefined` (`exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`).
+- **Structure:** every route segment that fetches data has `loading.tsx`, `error.tsx` and `not-found.tsx`; all calls go through `lib/api` with regenerated types (`npm run generate:api`); read the Next 16 docs in `node_modules/next/dist/docs/` before using framework APIs.
+- **Tests:** co-located Testing Library tests for every new component and hook, mocking at the `lib/api` boundary.
+
 ### Gates / docs
 
 Frontend + backend gates; guide 04 finalized (screenshots in `docs/assets/`): choosing a length, reading the review view, copying, comments, private marks, generating the PDF; README feature list.

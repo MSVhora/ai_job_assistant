@@ -1,10 +1,10 @@
 # v6 plan — Developer Evidence Engine: evidence-grounded resume builder + knowledge-base interview agent
 
 **Status:** Proposed plan of record for v6 (owner decisions recorded in §14.3)
-**Date:** 2026-10-02
-**Depends on:** v1 (#1–#12), v2 (#13–#23), v3 (#24–#30), v4 (#31–#39), v5 (#40–#47, hardening) — all merged; Alembic head `0021` (`0022` if v5 #43's schema audit adds a migration).
+**Date:** 2026-10-02 · **Revised:** 2026-10-03 after v5 (hardening) shipped — plans now target the standards and helpers v5 actually left behind
+**Depends on:** v1 (#1–#12), v2 (#13–#23), v3 (#24–#30), v4 (#31–#39), v5 (#40–#47, hardening) — all merged; Alembic head `0022` (v5 added `0021_add_updated_at_trigger` and `0022_set_null_on_canonical_posting_delete`).
 **Issue range:** #48 – #61, one GitHub milestone `v6`, branches `v6/milestone` and `v6/{issue}-{slug}` (AGENTS.md git workflow). Per-issue plans (`v6-issue-NNN-*.md`) are written before each issue starts (v1 retro lesson).
-**Inputs read:** `v6-planning-prompt.md`, `v1-implementation-plan.md`, `v4-search-relevance-plan.md`, `docs/architecture.md`, `backend/app/models/*`, `adapters/llm.py`, `adapters/retry.py`, `adapters/job_sources/base.py`, `schemas/profile.py`, `core/config.py`, `docs/instructions/*`.
+**Inputs read:** `v6-planning-prompt.md`, `v1-implementation-plan.md`, `v4-search-relevance-plan.md`, `docs/architecture.md`, `backend/app/models/*`, `adapters/llm.py` (incl. the v5 cost helpers), `adapters/retry.py`, `docs/plans/v5/*` (implementation notes), `adapters/job_sources/base.py`, `schemas/profile.py`, `core/config.py`, `docs/instructions/*`.
 
 > **Verify-first note.** Four external facts below come from my background knowledge, not from this repo, and are dated: GitHub API rate-limit numbers, the `typst` PyPI wheel (bundled compiler, no system deps), Gemini model prices, and fine-grained-PAT permission names. Issue #50 and #56 each start with a one-hour spike that confirms them before code depends on them. Prices in §7 are labelled as assumptions.
 
@@ -17,26 +17,32 @@
 | 1 | "Resume input is PDF only" | `text_extraction.extract_docx` and `architecture.md` show v1 accepts PDF **and** DOCX | No change; v6 adds no input formats. v6 *outputs* PDF only. |
 | 2 | "The existing profile" (singular identity anchor) | One `candidate` has **many** `profile` tracks (v1 #6); `match` is keyed on `profile_id` | Evidence is **candidate-scoped** (shared across tracks). Resume documents and agent sessions are **profile-scoped** (`profile_id` FK) — the profile is the anchor for each output. |
 | 3 | "Audit trail like `profile_revision`" | `profile_revision.source` is a **native PG enum**, FK `RESTRICT` | Reusing it would need `ALTER TYPE … ADD VALUE` and would mix two audit domains. v6 adds a sibling `achievement_revision` table. `profile_revision` is untouched. |
-| 4 | "Extend `llm.py` with model selection per task" | `generate()` / `parse_structured()` have **no per-call model**; they read `settings.llm_model` | Additive `task=` kwarg + settings (§7). Existing callers unchanged. |
+| 4 | "Extend `llm.py` with model selection per task" | `generate()` / `parse_structured()` have **no per-call model**; they read `settings.llm_model`. v5 added `estimate_cost(model, …)`, `estimate_tokens`, `estimate_structured_cost` and `cost_usd` on every result, but `estimate_structured_cost` also reads `settings.llm_model` | Additive `task=` kwarg + settings (§8); the estimate helpers gain an optional `model`/`task`. Existing callers unchanged. |
 | 5 | Resume rewriting needs per-bullet references | `structured_profile` bullets are bare strings with no IDs; v1 plan §11 said rewriting needs a planned per-bullet migration | v6 does **not** normalize `structured_profile`. Bullet-level provenance lives in the new `resume_document.content` JSONB. Zero changes to existing tables (§8). |
 | 6 | Ingestion "resumable" | Background work is FastAPI `BackgroundTasks` (no queue); a process restart silently kills a run | Resumability is **cursor-in-DB** + run guard + sweeper (the v4 #36 pattern), not in-memory state. |
 | 7 | Agent chat | `DbCommitMiddleware` commits the session at `http.response.start`; a streamed response would commit *before* the body is produced | MVP chat is **non-streaming JSON** (persist user message → generate → persist assistant message in one request). Streaming is v7 and needs its own session handling. |
-| 8 | Docs must stay in sync | `architecture.md` header still links the v3 plan and omits v4; ER section is titled "v1" | Fixed in #61 along with the v6 additions. |
-| 9 | "Only add a dependency if needed" | `httpx` is imported at runtime by `adapters/job_sources/base.py` but declared only in `[project.optional-dependencies].dev` (it arrives transitively via `litellm`) | Promote `httpx` to a runtime dependency in #48 (declaration fix, not a new dep). |
-| 10 | Migration head `0020` (at the time of the original prompt) | Revision `0015` lives in `c3f4cc09d71f_add_posting_expiry_columns.py` (filename ≠ revision id) | Superseded: v5 (hardening) adds `0021` (+ optional `0022`), so v6 migrations are `0023`–`0027` with numeric filenames. |
+| 8 | Docs must stay in sync | v5 brought `architecture.md`, the guides and the instruction files up to date | v6 only adds its own sections (guides 04/05, ER, sequences) and the instruction-file updates listed in #61. |
+| 9 | "Only add a dependency if needed" | `httpx` is imported at runtime by `adapters/job_sources/base.py` but declared only in `[project.optional-dependencies].dev` (it arrives transitively via `litellm`) | Promote `httpx` to a runtime dependency in #48 (declaration fix, not a new dep; `uv lock`, image rebuild). |
+| 10 | Migration head `0020` (at the time of the original prompt) | Revision `0015` lives in `c3f4cc09d71f_add_posting_expiry_columns.py` (filename ≠ revision id) | Superseded: v5 added `0021` and `0022`, so v6 migrations are `0023`–`0027` with numeric filenames. |
 | 11 | Hard requirement 3: "exactly 1 or 2 pages" | Owner decision 2026-10-02: the user picks **1, 2, 3 or 4** pages, and pages need not be *full* — the crux is **priority** of what fits | Page count is still exact and deterministic; the fill thresholds in the first draft are removed (§6.3). |
+| 12 | v5 standards are stricter than the first draft assumed | ruff `ALL`, pyright **strict**, a 90 % coverage floor (with the DB tests), ESLint `max-lines` as an **error**, `exactOptionalPropertyTypes`, mirrored tests | All v6 code meets them from the first commit; each issue plan carries a "Standards from v5" checklist. |
+| 13 | `PUT /api/evidence/github/scopes` (first draft) | CORS allows only `GET`, `POST`, `PATCH`, `DELETE`, `OPTIONS` (v5 #46) | Scope updates use `PATCH`. |
+| 14 | PDF download route | The standard requires `response_model` on every route (only redirect/204 excepted) | The render route is a binary download; #56 adds that exception to `backend-fastapi.md`. |
 
 ---
 
-## Prerequisites from v5 (hardening)
+## Prerequisites from v5 (hardening) — shipped, verified in the code
 
-v6 is written against the state v5 ([v5 plan](../v5/v5-hardening-plan.md)) leaves behind:
+v6 is written against what v5 ([v5 plan](../v5/v5-hardening-plan.md), merged) actually left behind:
 
-- **Tests** mirror `app/` (`tests/services/`, `tests/routers/`, …); v6 tests go there. The recorded/golden suites add one new top-level folder, `tests/eval/`.
-- **Strict gates** apply to all v6 code: ruff `ALL`, pyright strict, coverage threshold, Prettier, strict typed ESLint, `npm test`.
-- **Database:** every table with `updated_at` gets the `set_updated_at()` trigger through the helper from v5 #43; constraint/index names follow the naming convention added there; `alembic check` stays clean.
-- **LLM cost:** `estimate_cost`, cost logging and the confirm-gated estimate pattern from v5 #47 already exist; v6 #49 builds the usage meter, task routing, cache and redaction **on top of them** rather than creating a second estimator.
-- **Runtime:** explicit CORS, LLM timeouts (`LLM_TIMEOUT_S`) and bounded list endpoints are in place; new endpoints follow `docs/instructions/api-design.md`.
+- **Tests** mirror `app/`: `backend/tests/{adapters,services,routers,core,schemas,scripts,db}`; shared `conftest.py`, `fakes.py`, `fixtures/` at the root. `fakes.py` already provides provider-boundary fakes (`install_acompletion`, `install_aembedding`, `fake_vector`, `seed_profile_light`) that v6's recorded tests build on. v6 adds one folder, `tests/eval/`.
+- **Backend gates:** ruff `select = ["ALL"]` (documented ignores), pyright **strict** on `app/`, `pytest --cov=app` with `fail_under = 90` (needs `TEST_DATABASE_URL`), `pip-audit` on `uv.lock`, `pre-commit` (ruff, pyright, gitleaks). Banned imports: `os.getenv`/`os.environ` and provider SDKs outside their one module.
+- **Frontend gates:** `npm run lint && format:check && typecheck && test && build`; ESLint `max-lines` (200) is an error in `app/` and `components/`; `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`, no `!` on API data (`skipToken`).
+- **Database:** `0021_add_updated_at_trigger` + `0022_set_null_on_canonical_posting_delete` are applied; `app.core.migration_helpers` provides `create_updated_at_trigger` / `drop_updated_at_trigger`; `Base.metadata` carries a naming convention; `alembic check` and the schema audit run in `tests/db/test_schema_standards.py`. **v6 migrations start at `0023`.**
+- **LLM cost:** `adapters/llm.py` has `CostEstimate`, `estimate_tokens`, `estimate_cost`, `estimate_structured_cost`, `structured_system_prompt`, `format_cost`; every result dataclass carries `cost_usd`; settings `LLM_PRICE_IN_PER_MTOK`, `LLM_PRICE_OUT_PER_MTOK`, `EMBEDDING_PRICE_PER_MTOK`, `LLM_TIMEOUT_S` exist. v6 #49 adds task routing, a usage meter, the output cache and redaction **on top of these** — no second estimator.
+- **Runtime/API:** CORS is explicit (`GET/POST/PATCH/DELETE/OPTIONS`, headers `Content-Type`, `Accept`, `X-Total-Count` exposed); lists use the shared `pagination()` dependency (default 100, max 200); every `DomainError` subclass is covered by `tests/core/test_error_contract.py`; `tests/routers/test_logging_privacy.py` guards against resume text, prompts and keys in logs.
+- **Tooling:** `uv.lock` is the lock file (the image installs with `uv sync --frozen --no-dev`); `httpx` is still only a dev dependency (v6 #48 promotes it); `backend/openapi.json` remains untracked (see `docs/plans/future-tasks.md`).
+- **Known waiver:** `npm audit` reports a critical advisory in `next` 16.3.3 (`next/og`, unused by the app); upgrading Next is a separate change.
 
 ## 1. Executive summary and recommended architecture
 
@@ -228,7 +234,7 @@ class EvidenceSource(Protocol):
 
 | Dependency | Why | Alternative considered |
 |---|---|---|
-| `typst` (PyPI) | Only renderer that is fast enough for a repeated-compile fit search and needs no system libs | WeasyPrint (+ apt packages), LaTeX |
+| `typst` (PyPI) | Only renderer that is fast enough for a repeated-compile fit search and needs no system libs; added through `pyproject.toml` + `uv lock`, `pip-audit` clean, wrapped in one typed function for pyright strict | WeasyPrint (+ apt packages), LaTeX |
 | `httpx` → runtime dep | Already used; declaration fix | — |
 
 Everything else (GitHub client, redaction, chunking, tokens via `litellm.token_counter`, text diffing via stdlib `difflib`, PDF page measurement via existing `pdfplumber`) uses stdlib or the current stack. **No** LangChain/LlamaIndex, no `PyGithub`, no `cryptography`, no `tiktoken`, no frontend dependency (preview = `<iframe>` on a blob URL).
@@ -460,7 +466,7 @@ Decision-rationale questions ("why X over Y in project Z?") need explicit ration
 |---|---|
 | Task routing | `LLMTask` StrEnum (`classify`, `extract`, `write`, `judge`, plus existing default). `generate()` / `parse_structured()` gain `task: LLMTask \| None = None`; model = `settings.llm_model_<task>` falling back to `settings.llm_model`. Existing callers pass nothing and behave identically. |
 | Concurrency | `asyncio.Semaphore(settings.llm_max_concurrency)` (default 2) inside the wrapper so a 230-chunk extraction does not trip free-tier RPM; `retry.py` backoff still applies. |
-| Usage meter | `UsageMeter` accumulates prompt/completion tokens per task for a run; cost comes from v5 #47's `estimate_cost()` (LiteLLM price map + `LLM_PRICE_*` overrides; unknown ⇒ "cost unavailable"). Surfaced in run stats and in a pre-run estimate. |
+| Usage meter | `UsageMeter` accumulates `prompt_tokens`, `completion_tokens` and `cost_usd` per task for a run (the result dataclasses already carry `cost_usd`); cost is priced by v5 #47's `estimate_cost` (LiteLLM price map + `LLM_PRICE_*` overrides; unknown ⇒ "cost unavailable"). `estimate_structured_cost` / `estimate_cost` gain an optional `model`/`task` so estimates price the routed model. Surfaced in run stats and in a pre-run estimate. |
 | Structured output | Unchanged mechanism (prompt-instructed JSON + pydantic + one repair). **Constraint from the existing comment about Gemini looping on large schemas:** extraction/writing schemas stay small; batch ≤ 8 bullets or ≤ 3 achievements per call. |
 | Caching | `services/llm_cache.py::cached_parse_structured(task, key_parts, …)` → `llm_output_cache` keyed by SHA-256 of `(task, model, prompt_version, canonical inputs)`. Lives in the **service** layer so the adapter stays provider-only. Deviation from v4 #31 (hash column on the owning row) is deliberate: v6 has five task types and a single keyed table is less schema than five columns. Chunk-level `content_hash` still gates extraction. |
 | Prompt versions | `ACHIEVEMENT_PROMPT_VERSION`, `BULLET_PROMPT_VERSION`, `JD_PROMPT_VERSION`, `AGENT_PROMPT_VERSION` constants (bumped ⇒ new hash ⇒ re-run) stamped on outputs. |
@@ -478,7 +484,7 @@ Persona: 20 opted-in repos, ~1,500 commits, 150 PRs, 100 issues. After noise fil
 | Achievement embeddings (after approval) | ~250 | ~60k in | embedding |
 | **Total ≈** | | **~0.75M in / ~0.12M out** | |
 
-At Gemini Flash-class pricing (my recollection: ≈ $0.30 / M in, ≈ $2.50 / M out — **assumption**) that is on the order of **$0.50 per full ingestion**, **$0 on the free tier** but ~10 RPM ⇒ roughly 25–40 minutes (hence resumable runs + concurrency cap). Per resume ≈ 10 writing calls + 1 JD call + judge ≈ 40k tokens (cents). Per chat turn ≈ 6–10k tokens. The UI shows a pre-run estimate (chunks × avg tokens × configured prices) and requires confirmation.
+At Gemini Flash-class pricing (my recollection: ≈ $0.30 / M in, ≈ $2.50 / M out — **assumption**) that is on the order of **$0.50 per full ingestion**, **$0 on the free tier** but ~10 RPM ⇒ roughly 25–40 minutes (hence resumable runs + concurrency cap). Per resume ≈ 10 writing calls + 1 JD call + judge ≈ 40k tokens (cents). Per chat turn ≈ 6–10k tokens. The pre-run estimate is computed with v5 #47's `estimate_structured_cost` on the real chunk prompts (and `estimate_cost` for embeddings), priced from LiteLLM's map with `LLM_PRICE_*` overrides; unpriced models show "cost unavailable". The UI requires confirmation, as for Tune my queries.
 
 ---
 
@@ -486,7 +492,7 @@ At Gemini Flash-class pricing (my recollection: ≈ $0.30 / M in, ≈ $2.50 / M 
 
 **Amendments from issue planning (2026-10-02):** (1) the ORM class for `evidence_source` is `EvidenceSourceAccount` to avoid clashing with the `EvidenceSource` protocol (#48); (2) a 15th table, `achievement_extraction_run`, carries extraction progress/estimate/guard (#52); (3) `achievement.evidence_stale_at` flags approved achievements whose evidence changed after a refresh (#52/#53); (4) draft achievements are embedded at creation, retrieval still filters `status='approved'` (#52); (5) resume evidence is ingested from a chosen profile's `structured_profile` bullets, not `extracted_text` lines (#51); (6) removing a scope can purge its evidence, archiving dependent achievements (#61).
 
-Conventions per `docs/instructions/database-postgres.md`: FK columns indexed, native enums, timestamptz, JSONB for flexible payloads, queryable ⇒ real column.
+Conventions per `docs/instructions/database-postgres.md`: FK columns indexed, native enums, timestamptz, JSONB for flexible payloads, queryable ⇒ real column; plus the v5 additions — `create_updated_at_trigger` for every table with `updated_at`, an explicit ON DELETE per FK (CASCADE owned children, RESTRICT identity/audit, SET NULL provenance), named `uq_`/`ix_`/`fk_`/`ck_` constraints, `CHECK`s for bounded scalars, `alembic check` and the schema audit clean. Revisions are numbered from `0023`.
 
 ```python
 class EvidenceKind(StrEnum): commit, pull_request, review_comment, issue, readme, repo_summary, note, link, resume_line
@@ -576,7 +582,7 @@ class AgentMessage(Base):                # agent_message
 | `0026_add_resume_document` | #54 | `resume_document`, `resume_document_revision` |
 | `0027_add_agent_session` | #58 | `agent_session`, `agent_message` |
 
-All downgrades drop in reverse; `test_migrations.py` extended to round-trip each.
+All downgrades drop in reverse; `tests/db/test_migrations.py` extended to round-trip each.
 
 ---
 
@@ -587,7 +593,7 @@ All downgrades drop in reverse; `test_migrations.py` extended to round-trip each
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/api/evidence/github/status` | Token present? validated login + granted permissions |
-| GET/PUT | `/api/evidence/github/scopes` | List repos / set opt-in, `content_level`, `employer_ref`; private opt-in requires `acknowledged_disclosure` |
+| GET/PATCH | `/api/evidence/github/scopes` | List repos / set opt-in, `content_level`, `employer_ref`; private opt-in requires `acknowledged_disclosure` |
 | POST | `/api/evidence/github/sync` | Start run (409 + `active_sync_id` if active) |
 | GET | `/api/evidence/syncs/{id}` | Progress, budget, paused/resume info |
 | POST/GET/DELETE | `/api/evidence/notes` | Notes and links (text only) |
@@ -607,7 +613,7 @@ All downgrades drop in reverse; `test_migrations.py` extended to round-trip each
 | POST/GET | `/api/agent/sessions` (optional `match_id`) · `/api/agent/sessions/{id}` | Sessions |
 | POST | `/api/agent/sessions/{id}/messages` | One turn → answer + citations + grounding |
 
-Errors follow `core/errors.py` (`DomainError` subclasses, e.g. `DuplicateSyncError` → 409 with `active_sync_id`). Every body is re-validated with pydantic; every resource is checked against the candidate (and, for documents/sessions, the owning profile) → 404 on mismatch (the v3 #24 rule).
+Errors follow `core/errors.py` (`DomainError` subclasses, e.g. `DuplicateSyncError` → 409 with `active_sync_id`; each new subclass must satisfy `tests/core/test_error_contract.py`). All list endpoints (items, achievements, documents, sessions, messages) use the shared `pagination()` dependency (default 100, max 200) and return `X-Total-Count`. The PDF render route is a binary download (declared media type instead of `response_model`, documented in #56). CORS permits only `GET`, `POST`, `PATCH`, `DELETE`, `OPTIONS` — hence `PATCH`, never `PUT`. Every body is re-validated with pydantic; every resource is checked against the candidate (and, for documents/sessions, the owning profile) → 404 on mismatch (the v3 #24 rule).
 
 ### 10.2 Next.js routes (App Router)
 
@@ -652,10 +658,10 @@ Frontend lives in `components/features/{evidence,achievements,resume,interview}/
 
 ### 11.3 Mechanics
 
-- `tests/fakes.py` gains a `RecordedLLM` that monkeypatches `app.adapters.llm.generate/embed` and replays responses keyed by the SHA-256 of the request (task + prompt + schema). Missing key ⇒ test fails with "re-record".
+- `tests/fakes.py` gains a `RecordedLLM`: a recording/replaying handler for the existing provider-boundary fakes (`install_acompletion` / `install_aembedding`, which replace `litellm.acompletion` / `aembedding`), keyed by the SHA-256 of `(model, messages)`, so cost, token usage and task routing are exercised too. Missing key ⇒ test fails with "re-record".
 - `EVAL_RECORD=1 pytest tests/eval` re-records using a real key; recordings are committed (no secrets, scrubbed persona).
 - `pytest -m live_llm` (skipped unless `EVAL_LIVE=1`) runs the judge-based suite against the user's configured provider, prints a table, and exits non-zero below thresholds. Never in default CI.
-- GitHub connector tests use `httpx.MockTransport` + the golden JSON (no network). Run-guard concurrency test mirrors `test_duplicate_run_concurrency.py`.
+- GitHub connector tests use `httpx.MockTransport` + the golden JSON (no network). Run-guard concurrency test mirrors `tests/services/test_duplicate_run_concurrency.py`.
 
 ---
 
@@ -718,7 +724,7 @@ Cut in this order, all to v7: (1) #59's job-prep context and rolling-summary mem
 
 ### Milestone acceptance (end of week 4)
 
-From a clean clone: set `GITHUB_TOKEN` + Gemini key → connect → opt in 3 repos (one private, with disclosure) → sync (kill the API mid-run; restart resumes) → estimate shows cost → extract → review/approve ≥ 10 achievements → review (and copy) a resume from a pasted JD and from a ranked match, apply a comment to one section, then generate 1-, 2- and 3-page PDFs (each within its page target with the highest-priority content kept, conflicts and gaps shown) → ask the agent an intro, a behavioral, a technical-why and an unanswerable question (all cited or refused). `ruff`, `pytest`, `npm run lint`, `npm run build` green.
+From a clean clone: set `GITHUB_TOKEN` + Gemini key → connect → opt in 3 repos (one private, with disclosure) → sync (kill the API mid-run; restart resumes) → estimate shows cost → extract → review/approve ≥ 10 achievements → review (and copy) a resume from a pasted JD and from a ranked match, apply a comment to one section, then generate 1-, 2- and 3-page PDFs (each within its page target with the highest-priority content kept, conflicts and gaps shown) → ask the agent an intro, a behavioral, a technical-why and an unanswerable question (all cited or refused). All v5 gates green: backend `ruff check . && ruff format --check . && pyright && pytest --cov=app` (scratch `TEST_DATABASE_URL`, coverage ≥ 90 %), `alembic check`, `pre-commit run --all-files`; frontend `npm run lint && npm run format:check && npm run typecheck && npm test && npm run build`.
 
 ---
 
@@ -738,6 +744,7 @@ From a clean clone: set `GITHUB_TOKEN` + Gemini key → connect → opt in 3 rep
 | 8 | Review fatigue ⇒ user rubber-stamps AI drafts | Rank drafts by impact, bulk-approve only for fully evidenced items, show source quote next to each claim, metric confirmation is per-metric |
 | 9 | Scope: 14 issues / 4 weeks for one person | Pre-agreed cut line (§13.5), per-issue plans written first, recorded fixtures keep tests fast |
 | 10 | Prompt injection via repo/PR text, or achievements drifting from profile identity | Evidence fenced as data, no agent tools, schema validation, reconciliation panel, identity fields injected from `structured_profile` only |
+| 11 | Strict gates (ruff `ALL`, pyright strict, 90 % coverage, ESLint `max-lines` error) slow new code or fight untyped libraries (`typst`, `pdfplumber`, GitHub payloads) | Typed wrapper functions at each third-party boundary, narrow helpers instead of ignores, small functions/components from the start, tests written with the code; budget a day per week for gate fallout |
 
 ### 14.2 Assumptions made (instead of asking)
 
@@ -770,27 +777,27 @@ From a clean clone: set `GITHUB_TOKEN` + Gemini key → connect → opt in 3 rep
 
 | Phase | Use | Notes |
 |---|---|---|
-| All backend | FastAPI, SQLAlchemy 2 async, pydantic v2, Alembic, `litellm`, `pgvector`, `pdfplumber`, `pyyaml`, `httpx` (declared) | No new stack members besides `typst` |
+| All backend | FastAPI, SQLAlchemy 2 async, pydantic v2, Alembic, `litellm`, `pgvector`, `pdfplumber`, `pyyaml`, `httpx` (promoted to a runtime dependency in #48) | No new stack members besides `typst`; dependencies go through `uv` (`uv lock`, `pip-audit`) |
 | #50 GitHub | `httpx.MockTransport` for tests; GitHub MCP server (the engineering plugin's connector currently fails to connect — "does not support dynamic client registration" — so use `gh api` / curl for fixture capture instead) | Record real responses once, scrub, commit as golden |
 | #49/#52/#55/#58 LLM work | `litellm.token_counter`; Gemini via the existing wrapper | Optional `LLM_MODEL_WRITE` |
 | #56 Rendering | `typst` PyPI wheel; OFL fonts bundled; `pdfplumber` for measuring + ATS extraction tests | Spike: confirm wheel on `python:3.12-slim`, license of chosen fonts |
 | #53/#57/#59 Frontend | Existing `components/ui`, TanStack Query, Tailwind; `<iframe>` blob for PDF preview | No new npm deps |
 | #60 Eval | `pytest`, `pytest-asyncio`, custom `RecordedLLM`; marker `live_llm` | Register marker in `pyproject.toml` |
-| Dev tooling | `ruff`, `pytest`, `node scripts/render-diagrams.mjs` (needs `@mermaid-js/mermaid-cli`) | Existing DoD gates |
+| Dev tooling | `ruff` (ALL), `pyright` (strict), `pytest --cov`, `pre-commit`, `uv`, Prettier/ESLint/vitest, `node scripts/render-diagrams.mjs` (needs `@mermaid-js/mermaid-cli`) | The v5 definition-of-done gates in `AGENTS.md` |
 | Claude skills | `engineering:system-design` / `architecture` (design reviews, ADRs), `engineering:testing-strategy` (#60), `engineering:code-review` (before each merge), `engineering:documentation` (guides 04/05), `security-review` (#61), `/run` to drive the app for #57/#59 acceptance | |
 
 ---
 
 ## 16. First 10 tasks (start today)
 
-- [ ] 1. Commit this plan (and the planning prompt) to `main` — docs-only changes may go straight to `main` per AGENTS.md; leave `backend/openapi.json` out unless it is intended.
-- [ ] 2. Cut the milestone: `git switch main && git pull && git switch -c v6/milestone && git push -u origin v6/milestone`.
+- [ ] 1. Commit the revised plans to `main` — docs-only changes may go straight to `main` per AGENTS.md; leave `backend/openapi.json` out unless it is intended (see `future-tasks.md`).
+- [ ] 2. Cut the milestone: `git switch main && git pull && git switch -c v6/milestone && git push -u origin v6/milestone` (v5 merged at `a7d1c2b`).
 - [ ] 3. Create the GitHub milestone `v6` and issues #48–#61 from §13 (titles, acceptance criteria, doc-impact lines).
 - [x] 4. Open questions answered (§14.3).
 - [ ] 5. Create a **fine-grained read-only PAT** (Metadata, Contents, Pull requests, Issues; selected repos incl. one private test repo), put it in your local `.env`, add `GITHUB_TOKEN=` (and the other new settings from §8/§12) to `.env.example`.
-- [ ] 6. Run the two one-hour spikes: (a) `gh api` the endpoints #50 needs and record rate-limit headers + one GraphQL PR query; (b) `pip install typst` in the backend image and compile a 1-page sample, count pages with `pdfplumber`.
-- [ ] 7. Write `v6-issue-048-evidence-core-models-sources.md` (goal, locked decisions, scope, tests, doc impact), then branch `git switch -c v6/40-evidence-core-models-sources v6/milestone`.
-- [ ] 8. Implement #48: models + migration `0023` (review the autogenerate output by hand), `EvidenceSource` protocol/registry, noise-filter module with its golden test; `ruff check . && ruff format --check . && pytest`.
+- [ ] 6. Run the two one-hour spikes: (a) `gh api` the endpoints #50 needs and record rate-limit headers + one GraphQL PR query; (b) add `typst` with `uv add` on a scratch branch, build the backend image, and compile a 1-page sample, count pages with `pdfplumber`.
+- [ ] 7. Write `v6-issue-048-evidence-core-models-sources.md` (goal, locked decisions, scope, tests, doc impact), then branch `git switch -c v6/48-evidence-core-models-sources v6/milestone`.
+- [ ] 8. Implement #48: models + migration `0023` (review the autogenerate output by hand), `EvidenceSource` protocol/registry, noise-filter module with its golden test; the backend gate (`ruff check . && ruff format --check . && pyright && pytest --cov=app`, scratch `TEST_DATABASE_URL`) plus `pre-commit run --all-files`.
 - [ ] 9. Capture and scrub the golden GitHub fixtures for persona "Ada" (4 repos incl. bot/lockfile/merge-commit noise) into `backend/tests/eval/golden/github/` — they unblock #48's tests and #50.
 - [ ] 10. Write the #49 and #50 issue plans while #48 is in review, then merge #48 into `v6/milestone` (merging `main` in at the same time per AGENTS.md).
 

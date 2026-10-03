@@ -51,15 +51,24 @@ Define the one document shape the builder, renderer and editor share, map it los
 
 ### Tests
 
-- `test_resume_mapping.py`: `profile → content → profile` round trip loses nothing for the fixture profiles (incl. extra sections, awards, current roles, missing dates); JSON Resume export validates against the JSON Resume field names; profile-verbatim bullets keep `origin`.
-- `test_resume_reconcile.py` on `tests/eval/golden/profile.json` (deliberate conflicts): all seven kinds detected, each exactly once (incl. an overlapping-roles pair), no false positives on a clean profile; resolutions keyed stably across re-runs; "keep as is" suppresses without editing the profile; the profile row is **never** modified by reconciliation (asserted).
-- `test_resume_documents.py`: CRUD, `page_target` constraint (0 and 5 → 422/IntegrityError mapped; 1–4 accepted), revision snapshot cap at 20, cascade on profile delete, ownership 404s.
-- `test_resume_export.py`: plain text and Markdown contain every included bullet exactly once, contact comes from the profile, **no** private marker or provenance text appears in any format, JSON Resume validates; output is stable across two calls.
-- `test_migrations.py`: `0026` round trip (incl. `page_target` CHECK rejecting 0 and 5, `comments` default).
+- `tests/services/test_resume_mapping.py`: `profile → content → profile` round trip loses nothing for the fixture profiles (incl. extra sections, awards, current roles, missing dates); JSON Resume export validates against the JSON Resume field names; profile-verbatim bullets keep `origin`.
+- `tests/services/test_resume_reconcile.py` on `tests/eval/golden/profile.json` (deliberate conflicts): all seven kinds detected, each exactly once (incl. an overlapping-roles pair), no false positives on a clean profile; resolutions keyed stably across re-runs; "keep as is" suppresses without editing the profile; the profile row is **never** modified by reconciliation (asserted).
+- `tests/services/test_resume_documents.py`: CRUD, `page_target` constraint (0 and 5 → 422/IntegrityError mapped; 1–4 accepted), revision snapshot cap at 20, cascade on profile delete, ownership 404s.
+- `tests/services/test_resume_export.py`: plain text and Markdown contain every included bullet exactly once, contact comes from the profile, **no** private marker or provenance text appears in any format, JSON Resume validates; output is stable across two calls.
+- `tests/db/test_migrations.py` (+ `tests/db/test_schema_standards.py` picks the new tables up): `0026` round trip (incl. `page_target` CHECK rejecting 0 and 5, `comments` default).
+
+### Standards from v5 (must hold from the first commit)
+
+- **Lint/types:** ruff `ALL` and pyright strict pass with no new `noqa`; untyped third-party values are narrowed through small typed helpers (the pattern in `adapters/llm.py`); a `# pyright: ignore` needs a reason comment. Functions stay within the configured limits (args 6, branches 13, returns 8, complexity 14).
+- **Coverage and layout:** the 90 % floor holds with `TEST_DATABASE_URL` set; new code ships with its tests in the mirrored folders (`tests/adapters/`, `tests/services/`, `tests/routers/`, `tests/db/`, `tests/core/`; recorded/golden suites in `tests/eval/`).
+- **Config:** every new `Settings` field appears in `.env.example` (the settings↔env guard test fails otherwise); no `os.getenv`/`os.environ` and no provider SDK imports outside their one module.
+- **API:** new routes keep `response_model` (binary downloads declare their media type instead), use only the CORS-allowed methods (`GET`, `POST`, `PATCH`, `DELETE`, `OPTIONS` — **never PUT**) and headers (`Content-Type`, `Accept`), raise `DomainError` subclasses (checked by `tests/core/test_error_contract.py`), and bound every list with the shared `pagination()` dependency and `X-Total-Count`.
+- **Privacy:** no resume/evidence text, prompts, tokens or keys in logs (extend `tests/routers/test_logging_privacy.py` for the new flows); LLM calls log `cost_usd=`; outbound HTTP has an explicit timeout.
+- **Schema (v5 #43 conventions):** every table with `updated_at` gets `create_updated_at_trigger(table)` / `drop_updated_at_trigger(table)` from `app.core.migration_helpers`; every FK is indexed and declares its ON DELETE (CASCADE owned children, RESTRICT identity/audit, SET NULL provenance); constraints and indexes are named (`uq_`/`ix_`/`fk_`/`ck_`); bounded scalars get a `CHECK`; `alembic check` is clean and the schema audit (`tests/db/test_schema_standards.py`) reports nothing; downgrade works. Revision numbers continue from `0022`.
 
 ### Gates / docs
 
-`ruff` + `pytest`; `architecture.md` ER (resume_document tables); guide 04 "Reconciliation" section.
+the backend gate (`ruff check . && ruff format --check . && pyright && pytest --cov=app` with a scratch `TEST_DATABASE_URL`) and `pre-commit run --all-files`; `architecture.md` ER (resume_document tables); guide 04 "Reconciliation" section.
 
 ## Risks
 

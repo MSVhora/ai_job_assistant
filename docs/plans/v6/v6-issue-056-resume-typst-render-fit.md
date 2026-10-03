@@ -14,7 +14,7 @@ Decide **what is included** for the user's chosen page count (1, 2, 3 or 4) by m
 
 ## Spike first (≈ 1 hour, recorded in this file before coding)
 
-1. `pip install typst` inside the backend image (`python:3.12-slim`, arm64 and amd64): no system libs, compiles a sample with bundled fonts.
+1. `uv add typst` (scratch branch) and build the backend image (`python:3.12-slim`, arm64 and amd64): no system libs, compiles a sample with bundled fonts.
 2. Compile a sample, count pages with `pdfplumber`, extract text, check reading order and headings.
 3. Confirm font licences (OFL, e.g. Source Sans 3 / Libertinus); pin the compiler version.
 4. Note whether the pinned Typst version emits tagged PDF. If any check fails, switch to the fallback (WeasyPrint behind `PageMeter`) **before** writing the fit and report back.
@@ -56,21 +56,29 @@ Single column; standard headings (Experience, Education, Skills, Projects); real
 - `resources/typst/resume.typ` (+ per-variant parameters), `resources/fonts/*`.
 - `services/resume_render/{typst_template.py,page_meter.py,fit.py}`: content → Typst data (passed to the template as **data**, never concatenated into markup), compile, measure, fit search, `RenderResult(pdf_bytes | None, layout)`.
 - `services/resume_builder.py` integration point: `fit_document(document)` called after generation, after edits/add/remove, and before render.
-- `routers/resume_documents.py`: `POST /api/resume-documents/{id}/fit`, `POST …/render` (`application/pdf`, 422 `CannotFit` with details), `GET …/layout`. Contact info is injected from the profile at compile time; nothing private-marked is rendered into the file.
-- `pyproject.toml`: add `typst==<pinned>`; README note about rebuilding the image after a dependency change.
+- `routers/resume_documents.py`: `POST /api/resume-documents/{id}/fit`, `POST …/render` (binary download: declares `response_class=Response` and `responses={200: {"content": {"application/pdf": {}}}}`; update `backend-fastapi.md`, whose `response_model` exceptions currently list only redirect/204 routes; `application/pdf`, 422 `CannotFit` with details), `GET …/layout`. Contact info is injected from the profile at compile time; nothing private-marked is rendered into the file.
+- `pyproject.toml`: add `typst==<pinned>` to runtime `dependencies`, `uv lock`, rebuild the image (it installs with `uv sync --frozen --no-dev`), `pip-audit` clean. Pyright strict: wrap the compiler in one small typed function (`compile_pdf`) and narrow its return values there — no scattered ignores.
 - `core/config.py`: `resume_fit_max_compiles`.
 
 ### Tests (no LLM, no network)
 
-- `test_resume_fit.py`: 30+ synthetic documents (varying role/bullet counts, long lines, unicode names, empty sections) × targets {1,2,3,4}: `pages ≤ target` always; included set equals the maximal-priority prefix for the chosen preset (verified against a brute-force reference on small inputs); role anchors included before second bullets; pinned bullets never dropped before unpinned; `needs_review` bullets never included; roles dropped whole only when anchors cannot fit; `CannotFitError` for an impossible 1-page document; a sparse document returns `short_on_evidence=True` without padding.
-- `test_resume_determinism.py`: same input twice → identical `layout`, `steps` and extracted text.
-- `test_resume_ats.py`: `pdfplumber` extraction — headings in order, bullets are text lines, no empty-glyph boxes, contact exactly once, no table objects, single column (x-position clustering).
-- `test_page_meter.py`: fixtures with known page counts; escape-safety (names/bullets containing `#`, `*`, `$`, `@`, backticks, `\`, quotes render literally and never execute Typst code).
+- `tests/services/test_resume_fit.py`: 30+ synthetic documents (varying role/bullet counts, long lines, unicode names, empty sections) × targets {1,2,3,4}: `pages ≤ target` always; included set equals the maximal-priority prefix for the chosen preset (verified against a brute-force reference on small inputs); role anchors included before second bullets; pinned bullets never dropped before unpinned; `needs_review` bullets never included; roles dropped whole only when anchors cannot fit; `CannotFitError` for an impossible 1-page document; a sparse document returns `short_on_evidence=True` without padding.
+- `tests/services/test_resume_determinism.py`: same input twice → identical `layout`, `steps` and extracted text.
+- `tests/services/test_resume_ats.py`: `pdfplumber` extraction — headings in order, bullets are text lines, no empty-glyph boxes, contact exactly once, no table objects, single column (x-position clustering).
+- `tests/services/test_page_meter.py`: fixtures with known page counts; escape-safety (names/bullets containing `#`, `*`, `$`, `@`, backticks, `\`, quotes render literally and never execute Typst code).
 - Router tests: `/fit` returns layout and **no PDF bytes**; `/render` returns a valid PDF (`%PDF`, page count ≤ target); 404 on foreign document; 422 shape on `CannotFit`.
+
+### Standards from v5 (must hold from the first commit)
+
+- **Lint/types:** ruff `ALL` and pyright strict pass with no new `noqa`; untyped third-party values are narrowed through small typed helpers (the pattern in `adapters/llm.py`); a `# pyright: ignore` needs a reason comment. Functions stay within the configured limits (args 6, branches 13, returns 8, complexity 14).
+- **Coverage and layout:** the 90 % floor holds with `TEST_DATABASE_URL` set; new code ships with its tests in the mirrored folders (`tests/adapters/`, `tests/services/`, `tests/routers/`, `tests/db/`, `tests/core/`; recorded/golden suites in `tests/eval/`).
+- **Config:** every new `Settings` field appears in `.env.example` (the settings↔env guard test fails otherwise); no `os.getenv`/`os.environ` and no provider SDK imports outside their one module.
+- **API:** new routes keep `response_model` (binary downloads declare their media type instead), use only the CORS-allowed methods (`GET`, `POST`, `PATCH`, `DELETE`, `OPTIONS` — **never PUT**) and headers (`Content-Type`, `Accept`), raise `DomainError` subclasses (checked by `tests/core/test_error_contract.py`), and bound every list with the shared `pagination()` dependency and `X-Total-Count`.
+- **Privacy:** no resume/evidence text, prompts, tokens or keys in logs (extend `tests/routers/test_logging_privacy.py` for the new flows); LLM calls log `cost_usd=`; outbound HTTP has an explicit timeout.
 
 ### Gates / docs
 
-`ruff` + `pytest`; README (font licences, pinned `typst`, rebuild note); `architecture.md` (fit/render in the resume sequence); guide 04 "Choosing a length", "What gets included", "ATS".
+the backend gate (`ruff check . && ruff format --check . && pyright && pytest --cov=app` with a scratch `TEST_DATABASE_URL`) and `pre-commit run --all-files`; README (font licences, pinned `typst`, rebuild note); `architecture.md` (fit/render in the resume sequence); guide 04 "Choosing a length", "What gets included", "ATS".
 
 ## Risks
 

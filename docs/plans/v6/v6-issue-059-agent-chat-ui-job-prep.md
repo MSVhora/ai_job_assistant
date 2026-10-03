@@ -45,6 +45,14 @@ None expected beyond bug fixes found while integrating; any change must come wit
 - `npm run lint && npm run build`.
 - Manual script in the PR: intro, behavioral, technical-why (with and without rationale evidence), motivation with and without a pinned job, unanswerable question → refusal card → add note → approve in review → re-ask → now answered with citations; reload keeps the thread; summary kicks in after the configured number of turns (set `AGENT_HISTORY_TURNS=2` for the check); private-derived answer shows the badge and note.
 
+### Standards from v5 (must hold from the first commit)
+
+- **Gate:** `npm run lint && npm run format:check && npm run typecheck && npm test && npm run build` in `frontend/`; Prettier (width 100) with the Tailwind plugin.
+- **Components ≤ 200 lines** (ESLint `max-lines` is an error in `app/` and `components/`): split into subcomponents and hooks from the start.
+- **Types:** no `any`, no `!` on API data (use TanStack Query's `skipToken` for nullable ids); optional props are declared `?: T | undefined`; payloads omit empty keys instead of sending `undefined` (`exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`).
+- **Structure:** every route segment that fetches data has `loading.tsx`, `error.tsx` and `not-found.tsx`; all calls go through `lib/api` with regenerated types (`npm run generate:api`); read the Next 16 docs in `node_modules/next/dist/docs/` before using framework APIs.
+- **Tests:** co-located Testing Library tests for every new component and hook, mocking at the `lib/api` boundary.
+
 ### Gates / docs
 
 Gates green; `docs/guide/05-interview-agent.md` completed with screenshots; README feature list.

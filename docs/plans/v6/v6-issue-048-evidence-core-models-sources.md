@@ -50,7 +50,7 @@ Review checklist: no changes to existing tables or enums; no data migration.
 - `adapters/evidence_sources/base.py`: `EvidenceSource` protocol (plan §3.1) and `EvidenceSourceError`/`EvidenceSourceConfigError`; `registry.py` with `get_source(name)`/`registered_sources()` (empty registry until #50, with a fake registered only in tests).
 - `services/evidence_pipeline/noise.py`: rules from plan §4.3 — merge commits (`parents > 1` or `^Merge (branch|pull request|remote)`), bots (`[bot]` suffix or configured list), dependency bumps (message regex + ≤ 5 changed lines), lockfile/manifest-only PRs (path set), trivia messages (regex, or ≤ 2 words with ≤ 3 changed lines), generated/vendored-only paths. Order is fixed and the **first** matching rule supplies `reason`.
 - `core/config.py`: `github_token: str | None`, `github_api_url: str = "https://api.github.com"`, `github_max_requests_per_run: int = 1500`, `github_min_remaining_pct: int = 10`, `evidence_lookback_years: int = 6`, `evidence_bot_logins: list[str]` (defaults), all validated (`ge`/`le`), `github_token` added to the existing blank-to-None validator.
-- `pyproject.toml`: `httpx>=0.27` to runtime dependencies (removed from `dev` duplicates if any).
+- `pyproject.toml`: `httpx>=0.27` moves from the `dev` extra to runtime `dependencies`; `uv lock` regenerates `uv.lock` (the image installs with `uv sync --frozen --no-dev`) and `pip-audit` stays clean.
 
 ### OpenAPI / frontend
 
@@ -58,15 +58,24 @@ None (no endpoints yet).
 
 ### Tests (`backend/tests/`, scratch Postgres via `migrated_database`)
 
-- `test_migrations.py`: `0023` up/down round trip, enum and index existence.
-- `test_evidence_models.py`: `(candidate_id, kind, external_id)` uniqueness; second active `evidence_sync_run` for the same source raises `IntegrityError`, a terminal one does not; cascade from `evidence_source` → scope/run; chunk↔item link integrity.
-- `test_evidence_noise.py` driven by `tests/fixtures/evidence_noise_cases.yaml` (≈ 40 labelled synthetic items: merge, bot, `chore(deps)`, lockfile-only PR, `fix typo`, `wip`, and **kept** look-alikes such as "Fix race in token refresh", "Bump retry budget to handle 429s" with a real diff size). Asserts verdict and reason per row; asserts rule order determinism.
-- `test_evidence_registry.py`: unknown source → typed error; fake source satisfies the protocol (structural check).
-- `test_config.py` (or existing settings tests): new settings parse/validate; blank `GITHUB_TOKEN` → `None`.
+- `tests/db/test_migrations.py` (+ `tests/db/test_schema_standards.py` picks the new tables up): `0023` up/down round trip, enum and index existence.
+- `tests/db/test_evidence_models.py`: `(candidate_id, kind, external_id)` uniqueness; second active `evidence_sync_run` for the same source raises `IntegrityError`, a terminal one does not; cascade from `evidence_source` → scope/run; chunk↔item link integrity.
+- `tests/services/test_evidence_noise.py` driven by `tests/fixtures/evidence_noise_cases.yaml` (≈ 40 labelled synthetic items: merge, bot, `chore(deps)`, lockfile-only PR, `fix typo`, `wip`, and **kept** look-alikes such as "Fix race in token refresh", "Bump retry budget to handle 429s" with a real diff size). Asserts verdict and reason per row; asserts rule order determinism.
+- `tests/adapters/test_evidence_registry.py`: unknown source → typed error; fake source satisfies the protocol (structural check).
+- `tests/core/test_config.py`: new settings parse/validate; blank `GITHUB_TOKEN` → `None` (the `.env.example` guard in `tests/core/test_env_example.py` covers the template).
+
+### Standards from v5 (must hold from the first commit)
+
+- **Lint/types:** ruff `ALL` and pyright strict pass with no new `noqa`; untyped third-party values are narrowed through small typed helpers (the pattern in `adapters/llm.py`); a `# pyright: ignore` needs a reason comment. Functions stay within the configured limits (args 6, branches 13, returns 8, complexity 14).
+- **Coverage and layout:** the 90 % floor holds with `TEST_DATABASE_URL` set; new code ships with its tests in the mirrored folders (`tests/adapters/`, `tests/services/`, `tests/routers/`, `tests/db/`, `tests/core/`; recorded/golden suites in `tests/eval/`).
+- **Config:** every new `Settings` field appears in `.env.example` (the settings↔env guard test fails otherwise); no `os.getenv`/`os.environ` and no provider SDK imports outside their one module.
+- **API:** new routes keep `response_model` (binary downloads declare their media type instead), use only the CORS-allowed methods (`GET`, `POST`, `PATCH`, `DELETE`, `OPTIONS` — **never PUT**) and headers (`Content-Type`, `Accept`), raise `DomainError` subclasses (checked by `tests/core/test_error_contract.py`), and bound every list with the shared `pagination()` dependency and `X-Total-Count`.
+- **Privacy:** no resume/evidence text, prompts, tokens or keys in logs (extend `tests/routers/test_logging_privacy.py` for the new flows); LLM calls log `cost_usd=`; outbound HTTP has an explicit timeout.
+- **Schema (v5 #43 conventions):** every table with `updated_at` gets `create_updated_at_trigger(table)` / `drop_updated_at_trigger(table)` from `app.core.migration_helpers`; every FK is indexed and declares its ON DELETE (CASCADE owned children, RESTRICT identity/audit, SET NULL provenance); constraints and indexes are named (`uq_`/`ix_`/`fk_`/`ck_`); bounded scalars get a `CHECK`; `alembic check` is clean and the schema audit (`tests/db/test_schema_standards.py`) reports nothing; downgrade works. Revision numbers continue from `0022`.
 
 ### Gates / docs
 
-- `ruff check . && ruff format --check . && pytest` in `backend/`.
+- The backend gate (`ruff check . && ruff format --check . && pyright && pytest --cov=app` with a scratch `TEST_DATABASE_URL`) and `pre-commit run --all-files` in `backend/`.
 - `.env.example`: `GITHUB_TOKEN=` (with the fine-grained-PAT permission note), `GITHUB_API_URL`, `GITHUB_MAX_REQUESTS_PER_RUN`, `GITHUB_MIN_REMAINING_PCT`, `EVIDENCE_LOOKBACK_YEARS`, `EVIDENCE_BOT_LOGINS`.
 - `docs/architecture.md`: ER diagram gains the six tables (header link refresh waits for #61); re-run `node scripts/render-diagrams.mjs`.
 

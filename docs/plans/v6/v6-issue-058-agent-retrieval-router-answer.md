@@ -49,17 +49,26 @@ Answer interview-style questions in the user's voice from **approved** achieveme
 
 ### Tests
 
-- `test_agent_router.py`: labelled question set (≈ 40) → rules path correct for all that rules should catch; ambiguous questions reach the fallback (fake classifier asserted called).
-- `test_agent_retrieval.py` (Postgres, recorded vectors): recall@5 on `questions.yaml` ≥ 0.80; draft/rejected/archived achievements never returned; project filter works; empty KB → no-evidence path; thresholds respected.
-- `test_agent_grounding.py`: injected unsupported number, tool, year, and an unmarked sentence are each caught; one repair then partial result; marker → real evidence id resolution; private flag propagates.
-- `test_agent_answers.py` (recorded LLM): intro uses profile summary + top achievements; behavioral cites one achievement in STAR shape; technical drill-down includes chunk quotes; "why X over Y" without rationale evidence → says so and offers a note; unanswerable question refuses; hypothetical labelled as approach; prompt-injection text in evidence does not change behaviour.
-- `test_agent_memory.py`: window and summary rollover; summary never contains new factual claims (checked with the verifier against prior messages); session reload preserves order.
-- `test_agent_endpoints.py`: ownership 404s, foreign match 404, message persistence on both paths, error path keeps the user message.
-- `test_migrations.py`: `0027` round trip.
+- `tests/services/test_agent_router.py`: labelled question set (≈ 40) → rules path correct for all that rules should catch; ambiguous questions reach the fallback (fake classifier asserted called).
+- `tests/services/test_agent_retrieval.py` (Postgres, recorded vectors): recall@5 on `questions.yaml` ≥ 0.80; draft/rejected/archived achievements never returned; project filter works; empty KB → no-evidence path; thresholds respected.
+- `tests/services/test_agent_grounding.py`: injected unsupported number, tool, year, and an unmarked sentence are each caught; one repair then partial result; marker → real evidence id resolution; private flag propagates.
+- `tests/services/test_agent_answers.py` (recorded LLM): intro uses profile summary + top achievements; behavioral cites one achievement in STAR shape; technical drill-down includes chunk quotes; "why X over Y" without rationale evidence → says so and offers a note; unanswerable question refuses; hypothetical labelled as approach; prompt-injection text in evidence does not change behaviour.
+- `tests/services/test_agent_memory.py`: window and summary rollover; summary never contains new factual claims (checked with the verifier against prior messages); session reload preserves order.
+- `tests/routers/test_agent_endpoints.py`: ownership 404s, foreign match 404, message persistence on both paths, error path keeps the user message.
+- `tests/db/test_migrations.py` (+ `tests/db/test_schema_standards.py` picks the new tables up): `0027` round trip.
+
+### Standards from v5 (must hold from the first commit)
+
+- **Lint/types:** ruff `ALL` and pyright strict pass with no new `noqa`; untyped third-party values are narrowed through small typed helpers (the pattern in `adapters/llm.py`); a `# pyright: ignore` needs a reason comment. Functions stay within the configured limits (args 6, branches 13, returns 8, complexity 14).
+- **Coverage and layout:** the 90 % floor holds with `TEST_DATABASE_URL` set; new code ships with its tests in the mirrored folders (`tests/adapters/`, `tests/services/`, `tests/routers/`, `tests/db/`, `tests/core/`; recorded/golden suites in `tests/eval/`).
+- **Config:** every new `Settings` field appears in `.env.example` (the settings↔env guard test fails otherwise); no `os.getenv`/`os.environ` and no provider SDK imports outside their one module.
+- **API:** new routes keep `response_model` (binary downloads declare their media type instead), use only the CORS-allowed methods (`GET`, `POST`, `PATCH`, `DELETE`, `OPTIONS` — **never PUT**) and headers (`Content-Type`, `Accept`), raise `DomainError` subclasses (checked by `tests/core/test_error_contract.py`), and bound every list with the shared `pagination()` dependency and `X-Total-Count`.
+- **Privacy:** no resume/evidence text, prompts, tokens or keys in logs (extend `tests/routers/test_logging_privacy.py` for the new flows); LLM calls log `cost_usd=`; outbound HTTP has an explicit timeout.
+- **Schema (v5 #43 conventions):** every table with `updated_at` gets `create_updated_at_trigger(table)` / `drop_updated_at_trigger(table)` from `app.core.migration_helpers`; every FK is indexed and declares its ON DELETE (CASCADE owned children, RESTRICT identity/audit, SET NULL provenance); constraints and indexes are named (`uq_`/`ix_`/`fk_`/`ck_`); bounded scalars get a `CHECK`; `alembic check` is clean and the schema audit (`tests/db/test_schema_standards.py`) reports nothing; downgrade works. Revision numbers continue from `0022`.
 
 ### Gates / docs
 
-`ruff` + `pytest`; `.env.example` agent settings; `architecture.md` agent sequence diagram (re-render); `docs/guide/05-interview-agent.md` drafted (how answers are grounded, what "no evidence" means, adding a note to fill gaps).
+the backend gate (`ruff check . && ruff format --check . && pyright && pytest --cov=app` with a scratch `TEST_DATABASE_URL`) and `pre-commit run --all-files`; `.env.example` agent settings; `architecture.md` agent sequence diagram (re-render); `docs/guide/05-interview-agent.md` drafted (how answers are grounded, what "no evidence" means, adding a note to fill gaps).
 
 ## Risks
 

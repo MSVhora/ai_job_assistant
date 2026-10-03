@@ -18,7 +18,7 @@ Make quality measurable and regression-proof: a small golden dataset for a synth
 |---|---|---|
 | Location | `backend/tests/eval/` — `golden/`, `recordings/`, `test_*_eval.py`, `conftest.py` | Plan §11 |
 | Persona | Synthetic "Ada": 4 repos (public, private, fork, bot-heavy), notes, resume profile with deliberate conflicts; no real person's data | Safe to commit |
-| Recording mechanism | `RecordedLLM` in `tests/fakes.py` monkeypatches `app.adapters.llm.generate`/`embed`; key = SHA-256 of `(task, resolved model name, system, prompt, schema)`; missing key → test fails with "re-record" | Deterministic, no VCR dependency |
+| Recording mechanism | `RecordedLLM` in `tests/fakes.py` is a recording/replaying **handler for the existing provider-boundary fakes** (`install_acompletion` / `install_aembedding` replace `litellm.acompletion`/`aembedding`), so cost, token usage and task routing are exercised too; key = SHA-256 of `(model, messages)`; missing key → test fails with "re-record" | Deterministic, no VCR dependency |
 | Record mode | `EVAL_RECORD=1 pytest tests/eval` uses the configured real key and rewrites recordings; recordings are scrubbed (no keys, no real data) and committed | Reviewable diffs |
 | Live suite | `pytest -m live_llm`, additionally gated by `EVAL_LIVE=1`; prints a metric table; exits non-zero below thresholds; never part of default CI | Cost and flakiness control |
 | Judge | `LLMTask.judge` for entailment/rubric scoring in live mode only; CI uses deterministic checks | CI stays offline |
@@ -50,9 +50,17 @@ Make quality measurable and regression-proof: a small golden dataset for a synth
 
 Runs the same pipelines with the real provider: LLM-judge faithfulness on extraction/bullets/answers, bullet rubric scores, retrieval recall with live embeddings, router fallback accuracy; supports `--write-model` comparison (runs the writing task with the default and the candidate model and prints both columns — the evidence for the model decision). Writes a Markdown report to `tests/eval/reports/` (gitignored).
 
+### Standards from v5 (must hold from the first commit)
+
+- **Lint/types:** ruff `ALL` and pyright strict pass with no new `noqa`; untyped third-party values are narrowed through small typed helpers (the pattern in `adapters/llm.py`); a `# pyright: ignore` needs a reason comment. Functions stay within the configured limits (args 6, branches 13, returns 8, complexity 14).
+- **Coverage and layout:** the 90 % floor holds with `TEST_DATABASE_URL` set; new code ships with its tests in the mirrored folders (`tests/adapters/`, `tests/services/`, `tests/routers/`, `tests/db/`, `tests/core/`; recorded/golden suites in `tests/eval/`).
+- **Config:** every new `Settings` field appears in `.env.example` (the settings↔env guard test fails otherwise); no `os.getenv`/`os.environ` and no provider SDK imports outside their one module.
+- **API:** new routes keep `response_model` (binary downloads declare their media type instead), use only the CORS-allowed methods (`GET`, `POST`, `PATCH`, `DELETE`, `OPTIONS` — **never PUT**) and headers (`Content-Type`, `Accept`), raise `DomainError` subclasses (checked by `tests/core/test_error_contract.py`), and bound every list with the shared `pagination()` dependency and `X-Total-Count`.
+- **Privacy:** no resume/evidence text, prompts, tokens or keys in logs (extend `tests/routers/test_logging_privacy.py` for the new flows); LLM calls log `cost_usd=`; outbound HTTP has an explicit timeout.
+
 ### Gates / docs
 
-`ruff` + `pytest` green offline; `pyproject.toml` registers markers `live_llm`; `docs/instructions/` gains an evaluation note (how to record, how to run live, thresholds); guide 04/05 link to the quality guarantees.
+the backend gate (`ruff check . && ruff format --check . && pyright && pytest --cov=app` with a scratch `TEST_DATABASE_URL`) and `pre-commit run --all-files` green; `pyproject.toml` registers markers `live_llm`; `docs/instructions/` gains an evaluation note (how to record, how to run live, thresholds); guide 04/05 link to the quality guarantees.
 
 ## Risks
 

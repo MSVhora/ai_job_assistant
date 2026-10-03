@@ -32,7 +32,7 @@ Distil chunks into **draft** STAR achievements with skills/impact/difficulty tag
 | Difficulty | 1–5 against a written rubric embedded in the prompt (1 routine fix … 5 architectural / cross-team) | Reproducible |
 | Employer suggestion | For repo-based chunks: suggest `employer_ref` by overlap of chunk dates with `structured_profile.experience` ranges across profiles; stored as `employer_ref` with `employer_ref_source='suggested'` inside the JSON until confirmed in #53 | Plan §5.3 |
 | Run guard | Partial unique index on `achievement_extraction_run (candidate_id) WHERE status IN ('pending','running')`; sweeper with `max_run_age_minutes`; 409 with `active_run_id` | Same pattern as #36/#50 |
-| Confirm gate | `POST …/extract/estimate` returns chunk count (new vs cached), tokens, cost (or "unknown"), and a private-data breakdown; `POST …/extract` requires `confirmed_estimate_id` | User sees what leaves the machine and what it costs |
+| Confirm gate | `POST …/extract/estimate` returns chunk count (new vs cached), tokens, cost from v5 #47's `estimate_structured_cost` on the real chunk prompts and `estimate_cost` for embeddings (`usd` null + "cost unavailable for this model" when unpriced), and a private-data breakdown; `POST …/extract` requires `confirmed_estimate_id` | User sees what leaves the machine and what it costs |
 | `derived_from_private` | Set from linked items at creation | Provenance marking |
 
 ## Scope
@@ -52,15 +52,24 @@ Tables `achievement`, `achievement_evidence` (unique `(achievement_id, item_id)`
 
 ### Tests
 
-- `test_achievement_validation.py` (pure): evidence ids outside the chunk rejected; fabricated number → moved to `needs_confirmation`; `result` without a supporting quote → null; placeholder flag; empty evidence rejected.
-- `test_achievement_extraction.py` (Postgres, `RecordedLLM` fixtures from #60 scaffolding or inline fakes): trap chunk with no metric yields `metrics == []` and `result is None`; run twice → second run makes **zero** provider calls; changing `ACHIEVEMENT_PROMPT_VERSION` re-runs; one chunk raising `LLMError` does not fail the run; estimate within ±25 % of actual metered tokens on the fixtures; private share reported; `derived_from_private` set.
-- `test_extraction_run_guard.py`: concurrent starts → one 409 with `active_run_id`; sweeper releases a stale run.
-- `test_skill_canon.py`: aliases, case, profile-skill matching.
-- `test_migrations.py`: `0025` round trip.
+- `tests/services/test_achievement_validation.py` (pure): evidence ids outside the chunk rejected; fabricated number → moved to `needs_confirmation`; `result` without a supporting quote → null; placeholder flag; empty evidence rejected.
+- `tests/services/test_achievement_extraction.py` (Postgres, the provider-boundary fakes `install_acompletion`/`install_aembedding` in `tests/fakes.py` (the #60 recorder builds on them)): trap chunk with no metric yields `metrics == []` and `result is None`; run twice → second run makes **zero** provider calls; changing `ACHIEVEMENT_PROMPT_VERSION` re-runs; one chunk raising `LLMError` does not fail the run; estimate within ±25 % of actual metered tokens on the fixtures; private share reported; `derived_from_private` set.
+- `tests/services/test_extraction_run_guard.py`: concurrent starts → one 409 with `active_run_id`; sweeper releases a stale run.
+- `tests/services/test_skill_canon.py`: aliases, case, profile-skill matching.
+- `tests/db/test_migrations.py` (+ `tests/db/test_schema_standards.py` picks the new tables up): `0025` round trip.
+
+### Standards from v5 (must hold from the first commit)
+
+- **Lint/types:** ruff `ALL` and pyright strict pass with no new `noqa`; untyped third-party values are narrowed through small typed helpers (the pattern in `adapters/llm.py`); a `# pyright: ignore` needs a reason comment. Functions stay within the configured limits (args 6, branches 13, returns 8, complexity 14).
+- **Coverage and layout:** the 90 % floor holds with `TEST_DATABASE_URL` set; new code ships with its tests in the mirrored folders (`tests/adapters/`, `tests/services/`, `tests/routers/`, `tests/db/`, `tests/core/`; recorded/golden suites in `tests/eval/`).
+- **Config:** every new `Settings` field appears in `.env.example` (the settings↔env guard test fails otherwise); no `os.getenv`/`os.environ` and no provider SDK imports outside their one module.
+- **API:** new routes keep `response_model` (binary downloads declare their media type instead), use only the CORS-allowed methods (`GET`, `POST`, `PATCH`, `DELETE`, `OPTIONS` — **never PUT**) and headers (`Content-Type`, `Accept`), raise `DomainError` subclasses (checked by `tests/core/test_error_contract.py`), and bound every list with the shared `pagination()` dependency and `X-Total-Count`.
+- **Privacy:** no resume/evidence text, prompts, tokens or keys in logs (extend `tests/routers/test_logging_privacy.py` for the new flows); LLM calls log `cost_usd=`; outbound HTTP has an explicit timeout.
+- **Schema (v5 #43 conventions):** every table with `updated_at` gets `create_updated_at_trigger(table)` / `drop_updated_at_trigger(table)` from `app.core.migration_helpers`; every FK is indexed and declares its ON DELETE (CASCADE owned children, RESTRICT identity/audit, SET NULL provenance); constraints and indexes are named (`uq_`/`ix_`/`fk_`/`ck_`); bounded scalars get a `CHECK`; `alembic check` is clean and the schema audit (`tests/db/test_schema_standards.py`) reports nothing; downgrade works. Revision numbers continue from `0022`.
 
 ### Gates / docs
 
-`ruff` + `pytest`; `.env.example` unchanged (settings from #49); `architecture.md` ER (achievement tables, run table) and a new ingest→extract sequence diagram, re-render diagrams; guide 04 gains "Extraction and cost estimate".
+the backend gate (`ruff check . && ruff format --check . && pyright && pytest --cov=app` with a scratch `TEST_DATABASE_URL`) and `pre-commit run --all-files`; `.env.example` unchanged (settings from #49); `architecture.md` ER (achievement tables, run table) and a new ingest→extract sequence diagram, re-render diagrams; guide 04 gains "Extraction and cost estimate".
 
 ## Risks
 

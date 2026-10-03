@@ -8,6 +8,7 @@ from fastapi import BackgroundTasks
 from sqlalchemy import select, text
 
 from app.adapters.evidence_sources.base import EvidenceSourceError, EvidenceSourcePausedError
+from app.core.config import get_settings
 from app.core.db import session_factory
 from app.core.errors import (
     DuplicateSyncError,
@@ -467,3 +468,40 @@ async def test_a_killed_run_keeps_its_committed_pages_and_a_later_sync_resumes(
 
     assert resumed.seen[0].cursor == {"stage": "p2"}
     assert set(await load_items()) == {"c1", "c2", "c3"}
+
+
+async def test_a_run_chunks_what_it_stored_and_records_the_counts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(get_settings(), "gemini_api_key", None)
+    await seed_scopes("ada/engine")
+    install_evidence_source(
+        monkeypatch,
+        ScriptedEvidenceSource(
+            {
+                "ada/engine": [
+                    page([item("issue", "ada/engine#1"), item("issue", "ada/engine#2")], "done")
+                ]
+            }
+        ),
+    )
+
+    run_id = await sync()
+
+    chunks = (await load_run(run_id)).progress["chunks"]
+    assert chunks["created"] == 2
+    assert chunks["embed_failed"] == 0
+    assert chunks["pending_embedding"] == 2
+
+
+async def test_a_run_where_every_scope_fails_builds_no_chunks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    await seed_scopes("ada/a")
+    install_evidence_source(
+        monkeypatch, ScriptedEvidenceSource({"ada/a": [EvidenceSourceError("no access")]})
+    )
+
+    run_id = await sync()
+
+    assert "chunks" not in (await load_run(run_id)).progress

@@ -1,7 +1,7 @@
 # 4. Evidence from GitHub (draft)
 
-> **Status: draft, grows with v6.** This page covers what exists after issue #50: connecting
-> GitHub, choosing repositories and syncing. Achievements, the resume builder and the interview
+> **Status: draft, grows with v6.** This page covers what exists after issue #51: connecting
+> GitHub, choosing repositories, syncing, notes, links, resume bullets and chunking. Achievements, the resume builder and the interview
 > agent arrive in later v6 issues and will be added here.
 
 The v6 **Developer Evidence Engine** turns the work you actually did into an evidence store that
@@ -53,6 +53,46 @@ A refresh can never silently widen what is ingested: repositories found later ar
 - Noise (merge commits, bots, dependency bumps, lockfile-only or trivial changes) is **stored but
   marked filtered** with the reason, so you can restore it later. Standalone commits that are the
   squash of a pull request are attached to that pull request instead of counted twice.
+
+## Notes, links and resume bullets
+
+GitHub is one source. You can add evidence yourself, and it is chunked exactly like GitHub text:
+
+- **Notes** (`POST/GET/PATCH/DELETE /api/evidence/notes`): free text up to 20,000 characters with an
+  optional title. Editing a note creates a new version and hides the old one; deleting hides it
+  (nothing is removed, so an identical note can be re-added later). The same text twice is a 409.
+- **Links** (`POST /api/evidence/links`): an `http(s)` URL with an optional title and optional pasted
+  text. Links are **never fetched**. A link is only chunked, and so only usable later, when you
+  paste text for it.
+- **Resume bullets** (`POST /api/evidence/resume/ingest` with a `profile_id`): every experience and
+  project bullet of that profile becomes a `resume_line`. The same bullet in two profiles is one
+  item; re-ingesting after you edit a profile adds new bullets and hides the ones you removed.
+
+## What "filtered" means, and restoring an item
+
+Every item is `kept`, `filtered` or `excluded`. **Filtered** means the noise filter set it aside
+(merge commit, bot, dependency bump, lockfile-only or trivial change, or the squash of a pull
+request) and it is shown with its reason. **Excluded** means you removed it. Neither is chunked or
+sent to an LLM. `GET /api/evidence/items?status=filtered` lists the filtered ones;
+`PATCH /api/evidence/items/{id}` with `{"status": "kept"}` restores one (or `"excluded"` removes a
+kept one). Nothing here changes your profile.
+
+## Chunks and embeddings
+
+Kept items are grouped into **chunks**, the unit later features extract from and search:
+one per pull request (with its squash commit messages and a file-path summary), per burst of
+direct commits (a gap of 7 days or more starts a new one, at most 30 commits), per repository
+summary, issue, review, note paragraph group and resume entry. Chunks are rebuilt automatically at
+the end of every sync and after a note, link, resume or restore change.
+
+- Chunk text is **redacted** (emails, phone numbers, IPs, tokens and keys become placeholders such
+  as `<EMAIL_1>`); the original text stays on the item. Turn this off only with
+  `EVIDENCE_REDACTION_ENABLED=false`.
+- Each chunk is embedded once. Re-running with no change makes no embedding calls; editing an item
+  re-embeds only its chunk. If the provider fails, the chunk is kept without a vector and the next
+  rebuild retries it.
+- `GET /api/evidence/chunks/summary` reports chunk counts, tokens, the private share and how many
+  chunks still wait for an embedding.
 
 ## Not yet verified against live GitHub
 

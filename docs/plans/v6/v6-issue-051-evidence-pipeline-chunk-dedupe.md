@@ -1,7 +1,7 @@
 # Issue #51 — Evidence pipeline: chunking, dedupe, notes/links, resume ingestion, chunk embeddings (Week 2)
 
-**Status:** Proposed — for owner review
-**Tracks:** GitHub issue #51 (milestone `v6`, branch `v6/43-evidence-pipeline-chunk-dedupe`)
+**Status:** In progress — branch `v6/51-evidence-pipeline-chunk-dedupe`
+**Tracks:** GitHub issue #51 (milestone `v6`, branch `v6/51-evidence-pipeline-chunk-dedupe`)
 **Plan of record:** [v6-implementation-plan.md](v6-implementation-plan.md) §4.4–4.5, §12 (redaction)
 **Depends on:** #48, #49 (redaction, `embed` usage), #50 (items to chunk)
 **Blocks:** #52 (chunks are the extraction unit)
@@ -76,3 +76,15 @@ the backend gate (`ruff check . && ruff format --check . && pyright && pytest --
 ## Out of scope
 
 Fetching link content, LinkedIn/Jira/GitLab items, LLM extraction (#52), UI (#53), ANN indexes.
+
+## Implementation notes (deviations from the plan above)
+
+- **`pr` chunks** hold the PR title/body, a file-path summary (counts, top directories from `meta.paths`) and the squash commit messages attached by #50 (`filtered` / `squash_of_pull_request`, `meta.pr_number`); #50 stores no per-PR commit list or comments addressed to the user, so those parts of plan §4.4 do not exist yet.
+- **New chunk kind `review`** for the user's reviews of others' PRs (#50's `review_comment` items); links with pasted text chunk as `note`; bare links are never chunked.
+- **`repo_summary`** chunks carry the user's kept-commit count and first/last date, computed from stored commit items at chunk time.
+- **Redaction counts** are logged and returned from a rebuild (`progress["chunks"]["redactions"]` on a sync run), not stored per chunk, so `GET /api/evidence/chunks/summary` reports chunks, tokens, private share and embedding status instead.
+- **Rebuild** is serialized per candidate with `pg_advisory_xact_lock`, always rewrites `evidence_chunk_item` links, and embeds every chunk whose vector is missing (new ones and earlier failures). Without a configured LLM key chunks are still built and reported as pending. It runs at the end of every sync that did not fail every scope, and as a background task after note, link, resume-ingest and item-status changes (never inside a request).
+- **Pieces of one item keep document order** (stable sort); the sort key is `(kind, project_key, time_start)`, not the hash.
+- **Resume ingest** records the contributing profile ids in `meta.profile_ids`, so removing a bullet from one profile only excludes it when no other profile still has it; an excluded bullet that returns is revived.
+- **Notes:** delete is a soft `excluded`; an identical note that was excluded is revived rather than duplicated; PATCH/DELETE return 404 for foreign ids and for non-note items.
+- **Not done:** the "defensive second pass" squash resolution in `dedupe` (#50's per-scope pass already attaches squash commits; a second implementation would only duplicate it).

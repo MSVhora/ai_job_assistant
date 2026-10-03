@@ -503,6 +503,127 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/evidence/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Notes */
+        get: operations["list_notes_api_evidence_notes_get"];
+        put?: never;
+        /** Create Note */
+        post: operations["create_note_api_evidence_notes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/evidence/notes/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Note */
+        delete: operations["delete_note_api_evidence_notes__item_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Note */
+        patch: operations["update_note_api_evidence_notes__item_id__patch"];
+        trace?: never;
+    };
+    "/api/evidence/links": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Link */
+        post: operations["create_link_api_evidence_links_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/evidence/resume/ingest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Ingest Resume */
+        post: operations["ingest_resume_api_evidence_resume_ingest_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/evidence/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Items */
+        get: operations["list_items_api_evidence_items_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/evidence/items/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Item */
+        patch: operations["update_item_api_evidence_items__item_id__patch"];
+        trace?: never;
+    };
+    "/api/evidence/chunks/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Chunks Summary */
+        get: operations["chunks_summary_api_evidence_chunks_summary_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -532,6 +653,25 @@ export interface components {
             issuer?: string | null;
             /** Issued Date */
             issued_date?: string | null;
+        };
+        /** ChunkSummaryResponse */
+        ChunkSummaryResponse: {
+            /** Chunks */
+            chunks: number;
+            /** Tokens */
+            tokens: number;
+            /** Private Chunks */
+            private_chunks: number;
+            /** Private Share */
+            private_share: number;
+            /** Embedded */
+            embedded: number;
+            /** Pending Embedding */
+            pending_embedding: number;
+            /** By Kind */
+            by_kind: {
+                [key: string]: number;
+            };
         };
         /** ContactInfo */
         ContactInfo: {
@@ -610,6 +750,16 @@ export interface components {
             /** End Date */
             end_date?: string | null;
         };
+        /**
+         * EvidenceItemStatus
+         * @enum {string}
+         */
+        EvidenceItemStatus: "kept" | "filtered" | "excluded";
+        /**
+         * EvidenceKind
+         * @enum {string}
+         */
+        EvidenceKind: "commit" | "pull_request" | "review_comment" | "issue" | "readme" | "repo_summary" | "note" | "link" | "resume_line";
         /** EvidenceStatusResponse */
         EvidenceStatusResponse: {
             /** Configured */
@@ -731,6 +881,56 @@ export interface components {
             database: boolean;
             /** Llm Configured */
             llm_configured: boolean;
+        };
+        /** ItemResponse */
+        ItemResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            kind: components["schemas"]["EvidenceKind"];
+            /** External Id */
+            external_id: string;
+            /** Project Key */
+            project_key: string | null;
+            /** Title */
+            title: string | null;
+            /** Body */
+            body: string;
+            /** Url */
+            url: string | null;
+            /** Occurred At */
+            occurred_at: string | null;
+            /** Authored By User */
+            authored_by_user: boolean;
+            status: components["schemas"]["EvidenceItemStatus"];
+            /** Filter Reason */
+            filter_reason: string | null;
+            /** Is Private */
+            is_private: boolean;
+            /** Meta */
+            meta: {
+                [key: string]: unknown;
+            };
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** ItemUpdate */
+        ItemUpdate: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "kept" | "excluded";
         };
         /** JobPostingDetail */
         JobPostingDetail: {
@@ -928,6 +1128,18 @@ export interface components {
          * @enum {string}
          */
         JobType: "full_time" | "part_time" | "contract" | "internship" | "temporary";
+        /** LinkCreate */
+        LinkCreate: {
+            /**
+             * Url
+             * Format: uri
+             */
+            url: string;
+            /** Title */
+            title?: string | null;
+            /** Text */
+            text?: string | null;
+        };
         /**
          * MatchRebuildStatusResponse
          * @description Rebuild-run status; `id=None`, `status="idle"` when the profile never rebuilt.
@@ -1044,6 +1256,20 @@ export interface components {
             rerank_cost_usd?: number | null;
             /** Warning */
             warning?: string | null;
+        };
+        /** NoteCreate */
+        NoteCreate: {
+            /** Title */
+            title?: string | null;
+            /** Body */
+            body: string;
+        };
+        /** NoteUpdate */
+        NoteUpdate: {
+            /** Title */
+            title?: string | null;
+            /** Body */
+            body?: string | null;
         };
         /** Preferences */
         Preferences: {
@@ -1171,6 +1397,23 @@ export interface components {
          * @enum {string}
          */
         RemoteType: "remote" | "hybrid" | "on_site";
+        /** ResumeIngestRequest */
+        ResumeIngestRequest: {
+            /**
+             * Profile Id
+             * Format: uuid
+             */
+            profile_id: string;
+        };
+        /** ResumeIngestResponse */
+        ResumeIngestResponse: {
+            /** Created */
+            created: number;
+            /** Unchanged */
+            unchanged: number;
+            /** Excluded */
+            excluded: number;
+        };
         /** ResumeSummaryResponse */
         ResumeSummaryResponse: {
             /**
@@ -2684,6 +2927,292 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_notes_api_evidence_notes_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_note_api_evidence_notes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NoteCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_note_api_evidence_notes__item_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_note_api_evidence_notes__item_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NoteUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_link_api_evidence_links_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LinkCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ingest_resume_api_evidence_resume_ingest_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResumeIngestRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumeIngestResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_items_api_evidence_items_get: {
+        parameters: {
+            query?: {
+                kind?: components["schemas"]["EvidenceKind"] | null;
+                project_key?: string | null;
+                status?: components["schemas"]["EvidenceItemStatus"];
+                is_private?: boolean | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_item_api_evidence_items__item_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ItemUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    chunks_summary_api_evidence_chunks_summary_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChunkSummaryResponse"];
                 };
             };
         };

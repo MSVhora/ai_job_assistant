@@ -164,6 +164,21 @@ class EvidenceSourceUnavailableError(DomainError):
     default_detail = "GitHub request failed - check the token and retry shortly"
 
 
+class EvidenceItemNotFoundError(DomainError):
+    status_code = 404
+    default_detail = "evidence item not found"
+
+
+class DuplicateEvidenceError(DomainError):
+    status_code = 409
+    default_detail = "this evidence already exists"
+
+
+class InvalidEvidenceInputError(DomainError):
+    status_code = 400
+    default_detail = "the evidence could not be created from this input"
+
+
 class JobPostingNotFoundError(DomainError):
     status_code = 404
     default_detail = "job posting not found"

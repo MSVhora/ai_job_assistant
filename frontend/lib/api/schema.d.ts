@@ -417,6 +417,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/evidence/github/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Github Status */
+        get: operations["github_status_api_evidence_github_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/evidence/github/scopes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Github Scopes */
+        get: operations["list_github_scopes_api_evidence_github_scopes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Github Scopes */
+        patch: operations["update_github_scopes_api_evidence_github_scopes_patch"];
+        trace?: never;
+    };
+    "/api/evidence/github/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start Github Sync */
+        post: operations["start_github_sync_api_evidence_github_sync_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/evidence/syncs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Syncs */
+        get: operations["list_syncs_api_evidence_syncs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/evidence/syncs/{sync_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Sync */
+        get: operations["get_sync_api_evidence_syncs__sync_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -468,6 +554,11 @@ export interface components {
              */
             links: components["schemas"]["SourceLink"][];
         };
+        /**
+         * ContentLevel
+         * @enum {string}
+         */
+        ContentLevel: "messages_and_prs" | "metadata_only";
         /** CostEstimateResponse */
         CostEstimateResponse: {
             /** Prompt Tokens */
@@ -518,6 +609,22 @@ export interface components {
             start_date?: string | null;
             /** End Date */
             end_date?: string | null;
+        };
+        /** EvidenceStatusResponse */
+        EvidenceStatusResponse: {
+            /** Configured */
+            configured: boolean;
+            /** Login */
+            login: string | null;
+            /** Acknowledged At */
+            acknowledged_at: string | null;
+            /** Last Synced At */
+            last_synced_at: string | null;
+            /** Scopes Total */
+            scopes_total: number;
+            /** Scopes Enabled */
+            scopes_enabled: number;
+            latest_sync: components["schemas"]["SyncRunResponse"] | null;
         };
         /** ExperienceItem */
         ExperienceItem: {
@@ -1141,6 +1248,54 @@ export interface components {
              */
             created_at: string;
         };
+        /** ScopeResponse */
+        ScopeResponse: {
+            /** Ref */
+            ref: string;
+            /** Is Private */
+            is_private: boolean;
+            /** Is Fork */
+            is_fork: boolean;
+            /** Description */
+            description: string | null;
+            /** Pushed At */
+            pushed_at: string | null;
+            /** Enabled */
+            enabled: boolean;
+            /** Is New */
+            is_new: boolean;
+            content_level: components["schemas"]["ContentLevel"];
+            /** Sync State */
+            sync_state: string;
+            /** Last Synced At */
+            last_synced_at: string | null;
+            /** Employer Ref */
+            employer_ref: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ScopeUpdateItem */
+        ScopeUpdateItem: {
+            /** Ref */
+            ref: string;
+            /** Enabled */
+            enabled?: boolean | null;
+            content_level?: components["schemas"]["ContentLevel"] | null;
+            /** Employer Ref */
+            employer_ref?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /** ScopeUpdateRequest */
+        ScopeUpdateRequest: {
+            /** Scopes */
+            scopes: components["schemas"]["ScopeUpdateItem"][];
+            /**
+             * Acknowledged Disclosure
+             * @default false
+             */
+            acknowledged_disclosure: boolean;
+        };
         /** SearchQueriesResponse */
         SearchQueriesResponse: {
             /** Queries */
@@ -1170,6 +1325,8 @@ export interface components {
             adzuna_configured: boolean;
             /** Apify Configured */
             apify_configured: boolean;
+            /** Github Token Configured */
+            github_token_configured: boolean;
             /**
              * Task Models
              * @default {}
@@ -1366,6 +1523,63 @@ export interface components {
             preferences?: components["schemas"]["Preferences"] | null;
             /** Years Of Experience */
             years_of_experience?: number | null;
+        };
+        /** SyncRequest */
+        SyncRequest: {
+            /**
+             * Mode
+             * @default incremental
+             * @enum {string}
+             */
+            mode: "incremental" | "full";
+        };
+        /** SyncRunResponse */
+        SyncRunResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Status */
+            status: string;
+            /** Mode */
+            mode: string;
+            /** Progress */
+            progress: {
+                [key: string]: unknown;
+            };
+            /** Rate Limit */
+            rate_limit: {
+                [key: string]: unknown;
+            };
+            /** Resume At */
+            resume_at: string | null;
+            /** Error */
+            error: string | null;
+            /** Usage */
+            usage: {
+                [key: string]: unknown;
+            };
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** SyncStartResponse */
+        SyncStartResponse: {
+            /**
+             * Sync Id
+             * Format: uuid
+             */
+            sync_id: string;
+            /** Status */
+            status: string;
         };
         /** ValidationError */
         ValidationError: {
@@ -2293,6 +2507,175 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    github_status_api_evidence_github_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvidenceStatusResponse"];
+                };
+            };
+        };
+    };
+    list_github_scopes_api_evidence_github_scopes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScopeResponse"][];
+                };
+            };
+        };
+    };
+    update_github_scopes_api_evidence_github_scopes_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScopeUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScopeResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_github_sync_api_evidence_github_sync_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["SyncRequest"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncStartResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_syncs_api_evidence_syncs_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncRunResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_sync_api_evidence_syncs__sync_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sync_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncRunResponse"];
+                };
             };
             /** @description Validation Error */
             422: {

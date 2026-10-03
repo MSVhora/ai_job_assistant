@@ -1,4 +1,6 @@
+import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -7,11 +9,19 @@ from app.models.evidence import ContentLevel, EvidenceKind
 __all__ = [
     "EvidenceItemData",
     "EvidenceKind",
+    "EvidenceStatusResponse",
     "NoiseVerdict",
+    "RateLimitInfo",
     "ScopeCandidate",
+    "ScopeResponse",
     "ScopeState",
+    "ScopeUpdateItem",
+    "ScopeUpdateRequest",
     "SourceIdentity",
     "SyncPage",
+    "SyncRequest",
+    "SyncRunResponse",
+    "SyncStartResponse",
 ]
 
 
@@ -40,6 +50,7 @@ class NoiseVerdict(BaseModel):
 
 class SourceIdentity(BaseModel):
     login: str
+    node_id: str | None = None
     emails: list[str] = Field(default_factory=list)
     permissions: list[str] = Field(default_factory=list)
 
@@ -60,7 +71,78 @@ class ScopeState(BaseModel):
     since: datetime | None = None
 
 
+class RateLimitInfo(BaseModel):
+    api: str
+    remaining: int | None = None
+    limit: int | None = None
+    reset_at: datetime | None = None
+
+
 class SyncPage(BaseModel):
+    """One page of normalized items plus the scope cursor to persist with it.
+
+    `requests_used` is the number of requests spent since the previous page.
+    """
+
     items: list[EvidenceItemData] = Field(default_factory=list[EvidenceItemData])
     next_cursor: dict[str, object] | None = None
     requests_used: int = 0
+    rate_limits: list[RateLimitInfo] = Field(default_factory=list[RateLimitInfo])
+
+
+class SyncRequest(BaseModel):
+    mode: Literal["incremental", "full"] = "incremental"
+
+
+class SyncStartResponse(BaseModel):
+    sync_id: uuid.UUID
+    status: str
+
+
+class SyncRunResponse(BaseModel):
+    id: uuid.UUID
+    status: str
+    mode: str
+    progress: dict[str, object]
+    rate_limit: dict[str, object]
+    resume_at: datetime | None
+    error: str | None
+    usage: dict[str, object]
+    created_at: datetime
+    updated_at: datetime
+
+
+class EvidenceStatusResponse(BaseModel):
+    configured: bool
+    login: str | None
+    acknowledged_at: datetime | None
+    last_synced_at: datetime | None
+    scopes_total: int
+    scopes_enabled: int
+    latest_sync: SyncRunResponse | None
+
+
+class ScopeResponse(BaseModel):
+    ref: str
+    is_private: bool
+    is_fork: bool
+    description: str | None
+    pushed_at: datetime | None
+    enabled: bool
+    is_new: bool
+    content_level: ContentLevel
+    sync_state: str
+    last_synced_at: datetime | None
+    employer_ref: dict[str, object] | None
+
+
+class ScopeUpdateItem(BaseModel):
+    ref: str = Field(min_length=3, max_length=255)
+    enabled: bool | None = None
+    content_level: ContentLevel | None = None
+    employer_ref: dict[str, object] | None = None
+
+
+class ScopeUpdateRequest(BaseModel):
+    scopes: list[ScopeUpdateItem] = Field(min_length=1, max_length=200)
+    acknowledged_disclosure: bool = False

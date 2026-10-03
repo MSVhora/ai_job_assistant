@@ -120,6 +120,50 @@ class DuplicateRunError(DomainError):
         self.active_search_id = active_search_id
 
 
+class DuplicateSyncError(DomainError):
+    """A pending/running evidence sync for the same source already exists (#50)."""
+
+    status_code = 409
+    default_detail = "an evidence sync for this source is already active"
+
+    def __init__(self, detail: str | None = None, active_sync_id: UUID | None = None) -> None:
+        super().__init__(detail)
+        self.active_sync_id = active_sync_id
+
+
+class EvidenceSourceNotConfiguredError(DomainError):
+    status_code = 400
+    default_detail = "GITHUB_TOKEN is not configured - add a read-only token to backend/.env"
+
+
+class NoEnabledScopesError(DomainError):
+    status_code = 400
+    default_detail = "enable at least one repository before syncing"
+
+
+class DisclosureRequiredError(DomainError):
+    status_code = 409
+    default_detail = (
+        "enabling a private repository sends its text to your LLM provider - "
+        "acknowledge the disclosure first"
+    )
+
+
+class EvidenceScopeNotFoundError(DomainError):
+    status_code = 404
+    default_detail = "repository not found - list the repositories first"
+
+
+class SyncRunNotFoundError(DomainError):
+    status_code = 404
+    default_detail = "evidence sync run not found"
+
+
+class EvidenceSourceUnavailableError(DomainError):
+    status_code = 502
+    default_detail = "GitHub request failed - check the token and retry shortly"
+
+
 class JobPostingNotFoundError(DomainError):
     status_code = 404
     default_detail = "job posting not found"
@@ -156,6 +200,8 @@ async def domain_error_handler(_: Request, exc: DomainError) -> JSONResponse:
     body: dict[str, object] = {"detail": exc.detail}
     if isinstance(exc, DuplicateRunError) and exc.active_search_id is not None:
         body["active_search_id"] = str(exc.active_search_id)
+    if isinstance(exc, DuplicateSyncError) and exc.active_sync_id is not None:
+        body["active_sync_id"] = str(exc.active_sync_id)
     return JSONResponse(status_code=exc.status_code, content=body)
 
 

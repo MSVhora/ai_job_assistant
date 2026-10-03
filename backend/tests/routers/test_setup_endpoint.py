@@ -19,6 +19,7 @@ def configure(
     embedding_model: str = "gemini/gemini-embedding-001",
     adzuna: str | None = None,
     apify: str | None = None,
+    github: str | None = None,
 ) -> None:
     settings = get_settings()
     monkeypatch.setattr(settings, "gemini_api_key", gemini)
@@ -26,12 +27,13 @@ def configure(
     monkeypatch.setattr(settings, "adzuna_app_id", adzuna)
     monkeypatch.setattr(settings, "adzuna_app_key", adzuna)
     monkeypatch.setattr(settings, "apify_token", apify)
+    monkeypatch.setattr(settings, "github_token", github)
 
 
 async def test_setup_check_reports_configured_providers(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    configure(monkeypatch, adzuna="id", apify="token")
+    configure(monkeypatch, adzuna="id", apify="token", github="ghp_example")
 
     response = await client.post("/api/setup/check")
 
@@ -41,6 +43,7 @@ async def test_setup_check_reports_configured_providers(
         "embedding_configured": True,
         "adzuna_configured": True,
         "apify_configured": True,
+        "github_token_configured": True,
         "task_models": {
             "classify": "gemini/gemini-2.5-flash",
             "extract": "gemini/gemini-2.5-flash",
@@ -101,3 +104,16 @@ async def test_setup_check_reports_the_routed_model_per_task(
 
     assert body["task_models"]["write"] == "gemini/gemini-2.5-pro"
     assert body["task_models"]["extract"] == get_settings().llm_model
+
+
+async def test_setup_check_reports_github_token_presence_only(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    configure(monkeypatch, github=None)
+    assert (await client.post("/api/setup/check")).json()["github_token_configured"] is False
+
+    configure(monkeypatch, github="ghp_secretvalue")
+    response = await client.post("/api/setup/check")
+
+    assert response.json()["github_token_configured"] is True
+    assert "ghp_secretvalue" not in response.text

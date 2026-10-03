@@ -212,3 +212,53 @@ async def seed_profile_light(name: str = "Seeker") -> Any:
         profile_id: uuid.UUID = profile.id
         await session.commit()
         return profile_id
+
+
+class ScriptedEvidenceSource:
+    """Evidence source driven by a per-scope script of pages, errors, or blocking events."""
+
+    name = "github"
+
+    def __init__(
+        self,
+        scripts: dict[str, list[Any]] | None = None,
+        *,
+        configured: bool = True,
+        scopes: list[Any] | None = None,
+    ) -> None:
+        self.scripts = scripts or {}
+        self.configured = configured
+        self.scopes = scopes or []
+        self.seen: list[Any] = []
+
+    def is_configured(self) -> bool:
+        return self.configured
+
+    async def identify(self) -> Any:
+        from app.schemas.evidence import SourceIdentity
+
+        return SourceIdentity(login="ada")
+
+    async def list_scopes(self) -> list[Any]:
+        return self.scopes
+
+    async def sync_scope(self, scope: Any) -> Any:
+        import asyncio
+
+        self.seen.append(scope)
+        for step in self.scripts.get(scope.ref, []):
+            if isinstance(step, Exception):
+                raise step
+            if isinstance(step, asyncio.Event):
+                await step.wait()
+                continue
+            yield step
+
+    def normalize(self, raw: Any) -> Any:
+        raise NotImplementedError
+
+
+def install_evidence_source(monkeypatch: Any, source: ScriptedEvidenceSource) -> None:
+    from app.adapters.evidence_sources import registry
+
+    monkeypatch.setitem(registry._FACTORIES, source.name, lambda: source)

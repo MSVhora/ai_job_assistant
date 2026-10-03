@@ -1,0 +1,91 @@
+{
+  "data": {
+    "rateLimit": {
+      "limit": 5000,
+      "remaining": 4980,
+      "resetAt": "2026-10-03T16:00:00Z"
+    },
+    "search": {
+      "pageInfo": {
+        "hasNextPage": false,
+        "endCursor": null
+      },
+      "nodes": [
+        {
+          "number": 7,
+          "title": "Add punch-card loader",
+          "body": "Adds the loader and tests.",
+          "url": "https://github.com/ada/engine/pull/7",
+          "createdAt": "2026-08-01T09:00:00Z",
+          "mergedAt": "2026-08-02T09:00:00Z",
+          "state": "MERGED",
+          "additions": 120,
+          "deletions": 8,
+          "changedFiles": 2,
+          "mergeCommit": {
+            "oid": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1"
+          },
+          "author": {
+            "login": "ada"
+          },
+          "files": {
+            "nodes": [
+              {
+                "path": "src/loader.py"
+              },
+              {
+                "path": "tests/test_loader.py"
+              }
+            ]
+          }
+        },
+        {
+          "number": 8,
+          "title": "Refresh lockfile",
+          "body": "",
+          "url": "https://github.com/ada/engine/pull/8",
+          "createdAt": "2026-08-03T09:00:00Z",
+          "mergedAt": null,
+          "state": "OPEN",
+          "additions": 900,
+          "deletions": 700,
+          "changedFiles": 1,
+          "mergeCommit": null,
+          "author": {
+            "login": "ada"
+          },
+          "files": {
+            "nodes": [
+              {
+                "path": "uv.lock"
+              }
+            ]
+          }
+        },
+        {
+          "number": 9,
+          "title": "Huge refactor",
+          "body": "Touches everything.",
+          "url": "https://github.com/ada/engine/pull/9",
+          "createdAt": "2026-08-04T09:00:00Z",
+          "mergedAt": null,
+          "state": "OPEN",
+          "additions": 5000,
+          "deletions": 4000,
+          "changedFiles": 250,
+          "mergeCommit": null,
+          "author": {
+            "login": "ada"
+          },
+          "files": {
+            "nodes": [
+              {
+                "path": "uv.lock"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

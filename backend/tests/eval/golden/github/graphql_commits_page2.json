@@ -1,0 +1,36 @@
+{
+  "data": {
+    "rateLimit": {
+      "limit": 5000,
+      "remaining": 4990,
+      "resetAt": "2026-10-03T16:00:00Z"
+    },
+    "repository": {
+      "defaultBranchRef": {
+        "target": {
+          "history": {
+            "pageInfo": {
+              "hasNextPage": false,
+              "endCursor": null
+            },
+            "nodes": [
+              {
+                "oid": "c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
+                "messageHeadline": "Merge branch 'main' into loader",
+                "messageBody": "",
+                "committedDate": "2026-08-01T12:00:00Z",
+                "url": "https://github.com/ada/engine/commit/c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3c3",
+                "additions": 10,
+                "deletions": 2,
+                "changedFilesIfAvailable": 3,
+                "parents": {
+                  "totalCount": 2
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

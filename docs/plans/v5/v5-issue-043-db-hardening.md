@@ -1,6 +1,6 @@
 # Issue #43 — Database hardening: `updated_at` trigger and standards audit
 
-**Status:** Proposed — for owner review
+**Status:** Implemented — see notes below
 **Tracks:** GitHub issue #43 (milestone `v5`, branch `v5/43-db-hardening`)
 **Plan of record:** [v5 plan](v5-hardening-plan.md) · standards: [database-postgres.md](../../instructions/database-postgres.md) (*v5 #43* rules)
 **Depends on:** #42 (tests live in the mirrored layout) · **Blocks:** v6 (migration numbering), #41
@@ -62,3 +62,12 @@ Make the database standards true: `updated_at` is maintained by the database (OR
 ## Out of scope
 
 ANN (HNSW) indexes, table partitioning, backup tooling, changing existing constraint names.
+
+## Implementation notes
+
+- **`0022` was needed:** the audit found one gap, `job_posting.canonical_id` (implicit NO ACTION). It is now `ON DELETE SET NULL` (provenance pointer), in the model and in `0022_set_null_on_canonical_posting_delete`. v6 migrations start at `0023`.
+- **Trigger deviation:** `set_updated_at()` keeps a value the statement sets explicitly (`IF NEW.updated_at IS NOT DISTINCT FROM OLD.updated_at THEN now()`). A plain `NEW.updated_at = now()` overrode explicit values and broke `test_sweeper_reclaims_stuck_run`, which backdates a run to test the sweeper cutoff.
+- **Helper location:** `app/core/migration_helpers.py`, not `alembic/helpers.py`. The `alembic/` folder shadows nothing importable (the installed package wins), so a helper there could not be imported from migrations. The helper builds DDL with `sa.DDL` context substitution and a validated table identifier, not f-strings, so the new no-f-string-SQL test passes.
+- Naming convention: PG-default patterns; `alembic check` is clean (tested). Models only gained the convention and the `SET NULL`; the trigger docstring note lives on `Base`.
+- `audit_schema.py` ignores `alembic_version`. The "nullable NOT NULL candidates" check is narrowed to nullable `created_at`/`updated_at`, since a data-based check is meaningless on an empty scratch database.
+- Tests: `tests/db/test_updated_at_trigger.py`, `tests/db/test_schema_standards.py` (alembic check, 0021/0022 round trip, empty audit, no f-string SQL). Sweeper and `update(Match)` already set `updated_at` explicitly, so they are not separately re-tested.

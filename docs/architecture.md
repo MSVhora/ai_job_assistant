@@ -271,6 +271,13 @@ never a run failure. With no salary floor set the connector also sends
 Source of truth: `backend/app/models/` + Alembic migrations. See
 [plan §4](plans/v1/v1-implementation-plan.md#4-data-model) for the data model narrative.
 
+`updated_at` on `candidate`, `profile`, `job_search`, `match` and `match_rebuild` is maintained by a
+`set_updated_at()` database trigger (migration `0021`), so bulk `UPDATE`s bump it too; an update that
+changes nothing leaves it alone, and one that sets it explicitly keeps that value. New tables with the
+column add the trigger through `app/core/migration_helpers.py`. `job_posting.canonical_id` is
+`ON DELETE SET NULL` (migration `0022`). `backend/scripts/audit_schema.py` is the read-only audit
+(unindexed FKs, missing `ON DELETE`, nullable timestamps, unconventional names) that a test keeps empty.
+
 <!-- diagram: database-schema-er -->
 ```mermaid
 erDiagram

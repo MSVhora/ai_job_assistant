@@ -34,6 +34,14 @@ class Settings(BaseSettings):
     llm_retry_attempts: int = 3
     llm_retry_base_delay_s: float = 1.0
     llm_timeout_s: Annotated[float, Field(gt=0, le=600)] = 60.0
+    # v6 #49: optional per-task model overrides (blank = llm_model) and a cap on concurrent
+    # provider calls so a long extraction stays inside free-tier RPM limits.
+    llm_model_classify: str | None = None
+    llm_model_extract: str | None = None
+    llm_model_write: str | None = None
+    llm_model_judge: str | None = None
+    llm_max_concurrency: Annotated[int, Field(ge=1, le=16)] = 2
+    evidence_redaction_enabled: bool = True
     # Optional USD-per-million-token overrides for models LiteLLM's price map lacks or has stale.
     llm_price_in_per_mtok: Annotated[float | None, Field(ge=0)] = None
     llm_price_out_per_mtok: Annotated[float | None, Field(ge=0)] = None
@@ -109,6 +117,10 @@ class Settings(BaseSettings):
         "adzuna_app_key",
         "apify_token",
         "github_token",
+        "llm_model_classify",
+        "llm_model_extract",
+        "llm_model_write",
+        "llm_model_judge",
         mode="before",
     )
     @classmethod

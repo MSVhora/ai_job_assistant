@@ -1171,6 +1171,13 @@ export interface components {
             /** Apify Configured */
             apify_configured: boolean;
             /**
+             * Task Models
+             * @default {}
+             */
+            task_models: {
+                [key: string]: string;
+            };
+            /**
              * Warnings
              * @default []
              */

@@ -1,7 +1,7 @@
 # Issue #49 — LLM task routing, usage meter, output cache, redaction (Week 1)
 
-**Status:** Proposed — for owner review
-**Tracks:** GitHub issue #49 (milestone `v6`, branch `v6/41-llm-task-routing-cache-redaction`)
+**Status:** In progress — branch `v6/49-llm-task-routing-cache-redaction`
+**Tracks:** GitHub issue #49 (milestone `v6`, branch `v6/49-llm-task-routing-cache-redaction`)
 **Plan of record:** [v6-implementation-plan.md](v6-implementation-plan.md) §8, §12 (redaction), migration `0024`
 **Depends on:** #48 (settings conventions); otherwise independent of GitHub work
 **Blocks:** #51 (redaction), #52 (cache, usage, routing), #55, #58
@@ -60,7 +60,7 @@ Extend `app/adapters/llm.py` — not a second abstraction — so v6 can pick a m
 - **Config:** every new `Settings` field appears in `.env.example` (the settings↔env guard test fails otherwise); no `os.getenv`/`os.environ` and no provider SDK imports outside their one module.
 - **API:** new routes keep `response_model` (binary downloads declare their media type instead), use only the CORS-allowed methods (`GET`, `POST`, `PATCH`, `DELETE`, `OPTIONS` — **never PUT**) and headers (`Content-Type`, `Accept`), raise `DomainError` subclasses (checked by `tests/core/test_error_contract.py`), and bound every list with the shared `pagination()` dependency and `X-Total-Count`.
 - **Privacy:** no resume/evidence text, prompts, tokens or keys in logs (extend `tests/routers/test_logging_privacy.py` for the new flows); LLM calls log `cost_usd=`; outbound HTTP has an explicit timeout.
-- **Schema (v5 #43 conventions):** every table with `updated_at` gets `create_updated_at_trigger(table)` / `drop_updated_at_trigger(table)` from `app.core.migration_helpers`; every FK is indexed and declares its ON DELETE (CASCADE owned children, RESTRICT identity/audit, SET NULL provenance); constraints and indexes are named (`uq_`/`ix_`/`fk_`/`ck_`); bounded scalars get a `CHECK`; `alembic check` is clean and the schema audit (`tests/db/test_schema_standards.py`) reports nothing; downgrade works. Revision numbers continue from `0022`.
+- **Schema (v5 #43 conventions):** every table with `updated_at` gets `create_updated_at_trigger(table)` / `drop_updated_at_trigger(table)` from `app.core.migration_helpers`; every FK is indexed and declares its ON DELETE (CASCADE owned children, RESTRICT identity/audit, SET NULL provenance); constraints and indexes are named (`uq_`/`ix_`/`fk_`/`ck_`); bounded scalars get a `CHECK`; `alembic check` is clean and the schema audit (`tests/db/test_schema_standards.py`) reports nothing; downgrade works. Revision numbers continue from `0023` (this issue adds `0024`).
 
 ### Gates / docs
 
@@ -77,3 +77,13 @@ the backend gate (`ruff check . && ruff format --check . && pyright && pytest --
 ## Out of scope
 
 Streaming, provider switching UI, per-user budgets, automatic cost enforcement (estimate and confirm only), embedding caching.
+
+## Implementation notes (deviations from the plan above)
+
+- **Price-lookup fix:** LiteLLM raises a bare `Exception` (not `BadRequestError`) for a model missing from its price map, so a routed custom model would have failed *after* a successful call. `_map_prices_per_mtok` now also catches it (logged at debug with `exc_info`) and the estimate becomes "unavailable".
+- **Estimates:** `estimate_structured_cost` gained `task`; `estimate_cost` is unchanged (it already takes the model, which callers resolve with the public `model_for(task)`).
+- **Semaphore** wraps each provider call inside the retry loop, so backoff sleeps do not hold a slot; `embed()` shares it. The per-loop entry is rebuilt if `LLM_MAX_CONCURRENCY` changes.
+- **Meter** records in `generate()` and `embed()` (so a repair round-trip counts as a second call); embeddings are labelled `embed`, untasked calls `default`. A cache hit returns `cost_usd=0.0` and is counted only in the cache counters.
+- **Cache** takes the caller's `AsyncSession` and never commits; it upserts with `ON CONFLICT DO UPDATE`. Callers must pass already-redacted `key_parts` — `evidence_redaction_enabled` is read by the callers that wire redaction in (#51, #52), not by the cache itself.
+- **Redaction:** IPv4/IPv6 candidates are validated with `ipaddress`; an IPv4 directly after "version"/"v" is left alone (`v1.2.3.4`), real addresses in prose are redacted. Phone numbers need 9–15 digits and are skipped for dates and when attached to hex/UUID text.
+- **Frontend:** the per-task models render in a new `TaskModels` component (SetupChecklist is already at the 200-line cap).

@@ -13,6 +13,7 @@ from app.models.evidence import (
 )
 from app.models.job_posting import JobPosting, JobType, RemoteType
 from app.models.job_search import JobSearch, JobSearchStatus, SearchPosting
+from app.models.llm_output_cache import LLMOutputCache
 from app.models.match import Match, MatchRebuild, MatchRebuildStatus
 from app.models.profile import Profile
 from app.models.profile_revision import ProfileRevision, RevisionSource
@@ -34,6 +35,7 @@ __all__ = [
     "JobSearch",
     "JobSearchStatus",
     "JobType",
+    "LLMOutputCache",
     "Match",
     "MatchRebuild",
     "MatchRebuildStatus",

@@ -41,6 +41,12 @@ async def test_setup_check_reports_configured_providers(
         "embedding_configured": True,
         "adzuna_configured": True,
         "apify_configured": True,
+        "task_models": {
+            "classify": "gemini/gemini-2.5-flash",
+            "extract": "gemini/gemini-2.5-flash",
+            "write": "gemini/gemini-2.5-flash",
+            "judge": "gemini/gemini-2.5-flash",
+        },
         "warnings": [],
     }
 
@@ -83,3 +89,15 @@ def test_blank_env_keys_count_as_unconfigured(monkeypatch: pytest.MonkeyPatch) -
     assert settings.adzuna_app_id is None
     assert settings.adzuna_app_key is None
     assert settings.apify_token is None
+
+
+async def test_setup_check_reports_the_routed_model_per_task(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    configure(monkeypatch)
+    monkeypatch.setattr(get_settings(), "llm_model_write", "gemini/gemini-2.5-pro")
+
+    body = (await client.post("/api/setup/check")).json()
+
+    assert body["task_models"]["write"] == "gemini/gemini-2.5-pro"
+    assert body["task_models"]["extract"] == get_settings().llm_model

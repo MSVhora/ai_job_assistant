@@ -103,6 +103,23 @@ async def test_evidence_core_migration_round_trip(migrated_database: None) -> No
         await _alembic("upgrade", "head")
 
 
+async def test_llm_output_cache_migration_round_trip(migrated_database: None) -> None:
+    async def cache_table_exists() -> bool:
+        async with session_factory() as session:
+            return (
+                await session.execute(text("SELECT to_regclass('llm_output_cache') IS NOT NULL"))
+            ).scalar_one()
+
+    try:
+        await _alembic("downgrade", "0023")
+        assert not await cache_table_exists()
+
+        await _alembic("upgrade", "head")
+        assert await cache_table_exists()
+    finally:
+        await _alembic("upgrade", "head")
+
+
 async def test_schema_audit_has_no_findings(migrated_database: None) -> None:
     from audit_schema import audit
 

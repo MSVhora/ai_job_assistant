@@ -42,7 +42,7 @@ None expected beyond bug fixes found while integrating; any change must come wit
 
 ### Tests / verification
 
-- `npm run lint && npm run build`.
+- `npm run lint && npm run format:check && npm run typecheck && npm test && npm run build`.
 - Manual script in the PR: intro, behavioral, technical-why (with and without rationale evidence), motivation with and without a pinned job, unanswerable question → refusal card → add note → approve in review → re-ask → now answered with citations; reload keeps the thread; summary kicks in after the configured number of turns (set `AGENT_HISTORY_TURNS=2` for the check); private-derived answer shows the badge and note.
 
 ### Standards from v5 (must hold from the first commit)

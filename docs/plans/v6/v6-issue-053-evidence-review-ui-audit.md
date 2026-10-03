@@ -49,7 +49,7 @@ Give the user the human-in-the-loop gate (hard requirement 2): connect GitHub an
 ### Tests
 
 Backend (Postgres): approve without evidence → 409; approve with pending metric → 409; every mutation writes exactly one revision with the right source/diff; editing an approved row re-embeds and recomputes `derived_from_private` (fake embedder asserts a call); merge archives sources and links evidence union; split divides evidence; invalid transitions rejected; stale flag set by `mark_stale_after_sync` and cleared on re-review; merge proposals respect the 0.90 / same-project / date-overlap rule and never auto-apply; ownership 404s; bulk-approve excludes private-derived and unconfirmed items.
-Frontend: `npm run lint && npm run build`; manual walkthrough checklist recorded in the PR (connect → opt in private repo with disclosure → sync → pause banner → extract with estimate → review → approve → refresh → stale badge).
+Frontend: `npm run lint && npm run format:check && npm run typecheck && npm test && npm run build`; manual walkthrough checklist recorded in the PR (connect → opt in private repo with disclosure → sync → pause banner → extract with estimate → review → approve → refresh → stale badge).
 
 ### Standards from v5 (must hold from the first commit)
 

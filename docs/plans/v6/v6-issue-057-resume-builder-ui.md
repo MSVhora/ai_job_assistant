@@ -47,7 +47,7 @@ Only small additions if the UI needs them (`GET /api/resume-documents?profile_id
 
 ### Tests / verification
 
-- `npm run lint && npm run build` green.
+- `npm run lint && npm run format:check && npm run typecheck && npm test && npm run build` green.
 - Manual script recorded in the PR: create from paste (2 pages) and from a match (1 page); review shows data with no PDF; private marks visible on the right bullets and **absent** from every copy format; Plain/Markdown/JSON Resume copies paste cleanly; add a "not included" bullet (re-fit) and remove one; omitted overlapping role → Include anyway; comment on one section → Apply → only that section changes; a comment asking for unsupported content is rejected with "Add a note"; conflict "Edit in profile" and "Keep as is"; Generate PDF → page count ≤ target, downloads; unfittable state lists items; out-of-order PDF responses ignored.
 - Hook tests for the request-id guard where the repo has frontend tests; otherwise documented manual script (current frontend practice).
 

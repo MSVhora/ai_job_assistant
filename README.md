@@ -8,7 +8,7 @@ See [docs/plans/v1/v1-implementation-plan.md](docs/plans/v1/v1-implementation-pl
 
 - **[User guide](docs/guide/README.md)** — step-by-step: setup, profile pipeline, job discovery
 - **[Architecture](docs/architecture.md)** — diagrams (flow, sequence, ER schema) and layering rules
-- **Plans** — [v1 plan](docs/plans/v1/v1-implementation-plan.md) · [v2 plan](docs/plans/v2/v2-implementation-plan.md) · [v3 plan](docs/plans/v3/v3-implementation-plan.md) · issue plans live next to each plan ([v1](docs/plans/v1/) · [v2](docs/plans/v2/) · [v3](docs/plans/v3/))
+- **Plans** — [v1 plan](docs/plans/v1/v1-implementation-plan.md) · [v2 plan](docs/plans/v2/v2-implementation-plan.md) · [v3 plan](docs/plans/v3/v3-implementation-plan.md) · [v4 plan](docs/plans/v4/v4-search-relevance-plan.md) · issue plans live next to each plan ([v1](docs/plans/v1/) · [v2](docs/plans/v2/) · [v3](docs/plans/v3/) · [v4](docs/plans/v4/))
 
 Diagrams are Mermaid blocks in the docs, kept in sync with rendered SVG copies in
 `docs/assets/`. After editing any diagram, re-render:
@@ -57,7 +57,7 @@ A first successful match takes about five minutes (details in the [user guide](d
 | `backend/` | `uvicorn app.main:app --reload` |
 | `backend/` | `ruff check . && ruff format .` / `pytest` |
 | `frontend/` | `npm run dev` |
-| `frontend/` | `npm run lint` / `npm run build` |
+| `frontend/` | `npm run lint` / `npm run build` / `npm test` (vitest) |
 | `frontend/` | `npm run generate:api` (regenerate API types from backend OpenAPI; backend must be running) |
 | repo root | `docker compose up -d` |
 
@@ -65,7 +65,7 @@ DB-backed backend tests need a **scratch** Postgres database (the suite migrates
 session start and downgrades to `base` at the end — never point it at your dev database):
 
 ```bash
-docker exec ai_job_assistant-db-1 psql -U postgres -c "create database ai_job_assistant_test"
+docker compose exec db psql -U postgres -c "create database ai_job_assistant_test"
 cd backend && TEST_DATABASE_URL="postgresql+asyncpg://postgres:postgres@localhost:5432/ai_job_assistant_test" pytest
 ```
 
@@ -73,9 +73,9 @@ To explore the UI without any keys or live searches, seed a synthetic demo datas
 (profile "Jane Doe (demo)" + deterministic postings and matches, zero LLM calls):
 
 ```bash
-docker cp backend/scripts/seed_demo.py ai_job_assistant-api-1:/tmp/
-docker exec ai_job_assistant-api-1 python /tmp/seed_demo.py            # seed (~30 postings)
-docker exec ai_job_assistant-api-1 python /tmp/seed_demo.py --reset    # remove demo data
+docker compose cp backend/scripts/seed_demo.py api:/tmp/
+docker compose exec api python /tmp/seed_demo.py            # seed (~30 postings)
+docker compose exec api python /tmp/seed_demo.py --reset    # remove demo data
 ```
 
 ## License

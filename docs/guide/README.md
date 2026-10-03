@@ -22,7 +22,11 @@ The app is being built issue by issue (v1: [plan](../plans/v1/v1-implementation-
 v2: [plan](../plans/v2/v2-implementation-plan.md), #13–#23 — UI restructure, branding, dialogs;
 v3: [plan](../plans/v3/v3-implementation-plan.md), #24–#30 — profile-scoped searches and matching
 corpus, posting expiry + freshness filters, capability-driven per-source filters and search UI,
-the Start-search stepper). All v1–v3 issues are done.
+the Start-search stepper;
+v4: [plan](../plans/v4/v4-search-relevance-plan.md), #31–#39 — profile-grounded queries with a
+content-hash cache, derived seniority, per-source term rendering (Adzuna multi-pass, LinkedIn
+NL brief), a one-active-run guard, hybrid scoring, cross-source de-duplication, engagement
+signals and Tune my queries). All v1–v4 issues are done.
 Each guide marks what is **live now** vs **planned**:
 
 - Live: stack scaffold, health check (`GET /api/health`), resume upload + text extraction
@@ -36,4 +40,7 @@ Each guide marks what is **live now** vs **planned**:
   ranked matches with LLM re-rank + rationale ([issue #10](../plans/v1/v1-issue-010-matching-rerank-rationale.md)),
   priority weighting (role-fit ↔ company-fit slider, issue #11),
   rate-limit backoff on all outbound calls, a synthetic demo seed script, and audited
-  error states ([issue #12](../plans/v1/v1-issue-012-buffer-seed-errors-backoff.md))
+  error states ([issue #12](../plans/v1/v1-issue-012-buffer-seed-errors-backoff.md)),
+  and the v4 search-relevance work: hash-cached profile-grounded queries, derived seniority,
+  hybrid match scoring, cross-source de-duplication, engagement signals and Tune my queries
+  ([v4 plan](../plans/v4/v4-search-relevance-plan.md))

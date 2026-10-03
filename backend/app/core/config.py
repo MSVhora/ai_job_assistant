@@ -102,6 +102,8 @@ class Settings(BaseSettings):
     github_max_requests_per_run: Annotated[int, Field(ge=1, le=5000)] = 1500
     github_min_remaining_pct: Annotated[int, Field(ge=0, le=90)] = 10
     evidence_lookback_years: Annotated[int, Field(ge=1, le=30)] = 6
+    # v6 #54: two employment roles overlapping by at least this many days are flagged.
+    resume_overlap_min_days: Annotated[int, Field(ge=1, le=366)] = 60
     evidence_bot_logins: list[str] = [
         "dependabot",
         "renovate",

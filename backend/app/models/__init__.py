@@ -27,6 +27,11 @@ from app.models.match import Match, MatchRebuild, MatchRebuildStatus
 from app.models.profile import Profile
 from app.models.profile_revision import ProfileRevision, RevisionSource
 from app.models.resume import Resume
+from app.models.resume_document import (
+    ResumeDocument,
+    ResumeDocumentRevision,
+    ResumeDocumentStatus,
+)
 from app.models.source_state import SourceState
 
 __all__ = [
@@ -59,6 +64,9 @@ __all__ = [
     "ProfileRevision",
     "RemoteType",
     "Resume",
+    "ResumeDocument",
+    "ResumeDocumentRevision",
+    "ResumeDocumentStatus",
     "RevisionSource",
     "SearchPosting",
     "SourceState",

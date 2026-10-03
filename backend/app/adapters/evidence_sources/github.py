@@ -415,6 +415,8 @@ class GitHubSource:
                 login=login,
                 node_id=_str(body.get("node_id")),
                 emails=[email] if email else [],
+                name=_str(body.get("name")),
+                location=_str(body.get("location")),
                 permissions=[scope.strip() for scope in scopes.split(",") if scope.strip()],
             )
         return self._identity

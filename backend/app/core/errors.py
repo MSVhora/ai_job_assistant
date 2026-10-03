@@ -181,6 +181,21 @@ class InvalidAchievementInputError(DomainError):
     default_detail = "the achievement change is not valid"
 
 
+class ResumeDocumentNotFoundError(DomainError):
+    status_code = 404
+    default_detail = "resume document not found"
+
+
+class ConflictNotFoundError(DomainError):
+    status_code = 404
+    default_detail = "conflict not found"
+
+
+class InvalidResumeDocumentError(DomainError):
+    status_code = 400
+    default_detail = "the resume document change is not valid"
+
+
 class InvalidEmployerError(DomainError):
     status_code = 400
     default_detail = "employer must be one of your profile's experience entries or personal"

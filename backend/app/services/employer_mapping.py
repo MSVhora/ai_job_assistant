@@ -29,6 +29,24 @@ class ProfileFacts:
     experiences: list[Experience] = field(default_factory=list[Experience])
 
 
+def experiences_of(structured: StructuredProfile) -> list[Experience]:
+    """One profile's employment entries with their parsed windows (company-less rows skipped)."""
+    result: list[Experience] = []
+    for job in structured.experience:
+        if not job.company:
+            continue
+        start = resolve_date(job.start_date)
+        end = resolve_date(job.end_date)
+        if end is None and job.is_current:
+            end = date.today()  # noqa: DTZ011
+        result.append(
+            Experience(
+                job.company, job.start_date, start, max(start, end) if start and end else end
+            )
+        )
+    return result
+
+
 async def load_profile_facts(session: AsyncSession, candidate_id: uuid.UUID) -> ProfileFacts:
     """Skills and employment entries across all of the candidate's profiles (de-duplicated)."""
     skills: list[str] = []
@@ -44,19 +62,8 @@ async def load_profile_facts(session: AsyncSession, candidate_id: uuid.UUID) -> 
         except ValidationError:
             continue
         skills.extend(structured.skills)
-        for job in structured.experience:
-            if not job.company:
-                continue
-            start = resolve_date(job.start_date)
-            end = resolve_date(job.end_date)
-            if end is None and job.is_current:
-                end = date.today()  # noqa: DTZ011
-            experiences.setdefault(
-                (job.company, job.start_date),
-                Experience(
-                    job.company, job.start_date, start, max(start, end) if start and end else end
-                ),
-            )
+        for experience in experiences_of(structured):
+            experiences.setdefault((experience.company, experience.start_raw), experience)
     return ProfileFacts(skills=skills, experiences=list(experiences.values()))
 
 

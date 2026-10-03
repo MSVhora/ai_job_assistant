@@ -52,6 +52,8 @@ class SourceIdentity(BaseModel):
     login: str
     node_id: str | None = None
     emails: list[str] = Field(default_factory=list)
+    name: str | None = None
+    location: str | None = None
     permissions: list[str] = Field(default_factory=list)
 
 

@@ -1,3 +1,4 @@
+import asyncio
 import io
 import uuid
 from pathlib import Path
@@ -53,7 +54,7 @@ async def test_upload_docx_persists_metadata_and_returns_text(client: AsyncClien
         row = (await session.execute(select(Resume))).scalars().one()
     assert row.original_filename == "jane_resume.docx"
     saved_path = Path(row.file_path)
-    assert saved_path.exists()
+    assert await asyncio.to_thread(saved_path.exists)
     assert saved_path.suffix == ".docx"
     uuid.UUID(saved_path.stem)
 

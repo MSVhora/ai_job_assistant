@@ -290,7 +290,8 @@ async def seed_profile_with_embedding(name: str = "Deduper") -> tuple[uuid.UUID,
         )
         await session.commit()
         profile = await session.get(Profile, response.profile_id)
-        assert profile is not None and profile.embedding is not None
+        assert profile is not None
+        assert profile.embedding is not None
         return profile.id, profile.embedding
 
 

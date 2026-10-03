@@ -1,6 +1,6 @@
 import pytest
 
-from app.adapters.retry import Transient, retry_after_header, retryable_status, with_retry
+from app.adapters.retry import TransientError, retry_after_header, retryable_status, with_retry
 from app.core.config import get_settings
 
 
@@ -19,11 +19,13 @@ async def test_retries_transient_until_success() -> None:
     async def call() -> str:
         calls["count"] += 1
         if calls["count"] < 3:
-            raise Transient("status 429")
+            msg = "status 429"
+            raise TransientError(msg)
         return "ok"
 
     assert (
-        await with_retry("test", call, is_retryable=lambda exc: isinstance(exc, Transient)) == "ok"
+        await with_retry("test", call, is_retryable=lambda exc: isinstance(exc, TransientError))
+        == "ok"
     )
     assert calls["count"] == 3
 
@@ -34,10 +36,11 @@ async def test_gives_up_after_configured_attempts(monkeypatch: pytest.MonkeyPatc
 
     async def call() -> str:
         calls["count"] += 1
-        raise Transient("status 429")
+        msg = "status 429"
+        raise TransientError(msg)
 
-    with pytest.raises(Transient):
-        await with_retry("test", call, is_retryable=lambda exc: isinstance(exc, Transient))
+    with pytest.raises(TransientError):
+        await with_retry("test", call, is_retryable=lambda exc: isinstance(exc, TransientError))
     assert calls["count"] == 2
 
 
@@ -51,10 +54,11 @@ async def test_retry_after_pins_the_delay(monkeypatch: pytest.MonkeyPatch) -> No
     monkeypatch.setattr("app.adapters.retry.asyncio.sleep", record_sleep)
 
     async def call() -> str:
-        raise Transient("status 429", retry_after_s=7.5)
+        msg = "status 429"
+        raise TransientError(msg, retry_after_s=7.5)
 
-    with pytest.raises(Transient):
-        await with_retry("test", call, is_retryable=lambda exc: isinstance(exc, Transient))
+    with pytest.raises(TransientError):
+        await with_retry("test", call, is_retryable=lambda exc: isinstance(exc, TransientError))
 
     assert sleeps == [7.5]
 
@@ -64,7 +68,8 @@ async def test_non_retryable_fails_fast() -> None:
 
     async def call() -> str:
         calls["count"] += 1
-        raise ValueError("bad input")
+        msg = "bad input"
+        raise ValueError(msg)
 
     with pytest.raises(ValueError, match="bad input"):
         await with_retry("test", call, is_retryable=lambda exc: False)

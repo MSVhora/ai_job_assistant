@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 async def _require_profile(session: AsyncSession, profile_id: uuid.UUID) -> Profile:
     profile = await session.get(Profile, profile_id)
     if profile is None:
-        raise ProfileNotFoundError()
+        raise ProfileNotFoundError
     return profile
 
 
@@ -46,7 +46,7 @@ async def start_rebuild(
 ) -> MatchRebuildStatusResponse:
     profile = await _require_profile(session, profile_id)
     if profile.embedding is None:
-        raise ProfileNotEmbeddedError()
+        raise ProfileNotEmbeddedError
     stale_count = await matching.count_out_of_corpus_matches(session, profile_id)
     run = MatchRebuild(profile_id=profile_id, status=MatchRebuildStatus.pending)
     session.add(run)

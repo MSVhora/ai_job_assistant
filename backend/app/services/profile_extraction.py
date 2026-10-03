@@ -20,6 +20,7 @@ from app.schemas.job_search import StoredSearchQueries
 from app.schemas.profile import StructuredProfile
 from app.schemas.resume import DraftProfileResponse
 from app.services import profile_derivation, query_builder
+from app.services import sources as sources_service
 
 logger = logging.getLogger(__name__)
 
@@ -85,13 +86,13 @@ async def extract_resume_profile(
     started = time.monotonic()
     settings = get_settings()
     if not is_llm_configured():
-        raise LLMNotConfiguredError()
+        raise LLMNotConfiguredError
 
     resume = await session.get(Resume, resume_id)
     if resume is None:
-        raise ResumeNotFoundError()
+        raise ResumeNotFoundError
     if not (resume.extracted_text or "").strip():
-        raise ResumeTextUnavailableError()
+        raise ResumeTextUnavailableError
 
     prompt = _build_prompt(resume.extracted_text or "", settings.extraction_max_chars)
     try:
@@ -104,7 +105,8 @@ async def extract_resume_profile(
     profile_derivation.apply_derived_fields(profile)
     parsed_at = datetime.now(UTC)
     resume.draft_profile = profile.model_dump(mode="json")
-    resume.parse_version = f"{settings.llm_model}+{PROFILE_PROMPT_VERSION}"
+    parse_version = f"{settings.llm_model}+{PROFILE_PROMPT_VERSION}"
+    resume.parse_version = parse_version
     resume.parsed_at = parsed_at
 
     stored_queries = await _generate_draft_queries(session, resume, profile)
@@ -123,7 +125,7 @@ async def extract_resume_profile(
         resume_id=resume.id,
         candidate_id=resume.candidate_id,
         draft_profile=profile,
-        parse_version=resume.parse_version,
+        parse_version=parse_version,
         parsed_at=parsed_at,
         search_queries=stored_queries,
     )
@@ -133,8 +135,6 @@ async def _generate_draft_queries(
     session: AsyncSession, resume: Resume, profile: StructuredProfile
 ) -> StoredSearchQueries | None:
     """Generate per-source search queries from the draft; never fails extraction."""
-    from app.services import sources as sources_service
-
     try:
         enabled = await sources_service.enabled_sources(session)
         if not enabled:

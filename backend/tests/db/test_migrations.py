@@ -336,7 +336,8 @@ async def test_migration_0017_source_backfill_and_index(migration_0016: None) ->
                 )
             )
         ).scalar_one()
-        assert "'pending'" in partial and "'running'" in partial
+        assert "'pending'" in partial
+        assert "'running'" in partial
 
     await migrate("downgrade", "0016")
 

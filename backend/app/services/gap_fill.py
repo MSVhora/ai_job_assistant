@@ -21,7 +21,7 @@ from app.schemas.gap_fill import (
 )
 from app.schemas.profile import Preferences, RemotePreference, SeniorityLevel, StructuredProfile
 from app.services import embedding, matching, profile_derivation
-from app.services.profile_service import _next_timestamp, diff_profiles, schedule_query_refresh
+from app.services.profile_service import diff_profiles, next_timestamp, schedule_query_refresh
 
 logger = logging.getLogger(__name__)
 
@@ -172,10 +172,12 @@ def _build_prompt(
     lines.extend(
         [
             "",
-            "Extract any answers the user gave for the missing fields into `answers` (null for "
-            "anything not clearly answered). Then write `reply`: briefly acknowledge any new "
-            "information and ask about the next missing field; if every missing field now has "
-            "an answer, confirm and wrap up.",
+            (
+                "Extract any answers the user gave for the missing fields into `answers` (null "
+                "for anything not clearly answered). Then write `reply`: briefly acknowledge any "
+                "new information and ask about the next missing field; if every missing field "
+                "now has an answer, confirm and wrap up."
+            ),
         ]
     )
     return "\n".join(lines)[:_MAX_PROMPT_CHARS]
@@ -284,7 +286,7 @@ async def run_gap_fill_turn(
     started = time.monotonic()
     profile = await session.get(Profile, profile_id)
     if profile is None:
-        raise ProfileNotFoundError()
+        raise ProfileNotFoundError
     current = StructuredProfile.model_validate(profile.structured_profile)
 
     missing = missing_fields(current)
@@ -299,7 +301,7 @@ async def run_gap_fill_turn(
         )
 
     if not is_llm_configured():
-        raise LLMNotConfiguredError()
+        raise LLMNotConfiguredError
 
     turn = await _llm_turn(current, missing, payload.messages)
     updated = current.model_copy(deep=True)
@@ -314,7 +316,7 @@ async def run_gap_fill_turn(
             profile_id=profile.id,
             source=RevisionSource.gap_fill,
             diff=diff_profiles(current.model_dump(mode="json"), updated.model_dump(mode="json")),
-            created_at=_next_timestamp(None),
+            created_at=next_timestamp(None),
         )
         session.add(revision)
         await session.flush()

@@ -459,16 +459,16 @@ def test_settings_rejects_unbalanced_match_weights() -> None:
         "match_weight_company_fit",
         "match_weight_salary",
     ):
-        kwargs = dict(
-            match_weight_vector=0.35,
-            match_weight_skill=0.25,
-            match_weight_recency=0.15,
-            match_weight_role_fit=0.15,
-            match_weight_company_fit=0.05,
-            match_weight_salary=0.05,
-        )
+        kwargs = {
+            "match_weight_vector": 0.35,
+            "match_weight_skill": 0.25,
+            "match_weight_recency": 0.15,
+            "match_weight_role_fit": 0.15,
+            "match_weight_company_fit": 0.05,
+            "match_weight_salary": 0.05,
+        }
         kwargs[field] = 0.5
-        with pytest.raises(ValueError, match="must sum to 1.0"):
+        with pytest.raises(ValueError, match=r"must sum to 1\.0"):
             Settings(**kwargs)
 
 
@@ -562,7 +562,7 @@ async def test_scoped_corpus_postings_from_other_profile_never_scored(
 ) -> None:
     profile_a = await seed_profile("A")
     profile_b = await seed_profile("B")
-    _, profile_b_embedding = await fetch_profile_ids_with_embeddings(profile_b)
+    _, _profile_b_embedding = await fetch_profile_ids_with_embeddings(profile_b)
     postings = await seed_postings(
         [{"embedding": fake_vector(f"j{i}")} for i in range(2)], found_by=profile_a
     )
@@ -690,11 +690,11 @@ async def test_sql_salary_signal_matches_python_twin(
 ) -> None:
     profile_id = await seed_profile()
     specs = [
-        _salary_posting_spec(0, decimal.Decimal("70000"), decimal.Decimal("90000"), "GBP"),
+        _salary_posting_spec(0, decimal.Decimal(70000), decimal.Decimal(90000), "GBP"),
         _salary_posting_spec(1, None, None, None),
-        _salary_posting_spec(2, decimal.Decimal("40000"), decimal.Decimal("60000"), "GBP"),
-        _salary_posting_spec(3, decimal.Decimal("10000"), decimal.Decimal("20000"), "GBP"),
-        _salary_posting_spec(4, decimal.Decimal("120000"), decimal.Decimal("140000"), "GBP"),
+        _salary_posting_spec(2, decimal.Decimal(40000), decimal.Decimal(60000), "GBP"),
+        _salary_posting_spec(3, decimal.Decimal(10000), decimal.Decimal(20000), "GBP"),
+        _salary_posting_spec(4, decimal.Decimal(120000), decimal.Decimal(140000), "GBP"),
     ]
     postings = await seed_postings(specs, found_by=profile_id)
     install_rerank_for(monkeypatch, postings)

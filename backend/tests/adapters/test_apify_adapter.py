@@ -61,19 +61,22 @@ def test_normalize_maps_full_posting() -> None:
         data.url == "https://www.linkedin.com/jobs/view/data-analyst-at-johnstone-supply-4439105297"
     )
     assert data.location == "Orleans, IN"
-    assert data.job_type is not None and data.job_type.value == "full_time"
+    assert data.job_type is not None
+    assert data.job_type.value == "full_time"
     assert data.remote_type is None
     assert data.description is not None
     assert data.description.startswith("Johnstone Supply")
     assert data.posted_at == datetime(2026, 7, 12, tzinfo=UTC)
-    assert data.salary_min is None and data.salary_max is None
+    assert data.salary_min is None
+    assert data.salary_max is None
     assert data.raw_payload["id"] == "4439105297"
 
 
 def test_normalize_maps_contract_type() -> None:
     data = ApifyActorSource(CONFIG).normalize(_raw(_fixture()[2]))
 
-    assert data.job_type is not None and data.job_type.value == "contract"
+    assert data.job_type is not None
+    assert data.job_type.value == "contract"
 
 
 def test_normalize_parses_salary_range_string() -> None:
@@ -100,8 +103,10 @@ def test_normalize_maps_remote_and_hybrid_workplace_types() -> None:
         _raw({"id": "2", "title": "A", "workRemoteAllowed": False, "workplaceTypes": "on-site"})
     )
 
-    assert remote.remote_type is not None and remote.remote_type.value == "remote"
-    assert on_site.remote_type is not None and on_site.remote_type.value == "on_site"
+    assert remote.remote_type is not None
+    assert remote.remote_type.value == "remote"
+    assert on_site.remote_type is not None
+    assert on_site.remote_type.value == "on_site"
 
 
 def test_normalize_parses_posted_at_timestamp_ms() -> None:

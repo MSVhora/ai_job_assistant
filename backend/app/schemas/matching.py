@@ -29,16 +29,16 @@ class MatchSignalRequest(BaseModel):
 
 __all__ = [
     "MatchFilters",
+    "MatchListStatus",
     "MatchQueryParams",
     "MatchRebuildStatusResponse",
     "MatchResponse",
     "MatchSignalKind",
     "MatchSignalRequest",
-    "MatchListStatus",
     "MatchSort",
+    "MatchingOutcome",
     "RerankItem",
     "RerankResult",
-    "MatchingOutcome",
 ]
 
 
@@ -102,7 +102,7 @@ class RerankItem(BaseModel):
 
 
 class RerankResult(BaseModel):
-    items: list[RerankItem] = Field(default_factory=list)
+    items: list[RerankItem] = Field(default_factory=list[RerankItem])
 
 
 class MatchResponse(BaseModel):

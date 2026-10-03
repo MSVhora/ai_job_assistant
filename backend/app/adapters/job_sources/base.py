@@ -2,7 +2,7 @@ import html
 import re
 from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Literal, Protocol
+from typing import Literal, Protocol, cast
 
 import httpx
 from pydantic import BaseModel, Field, field_validator
@@ -35,13 +35,25 @@ def parse_datetime(value: object) -> datetime | None:
         return None
     if isinstance(value, str):
         try:
-            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            parsed = datetime.fromisoformat(value)
         except ValueError:
             return None
         return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed
-    seconds = value / 1000 if value > 1e12 else value
+    seconds = value / 1000 if value > _EPOCH_MILLIS_THRESHOLD else value
     return datetime.fromtimestamp(seconds, tz=UTC)
 
+
+def json_object(value: object) -> dict[str, object] | None:
+    return cast("dict[str, object]", value) if isinstance(value, dict) else None
+
+
+def json_array(value: object) -> list[object] | None:
+    return cast("list[object]", value) if isinstance(value, list) else None
+
+
+_EPOCH_MILLIS_THRESHOLD = 1e12
+_DAYS_PER_WEEK = 7
+_DAYS_PER_MONTH = 30
 
 SourceFilterValue = str | int | bool | list[str]
 
@@ -127,9 +139,9 @@ def date_posted_bucket(max_days_old: int | None) -> str:
         return "anyTime"
     if max_days_old <= 1:
         return "past24Hours"
-    if max_days_old <= 7:
+    if max_days_old <= _DAYS_PER_WEEK:
         return "pastWeek"
-    if max_days_old <= 30:
+    if max_days_old <= _DAYS_PER_MONTH:
         return "pastMonth"
     return "anyTime"
 
@@ -179,36 +191,43 @@ def _validate_option_value(decl: SourceFilterDecl, value: object) -> None:
     noun = f"filter '{decl.key}'"
     if decl.type == "number":
         if type(value) is not int:
-            raise InvalidSourceFilterError(f"{noun} must be an integer")
+            msg = f"{noun} must be an integer"
+            raise InvalidSourceFilterError(msg)
         return
     if decl.type == "boolean":
         if type(value) is not bool:
-            raise InvalidSourceFilterError(f"{noun} must be true or false")
+            msg = f"{noun} must be true or false"
+            raise InvalidSourceFilterError(msg)
         return
     if decl.type == "select":
         allowed = {option.value for option in decl.options or []}
         if type(value) is not str or value not in allowed:
             allowed_list = ", ".join(sorted(allowed))
-            raise InvalidSourceFilterError(f"{noun} must be one of: {allowed_list}")
+            msg = f"{noun} must be one of: {allowed_list}"
+            raise InvalidSourceFilterError(msg)
         return
     if decl.type == "multiselect":
-        if not isinstance(value, list) or not value:
-            raise InvalidSourceFilterError(f"{noun} must be a non-empty list of strings")
-        if any(type(item) is not str for item in value):
-            raise InvalidSourceFilterError(f"{noun} must be a non-empty list of strings")
-        if len(value) > _MAX_OPTION_LIST_ITEMS:
-            raise InvalidSourceFilterError(
-                f"{noun} must have at most {_MAX_OPTION_LIST_ITEMS} entries"
-            )
-        if any(len(item) == 0 or len(item) > _MAX_OPTION_ITEM_LEN for item in value):
-            raise InvalidSourceFilterError(
-                f"{noun} entries must be between 1 and {_MAX_OPTION_ITEM_LEN} characters"
-            )
+        items = json_array(value)
+        if not items:
+            msg = f"{noun} must be a non-empty list of strings"
+            raise InvalidSourceFilterError(msg)
+        strings = [item for item in items if type(item) is str]
+        if len(strings) != len(items):
+            msg = f"{noun} must be a non-empty list of strings"
+            raise InvalidSourceFilterError(msg)
+        if len(strings) > _MAX_OPTION_LIST_ITEMS:
+            msg = f"{noun} must have at most {_MAX_OPTION_LIST_ITEMS} entries"
+            raise InvalidSourceFilterError(msg)
+        if any(len(item) == 0 or len(item) > _MAX_OPTION_ITEM_LEN for item in strings):
+            msg = f"{noun} entries must be between 1 and {_MAX_OPTION_ITEM_LEN} characters"
+            raise InvalidSourceFilterError(msg)
         return
     if type(value) is not str or not value.strip():
-        raise InvalidSourceFilterError(f"{noun} must be a non-empty string")
+        msg = f"{noun} must be a non-empty string"
+        raise InvalidSourceFilterError(msg)
     if len(value) > _MAX_OPTION_ITEM_LEN:
-        raise InvalidSourceFilterError(f"{noun} must be at most {_MAX_OPTION_ITEM_LEN} characters")
+        msg = f"{noun} must be at most {_MAX_OPTION_ITEM_LEN} characters"
+        raise InvalidSourceFilterError(msg)
 
 
 def validate_source_options(
@@ -223,5 +242,6 @@ def validate_source_options(
     for key, value in options.items():
         decl = decls.get(key)
         if decl is None:
-            raise InvalidSourceFilterError(f"unknown filter '{key}' for source '{source_name}'")
+            msg = f"unknown filter '{key}' for source '{source_name}'"
+            raise InvalidSourceFilterError(msg)
         _validate_option_value(decl, value)

@@ -10,7 +10,8 @@ def _build_registry() -> tuple[JobSource, ...]:
         sources += (ApifyActorSource(actor_config),)
     names = [source.name for source in sources]
     if len(set(names)) != len(names):
-        raise ConnectorConfigError(f"duplicate source names in registry: {names}")
+        msg = f"duplicate source names in registry: {names}"
+        raise ConnectorConfigError(msg)
     return sources
 
 

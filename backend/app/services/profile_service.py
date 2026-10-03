@@ -1,13 +1,14 @@
 import logging
 import uuid
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, cast
 
 from fastapi import BackgroundTasks
 from pydantic import ValidationError
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.db import session_factory
 from app.core.errors import (
     ProfileNotFoundError,
     ResumeDraftUnavailableError,
@@ -26,6 +27,7 @@ from app.schemas.profile import (
 )
 from app.schemas.resume import DraftProfileResponse
 from app.services import embedding, matching, profile_derivation, query_builder
+from app.services import sources as sources_service
 from app.services.resume_service import get_or_create_candidate
 
 logger = logging.getLogger(__name__)
@@ -41,8 +43,6 @@ async def _hash_for_current_sources(
     """
     try:
         structured = StructuredProfile.model_validate(structured.model_dump(mode="json"))
-        from app.services import sources as sources_service
-
         enabled = await sources_service.enabled_sources(session)
         if not enabled:
             return None
@@ -56,8 +56,6 @@ async def _hash_for_current_sources(
 
 async def _refresh_queries_background(profile_id: uuid.UUID) -> None:
     """BackgroundTasks run after the response is committed — open a fresh session."""
-    from app.core.db import session_factory
-
     async with session_factory() as session:
         await query_builder.ensure_queries_fresh(session, profile_id)
         await session.commit()
@@ -92,12 +90,17 @@ def _diff_objects(
         new_value = new.get(key)
         path = f"{prefix}{key}"
         if isinstance(old_value, dict) or isinstance(new_value, dict):
-            _diff_objects(old_value or {}, new_value or {}, f"{path}.", diff)
+            _diff_objects(
+                cast("dict[str, Any]", old_value or {}),
+                cast("dict[str, Any]", new_value or {}),
+                f"{path}.",
+                diff,
+            )
         elif old_value != new_value:
             diff[path] = {"old": old_value, "new": new_value}
 
 
-def _next_timestamp(previous: datetime | None) -> datetime:
+def next_timestamp(previous: datetime | None) -> datetime:
     timestamp = datetime.now(UTC)
     if previous is not None and timestamp <= previous:
         timestamp = previous + timedelta(microseconds=1)
@@ -169,7 +172,7 @@ async def list_profiles(session: AsyncSession) -> list[ProfileSummary]:
 async def get_profile(session: AsyncSession, profile_id: uuid.UUID) -> ProfileResponse:
     profile = await session.get(Profile, profile_id)
     if profile is None:
-        raise ProfileNotFoundError()
+        raise ProfileNotFoundError
     filename = await _resume_filename(session, profile.source_resume_id)
     revision = await _latest_revision(session, profile.id)
     return _profile_response(profile, filename, revision)
@@ -186,7 +189,7 @@ def _first_save_revisions(
                 profile_id=profile_id,
                 source=RevisionSource.ai_extraction,
                 diff=diff_profiles(None, draft),
-                created_at=_next_timestamp(None),
+                created_at=next_timestamp(None),
             )
         ]
         if new_profile != draft:
@@ -195,7 +198,7 @@ def _first_save_revisions(
                     profile_id=profile_id,
                     source=RevisionSource.manual_edit,
                     diff=diff_profiles(draft, new_profile),
-                    created_at=_next_timestamp(revisions[-1].created_at),
+                    created_at=next_timestamp(revisions[-1].created_at),
                 )
             )
         return revisions
@@ -204,7 +207,7 @@ def _first_save_revisions(
             profile_id=profile_id,
             source=RevisionSource.manual_edit,
             diff=diff_profiles(None, new_profile),
-            created_at=_next_timestamp(None),
+            created_at=next_timestamp(None),
         )
     ]
 
@@ -241,7 +244,7 @@ async def create_profile(session: AsyncSession, payload: ProfileCreate) -> Profi
     if payload.source_resume_id is not None:
         resume = await session.get(Resume, payload.source_resume_id)
         if resume is None or resume.candidate_id != candidate.id:
-            raise ResumeNotFoundError()
+            raise ResumeNotFoundError
         if resume.draft_profile is not None:
             draft = _normalized(resume.draft_profile)
         draft_queries = resume.search_queries
@@ -279,23 +282,24 @@ async def save_profile(
 ) -> ProfileResponse:
     profile = await session.get(Profile, profile_id)
     if profile is None:
-        raise ProfileNotFoundError()
+        raise ProfileNotFoundError
 
-    renamed = payload.name is not None and payload.name.strip() != profile.name
-    if renamed:
-        profile.name = payload.name.strip()
+    new_name = payload.name.strip() if payload.name is not None else None
+    renamed = new_name is not None and new_name != profile.name
+    if new_name is not None and renamed:
+        profile.name = new_name
 
     last_revision: ProfileRevision | None = None
     content_changed = False
-    if payload.structured_profile is not None:
+    structured = payload.structured_profile
+    if structured is not None:
         _resolve_seniority_source(payload, profile)
-        structured = payload.structured_profile
         profile_derivation.apply_derived_fields(structured)
         new_profile = structured.model_dump(mode="json")
         if payload.source_resume_id is not None:
             resume = await session.get(Resume, payload.source_resume_id)
             if resume is None or resume.candidate_id != profile.candidate_id:
-                raise ResumeNotFoundError()
+                raise ResumeNotFoundError
             profile.source_resume_id = resume.id
 
         source = (
@@ -307,14 +311,14 @@ async def save_profile(
             profile_id=profile.id,
             source=source,
             diff=diff_profiles(_normalized(profile.structured_profile), new_profile),
-            created_at=_next_timestamp(None),
+            created_at=next_timestamp(None),
         )
         content_changed = profile.structured_profile != new_profile
         profile.structured_profile = new_profile
         session.add(last_revision)
 
     await session.flush()
-    if payload.structured_profile is not None:
+    if structured is not None:
         await embedding.refresh_profile_embedding(profile)
         await session.flush()
         await matching.rescore_matches(session, profile, invalidate_rationales=True)
@@ -348,7 +352,7 @@ async def update_preferences(
     """
     profile = await session.get(Profile, profile_id)
     if profile is None:
-        raise ProfileNotFoundError()
+        raise ProfileNotFoundError
     profile.preferences = payload.model_dump(mode="json")
     await session.flush()
     await session.refresh(profile)
@@ -361,7 +365,7 @@ async def update_preferences(
 async def delete_profile(session: AsyncSession, profile_id: uuid.UUID) -> None:
     profile = await session.get(Profile, profile_id)
     if profile is None:
-        raise ProfileNotFoundError()
+        raise ProfileNotFoundError
     await session.execute(delete(ProfileRevision).where(ProfileRevision.profile_id == profile.id))
     await session.delete(profile)
     await session.flush()
@@ -371,9 +375,9 @@ async def delete_profile(session: AsyncSession, profile_id: uuid.UUID) -> None:
 async def get_resume_draft(session: AsyncSession, resume_id: uuid.UUID) -> DraftProfileResponse:
     resume = await session.get(Resume, resume_id)
     if resume is None:
-        raise ResumeNotFoundError()
+        raise ResumeNotFoundError
     if resume.draft_profile is None or resume.parse_version is None or resume.parsed_at is None:
-        raise ResumeDraftUnavailableError()
+        raise ResumeDraftUnavailableError
     return DraftProfileResponse(
         resume_id=resume.id,
         candidate_id=resume.candidate_id,

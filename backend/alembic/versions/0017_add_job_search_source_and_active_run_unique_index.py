@@ -39,7 +39,8 @@ def upgrade() -> None:
         sa.text("SELECT count(*) FROM job_search WHERE source IS NULL")
     ).scalar_one()
     if remaining:
-        raise RuntimeError(f"{remaining} job_search row(s) could not be backfilled")
+        msg = f"{remaining} job_search row(s) could not be backfilled"
+        raise RuntimeError(msg)
     op.alter_column("job_search", "source", existing_type=sa.String(length=64), nullable=False)
     op.create_index(op.f("ix_job_search_source"), "job_search", ["source"], unique=False)
     op.create_index(

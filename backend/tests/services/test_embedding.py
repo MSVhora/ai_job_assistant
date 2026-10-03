@@ -89,9 +89,11 @@ async def test_embed_postings_batches_and_aligns(fake_embedding: list[dict[str, 
 
     assert len(fake_embedding) == 1
     assert fake_embedding[0]["input"] == ["Job 1\ndesc one", "Job 3\ndesc three"]
-    assert result[0] is not None and len(result[0]) == 768
+    assert result[0] is not None
+    assert len(result[0]) == 768
     assert result[1] is None
-    assert result[2] is not None and len(result[2]) == 768
+    assert result[2] is not None
+    assert len(result[2]) == 768
 
 
 async def test_embed_postings_without_descriptions_skips_provider(

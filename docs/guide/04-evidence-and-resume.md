@@ -1,6 +1,6 @@
 # 4. Evidence from GitHub (draft)
 
-> **Status: draft, grows with v6.** This page covers what exists after issue #52: connecting
+> **Status: draft, grows with v6.** This page covers what exists after issue #53a (the review API; the review pages arrive with 53b): connecting
 > GitHub, choosing repositories, syncing, notes, links, resume bullets, chunking and achievement
 > extraction. Achievements, the resume builder and the interview
 > agent arrive in later v6 issues and will be added here.
@@ -116,6 +116,41 @@ verbatim from that evidence, otherwise the metric is kept as `needs_confirmation
 kept only with a quote that supports it, so no stated outcome means no result; and text containing a
 redaction placeholder is flagged. Re-running with no change costs nothing; a changed chunk or a new
 prompt version re-extracts only what needs it, and one failing chunk never fails the run.
+
+## Reviewing achievements (API)
+
+Nothing reaches a resume or the interview agent until **you approve it**. Every change below is
+recorded as a revision (`GET /api/achievements/{id}/revisions`) with a field-level diff, so you can
+always see what was edited, merged or confirmed and when.
+
+- **States.** `draft → approved | rejected`; `approved → draft` (unapprove) or `archived`;
+  `rejected → draft` (restore). Anything else is a 409. Archived rows are kept for the audit trail.
+- **Approval gate.** `POST /api/achievements/{id}/approve` needs at least one evidence link and no
+  metric still marked `needs_confirmation`; otherwise you get a 409 that says why. Confirm a metric
+  with `POST …/confirm-metric` ("as written" or with an edited value); it is then marked
+  user-verified.
+- **Editing** (`PATCH /api/achievements/{id}`) works on drafts and approved rows alike. Editing an
+  approved row re-embeds it and rechecks whether it is derived from private data; it stays approved.
+  Evidence can be linked or unlinked (an approved achievement always keeps at least one link).
+- **Bulk approval** is a preview and a commit: `GET /api/achievements/bulk-approve/eligible` lists
+  the clean drafts (evidence present, no pending metric, no redaction placeholder, evidence
+  unchanged, and **not derived from private data**, which always needs an individual look);
+  `POST /api/achievements/bulk-approve` approves the ids you choose and reports what it skipped and
+  why. Unapprove undoes it.
+- **Merge and split.** `POST /api/achievements/merge` combines two or more achievements into a new
+  draft (evidence, skills and metrics are unioned) and archives the sources.
+  `GET /api/achievements/merge-proposals` only *suggests* likely duplicates (same repository,
+  overlapping dates, cosine similarity of 0.90 or more); nothing is merged automatically.
+  `POST …/split` moves chosen evidence to a new draft; both rows become drafts.
+- **Changed evidence.** After a sync, an approved achievement whose linked evidence changed is
+  flagged (`evidence_stale_at`, "evidence updated"). It is never altered silently; `POST
+  …/acknowledge` clears the flag once you have looked again.
+- **Employer mapping.** Each repository can be mapped once to one of your profile's experience
+  entries or to **Personal / open source** (`GET /api/evidence/employers`, then `PATCH
+  /api/evidence/github/scopes` with `employer_ref`). The scope list suggests a match when the repo
+  was active during exactly one job, and the choice applies to all of that repo's achievements.
+  Unmapped repos are not blocking; their achievements are treated as projects, never as employer
+  experience.
 
 ## Not yet verified against live GitHub
 

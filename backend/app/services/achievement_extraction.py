@@ -3,12 +3,11 @@ import json
 import logging
 import time
 import uuid
-from dataclasses import dataclass, field
-from datetime import UTC, date, datetime, timedelta
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, cast
 
 from fastapi import BackgroundTasks
-from pydantic import ValidationError
 from sqlalchemy import Select, select, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -46,7 +45,6 @@ from app.models import (
     EvidenceItem,
     EvidenceScope,
     LLMOutputCache,
-    Profile,
     SyncStatus,
 )
 from app.schemas.achievement import (
@@ -56,13 +54,12 @@ from app.schemas.achievement import (
     ExtractionStartResponse,
 )
 from app.schemas.cost import CostEstimateResponse
-from app.schemas.profile import StructuredProfile
 from app.services.achievement_validation import Rejection, ValidatedAchievement, validate
 from app.services.embedding import embed_texts
+from app.services.employer_mapping import ProfileFacts, load_profile_facts, suggest_employer
 from app.services.evidence_items import candidate_id_or_none
 from app.services.evidence_pipeline.dedupe import digest
 from app.services.llm_cache import cache_key, cached_parse_structured
-from app.services.profile_derivation import resolve_date
 from app.services.prompts.achievement import ACHIEVEMENT_PROMPT_VERSION, SYSTEM_PROMPT, build_prompt
 from app.services.redaction import redact
 from app.services.resume_service import get_or_create_candidate
@@ -77,7 +74,6 @@ EXPECTED_COMPLETION_TOKENS = 450
 EXPECTED_EMBED_TOKENS = 200
 ACTIVE_STATUSES = (SyncStatus.pending, SyncStatus.running)
 ABANDONED_ERROR = "run abandoned - in-flight lock released"
-NON_REPO_PREFIXES = ("resume:", "note:", "link:")
 QUOTE_MAX = 500
 LABEL_TITLE_MAX = 80
 _EPOCH = datetime.min.replace(tzinfo=UTC)
@@ -130,20 +126,6 @@ class _Unit:
             ACHIEVEMENT_PROMPT_VERSION,
             self.cache_parts,
         )
-
-
-@dataclass(frozen=True)
-class _Experience:
-    company: str
-    start_raw: str | None
-    start: date
-    end: date
-
-
-@dataclass(frozen=True)
-class _Context:
-    skills: list[str] = field(default_factory=list[str])
-    experiences: list[_Experience] = field(default_factory=list[_Experience])
 
 
 def _label_line(index: int, item: EvidenceItem, *, redaction_enabled: bool) -> str:
@@ -209,49 +191,6 @@ async def _load_units(session: AsyncSession, candidate_id: uuid.UUID) -> list[_U
             )
         )
     return units
-
-
-async def _load_context(session: AsyncSession, candidate_id: uuid.UUID) -> _Context:
-    skills: list[str] = []
-    experiences: dict[tuple[str, str | None], _Experience] = {}
-    profiles = (
-        (await session.execute(select(Profile).where(Profile.candidate_id == candidate_id)))
-        .scalars()
-        .all()
-    )
-    for profile in profiles:
-        try:
-            structured = StructuredProfile.model_validate(profile.structured_profile)
-        except ValidationError:
-            continue
-        skills.extend(structured.skills)
-        for job in structured.experience:
-            start = resolve_date(job.start_date)
-            if not job.company or start is None:
-                continue
-            end = resolve_date(job.end_date) or (date.today() if job.is_current else start)  # noqa: DTZ011
-            experiences.setdefault(
-                (job.company, job.start_date),
-                _Experience(job.company, job.start_date, start, max(start, end)),
-            )
-    return _Context(skills=skills, experiences=list(experiences.values()))
-
-
-def suggest_employer(
-    project_key: str | None, start: date | None, end: date | None, experiences: list[_Experience]
-) -> dict[str, object] | None:
-    """Best date-overlap employer for a repository chunk (a suggestion until #53 confirms)."""
-    if project_key is None or project_key.startswith(NON_REPO_PREFIXES) or start is None:
-        return None
-    span_end = end or start
-    best: tuple[int, _Experience] | None = None
-    for experience in experiences:
-        overlap = (min(span_end, experience.end) - max(start, experience.start)).days + 1
-        if overlap > 0 and (best is None or overlap > best[0]):
-            best = (overlap, experience)
-    if best is None:
-        return None
-    return {"company": best[1].company, "start_date": best[1].start_raw, "source": "suggested"}
 
 
 def _sum_estimates(estimates: list[CostEstimate], model: str) -> CostEstimate:
@@ -432,7 +371,7 @@ def _build_rows(
     candidate_id: uuid.UUID,
     unit: _Unit,
     item: ValidatedAchievement,
-    context: _Context,
+    context: ProfileFacts,
 ) -> tuple[Achievement, list[AchievementEvidence], list[str]]:
     by_label = {label.label: label for label in unit.labels}
     cited = [by_label[label] for label in item.evidence_labels]
@@ -536,7 +475,7 @@ async def _mark_extracted(session: AsyncSession, unit: _Unit) -> None:
 
 
 async def _process_unit(
-    candidate_id: uuid.UUID, unit: _Unit, context: _Context, meter: UsageMeter
+    candidate_id: uuid.UUID, unit: _Unit, context: ProfileFacts, meter: UsageMeter
 ) -> _UnitResult:
     result = _UnitResult()
     hits_before = meter.cache_hits
@@ -685,7 +624,7 @@ async def run_extraction(run_id: uuid.UUID) -> None:
         await session.commit()
         candidate_id = run.candidate_id
         units = await _load_units(session, candidate_id)
-        context = await _load_context(session, candidate_id)
+        context = await load_profile_facts(session, candidate_id)
     pending = [unit for unit in units if unit.extracted_hash != unit.key]
     counters = _Counters(total=len(pending))
     with usage_meter() as meter:

@@ -342,3 +342,61 @@ async def seed_evidence_chunk(
             item_ids.append(item.id)
         await session.commit()
         return candidate_id, chunk.id, item_ids
+
+
+async def seed_achievement(
+    candidate_id: "uuid.UUID",
+    *,
+    item_ids: "list[uuid.UUID] | None" = None,
+    status: str = "draft",
+    title: str = "Faster nightly import",
+    metrics: "list[dict[str, Any]] | None" = None,
+    flags: "list[str] | None" = None,
+    project_key: str | None = "ada/engine",
+    embedding: "list[float] | None" = None,
+    time_start: Any = None,
+    time_end: Any = None,
+    difficulty: int = 3,
+    private: bool = False,
+    stale: bool = False,
+    skills: "list[str] | None" = None,
+) -> "uuid.UUID":
+    """Seed an achievement linked (first one primary) to the given evidence items."""
+    from datetime import UTC, date, datetime
+
+    from app.core.db import session_factory
+    from app.models import Achievement, AchievementEvidence, AchievementStatus
+
+    async with session_factory() as session:
+        achievement = Achievement(
+            candidate_id=candidate_id,
+            status=AchievementStatus(status),
+            title=title,
+            situation="Situation",
+            task="Task",
+            action="Action",
+            result="Result",
+            metrics=metrics or [],
+            skills=skills or [],
+            impact_type="performance",
+            difficulty=difficulty,
+            project_key=project_key,
+            embedding=embedding,
+            time_start=time_start or date(2024, 6, 1),
+            time_end=time_end,
+            review_flags=flags or [],
+            derived_from_private=private,
+            evidence_stale_at=datetime.now(UTC) if stale else None,
+        )
+        session.add(achievement)
+        await session.flush()
+        for index, item_id in enumerate(item_ids or []):
+            session.add(
+                AchievementEvidence(
+                    achievement_id=achievement.id,
+                    item_id=item_id,
+                    role="primary" if index == 0 else "supporting",
+                )
+            )
+        await session.commit()
+        return achievement.id

@@ -164,6 +164,28 @@ class EvidenceSourceUnavailableError(DomainError):
     default_detail = "GitHub request failed - check the token and retry shortly"
 
 
+class AchievementNotFoundError(DomainError):
+    status_code = 404
+    default_detail = "achievement not found"
+
+
+class AchievementConflictError(DomainError):
+    """The requested review change is not allowed in the achievement's current state (409)."""
+
+    status_code = 409
+    default_detail = "that change is not allowed for this achievement right now"
+
+
+class InvalidAchievementInputError(DomainError):
+    status_code = 400
+    default_detail = "the achievement change is not valid"
+
+
+class InvalidEmployerError(DomainError):
+    status_code = 400
+    default_detail = "employer must be one of your profile's experience entries or personal"
+
+
 class DuplicateExtractionError(DomainError):
     """A pending/running achievement extraction for this candidate already exists (#52)."""
 

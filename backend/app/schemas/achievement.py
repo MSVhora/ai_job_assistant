@@ -2,7 +2,7 @@ import uuid
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.models.achievement import AchievementOrigin, AchievementStatus
 from app.schemas.cost import CostEstimateResponse
@@ -116,3 +116,102 @@ class ExtractionRunResponse(BaseModel):
     error: str | None
     created_at: datetime
     updated_at: datetime
+
+
+class AchievementUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    situation: str | None = None
+    task: str | None = None
+    action: str | None = None
+    result: str | None = None
+    skills: list[str] | None = Field(default=None, max_length=30)
+    impact_type: ImpactType | None = None
+    difficulty: int | None = Field(default=None, ge=1, le=5)
+    project_key: str | None = Field(default=None, max_length=255)
+    employer_ref: dict[str, object] | None = None
+    time_start: date | None = None
+    time_end: date | None = None
+
+    @model_validator(mode="after")
+    def _require_a_change(self) -> "AchievementUpdate":
+        if not self.model_fields_set:
+            msg = "send at least one field to change"
+            raise ValueError(msg)
+        if "title" in self.model_fields_set and self.title is None:
+            msg = "title cannot be cleared"
+            raise ValueError(msg)
+        return self
+
+
+class EvidenceLinkCreate(BaseModel):
+    item_id: uuid.UUID
+    role: Literal["primary", "supporting"] = "supporting"
+    quote: str | None = Field(default=None, max_length=500)
+
+
+class ConfirmMetricRequest(BaseModel):
+    index: int = Field(ge=0)
+    mode: Literal["as_written", "edit"]
+    text: str | None = Field(default=None, min_length=1, max_length=200)
+
+    @model_validator(mode="after")
+    def _edit_needs_text(self) -> "ConfirmMetricRequest":
+        if self.mode == "edit" and self.text is None:
+            msg = "text is required when editing a metric"
+            raise ValueError(msg)
+        return self
+
+
+class MergeRequest(BaseModel):
+    ids: list[uuid.UUID] = Field(min_length=2, max_length=10)
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+    situation: str | None = None
+    task: str | None = None
+    action: str | None = None
+    result: str | None = None
+
+
+class SplitRequest(BaseModel):
+    evidence_item_ids: list[uuid.UUID] = Field(min_length=1, max_length=50)
+    title: str | None = Field(default=None, min_length=1, max_length=200)
+
+
+class BulkApproveRequest(BaseModel):
+    ids: list[uuid.UUID] = Field(min_length=1, max_length=200)
+
+
+class BulkEligibleItem(BaseModel):
+    id: uuid.UUID
+    title: str
+    evidence_count: int
+
+
+class BulkEligibleResponse(BaseModel):
+    count: int
+    items: list[BulkEligibleItem]
+
+
+class BulkSkipped(BaseModel):
+    id: uuid.UUID
+    reasons: list[str]
+
+
+class BulkApproveResponse(BaseModel):
+    approved: list[uuid.UUID]
+    skipped: list[BulkSkipped]
+
+
+class RevisionResponse(BaseModel):
+    id: uuid.UUID
+    source: str
+    diff: dict[str, object]
+    created_at: datetime
+
+
+class MergeProposalResponse(BaseModel):
+    first_id: uuid.UUID
+    first_title: str
+    second_id: uuid.UUID
+    second_title: str
+    project_key: str | None
+    similarity: float

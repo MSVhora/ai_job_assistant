@@ -28,6 +28,7 @@ from app.core.errors import (
     EvidenceScopeNotFoundError,
     EvidenceSourceNotConfiguredError,
     EvidenceSourceUnavailableError,
+    InvalidEmployerError,
     NoEnabledScopesError,
     SyncRunNotFoundError,
 )
@@ -43,6 +44,7 @@ from app.models import (
     SyncStatus,
 )
 from app.schemas.evidence import (
+    EmployerOption,
     EvidenceItemData,
     EvidenceStatusResponse,
     ScopeCandidate,
@@ -52,6 +54,12 @@ from app.schemas.evidence import (
     SyncPage,
     SyncRunResponse,
     SyncStartResponse,
+)
+from app.services.achievement_review import apply_scope_employer, mark_stale_after_sync
+from app.services.employer_mapping import (
+    load_profile_facts,
+    normalize_employer_ref,
+    suggest_for_scope,
 )
 from app.services.evidence_chunks import rebuild_chunks_background
 from app.services.evidence_pipeline.dedupe import SQUASH_REASON
@@ -134,7 +142,11 @@ def _run_response(run: EvidenceSyncRun) -> SyncRunResponse:
 
 
 def _scope_response(
-    scope: EvidenceScope, live: ScopeCandidate | None, *, is_new: bool
+    scope: EvidenceScope,
+    live: ScopeCandidate | None,
+    *,
+    is_new: bool,
+    suggested: dict[str, object] | None = None,
 ) -> ScopeResponse:
     return ScopeResponse(
         ref=scope.ref,
@@ -148,6 +160,7 @@ def _scope_response(
         sync_state=scope.sync_state.value,
         last_synced_at=scope.last_synced_at,
         employer_ref=scope.employer_ref,
+        suggested_employer=suggested,
     )
 
 
@@ -174,6 +187,7 @@ async def get_status(session: AsyncSession) -> EvidenceStatusResponse:
             last_synced_at=None,
             scopes_total=0,
             scopes_enabled=0,
+            scopes_unmapped=0,
             latest_sync=None,
         )
     scopes = await _stored_scopes(session, account.id)
@@ -192,8 +206,46 @@ async def get_status(session: AsyncSession) -> EvidenceStatusResponse:
         last_synced_at=account.last_synced_at,
         scopes_total=len(scopes),
         scopes_enabled=sum(1 for scope in scopes.values() if scope.enabled),
+        scopes_unmapped=sum(
+            1
+            for scope in scopes.values()
+            if scope.enabled and scope.employer_ref is None and scope.last_synced_at is not None
+        ),
         latest_sync=_run_response(latest) if latest is not None else None,
     )
+
+
+async def _suggestions(
+    session: AsyncSession, candidate_id: uuid.UUID, scopes: list[EvidenceScope]
+) -> dict[uuid.UUID, dict[str, object]]:
+    """Suggested employer per unmapped scope, from its authored-item date span."""
+    unmapped = [scope for scope in scopes if scope.employer_ref is None]
+    if not unmapped:
+        return {}
+    spans = (
+        await session.execute(
+            select(
+                EvidenceItem.scope_id,
+                func.min(EvidenceItem.occurred_at),
+                func.max(EvidenceItem.occurred_at),
+            )
+            .where(
+                EvidenceItem.candidate_id == candidate_id,
+                EvidenceItem.kind.in_((EvidenceKind.commit, EvidenceKind.pull_request)),
+                EvidenceItem.scope_id.in_([scope.id for scope in unmapped]),
+            )
+            .group_by(EvidenceItem.scope_id)
+        )
+    ).all()
+    experiences = (await load_profile_facts(session, candidate_id)).experiences
+    suggestions: dict[uuid.UUID, dict[str, object]] = {}
+    for scope_id, first, last in spans:
+        suggestion = suggest_for_scope(
+            first.date() if first else None, last.date() if last else None, experiences
+        )
+        if scope_id is not None and suggestion is not None:
+            suggestions[scope_id] = suggestion
+    return suggestions
 
 
 async def list_scopes(session: AsyncSession) -> list[ScopeResponse]:
@@ -224,11 +276,21 @@ async def list_scopes(session: AsyncSession) -> list[ScopeResponse]:
         scope.is_private = candidate_scope.is_private
         matched.append((scope, candidate_scope))
     await session.flush()
+    everything = [scope for scope, _ in matched] + list(stored.values())
+    suggestions = await _suggestions(session, candidate.id, everything)
     responses = [
-        _scope_response(scope, candidate_scope, is_new=scope.ref in new_refs)
+        _scope_response(
+            scope,
+            candidate_scope,
+            is_new=scope.ref in new_refs,
+            suggested=suggestions.get(scope.id),
+        )
         for scope, candidate_scope in matched
     ]
-    responses.extend(_scope_response(scope, None, is_new=False) for scope in stored.values())
+    responses.extend(
+        _scope_response(scope, None, is_new=False, suggested=suggestions.get(scope.id))
+        for scope in stored.values()
+    )
     return responses
 
 
@@ -244,6 +306,14 @@ async def update_scopes(session: AsyncSession, payload: ScopeUpdateRequest) -> l
         if not payload.acknowledged_disclosure:
             raise DisclosureRequiredError
         account.acknowledged_at = datetime.now(UTC)
+    experiences = (await load_profile_facts(session, candidate.id)).experiences
+    employers: dict[str, dict[str, object] | None] = {}
+    for item in payload.scopes:
+        if "employer_ref" in item.model_fields_set:
+            try:
+                employers[item.ref] = normalize_employer_ref(item.employer_ref, experiences)
+            except ValueError as exc:
+                raise InvalidEmployerError from exc
     updated: list[ScopeResponse] = []
     for item in payload.scopes:
         scope = stored[item.ref]
@@ -251,11 +321,30 @@ async def update_scopes(session: AsyncSession, payload: ScopeUpdateRequest) -> l
             scope.enabled = item.enabled
         if item.content_level is not None:
             scope.content_level = item.content_level
-        if "employer_ref" in item.model_fields_set:
-            scope.employer_ref = item.employer_ref
+        if item.ref in employers:
+            scope.employer_ref = employers[item.ref]
+            await apply_scope_employer(session, candidate.id, scope.ref, employers[item.ref])
         updated.append(_scope_response(scope, None, is_new=False))
     await session.flush()
     return updated
+
+
+async def employer_options(session: AsyncSession) -> list[EmployerOption]:
+    candidate_id = await _candidate_id(session)
+    options: list[EmployerOption] = []
+    if candidate_id is not None:
+        for experience in (await load_profile_facts(session, candidate_id)).experiences:
+            label = f"{experience.company} ({experience.start_raw or 'dates unknown'})"
+            options.append(
+                EmployerOption(
+                    kind="experience",
+                    label=label,
+                    company=experience.company,
+                    start_date=experience.start_raw,
+                )
+            )
+    options.append(EmployerOption(kind="personal", label="Personal / open source"))
+    return options
 
 
 def _select_active_run(source_id: uuid.UUID) -> Select[tuple[EvidenceSyncRun]]:
@@ -334,6 +423,7 @@ class _RunOutcome:
     warnings: list[str] = field(default_factory=list[str])
     paused: EvidenceSourcePausedError | None = None
     chunks: dict[str, object] | None = None
+    stale_flagged: int | None = None
 
 
 def _content_hash(item: EvidenceItemData) -> str:
@@ -590,6 +680,7 @@ async def run_sync(run_id: uuid.UUID, mode: SyncMode) -> None:
             outcome.scopes_ok += 1
     if outcome.scopes_ok or outcome.paused is not None:
         outcome.chunks = await _rebuild_chunks(candidate_id)
+        outcome.stale_flagged = await _flag_stale(candidate_id)
     status = await _finish_run(run_id, outcome)
     logger.info(
         "evidence.done sync_id=%s status=%s items=%d duration_ms=%.0f",
@@ -607,6 +698,18 @@ async def _rebuild_chunks(candidate_id: uuid.UUID) -> dict[str, object]:
     except SQLAlchemyError as exc:
         logger.warning("evidence.chunks failed error_type=%s", type(exc).__name__)
         return {"error": "could not build chunks"}
+
+
+async def _flag_stale(candidate_id: uuid.UUID) -> int | None:
+    """Approved achievements whose evidence changed get the re-review flag (never edited)."""
+    try:
+        async with session_factory() as session:
+            flagged = await mark_stale_after_sync(session, candidate_id)
+            await session.commit()
+    except SQLAlchemyError as exc:
+        logger.warning("evidence.stale failed error_type=%s", type(exc).__name__)
+        return None
+    return flagged
 
 
 async def _finish_run(run_id: uuid.UUID, outcome: _RunOutcome) -> SyncStatus:
@@ -627,6 +730,8 @@ async def _finish_run(run_id: uuid.UUID, outcome: _RunOutcome) -> SyncStatus:
         progress["warnings"] = outcome.warnings
         if outcome.chunks is not None:
             progress["chunks"] = outcome.chunks
+        if outcome.stale_flagged is not None:
+            progress["stale_flagged"] = outcome.stale_flagged
         run.progress = progress
         run.status = status
         if status is SyncStatus.succeeded:

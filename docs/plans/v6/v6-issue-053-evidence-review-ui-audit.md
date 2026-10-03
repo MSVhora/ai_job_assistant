@@ -1,7 +1,7 @@
 # Issue #53 — Evidence & achievement review: API, audit trail, `/evidence` and `/evidence/review` UI (Week 2)
 
-**Status:** Proposed — for owner review
-**Tracks:** GitHub issue #53 (milestone `v6`, branch `v6/45-evidence-review-ui-audit`)
+**Status:** In progress — branch `v6/53-evidence-review-ui-audit` (53a backend in progress; 53b UI pending)
+**Tracks:** GitHub issue #53 (milestone `v6`, branch `v6/53-evidence-review-ui-audit`)
 **Plan of record:** [v6-implementation-plan.md](v6-implementation-plan.md) §5.2–5.3, §10, §12 (private provenance)
 **Depends on:** #50 (sync API), #51 (items/notes), #52 (drafts)
 **Blocks:** #54–#59 (approved achievements are the only input downstream)
@@ -58,7 +58,7 @@ Frontend: `npm run lint && npm run format:check && npm run typecheck && npm test
 - **Config:** every new `Settings` field appears in `.env.example` (the settings↔env guard test fails otherwise); no `os.getenv`/`os.environ` and no provider SDK imports outside their one module.
 - **API:** new routes keep `response_model` (binary downloads declare their media type instead), use only the CORS-allowed methods (`GET`, `POST`, `PATCH`, `DELETE`, `OPTIONS` — **never PUT**) and headers (`Content-Type`, `Accept`), raise `DomainError` subclasses (checked by `tests/core/test_error_contract.py`), and bound every list with the shared `pagination()` dependency and `X-Total-Count`.
 - **Privacy:** no resume/evidence text, prompts, tokens or keys in logs (extend `tests/routers/test_logging_privacy.py` for the new flows); LLM calls log `cost_usd=`; outbound HTTP has an explicit timeout.
-- **Schema (v5 #43 conventions):** every table with `updated_at` gets `create_updated_at_trigger(table)` / `drop_updated_at_trigger(table)` from `app.core.migration_helpers`; every FK is indexed and declares its ON DELETE (CASCADE owned children, RESTRICT identity/audit, SET NULL provenance); constraints and indexes are named (`uq_`/`ix_`/`fk_`/`ck_`); bounded scalars get a `CHECK`; `alembic check` is clean and the schema audit (`tests/db/test_schema_standards.py`) reports nothing; downgrade works. Revision numbers continue from `0022`.
+- **Schema (v5 #43 conventions):** every table with `updated_at` gets `create_updated_at_trigger(table)` / `drop_updated_at_trigger(table)` from `app.core.migration_helpers`; every FK is indexed and declares its ON DELETE (CASCADE owned children, RESTRICT identity/audit, SET NULL provenance); constraints and indexes are named (`uq_`/`ix_`/`fk_`/`ck_`); bounded scalars get a `CHECK`; `alembic check` is clean and the schema audit (`tests/db/test_schema_standards.py`) reports nothing; downgrade works. Revision numbers continue from `0025` (this issue adds none).
 
 ### Standards from v5 (must hold from the first commit)
 
@@ -83,3 +83,15 @@ Backend + frontend gates green; `docs/guide/04-evidence-and-resume.md` completed
 ## Out of scope
 
 LLM-assisted merge, bulk edit, keyboard-shortcut review mode, exporting achievements, multi-user review.
+
+## Implementation notes — 53a (backend), deviations from the plan above
+
+- **Scope of this round:** the backend only (review service, endpoints, tests, docs for the API). The `/evidence` and `/evidence/review` pages are **53b**, same branch; #53 closes after 53b.
+- **No migration.** "Evidence changed" compares each linked item's `updated_at` with the achievement's latest `achievement_revision` (or `created_at`); `mark_stale_after_sync` runs at the end of a sync after chunking and the run records `progress["stale_flagged"]`. `POST …/acknowledge` clears the flag and writes a `status_change` revision (`reviewed: true`), which also resets the baseline. A user changing an item's status also bumps `updated_at`, which counts as changed evidence.
+- **State changes** are separate POSTs (`approve`, `reject`, `archive`, `unapprove`, `restore`) over one state table. Approval also embeds a row that has no vector (graceful on failure).
+- **Bulk approve** is `GET …/bulk-approve/eligible` + `POST …/bulk-approve`; the server re-checks each id, returns `approved` and `skipped` with reasons, and writes a `status_change` revision with `bulk: true`.
+- **Merge** sets `source_chunk_hash = NULL` on the merged row so extraction's stale reconciliation never archives it; **split** keeps the original's hash on both rows.
+- **Proposals** use pgvector `<=>` with `return_type=Float` (the default return type would run the float through the Vector bind processor).
+- **Employer:** `normalize_employer_ref` accepts a profile experience entry (`company` + `start_date`) or `{kind: "personal"}` and stores `source: "user"`; applying it to existing achievements stores `source: "scope"` (as extraction does) with one `manual_edit` revision per row. Employer logic now lives in `services/employer_mapping.py` (extracted from `achievement_extraction.py`, behaviour unchanged). Scope responses gain `suggested_employer`; the status response gains `scopes_unmapped` (enabled, synced, unmapped).
+- **Ranking** for `GET /api/achievements` is `difficulty × (1 + evidence count)` (`sort=rank`, default) or `sort=recent`.
+- **Still to do in 53b:** both pages, components and hooks, the disclosure and Full re-sync dialogs, screenshots, the manual walkthrough checklist.

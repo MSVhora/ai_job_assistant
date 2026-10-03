@@ -33,3 +33,15 @@ repos:
         language: system
         files: ^backend/(app/.*\.py|pyproject\.toml)$
         pass_filenames: false
+      - id: prettier
+        name: prettier
+        entry: bash -c 'cd frontend && npx prettier --write .'
+        language: system
+        files: ^frontend/
+        pass_filenames: false
+      - id: eslint
+        name: eslint
+        entry: bash -c 'cd frontend && npx eslint'
+        language: system
+        files: ^frontend/.*\.(ts|tsx|mjs)$
+        pass_filenames: false

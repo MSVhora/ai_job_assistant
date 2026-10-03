@@ -1,6 +1,6 @@
 # Issue #44 — Frontend strict tooling: Prettier, strict typed ESLint, stricter tsconfig, tests in the gate
 
-**Status:** Proposed — for owner review
+**Status:** Implemented — see notes below
 **Tracks:** GitHub issue #44 (milestone `v5`, branch `v5/44-frontend-strict-tooling`)
 **Plan of record:** [v5 plan](v5-hardening-plan.md) · standards: [frontend-nextjs.md](../../instructions/frontend-nextjs.md) (*v5 #44* rules), [testing.md](../../instructions/testing.md)
 **Depends on:** #41 (shares the root `.pre-commit-config.yaml`) · **Blocks:** #45
@@ -56,3 +56,14 @@ Existing vitest suites (`SearchStepperModal.test.tsx`, `ProfileEditor.test.tsx`,
 ## Out of scope
 
 Component splits (#45), CI (see [future-tasks](../future-tasks.md)), changing the UI design system.
+
+## Implementation notes
+
+- **Baseline measured** (configs only, no fixes): `tsc` 38 errors (26 `TS2375` + 7 `TS2379` from `exactOptionalPropertyTypes`, 5 others); ESLint 279 problems (92 `no-confusing-void-expression`, 69 `restrict-template-expressions`, 43 `no-unnecessary-condition`, 14 `non-nullable-type-assertion-style`, 14 `max-lines`, 10 `prefer-nullish-coalescing`, the rest single digits) after ignoring the generated `schema.d.ts`, which alone had 60 more. Now: `tsc` 0, ESLint 0 errors and 15 `max-lines` warnings on components/pages (the #45 queue).
+- **Commits:** configs, one isolated Prettier commit (`bdbef43`, listed in `.git-blame-ignore-revs`; enable with `git config blame.ignoreRevsFile .git-blame-ignore-revs`), tsc errors, ESLint autofix + redundant conditions, the rest.
+- **`max-lines` scope:** the rule applies to `app/**/*.tsx` and `components/**/*.tsx`, not `lib/` modules (`lib/api/index.ts`, `lib/profile-schema.ts`, `search-form-schema.ts` are over 200 lines); the standard says "components". Stays `warn` until #45 flips it.
+- **ESLint tunings** (each with a comment): `restrict-template-expressions` allows numbers; `prefer-nullish-coalescing` ignores strings (an empty string must fall back too, e.g. `target_title || headline`); `no-unnecessary-type-parameters` off in `lib/api/client.ts` (unchecked response casts); `testing-library/no-node-access` off in `SearchStepperModal.test.tsx` (an unlabeled Radix-portaled form). `eslint-plugin-jsx-a11y` is registered by `eslint-config-next`, so only its strict rule set is added.
+- **No `!` on API data:** `eslint --fix` turned 14 `as T` casts into `!`; they were replaced by `skipToken` in the query hooks (`use-job-search`, `use-matches`, `use-profiles`, `use-match-rebuild`, `use-resume-draft`, `JobDetailPanel`).
+- **Behaviour-adjacent edits** (suite green, JSON unchanged): optional props accept `| undefined`; the search payload/spec omit empty keys instead of `undefined`; ~25 redundant `?.`/`??` on non-nullable generated types removed (the `ProfileEditor` test fixture was an incomplete profile that relied on them and is now complete); `FormEvent` → React 19 `SubmitEvent`; `ProfileReviewForm` wraps the async submit in `void`; vitest `globals: true` so RTL auto-cleanup runs and the manual `cleanup()` calls are gone.
+- **`npm audit` (not fixed here, waived):** `next` 16.3.3 has one critical advisory (RCE in `next/og` `ImageResponse`, GHSA-vcvr-r3jv-pc5j; the app does not use `next/og`), fixable by a non-major bump to 16.3.8. The rest are dev-tool transitives (`vitest`/`@vitest/mocker`, `eslint-config-next`'s `braces`/`micromatch`/`fast-glob`, `@redocly/openapi-core` via `openapi-typescript`) whose fixes are major downgrades. All of this predates #44; upgrading Next is a separate, deliberate change.
+- **Hooks:** Prettier and ESLint added to the root `.pre-commit-config.yaml` as local hooks run from `frontend/`.

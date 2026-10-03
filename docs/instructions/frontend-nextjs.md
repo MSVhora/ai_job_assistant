@@ -2,7 +2,7 @@
 
 Applies to everything under `frontend/`.
 
-> **Target state.** Rules marked *(v5 #44)* or *(v5 #45)* are brought into the code by the
+> **Target state.** Rules marked *(v5 #45)* are brought into the code by the
 > [v5 plans](../plans/v5/v5-hardening-plan.md). This repo runs Next.js 16: before writing
 > framework code, read the relevant guide in `node_modules/next/dist/docs/` (see `frontend/AGENTS.md`).
 
@@ -24,7 +24,7 @@ Shared app types live next to the code that owns them; prefer generated API type
 
 ## Rules
 
-- **TypeScript strict.** No `any`; use `unknown` + narrowing. No non-null `!` assertions on API data. *(v5 #44)* `tsconfig` also enables `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitOverride`, `noUnusedLocals`, `noUnusedParameters`.
+- **TypeScript strict.** No `any`; use `unknown` + narrowing. No non-null `!` assertions on API data. `tsconfig` also enables `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitOverride`, `noUnusedLocals`, `noUnusedParameters`, `noFallthroughCasesInSwitch`. Queries that need a nullable id use TanStack Query's `skipToken` instead of `!`; optional props that receive `undefined` are declared `?: T | undefined`; payloads omit empty keys instead of setting them `undefined`.
 - **Server Components by default.** Add `"use client"` only where interactivity/state/effects are needed, and push it to the smallest leaf component possible.
 - **API access**: all backend calls go through `lib/api` client functions with generated types. No raw `fetch`/`axios` inside components. Regenerate types with `npm run generate:api` after any backend schema change — never hand-write API response types.
 - **Secrets and env**: never reference backend keys in frontend code. `NEXT_PUBLIC_*` only for genuinely public values (`NEXT_PUBLIC_API_BASE_URL`); prefer proxying through Next route handlers instead.
@@ -35,15 +35,16 @@ Shared app types live next to the code that owns them; prefer generated API type
 - **Background work UX**: ingestion/scoring runs are async — poll status, show progress, allow navigation away without breaking the run.
 - **Scraping sources**: source badges ("Official API" / "Third-party scraper") always visible on cards and settings; the disclosure modal must be acknowledged before a scraping source can be enabled.
 - **Accessibility**: semantic HTML, labeled inputs, keyboard-navigable modals (focus trap + escape), visible focus rings, `aria-live` for async status changes.
-- **Components**: under ~200 lines *(#44: enforced by ESLint `max-lines`; #45: existing exceptions are split)*; extract subcomponents/hooks when larger. No comments except non-obvious decisions.
+- **Components**: under ~200 lines (ESLint `max-lines` warns above 200 lines in `app/` and `components/`; #45 splits the existing exceptions and flips it to an error); extract subcomponents/hooks when larger. No comments except non-obvious decisions.
 - Prefer App Router idioms: `app/` conventions, route handlers for proxying, `next/image` for images, metadata exports for titles.
 
 ## Tooling (target gates)
 
-- **Formatting** *(v5 #44)*: Prettier with `prettier-plugin-tailwindcss`; `npm run format` writes, `npm run format:check` is a gate. Prettier covers the frontend only — Python is formatted by `ruff format`.
-- **ESLint** *(v5 #44)*: `next/core-web-vitals` + `typescript-eslint` strict and stylistic type-checked configs, `jsx-a11y`, `testing-library`, and a `max-lines` rule for components.
+- **Formatting**: Prettier (`printWidth` 100) with `prettier-plugin-tailwindcss`; `npm run format` writes, `npm run format:check` is a gate. Prettier covers the frontend only — Python is formatted by `ruff format`.
+- **ESLint**: `next/core-web-vitals` + `typescript-eslint` `strictTypeChecked` and `stylisticTypeChecked`, `jsx-a11y` strict rules, `testing-library`/`vitest` rules for tests and `eslint-config-prettier`. Deliberate tunings live in `eslint.config.mjs` with their reasons (numbers allowed in template literals; `||` on strings stays; unchecked response casts in `lib/api/client.ts`). `lib/api/schema.d.ts` is generated and ignored.
 - **Dependencies**: `npm audit` clean (or each waiver documented); lockfile committed.
-- Gate command (in `frontend/`): `npm run lint && npm run format:check && npm test && npm run build`.
+- **Hooks**: the root `.pre-commit-config.yaml` runs Prettier and ESLint on `frontend/`.
+- Gate command (in `frontend/`): `npm run lint && npm run format:check && npm run typecheck && npm test && npm run build`.
 
 ## Testing
 

@@ -164,6 +164,32 @@ class EvidenceSourceUnavailableError(DomainError):
     default_detail = "GitHub request failed - check the token and retry shortly"
 
 
+class DuplicateExtractionError(DomainError):
+    """A pending/running achievement extraction for this candidate already exists (#52)."""
+
+    status_code = 409
+    default_detail = "an achievement extraction is already active"
+
+    def __init__(self, detail: str | None = None, active_run_id: UUID | None = None) -> None:
+        super().__init__(detail)
+        self.active_run_id = active_run_id
+
+
+class EstimateMismatchError(DomainError):
+    status_code = 409
+    default_detail = "the evidence or settings changed since the estimate - estimate again"
+
+
+class NothingToExtractError(DomainError):
+    status_code = 400
+    default_detail = "there is no new evidence to extract"
+
+
+class ExtractionRunNotFoundError(DomainError):
+    status_code = 404
+    default_detail = "extraction run not found"
+
+
 class EvidenceItemNotFoundError(DomainError):
     status_code = 404
     default_detail = "evidence item not found"
@@ -217,6 +243,8 @@ async def domain_error_handler(_: Request, exc: DomainError) -> JSONResponse:
         body["active_search_id"] = str(exc.active_search_id)
     if isinstance(exc, DuplicateSyncError) and exc.active_sync_id is not None:
         body["active_sync_id"] = str(exc.active_sync_id)
+    if isinstance(exc, DuplicateExtractionError) and exc.active_run_id is not None:
+        body["active_run_id"] = str(exc.active_run_id)
     return JSONResponse(status_code=exc.status_code, content=body)
 
 

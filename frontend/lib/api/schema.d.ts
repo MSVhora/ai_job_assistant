@@ -624,10 +624,148 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/evidence/extract/estimate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Estimate Extraction */
+        post: operations["estimate_extraction_api_evidence_extract_estimate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/evidence/extract": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start Extraction */
+        post: operations["start_extraction_api_evidence_extract_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/evidence/extract/runs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Extraction Run */
+        get: operations["get_extraction_run_api_evidence_extract_runs__run_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/achievements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Achievements */
+        get: operations["list_achievements_api_achievements_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AchievementOrigin
+         * @enum {string}
+         */
+        AchievementOrigin: "ai_extracted" | "user_created" | "merged";
+        /** AchievementResponse */
+        AchievementResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            status: components["schemas"]["AchievementStatus"];
+            origin: components["schemas"]["AchievementOrigin"];
+            /** Title */
+            title: string;
+            /** Situation */
+            situation: string | null;
+            /** Task */
+            task: string | null;
+            /** Action */
+            action: string | null;
+            /** Result */
+            result: string | null;
+            /** Metrics */
+            metrics: {
+                [key: string]: unknown;
+            }[];
+            /** Skills */
+            skills: string[];
+            /** Impact Type */
+            impact_type: string;
+            /** Difficulty */
+            difficulty: number;
+            /** Project Key */
+            project_key: string | null;
+            /** Employer Ref */
+            employer_ref: {
+                [key: string]: unknown;
+            } | null;
+            /** Time Start */
+            time_start: string | null;
+            /** Time End */
+            time_end: string | null;
+            /** Review Flags */
+            review_flags: string[];
+            /** Derived From Private */
+            derived_from_private: boolean;
+            /** Edited By User */
+            edited_by_user: boolean;
+            /** Evidence Stale At */
+            evidence_stale_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Evidence */
+            evidence?: components["schemas"]["EvidenceLinkResponse"][];
+        };
+        /**
+         * AchievementStatus
+         * @enum {string}
+         */
+        AchievementStatus: "draft" | "approved" | "rejected" | "archived";
         /** AwardItem */
         AwardItem: {
             /** Title */
@@ -760,6 +898,18 @@ export interface components {
          * @enum {string}
          */
         EvidenceKind: "commit" | "pull_request" | "review_comment" | "issue" | "readme" | "repo_summary" | "note" | "link" | "resume_line";
+        /** EvidenceLinkResponse */
+        EvidenceLinkResponse: {
+            /**
+             * Item Id
+             * Format: uuid
+             */
+            item_id: string;
+            /** Role */
+            role: string;
+            /** Quote */
+            quote: string | null;
+        };
         /** EvidenceStatusResponse */
         EvidenceStatusResponse: {
             /** Configured */
@@ -817,6 +967,76 @@ export interface components {
              * @description one entry per line/bullet, verbatim
              */
             entries: string[];
+        };
+        /** ExtractRequest */
+        ExtractRequest: {
+            /** Confirmed Estimate Id */
+            confirmed_estimate_id: string;
+        };
+        /** ExtractionEstimateResponse */
+        ExtractionEstimateResponse: {
+            /** Estimate Id */
+            estimate_id: string;
+            /** Chunks Total */
+            chunks_total: number;
+            /** Chunks Up To Date */
+            chunks_up_to_date: number;
+            /** Chunks Cached */
+            chunks_cached: number;
+            /** Chunks To Extract */
+            chunks_to_extract: number;
+            llm_cost: components["schemas"]["CostEstimateResponse"];
+            embedding_cost: components["schemas"]["CostEstimateResponse"];
+            /** Total Usd */
+            total_usd: number | null;
+            /** Private Chunks */
+            private_chunks: number;
+            /** Private Share */
+            private_share: number;
+        };
+        /** ExtractionRunResponse */
+        ExtractionRunResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Status */
+            status: string;
+            /** Estimate */
+            estimate: {
+                [key: string]: unknown;
+            };
+            /** Progress */
+            progress: {
+                [key: string]: unknown;
+            };
+            /** Usage */
+            usage: {
+                [key: string]: unknown;
+            };
+            /** Error */
+            error: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** ExtractionStartResponse */
+        ExtractionStartResponse: {
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+            /** Status */
+            status: string;
         };
         /** GapFillAppliedField */
         GapFillAppliedField: {
@@ -3213,6 +3433,123 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ChunkSummaryResponse"];
+                };
+            };
+        };
+    };
+    estimate_extraction_api_evidence_extract_estimate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtractionEstimateResponse"];
+                };
+            };
+        };
+    };
+    start_extraction_api_evidence_extract_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExtractRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtractionStartResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_extraction_run_api_evidence_extract_runs__run_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtractionRunResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_achievements_api_achievements_get: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["AchievementStatus"];
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AchievementResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

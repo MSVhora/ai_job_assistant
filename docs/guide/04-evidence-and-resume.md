@@ -1,7 +1,8 @@
 # 4. Evidence from GitHub (draft)
 
-> **Status: draft, grows with v6.** This page covers what exists after issue #51: connecting
-> GitHub, choosing repositories, syncing, notes, links, resume bullets and chunking. Achievements, the resume builder and the interview
+> **Status: draft, grows with v6.** This page covers what exists after issue #52: connecting
+> GitHub, choosing repositories, syncing, notes, links, resume bullets, chunking and achievement
+> extraction. Achievements, the resume builder and the interview
 > agent arrive in later v6 issues and will be added here.
 
 The v6 **Developer Evidence Engine** turns the work you actually did into an evidence store that
@@ -93,6 +94,28 @@ the end of every sync and after a note, link, resume or restore change.
   rebuild retries it.
 - `GET /api/evidence/chunks/summary` reports chunk counts, tokens, the private share and how many
   chunks still wait for an embedding.
+
+## Extraction and the cost estimate
+
+An **achievement** is a short STAR story (situation, task, action, result) with the skills it
+shows, an impact type, a difficulty from 1 to 5 and links to the evidence it came from. Extraction
+turns chunks into **draft** achievements with your cheap model (`LLM_MODEL_EXTRACT`, else
+`LLM_MODEL`). Drafts are never used for resumes or the agent until you approve them (review comes
+with a later issue).
+
+1. `POST /api/evidence/extract/estimate` shows what a run would do: how many chunks are new, how
+   many are already cached (free) or up to date, the token and USD estimate (or "cost unavailable"
+   for an unpriced model), and how much of it comes from private repositories. Nothing is sent.
+2. `POST /api/evidence/extract` with `confirmed_estimate_id` starts the run. If the evidence,
+   prompt version or model changed since the estimate you get a 409 and estimate again.
+3. Poll `GET /api/evidence/extract/runs/{id}`; list drafts with `GET /api/achievements?status=draft`.
+
+What keeps drafts honest: the model may only cite evidence from the chunk it was given
+(anything else is rejected); a number counts as **evidence-verified** only if the model quotes it
+verbatim from that evidence, otherwise the metric is kept as `needs_confirmation`; a **result** is
+kept only with a quote that supports it, so no stated outcome means no result; and text containing a
+redaction placeholder is flagged. Re-running with no change costs nothing; a changed chunk or a new
+prompt version re-extracts only what needs it, and one failing chunk never fails the run.
 
 ## Not yet verified against live GitHub
 

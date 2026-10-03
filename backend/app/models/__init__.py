@@ -1,3 +1,12 @@
+from app.models.achievement import (
+    Achievement,
+    AchievementEvidence,
+    AchievementExtractionRun,
+    AchievementOrigin,
+    AchievementRevision,
+    AchievementRevisionSource,
+    AchievementStatus,
+)
 from app.models.candidate import Candidate
 from app.models.evidence import (
     ContentLevel,
@@ -21,6 +30,13 @@ from app.models.resume import Resume
 from app.models.source_state import SourceState
 
 __all__ = [
+    "Achievement",
+    "AchievementEvidence",
+    "AchievementExtractionRun",
+    "AchievementOrigin",
+    "AchievementRevision",
+    "AchievementRevisionSource",
+    "AchievementStatus",
     "Candidate",
     "ContentLevel",
     "EvidenceChunk",

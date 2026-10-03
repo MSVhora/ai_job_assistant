@@ -1,7 +1,12 @@
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from app.core.errors import DomainError, DuplicateRunError, DuplicateSyncError
+from app.core.errors import (
+    DomainError,
+    DuplicateExtractionError,
+    DuplicateRunError,
+    DuplicateSyncError,
+)
 from app.main import create_app
 
 
@@ -39,6 +44,8 @@ async def test_domain_error_renders_detail_and_declared_status(
         allowed_extra = {"active_search_id"}
     if issubclass(error_class, DuplicateSyncError):
         allowed_extra = {"active_sync_id"}
+    if issubclass(error_class, DuplicateExtractionError):
+        allowed_extra = {"active_run_id"}
     assert set(body) - {"detail"} <= allowed_extra
 
 

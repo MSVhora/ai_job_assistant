@@ -1,6 +1,6 @@
-# 4. Evidence from GitHub (draft)
+# 4. Evidence, achievements and review (draft)
 
-> **Status: draft, grows with v6.** This page covers what exists after issue #53a (the review API; the review pages arrive with 53b): connecting
+> **Status: draft, grows with v6.** This page covers what exists after issue #53 (the evidence and review pages): connecting
 > GitHub, choosing repositories, syncing, notes, links, resume bullets, chunking and achievement
 > extraction. Achievements, the resume builder and the interview
 > agent arrive in later v6 issues and will be added here.
@@ -117,7 +117,7 @@ kept only with a quote that supports it, so no stated outcome means no result; a
 redaction placeholder is flagged. Re-running with no change costs nothing; a changed chunk or a new
 prompt version re-extracts only what needs it, and one failing chunk never fails the run.
 
-## Reviewing achievements (API)
+## Reviewing achievements
 
 Nothing reaches a resume or the interview agent until **you approve it**. Every change below is
 recorded as a revision (`GET /api/achievements/{id}/revisions`) with a field-level diff, so you can
@@ -151,6 +151,46 @@ always see what was edited, merged or confirmed and when.
   was active during exactly one job, and the choice applies to all of that repo's achievements.
   Unmapped repos are not blocking; their achievements are treated as projects, never as employer
   experience.
+
+## The two pages
+
+Everything above is available from the app, no API calls needed. Use the **Evidence** link in the
+header (or open `/evidence`).
+
+**`/evidence`** — connect and collect:
+
+1. **GitHub connection** shows whether the token is configured and, once repositories are loaded,
+   who you are connected as. Without a token the notes and resume sections still work.
+2. **Repositories** lists everything your token can see. Tick a repository to include it; new
+   ones start unticked and carry a *New* badge, and a refresh never ticks anything for you.
+   Ticking a **private** repository opens a disclosure the first time (what can reach your LLM
+   provider, what never does, that anything derived is marked private); later private repositories
+   ask for a one-line confirmation. Pick a content level per repository, and once a repository has
+   synced, map it to an employer (the page suggests one when the repository was active during
+   exactly one job) or to *Personal / open source*.
+3. **Sync** has **Refresh** (what changed since last time) and **Full re-sync** (re-reads the whole
+   look-back window; a confirmation explains that approved achievements are never changed). The
+   banner shows progress per repository, GitHub requests used, warnings, and — when a run stops
+   early — *Paused, resumes at HH:MM*; start a refresh to continue from where it stopped.
+4. **Notes, links and resume** adds your own evidence (see above).
+5. **Achievements** shows the chunk summary and **Estimate extraction**, a dialog with chunk counts,
+   the token and cost estimate (or "cost unavailable") and, again, how many chunks come from
+   private repositories — the second checkpoint before anything is sent. Confirm to start; the page
+   follows the run and links to the review page when it finishes.
+
+**`/evidence/review`** — decide:
+
+- Tabs **Draft**, **Approved**, **Rejected** and **Needs attention** (approved achievements whose
+  evidence changed). A *Private-derived only* filter narrows any tab. Cards are ranked by
+  difficulty and amount of evidence and carry badges: *Private repo*, *Evidence updated —
+  re-review*, metrics to confirm, impact, difficulty, employer or project.
+- **Approve** is disabled with the reason shown until the achievement has evidence and no
+  unconfirmed metric. **Approve all fully-evidenced…** previews the clean, non-private drafts with
+  checkboxes before approving.
+- Opening a card shows a panel with the story (STAR) editor, metrics (confirm as written, or edit
+  the value), tags, the evidence with source links and quotes, split controls and the full revision
+  history. Tick two or more cards to **Merge**, or use the *possible duplicates* list, which only
+  suggests and never merges by itself.
 
 ## Not yet verified against live GitHub
 

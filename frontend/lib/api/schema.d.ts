@@ -614,7 +614,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Get Item */
+        get: operations["get_item_api_evidence_items__item_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3862,6 +3863,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ItemResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_item_api_evidence_items__item_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemResponse"];
                 };
             };
             /** @description Validation Error */

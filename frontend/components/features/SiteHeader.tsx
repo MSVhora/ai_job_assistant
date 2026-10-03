@@ -73,17 +73,27 @@ export function SiteHeader() {
           </Link>
         )}
         {!isHome && !isGetStarted && (
-          <button
-            type="button"
-            onClick={() => {
-              router.back();
-            }}
-            aria-label="Go back to the previous page"
-            className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-white px-5 py-2.5 text-sm font-semibold text-violet-700 shadow-sm shadow-violet-100 transition hover:-translate-y-0.5 hover:shadow-md hover:shadow-violet-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
-          >
-            <BackIcon />
-            Back
-          </button>
+          <div className="flex items-center gap-2">
+            {!pathname.startsWith("/evidence") && (
+              <Link
+                href="/evidence"
+                className="rounded-full px-4 py-2.5 text-sm font-semibold text-violet-700 transition hover:bg-violet-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
+              >
+                Evidence
+              </Link>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                router.back();
+              }}
+              aria-label="Go back to the previous page"
+              className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-white px-5 py-2.5 text-sm font-semibold text-violet-700 shadow-sm shadow-violet-100 transition hover:-translate-y-0.5 hover:shadow-md hover:shadow-violet-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
+            >
+              <BackIcon />
+              Back
+            </button>
+          </div>
         )}
       </div>
     </header>

@@ -187,6 +187,14 @@ async def list_items(
     return await evidence_items.list_items(session, filters, page)
 
 
+@router.get("/items/{item_id}", response_model=ItemResponse)
+async def get_item(
+    item_id: uuid.UUID,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> ItemResponse:
+    return await evidence_items.get_item(session, item_id)
+
+
 @router.patch("/items/{item_id}", response_model=ItemResponse)
 async def update_item(
     item_id: uuid.UUID,

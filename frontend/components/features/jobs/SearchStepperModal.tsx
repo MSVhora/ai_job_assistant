@@ -10,7 +10,9 @@ import { useStartJobSearch } from "@/hooks/use-job-search";
 import { useProfile } from "@/hooks/use-profiles";
 import { DuplicateRunError, type ProfileSummary, type SourceInfo } from "@/lib/api";
 
-import { DetailsStep, ProfileStep, ReviewSummary, SourceStep } from "./SearchSteps";
+import { DetailsStep } from "./DetailsStep";
+import { ProfileStep, SourceStep } from "./ProfileSourceSteps";
+import { ReviewSummary } from "./ReviewSummary";
 import {
   emptyQueryFields,
   makeSearchFormSchema,

@@ -32,6 +32,7 @@ from app.models import JobPosting, Match, Profile
 from app.schemas.job_search import SearchQueriesResponse, StoredSearchQueries
 from app.schemas.profile import StructuredProfile
 from app.services import sources as sources_service
+from app.services.embedding import profile_digest_parts
 from app.services.matching import signal_skills
 from app.services.query_builder import (
     PROMPT_VERSION,
@@ -187,8 +188,6 @@ async def tune_for_profile(session: AsyncSession, profile_id: uuid.UUID) -> Sear
     buckets = await aggregate_signal_buckets(session, profile_id, signal_skills(structured))
 
     stored = parse_stored(profile.search_queries)
-    from app.services.embedding import profile_digest_parts
-
     digest = "\n".join(profile_digest_parts(structured))
     previous_block = ""
     if stored:

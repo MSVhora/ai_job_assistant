@@ -39,9 +39,13 @@ def parse_datetime(value: object) -> datetime | None:
         except ValueError:
             return None
         return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed
-    seconds = value / 1000 if value > 1e12 else value
+    seconds = value / 1000 if value > _EPOCH_MILLIS_THRESHOLD else value
     return datetime.fromtimestamp(seconds, tz=UTC)
 
+
+_EPOCH_MILLIS_THRESHOLD = 1e12
+_DAYS_PER_WEEK = 7
+_DAYS_PER_MONTH = 30
 
 SourceFilterValue = str | int | bool | list[str]
 
@@ -127,9 +131,9 @@ def date_posted_bucket(max_days_old: int | None) -> str:
         return "anyTime"
     if max_days_old <= 1:
         return "past24Hours"
-    if max_days_old <= 7:
+    if max_days_old <= _DAYS_PER_WEEK:
         return "pastWeek"
-    if max_days_old <= 30:
+    if max_days_old <= _DAYS_PER_MONTH:
         return "pastMonth"
     return "anyTime"
 

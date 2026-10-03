@@ -47,7 +47,5 @@ def extract_docx(data: bytes) -> str:
     parts = [p.text for p in document.paragraphs if p.text.strip()]
     for table in document.tables:
         for row in table.rows:
-            for cell in row.cells:
-                if cell.text.strip():
-                    parts.append(cell.text)
+            parts.extend(cell.text for cell in row.cells if cell.text.strip())
     return "\n".join(parts)

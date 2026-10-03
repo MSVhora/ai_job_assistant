@@ -172,10 +172,12 @@ def _build_prompt(
     lines.extend(
         [
             "",
-            "Extract any answers the user gave for the missing fields into `answers` (null for "
-            "anything not clearly answered). Then write `reply`: briefly acknowledge any new "
-            "information and ask about the next missing field; if every missing field now has "
-            "an answer, confirm and wrap up.",
+            (
+                "Extract any answers the user gave for the missing fields into `answers` (null "
+                "for anything not clearly answered). Then write `reply`: briefly acknowledge any "
+                "new information and ask about the next missing field; if every missing field "
+                "now has an answer, confirm and wrap up."
+            ),
         ]
     )
     return "\n".join(lines)[:_MAX_PROMPT_CHARS]

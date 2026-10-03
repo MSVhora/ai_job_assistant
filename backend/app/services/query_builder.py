@@ -24,6 +24,7 @@ from app.schemas.job_search import (
 )
 from app.schemas.profile import StructuredProfile
 from app.services import sources as sources_service
+from app.services.embedding import profile_digest_parts
 
 logger = logging.getLogger(__name__)
 
@@ -109,8 +110,6 @@ def _preference_lines(profile: StructuredProfile) -> list[str]:
 
 
 def _candidate_context(profile: StructuredProfile) -> str:
-    from app.services.embedding import profile_digest_parts
-
     lines = profile_digest_parts(profile)
     if profile.contact.country:
         lines.append(f"country: {profile.contact.country}")
@@ -152,10 +151,11 @@ def _strip_undeclared_options(
     for name, spec in queries.items():
         allowed = {decl.key for decl in declarations.get(name, [])}
         if allowed or spec.options:
-            spec = spec.model_copy(
+            cleaned[name] = spec.model_copy(
                 update={"options": {k: v for k, v in spec.options.items() if k in allowed}}
             )
-        cleaned[name] = spec
+        else:
+            cleaned[name] = spec
     return cleaned
 
 

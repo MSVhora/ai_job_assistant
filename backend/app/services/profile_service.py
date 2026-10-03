@@ -8,6 +8,7 @@ from pydantic import ValidationError
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.db import session_factory
 from app.core.errors import (
     ProfileNotFoundError,
     ResumeDraftUnavailableError,
@@ -26,6 +27,7 @@ from app.schemas.profile import (
 )
 from app.schemas.resume import DraftProfileResponse
 from app.services import embedding, matching, profile_derivation, query_builder
+from app.services import sources as sources_service
 from app.services.resume_service import get_or_create_candidate
 
 logger = logging.getLogger(__name__)
@@ -41,8 +43,6 @@ async def _hash_for_current_sources(
     """
     try:
         structured = StructuredProfile.model_validate(structured.model_dump(mode="json"))
-        from app.services import sources as sources_service
-
         enabled = await sources_service.enabled_sources(session)
         if not enabled:
             return None
@@ -56,8 +56,6 @@ async def _hash_for_current_sources(
 
 async def _refresh_queries_background(profile_id: uuid.UUID) -> None:
     """BackgroundTasks run after the response is committed — open a fresh session."""
-    from app.core.db import session_factory
-
     async with session_factory() as session:
         await query_builder.ensure_queries_fresh(session, profile_id)
         await session.commit()

@@ -40,7 +40,7 @@ def _render_term_plan(
     request: JobSearchRequest,
 ) -> TermPlan | None:
     if source_name == "adzuna":
-        return _render_adzuna_plan(spec, base_query, effective_query)
+        return _render_adzuna_plan(spec, effective_query)
     if source_name.startswith("apify_"):
         return _render_linkedin_plan(spec, base_query, request)
     return None
@@ -48,7 +48,6 @@ def _render_term_plan(
 
 def _render_adzuna_plan(
     spec: SourceQuerySpec | None,
-    base_query: str | None,
     effective_query: str,
 ) -> TermPlan:
     # Precedence: what_phrase + what_and/what_or combined; what only when no

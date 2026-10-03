@@ -77,4 +77,6 @@ async def enable_source(
     payload: SourceEnableRequest,
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> SourceInfoResponse:
-    return await sources_service.enable_source(session, name, payload.acknowledged_disclosure)
+    return await sources_service.enable_source(
+        session, name, acknowledged_disclosure=payload.acknowledged_disclosure
+    )

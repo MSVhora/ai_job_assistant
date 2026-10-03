@@ -468,7 +468,7 @@ def test_settings_rejects_unbalanced_match_weights() -> None:
             "match_weight_salary": 0.05,
         }
         kwargs[field] = 0.5
-        with pytest.raises(ValueError, match="must sum to 1.0"):
+        with pytest.raises(ValueError, match=r"must sum to 1\.0"):
             Settings(**kwargs)
 
 

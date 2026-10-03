@@ -16,7 +16,7 @@ async def list_sources_with_state(session: AsyncSession) -> list[SourceInfoRespo
 
 
 async def enable_source(
-    session: AsyncSession, name: str, acknowledged_disclosure: bool
+    session: AsyncSession, name: str, *, acknowledged_disclosure: bool
 ) -> SourceInfoResponse:
     source = registry.get_source(name)
     if source is None:

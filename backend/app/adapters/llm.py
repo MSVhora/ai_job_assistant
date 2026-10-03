@@ -2,6 +2,7 @@ import json
 import logging
 import time
 from dataclasses import dataclass
+from http import HTTPStatus
 
 import litellm
 from pydantic import BaseModel, ValidationError
@@ -11,7 +12,15 @@ from app.core.config import Settings, get_settings
 
 logger = logging.getLogger(__name__)
 
-_RETRYABLE_STATUS_CODES = frozenset({429, 500, 502, 503, 504})
+_RETRYABLE_STATUS_CODES = frozenset(
+    {
+        HTTPStatus.TOO_MANY_REQUESTS,
+        HTTPStatus.INTERNAL_SERVER_ERROR,
+        HTTPStatus.BAD_GATEWAY,
+        HTTPStatus.SERVICE_UNAVAILABLE,
+        HTTPStatus.GATEWAY_TIMEOUT,
+    }
+)
 
 
 class LLMError(Exception):
@@ -27,13 +36,13 @@ def _is_transport_retryable(exc: Exception) -> bool:
 
 def _failure_reason(exc: Exception) -> str:
     status = getattr(exc, "status_code", None)
-    if isinstance(exc, litellm.exceptions.RateLimitError) or status == 429:
+    if isinstance(exc, litellm.exceptions.RateLimitError) or status == HTTPStatus.TOO_MANY_REQUESTS:
         return "rate limited by the provider - retry shortly"
     if isinstance(exc, litellm.exceptions.Timeout):
         return "request timed out"
     if isinstance(exc, litellm.exceptions.APIConnectionError):
         return "could not reach the provider"
-    if isinstance(status, int) and status >= 500:
+    if isinstance(status, int) and status >= HTTPStatus.INTERNAL_SERVER_ERROR:
         return "provider service error - retry shortly"
     return "provider rejected the request"
 
@@ -67,7 +76,7 @@ async def _completion_with_retry(
     messages: list[dict[str, str]],
     temperature: float,
     max_tokens: int | None,
-):
+) -> litellm.ModelResponse:
     kwargs: dict[str, object] = {
         "model": settings.llm_model,
         "messages": messages,
@@ -76,7 +85,7 @@ async def _completion_with_retry(
         "api_key": settings.gemini_api_key,
     }
 
-    async def _call():
+    async def _call() -> litellm.ModelResponse:
         return await litellm.acompletion(**kwargs)
 
     try:
@@ -127,7 +136,7 @@ async def embed(texts: list[str]) -> EmbeddingResult:
     settings = get_settings()
     start = time.perf_counter()
 
-    async def _call():
+    async def _call() -> litellm.EmbeddingResponse:
         return await litellm.aembedding(
             model=settings.embedding_model,
             input=texts,

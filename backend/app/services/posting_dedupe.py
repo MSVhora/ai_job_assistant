@@ -19,7 +19,7 @@ import logging
 import re
 import uuid
 
-from sqlalchemy import select, text, tuple_
+from sqlalchemy import Select, select, text, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
@@ -84,7 +84,7 @@ async def _set_similarity_threshold(session: AsyncSession) -> None:
     )
 
 
-def _candidate_query(posting: JobPosting):
+def _candidate_query(posting: JobPosting) -> Select[tuple[JobPosting]]:
     """Indexed trigram candidate lookup, guarded to 'would beat self' rows.
 
     `title % :title` is served by `ix_job_posting_title_trgm` (the threshold

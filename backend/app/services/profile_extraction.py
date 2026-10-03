@@ -20,6 +20,7 @@ from app.schemas.job_search import StoredSearchQueries
 from app.schemas.profile import StructuredProfile
 from app.schemas.resume import DraftProfileResponse
 from app.services import profile_derivation, query_builder
+from app.services import sources as sources_service
 
 logger = logging.getLogger(__name__)
 
@@ -133,8 +134,6 @@ async def _generate_draft_queries(
     session: AsyncSession, resume: Resume, profile: StructuredProfile
 ) -> StoredSearchQueries | None:
     """Generate per-source search queries from the draft; never fails extraction."""
-    from app.services import sources as sources_service
-
     try:
         enabled = await sources_service.enabled_sources(session)
         if not enabled:

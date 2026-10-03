@@ -59,22 +59,22 @@ def _resolve_value(value: object, query: JobSearchQuery) -> object:
             case "query":
                 return query.query
             case "keywords":
-                if plan is not None and plan.keywords is not None:
-                    return plan.keywords
-                return _OMIT
+                return plan.keywords if plan is not None and plan.keywords is not None else _OMIT
             case "location":
-                if plan is not None and plan.location is not None:
-                    return plan.location
-                return query.location if query.location is not None else _OMIT
+                fallback = _OMIT if query.location is None else query.location
+                return plan.location if plan is not None and plan.location is not None else fallback
             case "country":
                 return query.country
             case "results_wanted":
                 max_results = get_settings().max_apify_results_per_run
                 return min(query.results_wanted, max_results)
             case "date_posted_bucket":
-                if plan is not None and plan.date_posted is not None:
-                    return plan.date_posted
-                return date_posted_bucket(query.max_days_old)
+                bucket = date_posted_bucket(query.max_days_old)
+                return (
+                    plan.date_posted
+                    if plan is not None and plan.date_posted is not None
+                    else bucket
+                )
     return value
 
 

@@ -1,6 +1,6 @@
 import pytest
 
-from app.adapters.retry import Transient, retry_after_header, retryable_status, with_retry
+from app.adapters.retry import TransientError, retry_after_header, retryable_status, with_retry
 from app.core.config import get_settings
 
 
@@ -20,11 +20,12 @@ async def test_retries_transient_until_success() -> None:
         calls["count"] += 1
         if calls["count"] < 3:
             msg = "status 429"
-            raise Transient(msg)
+            raise TransientError(msg)
         return "ok"
 
     assert (
-        await with_retry("test", call, is_retryable=lambda exc: isinstance(exc, Transient)) == "ok"
+        await with_retry("test", call, is_retryable=lambda exc: isinstance(exc, TransientError))
+        == "ok"
     )
     assert calls["count"] == 3
 
@@ -36,10 +37,10 @@ async def test_gives_up_after_configured_attempts(monkeypatch: pytest.MonkeyPatc
     async def call() -> str:
         calls["count"] += 1
         msg = "status 429"
-        raise Transient(msg)
+        raise TransientError(msg)
 
-    with pytest.raises(Transient):
-        await with_retry("test", call, is_retryable=lambda exc: isinstance(exc, Transient))
+    with pytest.raises(TransientError):
+        await with_retry("test", call, is_retryable=lambda exc: isinstance(exc, TransientError))
     assert calls["count"] == 2
 
 
@@ -54,10 +55,10 @@ async def test_retry_after_pins_the_delay(monkeypatch: pytest.MonkeyPatch) -> No
 
     async def call() -> str:
         msg = "status 429"
-        raise Transient(msg, retry_after_s=7.5)
+        raise TransientError(msg, retry_after_s=7.5)
 
-    with pytest.raises(Transient):
-        await with_retry("test", call, is_retryable=lambda exc: isinstance(exc, Transient))
+    with pytest.raises(TransientError):
+        await with_retry("test", call, is_retryable=lambda exc: isinstance(exc, TransientError))
 
     assert sleeps == [7.5]
 

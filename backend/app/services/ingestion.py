@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 
 from fastapi import BackgroundTasks
 from pydantic import ValidationError
-from sqlalchemy import func, select, update
+from sqlalchemy import Select, func, select, update
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
@@ -151,7 +151,7 @@ async def _sweep_stale_runs(session: AsyncSession) -> int:
     return swept
 
 
-def _select_active_run(profile_id: uuid.UUID, source_name: str):
+def _select_active_run(profile_id: uuid.UUID, source_name: str) -> Select[tuple[JobSearch]]:
     return (
         select(JobSearch)
         .where(

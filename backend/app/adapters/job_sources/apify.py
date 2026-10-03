@@ -3,6 +3,7 @@ import importlib
 import logging
 import time
 from collections.abc import Callable
+from http import HTTPStatus
 from typing import Any
 
 import httpx
@@ -17,7 +18,7 @@ from app.adapters.job_sources.base import (
     SourceFilterDecl,
 )
 from app.adapters.job_sources.config import ActorConfig, build_actor_input
-from app.adapters.retry import Transient, retry_after_header, retryable_status, with_retry
+from app.adapters.retry import TransientError, retry_after_header, retryable_status, with_retry
 from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -176,11 +177,11 @@ class ApifyActorSource:
             response = await client.request(
                 method, f"{_API_BASE}{path}", params=query, json=json_body
             )
-            if response.status_code < 400:
+            if response.status_code < HTTPStatus.BAD_REQUEST:
                 return _unwrap_json(response, self.name)
             if retryable_status(response.status_code):
                 msg = f"status {response.status_code}"
-                raise Transient(
+                raise TransientError(
                     msg,
                     retry_after_s=retry_after_header(response.headers.get("retry-after")),
                 )
@@ -191,7 +192,7 @@ class ApifyActorSource:
             return await with_retry(f"{self.name}", _call, is_retryable=_is_retryable)
         except ConnectorError:
             raise
-        except (httpx.HTTPError, Transient) as exc:
+        except (httpx.HTTPError, TransientError) as exc:
             if isinstance(exc, httpx.HTTPError):
                 description = f"transport error: {exc}"
             else:
@@ -201,7 +202,7 @@ class ApifyActorSource:
 
 
 def _is_retryable(exc: Exception) -> bool:
-    return isinstance(exc, (httpx.HTTPError, Transient))
+    return isinstance(exc, (httpx.HTTPError, TransientError))
 
 
 def _unwrap_json(response: httpx.Response, source_name: str) -> dict[str, Any]:

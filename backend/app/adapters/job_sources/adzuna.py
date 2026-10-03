@@ -1,5 +1,6 @@
 import logging
 import time
+from http import HTTPStatus
 from typing import Any
 
 import httpx
@@ -16,7 +17,7 @@ from app.adapters.job_sources.base import (
     clean_text,
     parse_datetime,
 )
-from app.adapters.retry import Transient, retry_after_header, retryable_status, with_retry
+from app.adapters.retry import TransientError, retry_after_header, retryable_status, with_retry
 from app.core.config import get_settings
 from app.models import JobType
 
@@ -312,33 +313,33 @@ class AdzunaJobSource:
         def _describe(exc: Exception) -> str:
             return f"transport error: {exc}" if isinstance(exc, httpx.HTTPError) else str(exc)
 
-        try:
-            async with self._client_factory() as client:
+        async with self._client_factory() as client:
 
-                async def _call() -> dict[str, Any]:
-                    response = await client.get(url, params=params)
-                    if response.status_code < 400:
-                        try:
-                            return response.json()
-                        except ValueError as exc:
-                            msg = "adzuna returned invalid JSON"
-                            raise ConnectorError(msg) from exc
-                    if retryable_status(response.status_code):
-                        msg = f"status {response.status_code}"
-                        raise Transient(
-                            msg,
-                            retry_after_s=retry_after_header(response.headers.get("retry-after")),
-                        )
-                    msg = f"adzuna request failed (status {response.status_code})"
-                    raise ConnectorError(msg)
+            async def _call() -> dict[str, Any]:
+                response = await client.get(url, params=params)
+                if response.status_code < HTTPStatus.BAD_REQUEST:
+                    try:
+                        return response.json()
+                    except ValueError as exc:
+                        msg = "adzuna returned invalid JSON"
+                        raise ConnectorError(msg) from exc
+                if retryable_status(response.status_code):
+                    msg = f"status {response.status_code}"
+                    raise TransientError(
+                        msg,
+                        retry_after_s=retry_after_header(response.headers.get("retry-after")),
+                    )
+                msg = f"adzuna request failed (status {response.status_code})"
+                raise ConnectorError(msg)
 
+            try:
                 return await with_retry("adzuna", _call, is_retryable=_is_retryable)
-        except ConnectorError:
-            raise
-        except (httpx.HTTPError, Transient) as exc:
-            msg = f"adzuna request failed ({_describe(exc)})"
-            raise ConnectorError(msg) from exc
+            except ConnectorError:
+                raise
+            except (httpx.HTTPError, TransientError) as exc:
+                msg = f"adzuna request failed ({_describe(exc)})"
+                raise ConnectorError(msg) from exc
 
 
 def _is_retryable(exc: Exception) -> bool:
-    return isinstance(exc, (httpx.HTTPError, Transient))
+    return isinstance(exc, (httpx.HTTPError, TransientError))

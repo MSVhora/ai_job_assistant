@@ -22,7 +22,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.adapters.llm import LLMError, parse_structured
+from app.adapters.llm import LLMError, format_cost, parse_structured
 from app.core.config import get_settings
 from app.core.errors import ProfileNotEmbeddedError, ProfileNotFoundError
 from app.models import JobPosting, JobSearch, Match, Profile, SearchPosting
@@ -683,12 +683,13 @@ async def _rerank_top_matches(
 
     logger.info(
         "matching.rerank profile_id=%s candidates=%d rationale=%d prompt_tokens=%d "
-        "completion_tokens=%d",
+        "completion_tokens=%d cost_usd=%s",
         profile.id,
         len(candidates),
         len(rows),
         result.prompt_tokens,
         result.completion_tokens,
+        format_cost(result.cost_usd),
     )
     return MatchingOutcome(
         status="ok",
@@ -696,6 +697,7 @@ async def _rerank_top_matches(
         rationale_count=len(rows),
         rerank_prompt_tokens=result.prompt_tokens,
         rerank_completion_tokens=result.completion_tokens,
+        rerank_cost_usd=result.cost_usd,
     )
 
 

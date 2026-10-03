@@ -409,6 +409,42 @@ async def test_regenerate_search_queries_persists(
     assert fetched["search_queries"]["queries"]["adzuna"]["title"] == "Senior Data Analyst"
 
 
+async def test_regenerate_estimate_endpoint_prices_without_calling_the_provider(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from fakes import VALID_PROFILE, install_acompletion, llm_response
+
+    from app.core.config import get_settings
+
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    monkeypatch.setenv("ADZUNA_APP_ID", "id")
+    monkeypatch.setenv("ADZUNA_APP_KEY", "key")
+    monkeypatch.setenv("LLM_PRICE_IN_PER_MTOK", "1.0")
+    monkeypatch.setenv("LLM_PRICE_OUT_PER_MTOK", "2.0")
+    get_settings.cache_clear()
+    inserted = await insert_resume_with_draft(VALID_PROFILE)
+    created = (
+        await create_profile(client, "Data", VALID_PROFILE, source_resume_id=inserted["resume_id"])
+    ).json()
+    calls = install_acompletion(monkeypatch, lambda **kw: llm_response("{}"))
+
+    response = await client.post(f"/api/profiles/{created['profile_id']}/search-queries/estimate")
+
+    body = response.json()
+    assert response.status_code == 200
+    assert calls == []
+    assert body["prompt_tokens"] > 0
+    assert body["basis"] == "configured_prices"
+    expected = (body["prompt_tokens"] * 1.0 + body["completion_tokens"] * 2.0) / 1_000_000
+    assert body["usd"] == pytest.approx(expected)
+
+
+async def test_regenerate_estimate_unknown_profile_returns_404(client: AsyncClient) -> None:
+    response = await client.post(f"/api/profiles/{uuid.uuid4()}/search-queries/estimate")
+
+    assert response.status_code == 404
+
+
 async def test_regenerate_search_queries_unknown_profile_returns_404(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:

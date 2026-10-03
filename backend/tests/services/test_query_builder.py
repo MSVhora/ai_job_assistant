@@ -414,3 +414,57 @@ async def test_regenerate_for_profile_overwrites_hash_and_runs_hot(
     async with session_factory() as session:
         row = await session.get(Profile, profile_id)
         assert row.queries_input_hash is not None
+
+
+async def _seed_profile_with_adzuna(monkeypatch: pytest.MonkeyPatch) -> uuid.UUID:
+    from app.core.db import session_factory
+    from app.models import Candidate, Profile
+
+    monkeypatch.setenv("ADZUNA_APP_ID", "id")
+    monkeypatch.setenv("ADZUNA_APP_KEY", "key")
+    get_settings.cache_clear()
+    async with session_factory() as session:
+        candidate = Candidate()
+        session.add(candidate)
+        await session.flush()
+        profile_row = Profile(
+            candidate_id=candidate.id, name="Android", structured_profile=VALID_PROFILE
+        )
+        session.add(profile_row)
+        await session.commit()
+        return profile_row.id
+
+
+async def test_regeneration_estimate_works_for_a_first_generation_without_any_signals(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.adapters.llm import estimate_tokens
+    from app.core.db import session_factory
+    from app.services.query_builder import estimate_regeneration_cost
+
+    profile_id = await _seed_profile_with_adzuna(monkeypatch)
+    calls = install_acompletion(monkeypatch, lambda **kw: queries_response())
+
+    async with session_factory() as session:
+        estimate = await estimate_regeneration_cost(session, profile_id, None)
+    assert calls == []
+
+    async with session_factory() as session:
+        await regenerate_for_profile(session, profile_id, None)
+        await session.commit()
+    assert len(calls) == 1
+    assert estimate.prompt_tokens == pytest.approx(estimate_tokens(calls[0]["messages"]), rel=0.25)
+    assert estimate.completion_tokens > 0
+
+
+async def test_regeneration_estimate_rejects_unknown_sources(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.core.db import session_factory
+    from app.services.query_builder import estimate_regeneration_cost
+
+    profile_id = await _seed_profile_with_adzuna(monkeypatch)
+
+    async with session_factory() as session:
+        with pytest.raises(Exception, match="not enabled"):
+            await estimate_regeneration_cost(session, profile_id, ["apify_linkedin"])

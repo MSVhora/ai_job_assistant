@@ -32,6 +32,7 @@ export type SearchQueriesResponse = components["schemas"]["SearchQueriesResponse
 export type JobPostingSummary = components["schemas"]["JobPostingSummary"];
 export type JobPostingDetail = components["schemas"]["JobPostingDetail"];
 export type MatchResponse = components["schemas"]["MatchResponse"];
+export type CostEstimate = components["schemas"]["CostEstimateResponse"];
 export type MatchingOutcome = components["schemas"]["MatchingOutcome"];
 export type StoredPreferences = components["schemas"]["StoredPreferences"];
 export type MatchListParams = operations["list_matches_api_matches_get"]["parameters"]["query"];
@@ -254,6 +255,20 @@ export async function recordMatchSignal(
 
 export function applyMatchUrl(matchId: string): string {
   return `/api/matches/${encodeURIComponent(matchId)}/apply`;
+}
+
+export async function estimateTuneQueries(profileId: string): Promise<CostEstimate> {
+  return apiFetch<CostEstimate>(
+    `/api/profiles/${encodeURIComponent(profileId)}/tune-queries/estimate`,
+    { method: "POST" },
+  );
+}
+
+export async function estimateRegenerateQueries(profileId: string): Promise<CostEstimate> {
+  return apiFetch<CostEstimate>(
+    `/api/profiles/${encodeURIComponent(profileId)}/search-queries/estimate`,
+    { method: "POST", body: JSON.stringify({}) },
+  );
 }
 
 export async function tuneSearchQueries(profileId: string): Promise<SearchQueriesResponse> {

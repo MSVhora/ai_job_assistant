@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.pagination import TOTAL_COUNT_HEADER, Pagination
 from app.deps import get_db, pagination
+from app.schemas.cost import CostEstimateResponse
 from app.schemas.gap_fill import GapFillRequest, GapFillResponse
 from app.schemas.job_search import SearchQueriesResponse, SearchQueryGenerateRequest
 from app.schemas.matching import MatchRebuildStatusResponse
@@ -87,12 +88,35 @@ async def regenerate_search_queries(
     )
 
 
+@router.post("/profiles/{profile_id}/search-queries/estimate", response_model=CostEstimateResponse)
+async def estimate_regenerate_search_queries(
+    profile_id: uuid.UUID,
+    session: Annotated[AsyncSession, Depends(get_db)],
+    payload: SearchQueryGenerateRequest | None = None,
+) -> CostEstimateResponse:
+    return CostEstimateResponse.from_estimate(
+        await query_builder.estimate_regeneration_cost(
+            session, profile_id, payload.sources if payload else None
+        )
+    )
+
+
 @router.post("/profiles/{profile_id}/tune-queries", response_model=SearchQueriesResponse)
 async def tune_search_queries(
     profile_id: uuid.UUID,
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> SearchQueriesResponse:
     return await query_tuner.tune_for_profile(session, profile_id)
+
+
+@router.post("/profiles/{profile_id}/tune-queries/estimate", response_model=CostEstimateResponse)
+async def estimate_tune_search_queries(
+    profile_id: uuid.UUID,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> CostEstimateResponse:
+    return CostEstimateResponse.from_estimate(
+        await query_tuner.estimate_tuning_cost(session, profile_id)
+    )
 
 
 @router.post(

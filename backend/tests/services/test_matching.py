@@ -16,7 +16,7 @@ from fakes import (
 from fastapi import BackgroundTasks
 from sqlalchemy import select
 
-from app.core.config import Settings
+from app.core.config import Settings, get_settings
 from app.core.db import session_factory
 from app.models import JobPosting, JobSearch, JobSearchStatus, Match, Profile, SearchPosting
 from app.schemas.matching import MatchQueryParams, MatchResponse
@@ -201,6 +201,8 @@ async def refresh(profile_id: uuid.UUID) -> Any:
 
 
 async def test_refresh_scores_and_reranks_all_postings(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(get_settings(), "llm_price_in_per_mtok", 1.0)
+    monkeypatch.setattr(get_settings(), "llm_price_out_per_mtok", 2.0)
     profile_id = await seed_profile()
     _, profile_embedding = await fetch_profile_ids_with_embeddings(profile_id)
     postings = await seed_postings(
@@ -216,6 +218,7 @@ async def test_refresh_scores_and_reranks_all_postings(monkeypatch: pytest.Monke
     assert outcome.rationale_count == 3
     assert outcome.rerank_prompt_tokens == 11
     assert outcome.rerank_completion_tokens == 5
+    assert outcome.rerank_cost_usd == pytest.approx((11 * 1.0 + 5 * 2.0) / 1_000_000)
     assert len(calls) == 1
 
     matches = await fetch_matches(profile_id)

@@ -178,6 +178,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/profiles/{profile_id}/search-queries/estimate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Estimate Regenerate Search Queries */
+        post: operations["estimate_regenerate_search_queries_api_profiles__profile_id__search_queries_estimate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/profiles/{profile_id}/tune-queries": {
         parameters: {
             query?: never;
@@ -189,6 +206,23 @@ export interface paths {
         put?: never;
         /** Tune Search Queries */
         post: operations["tune_search_queries_api_profiles__profile_id__tune_queries_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/profiles/{profile_id}/tune-queries/estimate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Estimate Tune Search Queries */
+        post: operations["estimate_tune_search_queries_api_profiles__profile_id__tune_queries_estimate_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -433,6 +467,22 @@ export interface components {
              * @default []
              */
             links: components["schemas"]["SourceLink"][];
+        };
+        /** CostEstimateResponse */
+        CostEstimateResponse: {
+            /** Prompt Tokens */
+            prompt_tokens: number;
+            /** Completion Tokens */
+            completion_tokens: number;
+            /** Usd */
+            usd: number | null;
+            /**
+             * Basis
+             * @enum {string}
+             */
+            basis: "configured_prices" | "litellm_price_map" | "unavailable";
+            /** Message */
+            message?: string | null;
         };
         /** DraftProfileResponse */
         DraftProfileResponse: {
@@ -883,6 +933,8 @@ export interface components {
              * @default 0
              */
             rerank_completion_tokens: number;
+            /** Rerank Cost Usd */
+            rerank_cost_usd?: number | null;
             /** Warning */
             warning?: string | null;
         };
@@ -1762,6 +1814,41 @@ export interface operations {
             };
         };
     };
+    estimate_regenerate_search_queries_api_profiles__profile_id__search_queries_estimate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["SearchQueryGenerateRequest"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CostEstimateResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     tune_search_queries_api_profiles__profile_id__tune_queries_post: {
         parameters: {
             query?: never;
@@ -1780,6 +1867,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SearchQueriesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    estimate_tune_search_queries_api_profiles__profile_id__tune_queries_estimate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CostEstimateResponse"];
                 };
             };
             /** @description Validation Error */

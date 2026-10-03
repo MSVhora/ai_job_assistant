@@ -1,6 +1,6 @@
 # Issue #47 — LLM cost estimation before batch operations
 
-**Status:** Proposed — for owner review
+**Status:** Implemented — see notes below
 **Tracks:** GitHub issue #47 (milestone `v5`, branch `v5/47-llm-cost-estimation`)
 **Plan of record:** [v5 plan](v5-hardening-plan.md) · standards: [llm-ai.md](../../instructions/llm-ai.md), [backend-fastapi.md](../../instructions/backend-fastapi.md) (*v5 #47* rules)
 **Depends on:** #41 · **Blocks:** v6 #49 (extends this instead of building an estimator)
@@ -62,3 +62,14 @@ Backend and frontend gates from #41/#44; `npm run generate:api` leaves no diff a
 ## Out of scope
 
 Usage meters across runs, budgets/caps, cost dashboards (v6 #49 extends this plan's primitives).
+
+## Implementation notes
+
+- **Adapter:** `CostEstimate(prompt_tokens, completion_tokens, usd | None, basis)`, `estimate_tokens` (LiteLLM's counter, chars/4 fallback), `estimate_cost`, `estimate_structured_cost` (prompt built exactly as `parse_structured` builds it, via the extracted `structured_system_prompt`). `basis` is `litellm_price_map`, `configured_prices` or `unavailable`. Overrides win per direction; if either direction has no price from the overrides or the map, the estimate is unavailable. The three results dataclasses gained `cost_usd`; every `llm.*`, `queries.tuned` and `matching.rerank` log line carries `cost_usd=` (`unknown` when unpriced).
+- **Settings:** `LLM_PRICE_IN_PER_MTOK`, `LLM_PRICE_OUT_PER_MTOK`, `EMBEDDING_PRICE_PER_MTOK` (`float | None`, `>= 0`), commented in `.env.example`.
+- **Tune my queries:** `query_tuner` split into `_prepare_tuning` (all preconditions + the prompt) shared by `tune_for_profile` and the new `estimate_tuning_cost`; `POST /api/profiles/{id}/tune-queries/estimate` returns `CostEstimateResponse` (with `message: "cost unavailable for this model"` when `usd` is null). The completion estimate is a fixed 120 tokens per source + 40, since the output is small and bounded; the UI labels the figure approximate and notes a repair round-trip can double it. No spending caps added.
+- **Regenerate (owner-requested addition, beyond the plan):** the Regenerate button is also a user-triggered LLM call, and first-time generation has no engagement signals, so it gets the same gate. `query_builder` was split the same way (`_prepare_regeneration`, shared `_generation_prompt`) with `POST /api/profiles/{id}/search-queries/estimate`; the frontend panel became `QueryCostConfirm` (`kind: "tune" | "regenerate"`) and Regenerate now needs one extra click. Automatic, hash-gated generation on profile save stays ungated. Tests: `test_query_builder.py` (first generation, no signals, no provider call, within ±25%), `test_profile_endpoints.py`, `QueryCostConfirm.test.tsx`. Tests also gained an autouse fixture that clears the `get_settings` cache after each test so env-driven price overrides cannot leak.
+- **Run outcome:** `MatchingOutcome.rerank_cost_usd`; the run banner shows it next to the re-rank tokens when known. Embedding cost in a run is logged but not added to the outcome (the plan only required re-rank).
+- **Backfill script:** prints the estimate and prompts (`input`, so it needs `docker exec -it`) unless `--yes`; declining stops before any provider call, exit code 1.
+- **Frontend:** new `TuneConfirm` (extracted from `SearchQueriesCard`), `useTuneEstimate`, `estimateTuneQueries`, `formatUsd`; `schema.d.ts` regenerated from the new backend. Component test for the estimate, unavailable and error states.
+- **Tests:** `tests/adapters/test_llm_cost.py` (price map pinned by a fake `cost_per_token`; unknown model; overrides; logging; repair-call cost sum), estimate tests in `tests/services/test_query_tuner.py` (zero provider calls, within ±25% of the prompt actually sent, endpoint JSON), `tests/scripts/test_backfill_embeddings.py`, the re-rank cost in `test_matching.py`.

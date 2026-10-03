@@ -41,7 +41,10 @@ Non-negotiable layering rules (enforced by the
 - `routers/` — HTTP only: parse, call a service, return a response model
 - `services/` — business logic; raise domain errors
 - `models/` — SQLAlchemy 2.0 ORM; the schema source of truth
-- `adapters/llm.py` — the **only** place that talks to an LLM provider; it also owns
+- `adapters/llm.py` — the **only** place that talks to an LLM provider; it prices calls
+  (`estimate_cost`: LiteLLM's price map, optional `LLM_PRICE_*` overrides, `unknown` when
+  neither knows the model), logs `cost_usd` on every call and backs the confirm-gated
+  cost estimates; it also owns
   resilience: the shared retry policy (`adapters/retry.py`, configurable via
   `LLM_RETRY_*`, default 3 attempts) applies exponential backoff with jitter on
   429/5xx/transport errors across LLM and job-source calls, honouring a provider's

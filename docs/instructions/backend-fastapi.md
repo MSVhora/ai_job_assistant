@@ -2,17 +2,13 @@
 
 Applies to everything under `backend/`.
 
-> **Target state.** Rules marked *(v5 #47)* describe tooling or behaviour that the
-> [v5 plans](../plans/v5/v5-hardening-plan.md) bring the code up to. Until each lands, the code
-> may not yet comply; the plan for each gap exists and nothing here is aspirational filler.
-
 ## Structure & responsibilities
 
 - `routers/` — HTTP layer only: parse input, call a service, return a response model. No business logic, no SQL, no LLM calls.
 - `services/` — business logic. Raise domain errors; no `Request`/`Response` objects here.
 - `models/` — SQLAlchemy ORM models. Schema source of truth.
 - `schemas/` — pydantic v2 request/response models, one module per domain area.
-- `adapters/` — `llm.py` (LiteLLM wrapper: `generate`, `parse_structured`, `embed`, and `estimate_cost` *(v5 #47)*) and job-source connectors.
+- `adapters/` — `llm.py` (LiteLLM wrapper: `generate`, `parse_structured`, `embed`, and `estimate_cost`/`estimate_tokens`/`estimate_structured_cost`) and job-source connectors.
 - `core/config.py` — pydantic-settings `Settings`; the only place that reads env vars.
 - `core/errors.py` — domain error classes and the central exception handlers.
 - `deps.py` — shared FastAPI dependencies (`get_db` provides the request's `AsyncSession`; settings come from `get_settings()`).
@@ -33,7 +29,7 @@ Applies to everything under `backend/`.
 - **Status codes**: 400 validation beyond pydantic's 422, 404 missing (also for resources the caller does not own), 409 conflict/duplicate, 422 malformed input. 401/403 are not used while the app is single-user with no auth; introduce them together with auth. Register central exception handlers for domain errors; no bare `except:` and no silent exception swallowing — log and re-raise or convert.
 - **Error contract**: error bodies are `{"detail": "<human message>"}`, optionally with extra machine keys (for example `active_search_id` on the duplicate-run 409). Domain errors subclass `DomainError` in `core/errors.py` and carry `status_code` + `default_detail`; routers never build error JSON by hand.
 - **Config**: only through `Settings` (`.env` backed). No `os.getenv`/`os.environ` in application code. Invalid settings fail fast at startup (bounds, weight sums). Provider keys (Gemini, Adzuna, Apify) are optional at startup by design — a missing key is reported by `/api/health` and `/api/setup/check` so the Setup page can guide the user.
-- **LLM calls**: only via `adapters/llm.py`, which returns token usage and logs it; user-triggered batch LLM actions are confirm-gated and show an estimated cost before they run *(v5 #47)*. Structured extraction must validate against a pydantic schema and retry/repair once on failure before erroring.
+- **LLM calls**: only via `adapters/llm.py`, which returns token usage and logs it; user-triggered batch LLM actions are confirm-gated and show an estimated cost before they run (`POST …/tune-queries/estimate`; the backfill script prints one and needs `--yes`); every `llm.*` log line carries `cost_usd=` (`unknown` when the model has no known price). Structured extraction must validate against a pydantic schema and retry/repair once on failure before erroring.
 - **Job sources**: only via the `JobSource` protocol. A failing source degrades gracefully (skip + warn), never fails the whole search.
 - **Long-running work** (ingestion runs, batch scoring, embeddings): `BackgroundTasks` with status queryable from the DB — never a synchronous request that hangs. A run guard (partial unique index) prevents duplicate concurrent runs and a sweeper reclaims stuck runs.
 - **Outbound HTTP**: every client call has an explicit timeout (job-source clients 30 s, LLM/embedding calls `LLM_TIMEOUT_S`) and goes through the shared retry policy (`adapters/retry.py`).

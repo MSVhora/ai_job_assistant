@@ -3,7 +3,7 @@ import logging
 import time
 from dataclasses import dataclass
 from http import HTTPStatus
-from typing import cast
+from typing import Literal, cast
 
 import litellm
 from pydantic import BaseModel, ValidationError
@@ -53,12 +53,14 @@ class GenerationResult:
     text: str
     prompt_tokens: int
     completion_tokens: int
+    cost_usd: float | None = None
 
 
 @dataclass(frozen=True)
 class EmbeddingResult:
     vectors: list[list[float]]
     prompt_tokens: int
+    cost_usd: float | None = None
 
 
 @dataclass(frozen=True)
@@ -66,6 +68,77 @@ class StructuredResult[ModelT: BaseModel]:
     data: ModelT
     prompt_tokens: int
     completion_tokens: int
+    cost_usd: float | None = None
+
+
+PriceBasis = Literal["configured_prices", "litellm_price_map", "unavailable"]
+
+_TOKENS_PER_MILLION = 1_000_000
+_APPROX_CHARS_PER_TOKEN = 4
+_PRICE_LOOKUP_ERRORS = (litellm.exceptions.BadRequestError, KeyError, ValueError, TypeError)
+_TOKEN_COUNT_ERRORS = (litellm.exceptions.BadRequestError, KeyError, ValueError, TypeError)
+
+
+@dataclass(frozen=True)
+class CostEstimate:
+    """USD is None when the model's price is unknown — never a guessed number."""
+
+    prompt_tokens: int
+    completion_tokens: int
+    usd: float | None
+    basis: PriceBasis
+
+
+def estimate_tokens(messages: list[dict[str, str]], model: str | None = None) -> int:
+    """Token count of a chat prompt via LiteLLM's tokenizer; chars/4 when it cannot count."""
+    resolved = model or get_settings().llm_model
+    try:
+        return int(litellm.token_counter(model=resolved, messages=messages))  # pyright: ignore[reportUnknownMemberType]  # litellm: partially unknown signature
+    except _TOKEN_COUNT_ERRORS:
+        chars = sum(len(message["content"]) for message in messages)
+        return -(-chars // _APPROX_CHARS_PER_TOKEN)
+
+
+def _map_prices_per_mtok(model: str) -> tuple[float, float] | None:
+    try:
+        prompt_usd, completion_usd = litellm.cost_per_token(  # pyright: ignore[reportUnknownMemberType]  # litellm: partially unknown signature
+            model=model,
+            prompt_tokens=_TOKENS_PER_MILLION,
+            completion_tokens=_TOKENS_PER_MILLION,
+        )
+    except _PRICE_LOOKUP_ERRORS:
+        return None
+    return float(prompt_usd), float(completion_usd)
+
+
+def estimate_cost(model: str, prompt_tokens: int, completion_tokens: int = 0) -> CostEstimate:
+    """Price `prompt_tokens`/`completion_tokens` for `model`.
+
+    Settings overrides win over LiteLLM's price map; a direction with no known
+    price makes the whole estimate unavailable.
+    """
+    settings = get_settings()
+    if model == settings.embedding_model:
+        override_in, override_out = settings.embedding_price_per_mtok, 0.0
+    else:
+        override_in, override_out = settings.llm_price_in_per_mtok, settings.llm_price_out_per_mtok
+    mapped = _map_prices_per_mtok(model) if override_in is None or override_out is None else None
+    price_in = override_in if override_in is not None else (mapped[0] if mapped else None)
+    price_out = override_out if override_out is not None else (mapped[1] if mapped else None)
+    if price_in is None or price_out is None:
+        return CostEstimate(prompt_tokens, completion_tokens, None, "unavailable")
+    usd = (prompt_tokens * price_in + completion_tokens * price_out) / _TOKENS_PER_MILLION
+    overridden = override_in is not None or override_out is not None
+    return CostEstimate(
+        prompt_tokens,
+        completion_tokens,
+        usd,
+        "configured_prices" if overridden else "litellm_price_map",
+    )
+
+
+def format_cost(usd: float | None) -> str:
+    return "unknown" if usd is None else f"{usd:.6f}"
 
 
 def is_llm_configured() -> bool:
@@ -131,17 +204,20 @@ async def generate(
 
     duration_ms = (time.perf_counter() - start) * 1000
     prompt_tokens, completion_tokens = _token_counts(response)
+    cost_usd = estimate_cost(settings.llm_model, prompt_tokens, completion_tokens).usd
     logger.info(
-        "llm.generate model=%s duration_ms=%.0f prompt_tokens=%s completion_tokens=%s",
+        "llm.generate model=%s duration_ms=%.0f prompt_tokens=%s completion_tokens=%s cost_usd=%s",
         settings.llm_model,
         duration_ms,
         prompt_tokens,
         completion_tokens,
+        format_cost(cost_usd),
     )
     return GenerationResult(
         text=_completion_text(response),
         prompt_tokens=prompt_tokens,
         completion_tokens=completion_tokens,
+        cost_usd=cost_usd,
     )
 
 
@@ -176,14 +252,50 @@ async def embed(texts: list[str]) -> EmbeddingResult:
 
     duration_ms = (time.perf_counter() - start) * 1000
     prompt_tokens, _ = _token_counts(response)
+    cost_usd = estimate_cost(settings.embedding_model, prompt_tokens).usd
     logger.info(
-        "llm.embed model=%s duration_ms=%.0f count=%d prompt_tokens=%s",
+        "llm.embed model=%s duration_ms=%.0f count=%d prompt_tokens=%s cost_usd=%s",
         settings.embedding_model,
         duration_ms,
         len(texts),
         prompt_tokens,
+        format_cost(cost_usd),
     )
-    return EmbeddingResult(vectors=_embedding_vectors(response), prompt_tokens=prompt_tokens)
+    return EmbeddingResult(
+        vectors=_embedding_vectors(response), prompt_tokens=prompt_tokens, cost_usd=cost_usd
+    )
+
+
+def structured_system_prompt(schema: type[BaseModel], system: str | None) -> str:
+    # Prompt-instructed JSON instead of provider structured output: Gemini 2.5 Flash
+    # loops and truncates on large responseSchema payloads (observed live 2026-08-31);
+    # the schema is enforced by pydantic validation plus one repair round-trip.
+    schema_json = _inline_json_schema_refs(schema.model_json_schema())
+    json_rule = (
+        "Respond with a single JSON object conforming to this JSON schema. "
+        f"No prose, no markdown fences:\n{json.dumps(schema_json)}"
+    )
+    return f"{system}\n\n{json_rule}" if system else json_rule
+
+
+def estimate_structured_cost(
+    prompt: str,
+    *,
+    schema: type[BaseModel],
+    system: str | None = None,
+    expected_completion_tokens: int,
+) -> CostEstimate:
+    """Cost of one `parse_structured` call, without calling the provider.
+
+    A validation failure triggers one repair round-trip, so the real cost can be up to about
+    twice this; callers phrase it as an approximate figure.
+    """
+    model = get_settings().llm_model
+    messages = [
+        {"role": "system", "content": structured_system_prompt(schema, system)},
+        {"role": "user", "content": prompt},
+    ]
+    return estimate_cost(model, estimate_tokens(messages, model), expected_completion_tokens)
 
 
 async def parse_structured[ModelT: BaseModel](
@@ -195,15 +307,7 @@ async def parse_structured[ModelT: BaseModel](
     max_tokens: int | None = None,
 ) -> StructuredResult[ModelT]:
     settings = get_settings()
-    # Prompt-instructed JSON instead of provider structured output: Gemini 2.5 Flash
-    # loops and truncates on large responseSchema payloads (observed live 2026-08-31);
-    # the schema is enforced by pydantic validation plus one repair round-trip.
-    schema_json = _inline_json_schema_refs(schema.model_json_schema())
-    json_rule = (
-        "Respond with a single JSON object conforming to this JSON schema. "
-        f"No prose, no markdown fences:\n{json.dumps(schema_json)}"
-    )
-    system_content = f"{system}\n\n{json_rule}" if system else json_rule
+    system_content = structured_system_prompt(schema, system)
 
     start = time.perf_counter()
     first = await generate(
@@ -213,6 +317,7 @@ async def parse_structured[ModelT: BaseModel](
         data = schema.model_validate_json(_extract_json(first.text))
         prompt_tokens = first.prompt_tokens
         completion_tokens = first.completion_tokens
+        cost_usd = first.cost_usd
     except ValidationError as exc:
         logger.warning("llm.parse_structured validation failed; attempting one repair call")
         repair_prompt = (
@@ -234,17 +339,27 @@ async def parse_structured[ModelT: BaseModel](
             raise LLMError(msg) from repair_exc
         prompt_tokens = first.prompt_tokens + repair.prompt_tokens
         completion_tokens = first.completion_tokens + repair.completion_tokens
+        cost_usd = (
+            first.cost_usd + repair.cost_usd
+            if first.cost_usd is not None and repair.cost_usd is not None
+            else None
+        )
 
     duration_ms = (time.perf_counter() - start) * 1000
     logger.info(
-        "llm.parse_structured model=%s duration_ms=%.0f prompt_tokens=%d completion_tokens=%d",
+        "llm.parse_structured model=%s duration_ms=%.0f prompt_tokens=%d completion_tokens=%d "
+        "cost_usd=%s",
         settings.llm_model,
         duration_ms,
         prompt_tokens,
         completion_tokens,
+        format_cost(cost_usd),
     )
     return StructuredResult(
-        data=data, prompt_tokens=prompt_tokens, completion_tokens=completion_tokens
+        data=data,
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+        cost_usd=cost_usd,
     )
 
 

@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     llm_retry_attempts: int = 3
     llm_retry_base_delay_s: float = 1.0
     llm_timeout_s: Annotated[float, Field(gt=0, le=600)] = 60.0
+    # Optional USD-per-million-token overrides for models LiteLLM's price map lacks or has stale.
+    llm_price_in_per_mtok: Annotated[float | None, Field(ge=0)] = None
+    llm_price_out_per_mtok: Annotated[float | None, Field(ge=0)] = None
+    embedding_price_per_mtok: Annotated[float | None, Field(ge=0)] = None
 
     adzuna_app_id: str | None = None
     adzuna_app_key: str | None = None

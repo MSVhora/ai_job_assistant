@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import { useJobSearchStatus } from "@/hooks/use-job-search";
+import { formatUsd } from "@/lib/format-cost";
 
 const STATUS_LABELS: Record<string, string> = {
   pending: "Run queued…",
@@ -122,6 +123,9 @@ export function RunBanner({
                     {status.data.matching.rationale_count} rationale(s) · rerank tokens{" "}
                     {status.data.matching.rerank_prompt_tokens}+
                     {status.data.matching.rerank_completion_tokens}
+                    {status.data.matching.rerank_cost_usd !== null &&
+                      status.data.matching.rerank_cost_usd !== undefined &&
+                      ` · ≈ ${formatUsd(status.data.matching.rerank_cost_usd)}`}
                   </span>
                 )}
                 {status.data.matching.warning && (

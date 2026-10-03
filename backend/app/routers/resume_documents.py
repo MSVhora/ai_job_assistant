@@ -8,7 +8,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.pagination import TOTAL_COUNT_HEADER, Pagination
 from app.deps import get_db, pagination
 from app.schemas.resume_document import (
+    BulletUpdate,
+    CommentCreate,
+    CommentUpdate,
     ConflictsResponse,
+    RegenerateRequest,
     ResolveConflictRequest,
     ResumeContent,
     ResumeDocumentCreate,
@@ -16,7 +20,13 @@ from app.schemas.resume_document import (
     ResumeDocumentSummary,
     ResumeDocumentUpdate,
 )
-from app.services import resume_documents, resume_export
+from app.services import (
+    resume_builder,
+    resume_bullets,
+    resume_comments,
+    resume_documents,
+    resume_export,
+)
 
 router = APIRouter(prefix="/api", tags=["resume-documents"])
 
@@ -33,7 +43,7 @@ async def create_resume_document(
     payload: ResumeDocumentCreate,
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> ResumeDocumentResponse:
-    return await resume_documents.create_document(session, payload)
+    return await resume_builder.create_and_generate(session, payload)
 
 
 @router.get("/resume-documents", response_model=list[ResumeDocumentSummary])
@@ -128,3 +138,109 @@ async def export_resume_document(
     else:
         body = resume_export.to_plain_text(content)
     return Response(content=body, media_type=EXPORT_MEDIA_TYPES[export_format])
+
+
+@router.post("/resume-documents/{document_id}/regenerate", response_model=ResumeDocumentResponse)
+async def regenerate_resume_document(
+    document_id: uuid.UUID,
+    session: Annotated[AsyncSession, Depends(get_db)],
+    payload: RegenerateRequest | None = None,
+) -> ResumeDocumentResponse:
+    block_id = payload.block_id if payload else None
+    return await resume_builder.regenerate(session, document_id, block_id)
+
+
+@router.patch(
+    "/resume-documents/{document_id}/bullets/{bullet_id}", response_model=ResumeDocumentResponse
+)
+async def update_resume_bullet(
+    document_id: uuid.UUID,
+    bullet_id: str,
+    payload: BulletUpdate,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> ResumeDocumentResponse:
+    return await resume_bullets.update_bullet(session, document_id, bullet_id, payload)
+
+
+@router.post(
+    "/resume-documents/{document_id}/bullets/{bullet_id}/approve-anyway",
+    response_model=ResumeDocumentResponse,
+)
+async def approve_resume_bullet_anyway(
+    document_id: uuid.UUID,
+    bullet_id: str,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> ResumeDocumentResponse:
+    return await resume_bullets.approve_anyway(session, document_id, bullet_id)
+
+
+@router.post(
+    "/resume-documents/{document_id}/roles/{block_id}/include-anyway",
+    response_model=ResumeDocumentResponse,
+)
+async def include_resume_role_anyway(
+    document_id: uuid.UUID,
+    block_id: str,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> ResumeDocumentResponse:
+    return await resume_builder.include_role_anyway(session, document_id, block_id)
+
+
+@router.post(
+    "/resume-documents/{document_id}/write/{achievement_id}",
+    response_model=ResumeDocumentResponse,
+)
+async def write_resume_achievement(
+    document_id: uuid.UUID,
+    achievement_id: uuid.UUID,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> ResumeDocumentResponse:
+    return await resume_builder.write_on_demand(session, document_id, achievement_id)
+
+
+@router.post(
+    "/resume-documents/{document_id}/comments",
+    response_model=ResumeDocumentResponse,
+    status_code=201,
+)
+async def add_resume_comment(
+    document_id: uuid.UUID,
+    payload: CommentCreate,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> ResumeDocumentResponse:
+    return await resume_comments.add_comment(session, document_id, payload)
+
+
+@router.patch(
+    "/resume-documents/{document_id}/comments/{comment_id}",
+    response_model=ResumeDocumentResponse,
+)
+async def update_resume_comment(
+    document_id: uuid.UUID,
+    comment_id: str,
+    payload: CommentUpdate,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> ResumeDocumentResponse:
+    return await resume_comments.update_comment(session, document_id, comment_id, payload)
+
+
+@router.delete(
+    "/resume-documents/{document_id}/comments/{comment_id}",
+    response_model=ResumeDocumentResponse,
+)
+async def delete_resume_comment(
+    document_id: uuid.UUID,
+    comment_id: str,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> ResumeDocumentResponse:
+    return await resume_comments.delete_comment(session, document_id, comment_id)
+
+
+@router.post(
+    "/resume-documents/{document_id}/apply-comments", response_model=ResumeDocumentResponse
+)
+async def apply_resume_comments(
+    document_id: uuid.UUID,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> ResumeDocumentResponse:
+    return await resume_comments.apply_comments(session, document_id)

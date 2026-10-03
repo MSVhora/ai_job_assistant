@@ -85,11 +85,12 @@ async def test_create_read_update_delete_round_trip(client: AsyncClient) -> None
     deleted = await client.delete(f"{BASE}/{created['id']}")
     gone = await client.get(f"{BASE}/{created['id']}")
 
-    assert (created["title"], created["page_target"], created["version"]) == ("Backend roles", 2, 1)
+    # Creation writes version 1; generation then drops the golden profile's overlapping role.
+    assert (created["title"], created["page_target"], created["version"]) == ("Backend roles", 2, 2)
     assert fetched.json()["content"]["basics"]["full_name"] == "Ada Lovelace"
     assert (patched.status_code, patched.json()["version"], patched.json()["status"]) == (
         200,
-        2,
+        3,
         "final",
     )
     assert deleted.status_code == 204

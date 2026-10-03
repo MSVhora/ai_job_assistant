@@ -66,6 +66,9 @@ class ResumeDocument(Base):
     comments: Mapped[list[dict[str, object]]] = mapped_column(
         JSONB, default=list, server_default=sql_text("'[]'::jsonb")
     )
+    generation: Mapped[dict[str, object]] = mapped_column(
+        JSONB, default=dict, server_default=sql_text("'{}'::jsonb")
+    )
     status: Mapped[ResumeDocumentStatus] = mapped_column(
         Enum(ResumeDocumentStatus, name="resume_document_status", native_enum=True),
         default=ResumeDocumentStatus.draft,

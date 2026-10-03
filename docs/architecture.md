@@ -238,6 +238,25 @@ are fetched on demand for the identity check and never stored; without a token o
 detector is skipped and the response says so. Saving content snapshots a
 `resume_document_revision` and keeps the newest 20.
 
+#### Content generation (#55)
+
+`POST /api/resume-documents` also generates the content (still data, no PDF). `resume_builder`
+loads the approved achievements (optionally without private-derived ones), analyses the JD
+(`resume_jd`, `classify` task, cached by text) and embeds its digest, then ranks:
+`resume_priority` computes a JD-independent base (impact, difficulty, recency), blends in the
+alignment with weight w (`light` / `balanced` / `strong`, 0 without a JD), orders by MMR, scores
+roles and drops the lower-priority one of any employment pair overlapping by
+`RESUME_OVERLAP_MIN_DAYS`. The top `ceil(budget × RESUME_CANDIDATE_OVERSAMPLE)` candidates (always
+including each block's best) go to `resume_writer`, one `write` call per block with the evidence
+fenced as data and only the allowed JD terms offered (`resume_terms`). `resume_verify` checks every
+drafted bullet by code (numbers, versions, years, tools, tense, length, filler, ownership verbs);
+a `judge` call checks entailment; a failing bullet is rewritten once, then flagged `needs_review`.
+`resume_comments` regenerates only commented blocks with the comment as a subordinate instruction;
+`resume_bullets` re-checks user edits by code and records overrides. Everything the run produced
+besides the content (pool, omitted roles, gaps, warnings, usage) is stored in
+`resume_document.generation`. The layout returned for now lists what is unusable (`needs_review`,
+`not_written`, `overlap_omitted`); the page fit that fills `layout` properly is #56.
+
 Search runs start **only** from an explicit `POST /api/jobs/search` — never automatically —
 and are tracked in `job_search` (status + per-source `{source, status, count, warning}`
 outcomes, queryable via `GET /api/jobs/searches/{id}`). A failing source is a run warning,
@@ -686,7 +705,8 @@ erDiagram
         jsonb content "ResumeContent with per-bullet provenance"
         jsonb layout "fit result (#56)"
         jsonb conflicts "kept-as-is resolutions, keyed by conflict key"
-        jsonb comments
+        jsonb comments "open | applied | rejected, with reasons"
+        jsonb generation "ranked pool, omitted roles, gaps, JD analysis, warnings, usage"
         text status "draft | final"
         integer version
         timestamptz created_at
@@ -698,7 +718,7 @@ erDiagram
         uuid document_id FK "CASCADE"
         integer version
         jsonb content
-        varchar source "create | manual_edit"
+        varchar source "create | manual_edit | generate | bullet_edit | apply_comments"
         timestamptz created_at
     }
 

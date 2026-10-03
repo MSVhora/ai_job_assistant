@@ -5,59 +5,12 @@ import { useEffect, useRef } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { FreshnessBadge } from "@/components/features/jobs/FreshnessBadge";
+import { CloseIcon, DetailRow, JOB_TYPE_LABELS, REMOTE_TYPE_LABELS } from "./job-detail-parts";
+import { MatchBreakdown } from "./MatchBreakdown";
+import { SparkleIcon } from "./match-card-parts";
 import { useOpenMatchSignal } from "@/hooks/use-match-signals";
 import { applyMatchUrl, getJobPosting, type MatchResponse } from "@/lib/api";
-import { salaryLine, scorePercent } from "@/lib/salary";
-
-function SparkleIcon() {
-  return (
-    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className="h-3.5 w-3.5">
-      <path d="M10 1.5l1.8 4.7 4.7 1.8-4.7 1.8L10 14.5 8.2 9.8 3.5 8l4.7-1.8L10 1.5zM15.5 13l.9 2.3 2.3.9-2.3.9-.9 2.3-.9-2.3-2.3-.9 2.3-.9.9-2.3z" />
-    </svg>
-  );
-}
-
-function CloseIcon() {
-  return (
-    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className="h-4 w-4">
-      <path d="M6.3 5a1 1 0 00-1.3 1.3L8.6 10l-3.6 3.7A1 1 0 006.3 15L10 11.4 13.7 15a1 1 0 001.3-1.3L11.4 10 15 6.3A1 1 0 0013.7 5L10 8.6 6.3 5z" />
-    </svg>
-  );
-}
-
-const JOB_TYPE_LABELS: Record<string, string> = {
-  full_time: "Full-time",
-  part_time: "Part-time",
-  contract: "Contract",
-  internship: "Internship",
-  temporary: "Temporary",
-};
-
-const REMOTE_TYPE_LABELS: Record<string, string> = {
-  remote: "Remote",
-  hybrid: "Hybrid",
-  on_site: "On-site",
-};
-
-function DetailRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col gap-0.5 rounded-xl bg-gray-50/80 px-3 py-2">
-      <span className="text-[11px] font-semibold tracking-wide text-gray-500 uppercase">
-        {label}
-      </span>
-      <span className="text-sm font-medium text-gray-900">{value}</span>
-    </div>
-  );
-}
-
-function ScoreRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-2 text-sm">
-      <span className="text-gray-600">{label}</span>
-      <span className="font-semibold text-gray-900">{value}</span>
-    </div>
-  );
-}
+import { salaryLine } from "@/lib/salary";
 
 export function JobDetailPanel({
   match,
@@ -213,27 +166,7 @@ export function JobDetailPanel({
               )}
             </div>
 
-            <div className="rounded-2xl border border-violet-100 bg-violet-50/50 p-4">
-              <h4 className="mb-2 flex items-center gap-1.5 text-xs font-semibold tracking-wide text-violet-700 uppercase">
-                <SparkleIcon />
-                AI match breakdown
-              </h4>
-              <div className="flex flex-col gap-1.5">
-                <ScoreRow label="Final score" value={scorePercent(match.final_score)} />
-                <ScoreRow label="Similarity" value={scorePercent(match.vector_score ?? 0)} />
-                {match.role_fit != null && (
-                  <ScoreRow label="Role fit" value={`${match.role_fit}/10`} />
-                )}
-                {match.company_fit != null && (
-                  <ScoreRow label="Company fit" value={`${match.company_fit}/10`} />
-                )}
-              </div>
-              {match.rationale && (
-                <p className="mt-3 rounded-xl border border-violet-100 bg-white px-3 py-2.5 text-sm leading-relaxed text-gray-700">
-                  {match.rationale}
-                </p>
-              )}
-            </div>
+            <MatchBreakdown match={match} />
           </div>
         )}
       </div>

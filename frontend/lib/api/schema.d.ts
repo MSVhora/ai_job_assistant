@@ -1372,7 +1372,10 @@ export interface operations {
     };
     list_resumes_api_resumes_get: {
         parameters: {
-            query?: never;
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -1386,6 +1389,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ResumeSummaryResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -1487,7 +1499,10 @@ export interface operations {
     };
     list_profiles_api_profiles_get: {
         parameters: {
-            query?: never;
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -1501,6 +1516,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProfileSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -1899,6 +1923,8 @@ export interface operations {
         parameters: {
             query: {
                 profile_id: string;
+                limit?: number;
+                offset?: number;
             };
             header?: never;
             path?: never;
@@ -1963,6 +1989,8 @@ export interface operations {
         parameters: {
             query: {
                 profile_id: string;
+                limit?: number;
+                offset?: number;
             };
             header?: never;
             path: {

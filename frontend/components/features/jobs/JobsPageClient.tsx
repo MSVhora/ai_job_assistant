@@ -7,10 +7,8 @@ import { useState } from "react";
 import { SearchResults } from "@/components/features/jobs/SearchResults";
 import { RunBanners } from "@/components/features/jobs/RunBanners";
 import { RebuildBanner } from "@/components/features/jobs/RebuildBanner";
-import {
-  SearchStepperModal,
-  StartSearchButton,
-} from "@/components/features/jobs/SearchStepperModal";
+import { SearchStepperModal } from "@/components/features/jobs/SearchStepperModal";
+import { StartSearchButton } from "@/components/features/jobs/StartSearchButton";
 import { DEFAULT_MATCH_FILTERS, type MatchFilterValues } from "@/hooks/use-matches";
 import { MatchList, type MatchSelection } from "@/components/features/jobs/MatchList";
 import { JobDetailPanel } from "@/components/features/jobs/JobDetailPanel";

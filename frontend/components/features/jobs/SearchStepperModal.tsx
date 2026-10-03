@@ -8,56 +8,20 @@ import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { useStartJobSearch } from "@/hooks/use-job-search";
 import { useProfile } from "@/hooks/use-profiles";
-import { DuplicateRunError, type ProfileSummary, type SourceInfo } from "@/lib/api";
+import { type ProfileSummary, type SourceInfo } from "@/lib/api";
 
-import { DetailsStep } from "./DetailsStep";
-import { ProfileStep, SourceStep } from "./ProfileSourceSteps";
-import { ReviewSummary } from "./ReviewSummary";
+import { SearchRunErrors } from "./SearchRunErrors";
+import { StepIndicator } from "./StepIndicator";
+import { LAST_STEP, STEP_FIELDS } from "./search-steps";
+import { useSeedSearchForm } from "./use-seed-search-form";
+import { SearchStepContent } from "./SearchStepContent";
 import {
-  emptyQueryFields,
+  emptySearchFormValues,
+  missingFieldMessage,
   makeSearchFormSchema,
-  optionsFromStored,
-  seedSpec,
   toSearchRequest,
   type SearchFormValues,
 } from "./search-form-schema";
-
-const STEP_LABELS = ["Profile", "Source", "Details", "Review"] as const;
-const LAST_STEP = 4;
-
-const STEP_FIELDS: string[][] = [
-  [],
-  ["source"],
-  [
-    "query.title",
-    "query.skills_all",
-    "query.skills",
-    "query.exclude",
-    "location",
-    "country",
-    "minSalary",
-    "maxSalary",
-    "posted_within",
-    "results_wanted",
-  ],
-  [],
-];
-
-function StartSearchButton({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-haspopup="dialog"
-      className="w-full rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-violet-300 transition hover:-translate-y-0.5 hover:shadow-lg hover:shadow-violet-400/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
-    >
-      Start search
-      <span className="block text-[11px] font-medium text-violet-100">
-        One profile · one source per run
-      </span>
-    </button>
-  );
-}
 
 export function SearchStepperModal({
   open,
@@ -85,23 +49,13 @@ export function SearchStepperModal({
   const [sourceName, setSourceName] = useState("");
   const selectedSource = sources.find((source) => source.name === sourceName) ?? null;
   const profileQuery = useProfile(activeProfileId);
-  const profileName = profileQuery.data?.name ?? null;
   const start = useStartJobSearch();
   const structured = profileQuery.data?.structured_profile ?? null;
   const schema = useMemo(() => makeSearchFormSchema(selectedSource), [selectedSource]);
 
   const form = useForm<SearchFormValues>({
     resolver: standardSchemaResolver(schema),
-    defaultValues: {
-      query: emptyQueryFields(),
-      source: "",
-      location: "",
-      country: "",
-      minSalary: "",
-      maxSalary: "",
-      posted_within: "any",
-      results_wanted: 50,
-    },
+    defaultValues: emptySearchFormValues(),
     mode: "onBlur",
   });
 
@@ -127,44 +81,14 @@ export function SearchStepperModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sourceName]);
 
-  // Re-seed prefilled values on profile switch, source switch, and after a
-  // regenerate refreshes the stored per-source queries.
-  useEffect(() => {
-    if (structured === null) {
-      return;
-    }
-    const preferences = structured.preferences;
-    const stored = profileQuery.data?.search_queries?.queries[sourceName];
-    const seeded = seedSpec(structured);
-    form.reset({
-      query: {
-        title: stored?.title ?? seeded.title,
-        skills_all: (stored?.skills_all ?? []).join(", "),
-        skills: (stored?.skills ?? seeded.skills).join(", "),
-        exclude: (stored?.exclude ?? []).join(", "),
-        options: optionsFromStored(stored?.options, selectedSource),
-      },
-      source: sourceName,
-      location: preferences?.target_location || structured.contact.location || "",
-      country: structured.contact.country || "",
-      minSalary:
-        preferences?.salary_min !== undefined && preferences.salary_min !== null
-          ? String(preferences.salary_min)
-          : "",
-      maxSalary:
-        preferences?.salary_max !== undefined && preferences.salary_max !== null
-          ? String(preferences.salary_max)
-          : "",
-      posted_within: "any" as const,
-      results_wanted: 50,
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    activeProfileId,
+  useSeedSearchForm({
+    form,
+    structured,
+    profile: profileQuery.data,
     sourceName,
-    profileQuery.data?.updated_at,
-    profileQuery.data?.search_queries?.generated_at,
-  ]);
+    selectedSource,
+    activeProfileId,
+  });
 
   const advance = async () => {
     const fields = STEP_FIELDS[step - 1];
@@ -195,14 +119,7 @@ export function SearchStepperModal({
       activeProfileId,
     );
     if (missing.length > 0) {
-      form.setError("root", {
-        message:
-          missing[0] === "profile"
-            ? "Select a profile before starting a search (every run is scoped to one)."
-            : missing[0] === "source"
-              ? "Pick the source to search."
-              : `Add a title, skills, or advanced filters for ${selectedSource?.name ?? "this source"}.`,
-      });
+      form.setError("root", { message: missingFieldMessage(missing[0], selectedSource) });
       return;
     }
     form.clearErrors("root");
@@ -239,8 +156,6 @@ export function SearchStepperModal({
     setStep((current) => Math.max(current - 1, 1));
   };
 
-  const duplicateRunError = start.error instanceof DuplicateRunError ? start.error : null;
-
   return (
     <Modal
       open={open}
@@ -250,60 +165,24 @@ export function SearchStepperModal({
     >
       <FormProvider {...form}>
         <form onSubmit={onFormSubmit} className="flex flex-col gap-5" noValidate>
-          <ol aria-label="Steps" className="flex flex-wrap items-center gap-2 text-xs">
-            {STEP_LABELS.map((label, index) => {
-              const number = index + 1;
-              const current = number === step;
-              return (
-                <li
-                  key={label}
-                  aria-current={current ? "step" : undefined}
-                  className={`flex items-center gap-1.5 rounded-full border px-3 py-1 font-semibold ${
-                    current
-                      ? "border-violet-400 bg-violet-50 text-violet-800"
-                      : number < step
-                        ? "border-gray-200 bg-gray-50 text-gray-600"
-                        : "border-dashed border-gray-200 text-gray-400"
-                  }`}
-                >
-                  <span>{number}.</span>
-                  <span>{label}</span>
-                </li>
-              );
-            })}
-          </ol>
+          <StepIndicator step={step} />
 
-          {step === 1 && (
-            <ProfileStep
-              profiles={profilesList}
-              activeProfileId={activeProfileId}
-              profilesPending={profilesPending}
-              profilesError={profilesError}
-              onSelectProfile={onSelectProfile}
-            />
-          )}
-          {step === 2 && (
-            <SourceStep sources={sources} selectedSourceId={sourceName} onSelect={setSourceName} />
-          )}
-          {step === 3 && selectedSource !== null && (
-            <DetailsStep
-              source={selectedSource}
-              profileId={activeProfileId}
-              structuredProfile={structured}
-              storedQueries={profileQuery.data?.search_queries ?? null}
-              updatedAt={profileQuery.data?.updated_at}
-              currency={currency}
-            />
-          )}
-          {step === 4 && selectedSource !== null && (
-            <div aria-label="Step 4: review" className="flex flex-col gap-3">
-              <ReviewSummary
-                source={selectedSource}
-                profileName={profileName}
-                currency={currency}
-              />
-            </div>
-          )}
+          <SearchStepContent
+            step={step}
+            profiles={{
+              list: profilesList,
+              pending: profilesPending,
+              error: profilesError,
+              activeId: activeProfileId,
+              onSelect: onSelectProfile,
+            }}
+            sources={sources}
+            sourceName={sourceName}
+            onSelectSource={setSourceName}
+            selectedSource={selectedSource}
+            profile={profileQuery.data}
+            currency={currency}
+          />
 
           <div className="flex items-center justify-between gap-3 border-t border-gray-100 pt-4">
             <Button type="button" variant="secondary" disabled={step === 1} onClick={goingBack}>
@@ -328,35 +207,15 @@ export function SearchStepperModal({
               {form.formState.errors.root.message}
             </p>
           )}
-          {start.isError && duplicateRunError !== null && (
-            <div role="alert" className="flex flex-col gap-2 text-xs text-red-600">
-              <span>A search for this profile and source is already running.</span>
-              {duplicateRunError.activeSearchId !== null && (
-                <button
-                  type="button"
-                  className="self-start rounded-lg border border-red-200 px-3 py-1.5 font-semibold text-red-700 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
-                  onClick={() => {
-                    const activeId = duplicateRunError.activeSearchId;
-                    if (activeId !== null) {
-                      onSearchStarted(activeId);
-                      onOpenChange(false);
-                    }
-                  }}
-                >
-                  Go to active run
-                </button>
-              )}
-            </div>
-          )}
-          {start.isError && duplicateRunError === null && (
-            <p role="alert" className="text-xs text-red-600">
-              {start.error.message}
-            </p>
-          )}
+          <SearchRunErrors
+            error={start.isError ? start.error : null}
+            onSearchStarted={onSearchStarted}
+            onClose={() => {
+              onOpenChange(false);
+            }}
+          />
         </form>
       </FormProvider>
     </Modal>
   );
 }
-
-export { StartSearchButton };

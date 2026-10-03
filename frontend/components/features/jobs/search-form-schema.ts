@@ -276,3 +276,27 @@ export function toSearchRequest(
     missing,
   };
 }
+
+export function emptySearchFormValues(): SearchFormValues {
+  return {
+    query: emptyQueryFields(),
+    source: "",
+    location: "",
+    country: "",
+    minSalary: "",
+    maxSalary: "",
+    posted_within: "any",
+    results_wanted: 50,
+  };
+}
+
+export function missingFieldMessage(
+  missing: string | undefined,
+  source: SourceInfo | null,
+): string {
+  if (missing === "profile") {
+    return "Select a profile before starting a search (every run is scoped to one).";
+  }
+  if (missing === "source") return "Pick the source to search.";
+  return `Add a title, skills, or advanced filters for ${source?.name ?? "this source"}.`;
+}

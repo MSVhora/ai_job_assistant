@@ -1,6 +1,6 @@
 # Issue #54 — Canonical resume schema, JSON Resume mapping, reconciliation engine (Week 3)
 
-**Status:** Proposed — for owner review (refreshed after #52/#53 shipped)
+**Status:** Implemented — branch `v6/54-resume-schema-reconcile` (awaiting merge into `v6/milestone`)
 **Tracks:** GitHub issue #54 (milestone `v6`, branch `v6/54-resume-schema-reconcile`, cut from `v6/milestone`)
 **Plan of record:** [v6-implementation-plan.md](v6-implementation-plan.md) §6.1, §6.2 step 2, §9 (migration `0026`)
 **Depends on:** #52/#53 (approved achievements with `employer_ref`)
@@ -111,3 +111,17 @@ Backend gate (`ruff check . && ruff format --check . && pyright && pytest --cov=
 ## Out of scope
 
 LLM generation (#55), rendering (#56), UI (#57), writing resolved conflicts back to the profile automatically, persisting GitHub identity.
+
+## Implementation notes — deviations from the plan above
+
+- **Conflicts endpoint shape:** `GET …/conflicts` returns `{open, resolved, github_checked, note}` rather than a bare list, so the UI can show kept-as-is items, and whether the GitHub identity check ran. `POST …/conflicts/{key}/resolve` takes `action: "keep_as_is" | "reopen"`; `resume_document.conflicts` stores only the resolutions (`key`, `action`, `resolved_at`), and the conflicts themselves are always recomputed. An unknown key is a 404.
+- **Extra endpoint:** `POST /api/resume-documents/{id}/resync-identity` implements the "re-synced on request" decision: it re-copies `basics` (keeping the document's own summary), `education` and, for work entries matched on `(company, start_date)`, title, location, end date and current flag; bullets are untouched. It is the only addition beyond the planned route list.
+- **Identity mismatch** emits one conflict per differing field (`name`, `location`, `email`, key refs `{field}`); comparison is by shared word tokens, and the email is compared only when GitHub exposes one. `SourceIdentity` gained `name` and `location` and `GitHubSource.identify()` fills them (D1).
+- **Skill detectors** only run when the candidate has at least one approved achievement, so an empty evidence base does not flag every profile skill.
+- **Date check** compares at month granularity and treats a year-only end date as 31 December, so month- and year-level profile dates cannot produce false conflicts; unparsable or missing dates yield nothing. `experiences_of(profile)` was extracted from `load_profile_facts` in `employer_mapping.py` (behaviour unchanged) so the detectors and the mapping share one window computation.
+- **`metric_contradiction`** requires a shared topic (at least two non-stopword words) and the same unit (`%`, `x`, time and size units); it checks employer-scoped bullets via the confirmed `employer_ref`, or project bullets via the repository name in `project_key`.
+- **Golden profile:** `tests/eval/golden/profile.json` carries one instance of each kind (plus an undated role, extra sections, awards, certifications and preferences); the achievements that trigger the other detectors are built in the tests, not in the fixture. `golden/github/user.json` gained `name` and `location`.
+- **Revisions:** `version` increments only when the saved content differs, creation writes version 1 (`source="create"`), and the newest 20 are kept in the same transaction.
+- **`template`** defaults to `classic`; `jd_weight`, `job_description`, `jd_hash`, `layout` and `comments` exist but are written by #55/#56.
+- **Frontend:** only `lib/api/schema.d.ts` was regenerated (from the running backend; the response models are now typed for #57).
+- **Verification:** backend gate green against a scratch database (1030 tests, 92.7 % coverage; ruff, format and pyright clean), `pre-commit run --all-files` clean, `alembic check` and the schema audit clean, frontend typecheck and format check pass. The GitHub identity call was tested through fakes and a `MockTransport` only, not against live GitHub.

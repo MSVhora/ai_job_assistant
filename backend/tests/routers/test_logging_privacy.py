@@ -84,6 +84,7 @@ async def test_resume_to_search_flow_logs_no_resume_text_prompts_or_keys(
     assert (extracted.status_code, created.status_code, search.status_code) == (200, 201, 202)
     assert prompts, "the flow must have exercised the LLM wrapper"
     logged = "\n".join(record.getMessage() for record in caplog.records)
+    assert "task=" in logged
     assert logged
     assert RESUME_MARKER not in logged
     assert POSTING_MARKER not in logged

@@ -1,7 +1,13 @@
+import asyncio
+import enum
 import json
 import logging
 import time
-from dataclasses import dataclass
+import weakref
+from collections.abc import Generator
+from contextlib import contextmanager
+from contextvars import ContextVar
+from dataclasses import dataclass, field
 from http import HTTPStatus
 from typing import Literal, cast
 
@@ -26,6 +32,126 @@ _RETRYABLE_STATUS_CODES = frozenset(
 
 class LLMError(Exception):
     pass
+
+
+class LLMTask(enum.StrEnum):
+    classify = "classify"
+    extract = "extract"
+    write = "write"
+    judge = "judge"
+
+
+def model_for(task: LLMTask | None = None) -> str:
+    """Model for `task`: its `LLM_MODEL_<TASK>` override, else `LLM_MODEL`."""
+    settings = get_settings()
+    overrides = {
+        LLMTask.classify: settings.llm_model_classify,
+        LLMTask.extract: settings.llm_model_extract,
+        LLMTask.write: settings.llm_model_write,
+        LLMTask.judge: settings.llm_model_judge,
+    }
+    return (overrides[task] if task is not None else None) or settings.llm_model
+
+
+def _task_label(task: LLMTask | None) -> str:
+    return task.value if task is not None else "default"
+
+
+_semaphores: weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, tuple[int, asyncio.Semaphore]] = (
+    weakref.WeakKeyDictionary()
+)
+
+
+def _provider_semaphore() -> asyncio.Semaphore:
+    # One semaphore per running loop: a module-level one would bind to whichever loop
+    # first used it (pytest-asyncio runs a loop per test).
+    loop = asyncio.get_running_loop()
+    size = get_settings().llm_max_concurrency
+    entry = _semaphores.get(loop)
+    if entry is None or entry[0] != size:
+        entry = (size, asyncio.Semaphore(size))
+        _semaphores[loop] = entry
+    return entry[1]
+
+
+@dataclass
+class TaskUsage:
+    calls: int = 0
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    unpriced_calls: int = 0
+    priced_usd: float = 0.0
+
+    @property
+    def cost_usd(self) -> float | None:
+        return None if self.unpriced_calls else self.priced_usd
+
+
+@dataclass
+class UsageMeter:
+    """Per-run token and cost totals by task; cost is None when any call was unpriced."""
+
+    tasks: dict[str, TaskUsage] = field(default_factory=dict[str, TaskUsage])
+    cache_hits: int = 0
+    cache_misses: int = 0
+
+    def record(
+        self, label: str, prompt_tokens: int, completion_tokens: int, cost_usd: float | None
+    ) -> None:
+        usage = self.tasks.setdefault(label, TaskUsage())
+        usage.calls += 1
+        usage.prompt_tokens += prompt_tokens
+        usage.completion_tokens += completion_tokens
+        if cost_usd is None:
+            usage.unpriced_calls += 1
+        else:
+            usage.priced_usd += cost_usd
+
+    @property
+    def prompt_tokens(self) -> int:
+        return sum(usage.prompt_tokens for usage in self.tasks.values())
+
+    @property
+    def completion_tokens(self) -> int:
+        return sum(usage.completion_tokens for usage in self.tasks.values())
+
+    @property
+    def cost_usd(self) -> float | None:
+        costs = [usage.cost_usd for usage in self.tasks.values()]
+        if any(cost is None for cost in costs):
+            return None
+        return sum(cost for cost in costs if cost is not None)
+
+
+_active_meter: ContextVar[UsageMeter | None] = ContextVar("llm_usage_meter", default=None)
+
+
+@contextmanager
+def usage_meter() -> Generator[UsageMeter]:
+    """Meter every provider call made inside the block; nested meters are isolated."""
+    meter = UsageMeter()
+    token = _active_meter.set(meter)
+    try:
+        yield meter
+    finally:
+        _active_meter.reset(token)
+
+
+def _record_usage(
+    label: str, prompt_tokens: int, completion_tokens: int, cost_usd: float | None
+) -> None:
+    meter = _active_meter.get()
+    if meter is not None:
+        meter.record(label, prompt_tokens, completion_tokens, cost_usd)
+
+
+def record_cache_lookup(*, hit: bool) -> None:
+    meter = _active_meter.get()
+    if meter is not None:
+        if hit:
+            meter.cache_hits += 1
+        else:
+            meter.cache_misses += 1
 
 
 def _is_transport_retryable(exc: Exception) -> bool:
@@ -108,6 +234,10 @@ def _map_prices_per_mtok(model: str) -> tuple[float, float] | None:
         )
     except _PRICE_LOOKUP_ERRORS:
         return None
+    except Exception:
+        # litellm raises a bare Exception for models missing from its price map.
+        logger.debug("llm price lookup failed for model=%s", model, exc_info=True)
+        return None
     return float(prompt_usd), float(completion_usd)
 
 
@@ -163,19 +293,21 @@ def _completion_text(response: object) -> str:
 
 async def _completion_with_retry(
     settings: Settings,
+    model: str,
     messages: list[dict[str, str]],
     temperature: float,
     max_tokens: int | None,
 ) -> object:
     async def _call() -> object:
-        return await litellm.acompletion(  # pyright: ignore[reportUnknownMemberType]  # litellm: partially unknown signature
-            model=settings.llm_model,
-            messages=messages,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            api_key=settings.gemini_api_key,
-            timeout=settings.llm_timeout_s,
-        )
+        async with _provider_semaphore():
+            return await litellm.acompletion(  # pyright: ignore[reportUnknownMemberType]  # litellm: partially unknown signature
+                model=model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                api_key=settings.gemini_api_key,
+                timeout=settings.llm_timeout_s,
+            )
 
     try:
         return await with_retry("llm.generate", _call, is_retryable=_is_transport_retryable)
@@ -192,22 +324,27 @@ async def generate(
     system: str | None = None,
     temperature: float = 0.2,
     max_tokens: int | None = None,
+    task: LLMTask | None = None,
 ) -> GenerationResult:
     settings = get_settings()
+    model = model_for(task)
     messages: list[dict[str, str]] = []
     if system is not None:
         messages.append({"role": "system", "content": system})
     messages.append({"role": "user", "content": prompt})
 
     start = time.perf_counter()
-    response = await _completion_with_retry(settings, messages, temperature, max_tokens)
+    response = await _completion_with_retry(settings, model, messages, temperature, max_tokens)
 
     duration_ms = (time.perf_counter() - start) * 1000
     prompt_tokens, completion_tokens = _token_counts(response)
-    cost_usd = estimate_cost(settings.llm_model, prompt_tokens, completion_tokens).usd
+    cost_usd = estimate_cost(model, prompt_tokens, completion_tokens).usd
+    _record_usage(_task_label(task), prompt_tokens, completion_tokens, cost_usd)
     logger.info(
-        "llm.generate model=%s duration_ms=%.0f prompt_tokens=%s completion_tokens=%s cost_usd=%s",
-        settings.llm_model,
+        "llm.generate task=%s model=%s duration_ms=%.0f prompt_tokens=%s completion_tokens=%s "
+        "cost_usd=%s",
+        _task_label(task),
+        model,
         duration_ms,
         prompt_tokens,
         completion_tokens,
@@ -234,13 +371,14 @@ async def embed(texts: list[str]) -> EmbeddingResult:
     start = time.perf_counter()
 
     async def _call() -> object:
-        return await litellm.aembedding(  # pyright: ignore[reportUnknownMemberType]  # litellm: partially unknown signature
-            model=settings.embedding_model,
-            input=texts,
-            dimensions=settings.embedding_dimensions,
-            api_key=settings.gemini_api_key,
-            timeout=settings.llm_timeout_s,
-        )
+        async with _provider_semaphore():
+            return await litellm.aembedding(  # pyright: ignore[reportUnknownMemberType]  # litellm: partially unknown signature
+                model=settings.embedding_model,
+                input=texts,
+                dimensions=settings.embedding_dimensions,
+                api_key=settings.gemini_api_key,
+                timeout=settings.llm_timeout_s,
+            )
 
     try:
         response = await with_retry("llm.embed", _call, is_retryable=_is_transport_retryable)
@@ -253,6 +391,7 @@ async def embed(texts: list[str]) -> EmbeddingResult:
     duration_ms = (time.perf_counter() - start) * 1000
     prompt_tokens, _ = _token_counts(response)
     cost_usd = estimate_cost(settings.embedding_model, prompt_tokens).usd
+    _record_usage("embed", prompt_tokens, 0, cost_usd)
     logger.info(
         "llm.embed model=%s duration_ms=%.0f count=%d prompt_tokens=%s cost_usd=%s",
         settings.embedding_model,
@@ -284,13 +423,14 @@ def estimate_structured_cost(
     schema: type[BaseModel],
     system: str | None = None,
     expected_completion_tokens: int,
+    task: LLMTask | None = None,
 ) -> CostEstimate:
     """Cost of one `parse_structured` call, without calling the provider.
 
     A validation failure triggers one repair round-trip, so the real cost can be up to about
     twice this; callers phrase it as an approximate figure.
     """
-    model = get_settings().llm_model
+    model = model_for(task)
     messages = [
         {"role": "system", "content": structured_system_prompt(schema, system)},
         {"role": "user", "content": prompt},
@@ -305,13 +445,13 @@ async def parse_structured[ModelT: BaseModel](
     system: str | None = None,
     temperature: float = 0.2,
     max_tokens: int | None = None,
+    task: LLMTask | None = None,
 ) -> StructuredResult[ModelT]:
-    settings = get_settings()
     system_content = structured_system_prompt(schema, system)
 
     start = time.perf_counter()
     first = await generate(
-        prompt, system=system_content, temperature=temperature, max_tokens=max_tokens
+        prompt, system=system_content, temperature=temperature, max_tokens=max_tokens, task=task
     )
     try:
         data = schema.model_validate_json(_extract_json(first.text))
@@ -327,7 +467,11 @@ async def parse_structured[ModelT: BaseModel](
             "Return the corrected JSON object only."
         )
         repair = await generate(
-            repair_prompt, system=system_content, temperature=temperature, max_tokens=max_tokens
+            repair_prompt,
+            system=system_content,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            task=task,
         )
         try:
             data = schema.model_validate_json(_extract_json(repair.text))
@@ -347,9 +491,10 @@ async def parse_structured[ModelT: BaseModel](
 
     duration_ms = (time.perf_counter() - start) * 1000
     logger.info(
-        "llm.parse_structured model=%s duration_ms=%.0f prompt_tokens=%d completion_tokens=%d "
-        "cost_usd=%s",
-        settings.llm_model,
+        "llm.parse_structured task=%s model=%s duration_ms=%.0f prompt_tokens=%d "
+        "completion_tokens=%d cost_usd=%s",
+        _task_label(task),
+        model_for(task),
         duration_ms,
         prompt_tokens,
         completion_tokens,

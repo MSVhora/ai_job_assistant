@@ -44,7 +44,13 @@ Non-negotiable layering rules (enforced by the
 - `adapters/llm.py` — the **only** place that talks to an LLM provider; it prices calls
   (`estimate_cost`: LiteLLM's price map, optional `LLM_PRICE_*` overrides, `unknown` when
   neither knows the model), logs `cost_usd` on every call and backs the confirm-gated
-  cost estimates; it also owns
+  cost estimates; it routes a model per task (`LLMTask`: classify, extract, write, judge, each
+  with an optional `LLM_MODEL_<TASK>` override, falling back to `LLM_MODEL`), caps concurrent
+  provider calls (`LLM_MAX_CONCURRENCY`, one semaphore per event loop) and meters tokens and
+  cost per run (`usage_meter()`). Around it, `services/redaction.py` strips emails, phone
+  numbers, IPs, tokens and keys from evidence text before it is sent or cached, and
+  `services/llm_cache.py` caches structured outputs in `llm_output_cache` keyed by a SHA-256 of
+  task, model, prompt version and the redacted inputs (a hit costs no tokens). It also owns
   resilience: the shared retry policy (`adapters/retry.py`, configurable via
   `LLM_RETRY_*`, default 3 attempts) applies exponential backoff with jitter on
   429/5xx/transport errors across LLM and job-source calls, honouring a provider's
@@ -501,6 +507,17 @@ erDiagram
     evidence_chunk_item {
         uuid chunk_id PK "FK CASCADE"
         uuid item_id PK "FK CASCADE"
+    }
+
+    llm_output_cache {
+        text key PK "SHA-256 of task, model, prompt version, redacted inputs; not candidate-owned"
+        text task
+        text model
+        text prompt_version
+        jsonb output
+        integer prompt_tokens
+        integer completion_tokens
+        timestamptz created_at
     }
 ```
 

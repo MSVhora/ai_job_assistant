@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { SetupChecklist } from "@/components/features/setup/SetupChecklist";
 import { SourceList } from "@/components/features/setup/SourceList";
+import { TaskModels } from "@/components/features/setup/TaskModels";
 import { KeyIcon } from "@/components/features/setup/icons";
 
 export const metadata: Metadata = {
@@ -42,6 +43,7 @@ export default function SetupPage() {
         </section>
 
         <SetupChecklist />
+        <TaskModels />
         <SourceList />
 
         <p className="text-center text-sm text-gray-600">

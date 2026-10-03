@@ -215,8 +215,7 @@ export function toFormValues(profile: StructuredProfile): ProfileFormValues {
           salary_min: profile.preferences.salary_min?.toString() ?? "",
           salary_max: profile.preferences.salary_max?.toString() ?? "",
           currency: profile.preferences.currency ?? "",
-          seniority: (profile.preferences.seniority ??
-            "") as (typeof seniority)["options"][number],
+          seniority: (profile.preferences.seniority ?? "") as (typeof seniority)["options"][number],
           seniority_source: profile.preferences.seniority_source ?? "",
           work_authorization: profile.preferences.work_authorization ?? "",
         }

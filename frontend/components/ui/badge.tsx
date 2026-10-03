@@ -1,13 +1,7 @@
 import type { ReactNode } from "react";
 
 type BadgeVariant =
-  | "neutral"
-  | "success"
-  | "warn"
-  | "danger"
-  | "ai"
-  | "official-api"
-  | "third-party-scraper";
+  "neutral" | "success" | "warn" | "danger" | "ai" | "official-api" | "third-party-scraper";
 
 const variantStyles: Record<BadgeVariant, string> = {
   neutral: "border-gray-300 bg-gray-50 text-gray-700",

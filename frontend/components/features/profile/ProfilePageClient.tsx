@@ -30,9 +30,7 @@ export function ProfilePageClient() {
 
   if (resumeId !== null) {
     if (profilesQuery.isPending || draftQuery.isPending) {
-      return (
-        <div className="h-96 animate-pulse rounded-3xl bg-white/60" aria-live="polite" />
-      );
+      return <div className="h-96 animate-pulse rounded-3xl bg-white/60" aria-live="polite" />;
     }
     if (profilesQuery.isError) {
       return (

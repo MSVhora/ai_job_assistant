@@ -10,7 +10,16 @@ import { listResumes, type ResumeSummaryResponse } from "@/lib/api";
 
 function FileIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="h-4 w-4">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className="h-4 w-4"
+    >
       <path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8l-5-5z" />
       <path d="M14 3v5h5" />
     </svg>
@@ -30,8 +39,13 @@ export function ResumeList() {
 
   if (resumesQuery.isPending) {
     return (
-      <section aria-labelledby="resumes-heading" className="rounded-3xl border border-gray-200 bg-white p-6 shadow-lg shadow-gray-100">
-        <h2 id="resumes-heading" className="text-lg font-bold tracking-tight text-gray-900">Uploaded resumes</h2>
+      <section
+        aria-labelledby="resumes-heading"
+        className="rounded-3xl border border-gray-200 bg-white p-6 shadow-lg shadow-gray-100"
+      >
+        <h2 id="resumes-heading" className="text-lg font-bold tracking-tight text-gray-900">
+          Uploaded resumes
+        </h2>
         <div className="mt-4 h-16 animate-pulse rounded-lg bg-gray-200" aria-live="polite" />
       </section>
     );
@@ -39,8 +53,13 @@ export function ResumeList() {
 
   if (resumesQuery.isError) {
     return (
-      <section aria-labelledby="resumes-heading" className="rounded-3xl border border-gray-200 bg-white p-6 shadow-lg shadow-gray-100">
-        <h2 id="resumes-heading" className="text-lg font-bold tracking-tight text-gray-900">Uploaded resumes</h2>
+      <section
+        aria-labelledby="resumes-heading"
+        className="rounded-3xl border border-gray-200 bg-white p-6 shadow-lg shadow-gray-100"
+      >
+        <h2 id="resumes-heading" className="text-lg font-bold tracking-tight text-gray-900">
+          Uploaded resumes
+        </h2>
         <p role="alert" className="mt-4 mb-3 text-sm text-red-700">
           {resumesQuery.error.message}
         </p>
@@ -55,21 +74,34 @@ export function ResumeList() {
 
   if (resumes.length === 0) {
     return (
-      <section aria-labelledby="resumes-heading" className="rounded-3xl border border-gray-200 bg-white p-6 shadow-lg shadow-gray-100">
-        <h2 id="resumes-heading" className="text-lg font-bold tracking-tight text-gray-900">Uploaded resumes</h2>
-        <p className="mt-2 text-sm text-gray-600">No resumes yet — upload one above to get started.</p>
+      <section
+        aria-labelledby="resumes-heading"
+        className="rounded-3xl border border-gray-200 bg-white p-6 shadow-lg shadow-gray-100"
+      >
+        <h2 id="resumes-heading" className="text-lg font-bold tracking-tight text-gray-900">
+          Uploaded resumes
+        </h2>
+        <p className="mt-2 text-sm text-gray-600">
+          No resumes yet — upload one above to get started.
+        </p>
       </section>
     );
   }
 
   return (
-    <section aria-labelledby="resumes-heading" className="rounded-3xl border border-gray-200 bg-white p-6 shadow-lg shadow-gray-100">
+    <section
+      aria-labelledby="resumes-heading"
+      className="rounded-3xl border border-gray-200 bg-white p-6 shadow-lg shadow-gray-100"
+    >
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <h2 id="resumes-heading" className="text-lg font-bold tracking-tight text-gray-900">Uploaded resumes</h2>
+        <h2 id="resumes-heading" className="text-lg font-bold tracking-tight text-gray-900">
+          Uploaded resumes
+        </h2>
         <Badge variant="neutral">{resumes.length}</Badge>
       </div>
       <p className="mb-4 text-sm text-gray-600">
-        Click a resume to review its AI draft — merge it into an existing profile or save it as a new one. A resume without a draft can be re-extracted.
+        Click a resume to review its AI draft — merge it into an existing profile or save it as a
+        new one. A resume without a draft can be re-extracted.
       </p>
       <ul className="flex flex-col gap-3">
         {resumes.map((resume) => (
@@ -95,10 +127,13 @@ function ResumeRow({ resume }: { resume: ResumeSummaryResponse }) {
               {resume.original_filename}
             </Link>
           ) : (
-            <span className="block truncate font-semibold text-gray-900">{resume.original_filename}</span>
+            <span className="block truncate font-semibold text-gray-900">
+              {resume.original_filename}
+            </span>
           )}
           <span className="block truncate text-xs text-gray-500">
-            {formatSize(resume.size_bytes)} · uploaded {new Date(resume.created_at).toLocaleString()}
+            {formatSize(resume.size_bytes)} · uploaded{" "}
+            {new Date(resume.created_at).toLocaleString()}
           </span>
           {extract.isError && (
             <p role="alert" className="text-sm text-red-700">

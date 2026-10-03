@@ -12,7 +12,12 @@ function SparkleIcon({ className }: { className?: string }) {
 
 function CheckIcon() {
   return (
-    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className="h-4 w-4 text-violet-600">
+    <svg
+      viewBox="0 0 20 20"
+      fill="currentColor"
+      aria-hidden="true"
+      className="h-4 w-4 text-violet-600"
+    >
       <path
         fillRule="evenodd"
         d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.7-9.3a1 1 0 00-1.4-1.4L9 10.6 7.7 9.3a1 1 0 00-1.4 1.4l2 2a1 1 0 001.4 0l4-4z"
@@ -30,13 +35,13 @@ const STATS = [
 
 export function HeroSection() {
   return (
-    <section className="relative overflow-hidden pb-24 pt-16 text-gray-900">
+    <section className="relative overflow-hidden pt-16 pb-24 text-gray-900">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute -left-24 top-4 h-80 w-80 rounded-full bg-violet-300/60 blur-3xl" />
-        <div className="absolute -right-20 top-20 h-80 w-80 rounded-full bg-fuchsia-300/50 blur-3xl" />
-        <div className="absolute left-1/3 top-80 h-64 w-64 rounded-full bg-purple-200/60 blur-3xl" />
+        <div className="absolute top-4 -left-24 h-80 w-80 rounded-full bg-violet-300/60 blur-3xl" />
+        <div className="absolute top-20 -right-20 h-80 w-80 rounded-full bg-fuchsia-300/50 blur-3xl" />
+        <div className="absolute top-80 left-1/3 h-64 w-64 rounded-full bg-purple-200/60 blur-3xl" />
         <svg
-          className="absolute left-16 top-40 h-8 w-8 text-violet-400/70"
+          className="absolute top-40 left-16 h-8 w-8 text-violet-400/70"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -46,7 +51,7 @@ export function HeroSection() {
           <path d="M4 16c3-8 6 4 9-4s4 6 7-2" />
         </svg>
         <svg
-          className="absolute right-24 top-56 h-6 w-6 text-fuchsia-400/70"
+          className="absolute top-56 right-24 h-6 w-6 text-fuchsia-400/70"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -63,7 +68,7 @@ export function HeroSection() {
           <SparkleIcon className="h-3.5 w-3.5" />
           AI-Powered Job Matching
         </p>
-        <h1 className="max-w-3xl text-4xl font-bold leading-tight tracking-tight sm:text-6xl sm:leading-[1.1]">
+        <h1 className="max-w-3xl text-4xl leading-tight font-bold tracking-tight sm:text-6xl sm:leading-[1.1]">
           Unlock Your Future:{" "}
           <span className="bg-gradient-to-r from-violet-600 via-purple-600 to-fuchsia-600 bg-clip-text text-transparent">
             Find Your Perfect Job
@@ -71,9 +76,8 @@ export function HeroSection() {
           Today!
         </h1>
         <p className="max-w-2xl text-base leading-relaxed text-gray-600 sm:text-lg">
-          Upload your resume once — AI drafts your profile, you review every field, and matches
-          from all your job sources arrive ranked with plain-language explanations of why each
-          role fits.
+          Upload your resume once — AI drafts your profile, you review every field, and matches from
+          all your job sources arrive ranked with plain-language explanations of why each role fits.
         </p>
         <div className="flex flex-col items-center gap-3 sm:flex-row">
           <Link

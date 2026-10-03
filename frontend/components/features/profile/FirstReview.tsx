@@ -7,11 +7,7 @@ import { FormProvider, useForm } from "react-hook-form";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { useCreateProfile } from "@/hooks/use-profiles";
-import {
-  profileFormSchema,
-  toFormValues,
-  type ProfileFormValues,
-} from "@/lib/profile-schema";
+import { profileFormSchema, toFormValues, type ProfileFormValues } from "@/lib/profile-schema";
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import type { DraftProfileResponse, StructuredProfile } from "@/lib/api";
 
@@ -58,14 +54,11 @@ export function FirstReview({ draft }: { draft: DraftProfileResponse }) {
           Name this profile
         </h2>
         <p className="mt-1 text-sm text-gray-600">
-          One career can seed several profiles — e.g. a native-Android track and a broader SWE track.
+          One career can seed several profiles — e.g. a native-Android track and a broader SWE
+          track.
         </p>
         <div className="mt-4">
-          <Field
-            label="Profile name"
-            htmlFor="profile-name"
-            error={nameError ?? undefined}
-          >
+          <Field label="Profile name" htmlFor="profile-name" error={nameError ?? undefined}>
             <Input
               id="profile-name"
               value={name}

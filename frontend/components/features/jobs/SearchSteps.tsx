@@ -60,7 +60,7 @@ export function SourceStep({
 }) {
   return (
     <fieldset aria-label="Step 2: source" className="flex flex-col gap-2">
-      <legend className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+      <legend className="text-xs font-semibold tracking-wide text-gray-500 uppercase">
         Search one source
       </legend>
       {sources.map((source) => (
@@ -136,12 +136,7 @@ export function DetailsStep({
           error={errors.country?.message}
           hint="Two letters, e.g. in."
         >
-          <Input
-            id="job-country"
-            {...form.register("country")}
-            placeholder="in"
-            maxLength={2}
-          />
+          <Input id="job-country" {...form.register("country")} placeholder="in" maxLength={2} />
         </Field>
         <Field
           label="Min. salary"
@@ -159,12 +154,14 @@ export function DetailsStep({
         >
           <Input id="job-max-salary" type="number" min={0} {...form.register("maxSalary")} />
         </Field>
-        <Field
-          label="Results wanted"
-          htmlFor="job-results"
-          error={errors.results_wanted?.message}
-        >
-          <Input id="job-results" type="number" min={1} max={100} {...form.register("results_wanted")} />
+        <Field label="Results wanted" htmlFor="job-results" error={errors.results_wanted?.message}>
+          <Input
+            id="job-results"
+            type="number"
+            min={1}
+            max={100}
+            {...form.register("results_wanted")}
+          />
         </Field>
         <Field
           label="Posted within"
@@ -268,7 +265,10 @@ export function ReviewSummary({
     },
     {
       label: "Max. salary",
-      value: (values?.maxSalary ?? "").trim() === "" ? "—" : `${values.maxSalary}${currency !== null ? ` ${currency}` : ""}`,
+      value:
+        (values?.maxSalary ?? "").trim() === ""
+          ? "—"
+          : `${values.maxSalary}${currency !== null ? ` ${currency}` : ""}`,
     },
     { label: "Results wanted", value: String(values?.results_wanted ?? "—") },
     {
@@ -289,10 +289,10 @@ export function ReviewSummary({
             key={row.label}
             className="flex items-baseline justify-between gap-4 border-b border-violet-100/70 py-1.5 text-sm last:border-0 last:pb-0"
           >
-            <dt className="shrink-0 text-xs font-semibold uppercase tracking-wide text-gray-500">
+            <dt className="shrink-0 text-xs font-semibold tracking-wide text-gray-500 uppercase">
               {row.label}
             </dt>
-            <dd className="min-w-0 break-words text-right text-gray-900">{row.value}</dd>
+            <dd className="min-w-0 text-right break-words text-gray-900">{row.value}</dd>
           </div>
         ))}
       </dl>

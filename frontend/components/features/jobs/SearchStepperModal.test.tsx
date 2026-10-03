@@ -65,7 +65,12 @@ vi.mock("@/hooks/use-job-search", async (importOriginal) => {
   const original = await importOriginal<Record<string, unknown>>();
   return {
     ...original,
-    useStartJobSearch: () => ({ mutate: startMutation, isPending: false, isError: false, error: null }),
+    useStartJobSearch: () => ({
+      mutate: startMutation,
+      isPending: false,
+      isError: false,
+      error: null,
+    }),
   };
 });
 
@@ -126,9 +131,7 @@ describe("SearchStepperModal", () => {
       screen.getByRole("button", { name: /More filters for this source/ }),
     ).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /More filters for this source/ }));
-    expect(
-      screen.getByRole("checkbox", { name: "Title-only search" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Title-only search" })).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Next" }));
 
     const review = screen.getByRole("region", { name: /Review of the search/ });

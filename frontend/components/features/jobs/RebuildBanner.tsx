@@ -4,7 +4,11 @@ import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { Badge } from "@/components/ui/badge";
-import { isRebuildActive, useMatchRebuildStatus, useStartMatchRebuild } from "@/hooks/use-match-rebuild";
+import {
+  isRebuildActive,
+  useMatchRebuildStatus,
+  useStartMatchRebuild,
+} from "@/hooks/use-match-rebuild";
 
 const STATUS_LABELS: Record<string, string> = {
   idle: "Never rebuilt",
@@ -22,7 +26,7 @@ function RebuildTrigger({ profileId, disabled }: { profileId: string; disabled: 
       type="button"
       disabled={alreadyDisabled}
       onClick={() => start.mutate(profileId)}
-      className="shrink-0 rounded-xl border border-violet-200 bg-white px-3.5 py-2 text-xs font-semibold text-violet-700 shadow-sm hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
+      className="shrink-0 rounded-xl border border-violet-200 bg-white px-3.5 py-2 text-xs font-semibold text-violet-700 shadow-sm hover:bg-violet-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 disabled:cursor-not-allowed disabled:opacity-50"
     >
       {alreadyDisabled ? "Rebuild in progress…" : "Rebuild matches for this profile"}
     </button>

@@ -21,10 +21,7 @@ const eslintConfig = defineConfig([
     },
     rules: {
       ...jsxA11y.flatConfigs.strict.rules,
-      "max-lines": [
-        "warn",
-        { max: 200, skipBlankLines: true, skipComments: true },
-      ],
+      "max-lines": ["warn", { max: 200, skipBlankLines: true, skipComments: true }],
     },
   },
   {

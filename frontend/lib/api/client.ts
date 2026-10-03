@@ -75,8 +75,7 @@ async function parseErrorBody(
     // fall through to the fallback message
   }
   return {
-    message:
-      STATUS_FALLBACK_MESSAGES[response.status] ?? `API error ${response.status} on ${path}`,
+    message: STATUS_FALLBACK_MESSAGES[response.status] ?? `API error ${response.status} on ${path}`,
     body: undefined,
   };
 }
@@ -111,7 +110,10 @@ export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T>
   return (await response.json()) as T;
 }
 
-export async function apiFetchWithTotal<T>(path: string, init?: ApiFetchInit): Promise<{ items: T; total: number }> {
+export async function apiFetchWithTotal<T>(
+  path: string,
+  init?: ApiFetchInit,
+): Promise<{ items: T; total: number }> {
   const { timeoutMs = DEFAULT_TIMEOUT_MS, ...requestInit } = init ?? {};
   let response: Response;
   const headers = new Headers(requestInit.headers);

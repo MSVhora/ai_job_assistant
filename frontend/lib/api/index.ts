@@ -38,8 +38,13 @@ export type StoredPreferences = components["schemas"]["StoredPreferences"];
 export type MatchListParams = operations["list_matches_api_matches_get"]["parameters"]["query"];
 export type MatchRebuildStatus = components["schemas"]["MatchRebuildStatusResponse"];
 
-export { ApiError, DuplicateRunError, ExtractionFailedError, apiFetch, apiFetchWithTotal } from "./client";
-
+export {
+  ApiError,
+  DuplicateRunError,
+  ExtractionFailedError,
+  apiFetch,
+  apiFetchWithTotal,
+} from "./client";
 
 export async function getHealth(): Promise<HealthResponse> {
   return apiFetch<HealthResponse>("/api/health");
@@ -114,10 +119,10 @@ export async function updatePreferences(
   profileId: string,
   payload: StoredPreferences,
 ): Promise<StoredPreferences> {
-  return apiFetch<StoredPreferences>(
-    `/api/profiles/${encodeURIComponent(profileId)}/preferences`,
-    { method: "PATCH", body: JSON.stringify(payload) },
-  );
+  return apiFetch<StoredPreferences>(`/api/profiles/${encodeURIComponent(profileId)}/preferences`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function gapFillTurn(

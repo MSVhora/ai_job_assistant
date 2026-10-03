@@ -22,7 +22,16 @@ function CheckIcon() {
 
 function UploadIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="h-5 w-5">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className="h-5 w-5"
+    >
       <path d="M12 16V4m0 0l-4 4m4-4l4 4" />
       <path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2" />
     </svg>
@@ -31,7 +40,16 @@ function UploadIcon() {
 
 function ProfileIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="h-5 w-5">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className="h-5 w-5"
+    >
       <circle cx="12" cy="8" r="4" />
       <path d="M4 21c0-4 3.6-6 8-6s8 2 8 6" />
     </svg>
@@ -40,7 +58,16 @@ function ProfileIcon() {
 
 function KeyIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="h-5 w-5">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className="h-5 w-5"
+    >
       <circle cx="8" cy="14" r="4" />
       <path d="M11 11l9-9m-3 3l3 3" />
     </svg>
@@ -49,7 +76,16 @@ function KeyIcon() {
 
 function JobsIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="h-5 w-5">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className="h-5 w-5"
+    >
       <rect x="3" y="7" width="18" height="13" rx="2" />
       <path d="M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2M3 12h18" />
     </svg>
@@ -58,7 +94,16 @@ function JobsIcon() {
 
 function AtsIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="h-5 w-5">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className="h-5 w-5"
+    >
       <circle cx="12" cy="12" r="9" />
       <path d="M12 7v5l3 3" />
     </svg>
@@ -67,7 +112,16 @@ function AtsIcon() {
 
 function BuilderIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="h-5 w-5">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className="h-5 w-5"
+    >
       <path d="M12 20h9" />
       <path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z" />
     </svg>
@@ -78,20 +132,32 @@ function JobSearchPreview() {
   return (
     <div className="mt-5 flex flex-col gap-2 rounded-2xl border border-gray-100 bg-gray-50/80 p-3">
       <div className="flex items-center gap-3 rounded-xl border border-gray-100 bg-white p-2.5 shadow-sm">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-[10px] font-bold text-blue-700">IBM</span>
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-[10px] font-bold text-blue-700">
+          IBM
+        </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-xs font-semibold text-gray-900">Software Engineer, IBM</span>
+          <span className="block truncate text-xs font-semibold text-gray-900">
+            Software Engineer, IBM
+          </span>
           <span className="block text-[11px] text-gray-500">Engineering</span>
         </span>
-        <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold text-violet-700">Great fit</span>
+        <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold text-violet-700">
+          Great fit
+        </span>
       </div>
       <div className="flex items-center gap-3 rounded-xl border border-gray-100 bg-white p-2.5 shadow-sm">
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-[10px] font-bold text-emerald-700">MS</span>
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-[10px] font-bold text-emerald-700">
+          MS
+        </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-xs font-semibold text-gray-900">HR Manager, Microsoft</span>
+          <span className="block truncate text-xs font-semibold text-gray-900">
+            HR Manager, Microsoft
+          </span>
           <span className="block text-[11px] text-gray-500">Operations</span>
         </span>
-        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">Applied</span>
+        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+          Applied
+        </span>
       </div>
     </div>
   );
@@ -135,7 +201,9 @@ function ProfilePreview() {
             <span className="block h-2 w-20 rounded-full bg-gray-300" />
             <span className="mt-1.5 block h-2 w-14 rounded-full bg-gray-200" />
           </span>
-          <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold text-violet-700">Reviewed</span>
+          <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-semibold text-violet-700">
+            Reviewed
+          </span>
         </div>
         <div className="mt-3 space-y-1.5">
           <span className="block h-2 w-full rounded-full bg-gray-100" />
@@ -151,12 +219,17 @@ function SetupPreview() {
   return (
     <div className="mt-5 flex flex-col gap-2 rounded-2xl border border-gray-100 bg-gray-50/80 p-3">
       {["Gemini", "Adzuna", "Apify"].map((name) => (
-        <div key={name} className="flex items-center gap-3 rounded-xl border border-gray-100 bg-white p-2.5 shadow-sm">
+        <div
+          key={name}
+          className="flex items-center gap-3 rounded-xl border border-gray-100 bg-white p-2.5 shadow-sm"
+        >
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-100 text-violet-600">
             <KeyIcon />
           </span>
           <span className="flex-1 text-xs font-semibold text-gray-900">{name} key</span>
-          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">Active</span>
+          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+            Active
+          </span>
         </div>
       ))}
     </div>
@@ -259,11 +332,11 @@ export default function GetStartedPage() {
     <main className="relative flex min-h-screen w-full flex-col overflow-hidden">
       <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10">
         <div className="absolute inset-x-0 top-0 h-[420px] bg-gradient-to-b from-violet-50 via-fuchsia-50/50 to-transparent" />
-        <div className="absolute -left-24 top-10 h-72 w-72 rounded-full bg-violet-300/40 blur-3xl" />
-        <div className="absolute -right-24 top-32 h-72 w-72 rounded-full bg-fuchsia-300/30 blur-3xl" />
+        <div className="absolute top-10 -left-24 h-72 w-72 rounded-full bg-violet-300/40 blur-3xl" />
+        <div className="absolute top-32 -right-24 h-72 w-72 rounded-full bg-fuchsia-300/30 blur-3xl" />
       </div>
 
-      <div className="mx-auto flex w-full max-w-5xl flex-col items-center gap-3 px-6 pb-16 pt-16 text-center">
+      <div className="mx-auto flex w-full max-w-5xl flex-col items-center gap-3 px-6 pt-16 pb-16 text-center">
         <p className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-white px-4 py-1.5 text-xs font-semibold tracking-wide text-violet-700 shadow-sm shadow-violet-100">
           <SparkleIcon className="h-3.5 w-3.5" />
           Choose your path
@@ -286,10 +359,10 @@ export default function GetStartedPage() {
                 aria-disabled="true"
                 className="relative flex flex-col rounded-3xl border border-gray-200 bg-gray-50/80 p-5 text-left"
               >
-                <span className="absolute right-4 top-4 rounded-full bg-gray-200 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                <span className="absolute top-4 right-4 rounded-full bg-gray-200 px-2.5 py-1 text-[10px] font-bold tracking-wider text-gray-500 uppercase">
                   Coming soon
                 </span>
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                <p className="text-[11px] font-semibold tracking-wider text-gray-400 uppercase">
                   {option.eyebrow}
                 </p>
                 <div className="mt-1.5 flex items-center gap-3">
@@ -315,11 +388,11 @@ export default function GetStartedPage() {
                 )}
                 <span
                   aria-hidden="true"
-                  className="absolute right-4 top-4 flex h-6 w-6 items-center justify-center rounded-full border-2 border-gray-300 text-transparent transition-colors group-hover:border-violet-600 group-hover:bg-violet-600 group-hover:text-white"
+                  className="absolute top-4 right-4 flex h-6 w-6 items-center justify-center rounded-full border-2 border-gray-300 text-transparent transition-colors group-hover:border-violet-600 group-hover:bg-violet-600 group-hover:text-white"
                 >
                   <CheckIcon />
                 </span>
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+                <p className="text-[11px] font-semibold tracking-wider text-gray-500 uppercase">
                   {option.eyebrow}
                 </p>
                 <div className="mt-1.5 flex items-center gap-3 pr-8">

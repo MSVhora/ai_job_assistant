@@ -120,7 +120,6 @@ export function SearchStepperModal({
     step4AtRef.current = null;
   }, [open]);
 
-
   useEffect(() => {
     form.setValue("source", sourceName, { shouldValidate: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -236,8 +235,7 @@ export function SearchStepperModal({
     setStep((current) => Math.max(current - 1, 1));
   };
 
-  const duplicateRunError =
-    start.error instanceof DuplicateRunError ? start.error : null;
+  const duplicateRunError = start.error instanceof DuplicateRunError ? start.error : null;
 
   return (
     <Modal
@@ -281,11 +279,7 @@ export function SearchStepperModal({
             />
           )}
           {step === 2 && (
-            <SourceStep
-              sources={sources}
-              selectedSourceId={sourceName}
-              onSelect={setSourceName}
-            />
+            <SourceStep sources={sources} selectedSourceId={sourceName} onSelect={setSourceName} />
           )}
           {step === 3 && selectedSource !== null && (
             <DetailsStep
@@ -308,12 +302,7 @@ export function SearchStepperModal({
           )}
 
           <div className="flex items-center justify-between gap-3 border-t border-gray-100 pt-4">
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={step === 1}
-              onClick={goingBack}
-            >
+            <Button type="button" variant="secondary" disabled={step === 1} onClick={goingBack}>
               Back
             </Button>
             {step < LAST_STEP ? (

@@ -10,7 +10,16 @@ import type { DraftProfileResponse, ProfileSummary } from "@/lib/api";
 
 function ProfileIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="h-4 w-4">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className="h-4 w-4"
+    >
       <circle cx="12" cy="8" r="4" />
       <path d="M4 21c0-4 3.6-6 8-6s8 2 8 6" />
     </svg>
@@ -19,7 +28,16 @@ function ProfileIcon() {
 
 function MergeIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="h-4 w-4">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className="h-4 w-4"
+    >
       <path d="M7 3v5c0 3 2 5 5 5h5" />
       <path d="M14 10l3 3-3 3" />
       <path d="M7 21v-5" />
@@ -29,7 +47,16 @@ function MergeIcon() {
 
 function PlusIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="h-4 w-4">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className="h-4 w-4"
+    >
       <path d="M12 5v14M5 12h14" />
     </svg>
   );
@@ -57,7 +84,8 @@ export function TargetChooser({
         Choose where this draft goes
       </h2>
       <p className="mt-1.5 text-sm text-gray-600">
-        Merge the AI draft into one of your existing profiles — or save it as a new, independent profile. Nothing changes until you decide.
+        Merge the AI draft into one of your existing profiles — or save it as a new, independent
+        profile. Nothing changes until you decide.
       </p>
 
       {profiles.length === 0 ? (

@@ -9,7 +9,16 @@ import { ExtractionFailedError } from "@/lib/api";
 
 function UploadCloudIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="h-8 w-8">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className="h-8 w-8"
+    >
       <path d="M12 16V8m0 0l-3 3m3-3l3 3" />
       <path d="M6.5 19a4.5 4.5 0 01-.4-8.98 6 6 0 0111.66-1.6A4.25 4.25 0 0117.75 19H6.5z" />
     </svg>
@@ -18,7 +27,16 @@ function UploadCloudIcon() {
 
 function FileIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="h-5 w-5">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className="h-5 w-5"
+    >
       <path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8l-5-5z" />
       <path d="M14 3v5h5" />
     </svg>
@@ -44,7 +62,8 @@ const STAGES = [
   { label: "Almost done", end: 100 },
 ] as const;
 
-const ACCEPTED = ".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+const ACCEPTED =
+  ".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 export function ResumeUploadForm() {
   const router = useRouter();
@@ -105,7 +124,9 @@ export function ResumeUploadForm() {
   };
 
   const formatSize = (bytes: number) =>
-    bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    bytes < 1024 * 1024
+      ? `${Math.max(1, Math.round(bytes / 1024))} KB`
+      : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 
   return (
     <form onSubmit={onSubmit} className="flex w-full flex-col gap-4" noValidate>
@@ -214,7 +235,11 @@ export function ResumeUploadForm() {
                 <li
                   key={stage.label}
                   className={`flex items-center gap-1 ${
-                    done ? "text-emerald-600" : active ? "font-semibold text-violet-700" : "text-gray-400"
+                    done
+                      ? "text-emerald-600"
+                      : active
+                        ? "font-semibold text-violet-700"
+                        : "text-gray-400"
                   }`}
                 >
                   {done ? <CheckIcon /> : <span aria-hidden>{index + 1}.</span>}
@@ -228,7 +253,10 @@ export function ResumeUploadForm() {
 
       {extractFailure !== null && (
         <div className="flex flex-col gap-2 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-          <p>The resume uploaded, but extraction didn&apos;t complete. You can retry without re-uploading.</p>
+          <p>
+            The resume uploaded, but extraction didn&apos;t complete. You can retry without
+            re-uploading.
+          </p>
           {retryExtract.error !== null && <p role="alert">{retryExtract.error.message}</p>}
           <div>
             <Button

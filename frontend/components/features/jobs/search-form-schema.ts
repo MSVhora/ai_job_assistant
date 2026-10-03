@@ -41,17 +41,14 @@ function optionSchemaFor(decl: SourceFilterDecl): z.ZodType {
       return z
         .string()
         .refine(
-          (value) =>
-            value.trim() === "" || (Number.isInteger(Number(value)) && Number(value) >= 0),
+          (value) => value.trim() === "" || (Number.isInteger(Number(value)) && Number(value) >= 0),
           { message: "Must be a whole number" },
         );
     case "select": {
       const allowed = (decl.options ?? []).map((option) => option.value);
-      return z
-        .string()
-        .refine((value) => value === "" || allowed.includes(value), {
-          message: "Pick one of the listed values",
-        });
+      return z.string().refine((value) => value === "" || allowed.includes(value), {
+        message: "Pick one of the listed values",
+      });
     }
     case "boolean":
       return z.boolean();
@@ -68,12 +65,12 @@ export function makeSearchFormSchema(source: SourceInfo | null) {
     optionSchemas.set(decl.key, optionSchemaFor(decl));
   }
   return z.object({
-      query: z
-        .object({
-          title: z.string().max(80, "Keep the title under 80 characters"),
-          skills_all: z.string(),
-          skills: z.string(),
-          exclude: z.string(),
+    query: z
+      .object({
+        title: z.string().max(80, "Keep the title under 80 characters"),
+        skills_all: z.string(),
+        skills: z.string(),
+        exclude: z.string(),
         options: z.record(z.string(), z.union([z.string(), z.boolean()])),
       })
       .superRefine((query, ctx) => {
@@ -153,7 +150,10 @@ function keywordLike(skill: string): boolean {
 }
 
 function tokens(value: string): string[] {
-  return value.toLowerCase().split(TOKEN_SPLIT).filter((token) => token !== "");
+  return value
+    .toLowerCase()
+    .split(TOKEN_SPLIT)
+    .filter((token) => token !== "");
 }
 
 export function seedSpec(profile: StructuredProfile): { title: string; skills: string[] } {
@@ -194,10 +194,7 @@ export function optionsFromStored(
   return options;
 }
 
-function coerceOptions(
-  fields: QueryFieldValues,
-  decls: SourceFilterDecl[],
-): StoredOptions {
+function coerceOptions(fields: QueryFieldValues, decls: SourceFilterDecl[]): StoredOptions {
   const options: StoredOptions = {};
   for (const decl of decls) {
     const raw = fields.options[decl.key];
@@ -251,7 +248,8 @@ export function toSearchRequest(
 
   const minSalary = values.minSalary.trim();
   const maxSalary = values.maxSalary.trim();
-  const currency = profileCurrency && /^[A-Za-z]{3}$/.test(profileCurrency) ? profileCurrency : undefined;
+  const currency =
+    profileCurrency && /^[A-Za-z]{3}$/.test(profileCurrency) ? profileCurrency : undefined;
   const spec = hasSpec
     ? {
         title: title || undefined,

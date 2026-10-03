@@ -10,7 +10,7 @@ export function salaryLine(
   if (salaryMin !== null && salaryMax !== null && salaryMin !== salaryMax) {
     return `${currencyPrefix}${salaryMin.toLocaleString()} – ${salaryMax.toLocaleString()}`;
   }
-  const value = (salaryMax ?? salaryMin) ?? 0;
+  const value = salaryMax ?? salaryMin ?? 0;
   return `${currencyPrefix}${value.toLocaleString()}${salaryMin !== null && salaryMax === null ? "+" : ""}`;
 }
 

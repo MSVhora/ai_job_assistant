@@ -9,7 +9,8 @@ import type { CostEstimate } from "@/lib/api";
 
 import { QueryCostConfirm } from "./QueryCostConfirm";
 
-let respond: (profileId: string) => Promise<CostEstimate> = () => Promise.reject(new Error("unset"));
+let respond: (profileId: string) => Promise<CostEstimate> = () =>
+  Promise.reject(new Error("unset"));
 const requested: string[] = [];
 
 vi.mock("@/lib/api", () => ({

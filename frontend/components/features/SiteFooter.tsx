@@ -5,7 +5,7 @@ export function SiteFooter() {
   return (
     <footer className="relative overflow-hidden border-t border-violet-100 bg-gradient-to-b from-transparent to-violet-100/70 text-gray-900">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute left-1/2 top-0 h-px w-2/3 -translate-x-1/2 bg-gradient-to-r from-transparent via-violet-400 to-transparent" />
+        <div className="absolute top-0 left-1/2 h-px w-2/3 -translate-x-1/2 bg-gradient-to-r from-transparent via-violet-400 to-transparent" />
         <div className="absolute -top-24 left-1/2 h-48 w-[36rem] -translate-x-1/2 rounded-full bg-violet-300/40 blur-3xl" />
         <div className="absolute bottom-0 left-1/4 h-40 w-80 rounded-full bg-fuchsia-300/30 blur-3xl" />
       </div>

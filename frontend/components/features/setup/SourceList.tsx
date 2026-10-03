@@ -63,9 +63,7 @@ export function SourceList() {
           <h2 id="job-sources-heading" className="text-base font-bold tracking-tight text-gray-900">
             Job sources
           </h2>
-          <p className="text-xs text-gray-500">
-            Where the app searches for job postings
-          </p>
+          <p className="text-xs text-gray-500">Where the app searches for job postings</p>
         </div>
         <ul className="flex flex-col gap-3">
           {data.map((source) => (
@@ -74,9 +72,7 @@ export function SourceList() {
               className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-violet-100 bg-violet-50/40 p-4"
             >
               <div className="flex flex-wrap items-center gap-2">
-                <span className="font-mono text-sm font-semibold text-gray-900">
-                  {source.name}
-                </span>
+                <span className="font-mono text-sm font-semibold text-gray-900">{source.name}</span>
                 <Badge variant={source.is_official_api ? "official-api" : "third-party-scraper"}>
                   {source.is_official_api ? "Official API" : "Third-party scraper"}
                 </Badge>
@@ -90,7 +86,7 @@ export function SourceList() {
                   type="button"
                   disabled={!source.is_configured}
                   onClick={() => setDisclosureFor(source.name)}
-                  className="rounded-full bg-gradient-to-r from-violet-600 to-purple-600 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-violet-300 transition hover:-translate-y-0.5 hover:shadow-lg hover:shadow-violet-400/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
+                  className="rounded-full bg-gradient-to-r from-violet-600 to-purple-600 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-violet-300 transition hover:-translate-y-0.5 hover:shadow-lg hover:shadow-violet-400/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
                 >
                   Enable…
                 </button>
@@ -112,10 +108,7 @@ export function SourceList() {
         sourceName={disclosureFor}
         pending={enable.isPending}
         onConfirm={(name) => {
-          enable.mutate(
-            { name, acknowledged: true },
-            { onSettled: () => setDisclosureFor(null) },
-          );
+          enable.mutate({ name, acknowledged: true }, { onSettled: () => setDisclosureFor(null) });
         }}
         onClose={() => setDisclosureFor(null)}
       />
@@ -137,67 +130,70 @@ function DisclosureDialog({
   const [acknowledged, setAcknowledged] = useState(false);
 
   return (
-      <Modal
-        open={sourceName !== null}
-        onOpenChange={(open) => {
-          if (!open) {
+    <Modal
+      open={sourceName !== null}
+      onOpenChange={(open) => {
+        if (!open) {
+          setAcknowledged(false);
+          onClose();
+        }
+      }}
+      title="Before you enable this scraping source"
+      description="Please read and acknowledge the terms below."
+    >
+      <ul className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50/60 p-4">
+        {LINKEDIN_DISCLOSURE.map((line) => (
+          <li
+            key={line}
+            className="flex items-start gap-2.5 text-sm leading-relaxed text-amber-900"
+          >
+            <svg
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              aria-hidden="true"
+              className="mt-0.5 h-4 w-4 shrink-0 text-amber-500"
+            >
+              <path
+                fillRule="evenodd"
+                d="M8.5 3.5a2 2 0 013 0l6.5 11a2 2 0 01-1.5 3h-13A2 2 0 012 14.5l6.5-11zm1.5 4.25v4a.75.75 0 001.5 0v-4a.75.75 0 00-1.5 0zM10 15.5a1 1 0 100-2 1 1 0 000 2z"
+                clipRule="evenodd"
+              />
+            </svg>
+            {line}
+          </li>
+        ))}
+      </ul>
+      <label className="mt-5 flex cursor-pointer items-start gap-2.5 rounded-2xl border border-violet-100 bg-violet-50/50 p-4 text-sm font-medium text-gray-900">
+        <input
+          type="checkbox"
+          checked={acknowledged}
+          onChange={(event) => setAcknowledged(event.target.checked)}
+          className="mt-0.5 h-4 w-4 rounded border-gray-300 accent-violet-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
+        />
+        I have read and acknowledge the disclosure above.
+      </label>
+      <div className="mt-5 flex flex-col gap-2 border-t border-gray-100 pt-4 sm:flex-row-reverse">
+        <button
+          type="button"
+          disabled={!acknowledged || pending || sourceName === null}
+          onClick={() => {
+            if (sourceName !== null) onConfirm(sourceName);
+          }}
+          className="rounded-full bg-gradient-to-r from-violet-600 to-purple-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-violet-300 transition hover:-translate-y-0.5 hover:shadow-lg hover:shadow-violet-400/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+        >
+          {pending ? "Enabling…" : "Enable source"}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
             setAcknowledged(false);
             onClose();
-          }
-        }}
-        title="Before you enable this scraping source"
-        description="Please read and acknowledge the terms below."
-      >
-        <ul className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50/60 p-4">
-          {LINKEDIN_DISCLOSURE.map((line) => (
-            <li key={line} className="flex items-start gap-2.5 text-sm leading-relaxed text-amber-900">
-              <svg
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                aria-hidden="true"
-                className="mt-0.5 h-4 w-4 shrink-0 text-amber-500"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M8.5 3.5a2 2 0 013 0l6.5 11a2 2 0 01-1.5 3h-13A2 2 0 012 14.5l6.5-11zm1.5 4.25v4a.75.75 0 001.5 0v-4a.75.75 0 00-1.5 0zM10 15.5a1 1 0 100-2 1 1 0 000 2z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              {line}
-            </li>
-          ))}
-        </ul>
-        <label className="mt-5 flex cursor-pointer items-start gap-2.5 rounded-2xl border border-violet-100 bg-violet-50/50 p-4 text-sm font-medium text-gray-900">
-          <input
-            type="checkbox"
-            checked={acknowledged}
-            onChange={(event) => setAcknowledged(event.target.checked)}
-            className="mt-0.5 h-4 w-4 rounded border-gray-300 accent-violet-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
-          />
-          I have read and acknowledge the disclosure above.
-        </label>
-        <div className="mt-5 flex flex-col gap-2 border-t border-gray-100 pt-4 sm:flex-row-reverse">
-          <button
-            type="button"
-            disabled={!acknowledged || pending || sourceName === null}
-            onClick={() => {
-              if (sourceName !== null) onConfirm(sourceName);
-            }}
-            className="rounded-full bg-gradient-to-r from-violet-600 to-purple-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-violet-300 transition hover:-translate-y-0.5 hover:shadow-lg hover:shadow-violet-400/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
-          >
-            {pending ? "Enabling…" : "Enable source"}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setAcknowledged(false);
-              onClose();
-            }}
-            className="rounded-full border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
-          >
-            Cancel
-          </button>
-        </div>
-      </Modal>
+          }}
+          className="rounded-full border border-gray-300 px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
+        >
+          Cancel
+        </button>
+      </div>
+    </Modal>
   );
 }

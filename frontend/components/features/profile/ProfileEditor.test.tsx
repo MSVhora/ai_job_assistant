@@ -30,9 +30,7 @@ vi.mock("./GapFillChat", () => ({
 const queryClient = new QueryClient();
 
 function wrapper(ui: ReactElement) {
-  return (
-    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
-  );
+  return <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>;
 }
 
 function profileFixture(missingFields: string[]): ProfileResponse {

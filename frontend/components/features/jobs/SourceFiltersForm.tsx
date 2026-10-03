@@ -10,13 +10,7 @@ import type { SourceFilterDecl } from "@/lib/api";
 
 import type { SearchFormValues } from "./search-form-schema";
 
-function FilterControl({
-  decl,
-  invalid,
-}: {
-  decl: SourceFilterDecl;
-  invalid: boolean;
-}) {
+function FilterControl({ decl, invalid }: { decl: SourceFilterDecl; invalid: boolean }) {
   const { register } = useFormContext<SearchFormValues>();
   const id = `query-option-${decl.key}`;
   const path = `query.options.${decl.key}` as const;
@@ -56,11 +50,7 @@ function FilterControl({
   );
 }
 
-export function SourceFiltersForm({
-  decls,
-}: {
-  decls: SourceFilterDecl[];
-}) {
+export function SourceFiltersForm({ decls }: { decls: SourceFilterDecl[] }) {
   const {
     formState: { errors },
   } = useFormContext<SearchFormValues>();
@@ -68,7 +58,7 @@ export function SourceFiltersForm({
 
   return (
     <div className="flex flex-col gap-2.5 rounded-xl bg-gray-50 p-2.5">
-      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+      <p className="text-xs font-semibold tracking-wide text-gray-500 uppercase">
         Advanced filters
       </p>
       {decls.map((decl) => {
@@ -84,10 +74,7 @@ export function SourceFiltersForm({
             error={typeof message === "string" ? message : undefined}
             hint={decl.help_text ?? undefined}
           >
-            <FilterControl
-              decl={decl}
-              invalid={message !== undefined}
-            />
+            <FilterControl decl={decl} invalid={message !== undefined} />
           </Field>
         );
       })}

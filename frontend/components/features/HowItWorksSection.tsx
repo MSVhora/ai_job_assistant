@@ -98,13 +98,16 @@ function FlowArrow() {
       className="flex h-16 w-16 shrink-0 items-center justify-center self-center lg:h-12 lg:w-24"
       aria-hidden="true"
     >
-      <svg
-        viewBox="0 0 96 44"
-        className="h-11 w-24 max-lg:rotate-90"
-        fill="none"
-      >
+      <svg viewBox="0 0 96 44" className="h-11 w-24 max-lg:rotate-90" fill="none">
         <defs>
-          <linearGradient id="flow-gradient" x1="0" y1="0" x2="96" y2="0" gradientUnits="userSpaceOnUse">
+          <linearGradient
+            id="flow-gradient"
+            x1="0"
+            y1="0"
+            x2="96"
+            y2="0"
+            gradientUnits="userSpaceOnUse"
+          >
             <stop stopColor="#8b5cf6" />
             <stop offset="1" stopColor="#d946ef" />
           </linearGradient>
@@ -139,8 +142,8 @@ export function HowItWorksSection() {
   return (
     <section className="relative overflow-hidden bg-gradient-to-b from-transparent via-violet-100/40 to-transparent py-20 text-gray-900">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute left-1/4 top-16 h-72 w-72 rounded-full bg-violet-300/30 blur-3xl" />
-        <div className="absolute right-1/4 top-40 h-72 w-72 rounded-full bg-fuchsia-300/25 blur-3xl" />
+        <div className="absolute top-16 left-1/4 h-72 w-72 rounded-full bg-violet-300/30 blur-3xl" />
+        <div className="absolute top-40 right-1/4 h-72 w-72 rounded-full bg-fuchsia-300/25 blur-3xl" />
       </div>
       <div className="mx-auto max-w-6xl px-6">
         <Reveal className="flex flex-col items-center gap-4 text-center">
@@ -154,8 +157,8 @@ export function HowItWorksSection() {
             </span>
           </h2>
           <p className="max-w-2xl text-base text-gray-600 sm:text-lg">
-            A guided pipeline with you in control at every step — AI does the heavy lifting,
-            you make the calls.
+            A guided pipeline with you in control at every step — AI does the heavy lifting, you
+            make the calls.
           </p>
         </Reveal>
 
@@ -164,7 +167,7 @@ export function HowItWorksSection() {
             <div key={step.title} className="contents">
               <Reveal className="flex-1 [&>*]:h-full">
                 <div className="group relative h-full rounded-3xl border border-violet-200/70 bg-gradient-to-br from-white via-violet-50/70 to-fuchsia-50/50 p-6 text-center shadow-xl shadow-violet-200/50 transition-all hover:-translate-y-1 hover:shadow-2xl hover:shadow-violet-300/60">
-                  <span className="absolute right-4 top-4 flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-500 text-[11px] font-bold text-white shadow-sm shadow-violet-300">
+                  <span className="absolute top-4 right-4 flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-500 text-[11px] font-bold text-white shadow-sm shadow-violet-300">
                     {i + 1}
                   </span>
                   <span className="relative mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white shadow-lg shadow-violet-300 transition-transform group-hover:scale-110">
@@ -175,12 +178,15 @@ export function HowItWorksSection() {
                     <step.Icon />
                   </span>
                   <h3 className="mt-4 text-lg font-bold">{step.title}</h3>
-                  <p className="mt-1.5 text-sm leading-relaxed text-gray-600">
-                    {step.description}
-                  </p>
+                  <p className="mt-1.5 text-sm leading-relaxed text-gray-600">{step.description}</p>
                   {step.ai === true && (
-                    <p className="mt-3 inline-flex items-center gap-1 rounded-full bg-violet-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-violet-700">
-                      <svg viewBox="0 0 20 20" fill="currentColor" className="h-3 w-3" aria-hidden="true">
+                    <p className="mt-3 inline-flex items-center gap-1 rounded-full bg-violet-50 px-2.5 py-1 text-[10px] font-bold tracking-wider text-violet-700 uppercase">
+                      <svg
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                        className="h-3 w-3"
+                        aria-hidden="true"
+                      >
                         <path d="M10 1.5l1.8 4.7 4.7 1.8-4.7 1.8L10 14.5 8.2 9.8 3.5 8l4.7-1.8L10 1.5z" />
                       </svg>
                       AI step

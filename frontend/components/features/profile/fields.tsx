@@ -200,7 +200,10 @@ export function SectionCard({
         {action !== undefined && <div className="flex shrink-0 items-center">{action}</div>}
       </div>
       {hasError && !open && (
-        <p role="alert" className="border-b border-red-100 bg-red-50 px-6 py-2 text-xs font-medium text-red-700">
+        <p
+          role="alert"
+          className="border-b border-red-100 bg-red-50 px-6 py-2 text-xs font-medium text-red-700"
+        >
           This section has fields that need attention — reopen to review them.
         </p>
       )}
@@ -237,9 +240,7 @@ export function ItemCard({
             {title !== undefined && (
               <p className="truncate text-sm font-semibold text-gray-900">{title}</p>
             )}
-            {subtitle !== undefined && (
-              <p className="truncate text-xs text-gray-500">{subtitle}</p>
-            )}
+            {subtitle !== undefined && <p className="truncate text-xs text-gray-500">{subtitle}</p>}
           </div>
         </div>
         <div className="flex shrink-0 gap-1">
@@ -409,7 +410,11 @@ export function SelectField({
   const { register } = useFormContext<ProfileFormValues>();
   return (
     <Field label={label} htmlFor={name} error={error} badge={badge} hint={hint}>
-      <select id={name} className={SELECT_STYLES} {...register(name as FieldPath<ProfileFormValues>)}>
+      <select
+        id={name}
+        className={SELECT_STYLES}
+        {...register(name as FieldPath<ProfileFormValues>)}
+      >
         <option value="">Not set</option>
         {options.map((option) => (
           <option key={option.value} value={option.value}>

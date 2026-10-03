@@ -40,8 +40,7 @@ export const SORT_OPTIONS = [
 
 export function hasActiveFilters(filters: MatchFilterValues): boolean {
   return (
-    filters.location !== undefined &&
-    filters.location !== "" ||
+    (filters.location !== undefined && filters.location !== "") ||
     filters.remote_type !== undefined ||
     filters.job_type !== undefined ||
     filters.posted_within_days !== undefined
@@ -73,16 +72,14 @@ export function MatchFilterPanel({
       <div className="flex flex-col gap-1">
         <label
           htmlFor="filter-location"
-          className="text-xs font-semibold uppercase tracking-wide text-gray-500"
+          className="text-xs font-semibold tracking-wide text-gray-500 uppercase"
         >
           Location
         </label>
         <Input
           id="filter-location"
           value={filters.location ?? ""}
-          onChange={(event) =>
-            onChange({ ...filters, location: event.target.value || undefined })
-          }
+          onChange={(event) => onChange({ ...filters, location: event.target.value || undefined })}
           placeholder="Bangalore"
         />
       </div>
@@ -113,9 +110,7 @@ export function MatchFilterPanel({
       <SelectField
         id="filter-recency"
         label="Posted"
-        value={
-          filters.posted_within_days !== undefined ? String(filters.posted_within_days) : ""
-        }
+        value={filters.posted_within_days !== undefined ? String(filters.posted_within_days) : ""}
         options={RECENCY_OPTIONS}
         onChange={(value) =>
           onChange({ ...filters, posted_within_days: value ? Number(value) : undefined })
@@ -138,9 +133,7 @@ export function MatchFilterPanel({
       {active > 0 && (
         <button
           type="button"
-          onClick={() =>
-            onChange({ ...DEFAULT_MATCH_FILTERS, location: undefined })
-          }
+          onClick={() => onChange({ ...DEFAULT_MATCH_FILTERS, location: undefined })}
           className="w-fit rounded-full border border-violet-300 bg-white px-4 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
         >
           Clear filters ({active})
@@ -165,10 +158,7 @@ function SelectField({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      <label
-        htmlFor={id}
-        className="text-xs font-semibold uppercase tracking-wide text-gray-500"
-      >
+      <label htmlFor={id} className="text-xs font-semibold tracking-wide text-gray-500 uppercase">
         {label}
       </label>
       <select

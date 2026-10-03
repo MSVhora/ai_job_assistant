@@ -83,13 +83,17 @@ export function MatchCard({
             <span className="truncate font-semibold text-gray-900 group-hover:text-violet-700">
               {posting.title}
             </span>
-            <Badge variant={posting.source.startsWith("apify") ? "third-party-scraper" : "official-api"}>
+            <Badge
+              variant={posting.source.startsWith("apify") ? "third-party-scraper" : "official-api"}
+            >
               {posting.source}
             </Badge>
             <FreshnessBadge expiresAt={posting.expires_at} postedAt={posting.posted_at} />
           </div>
           <p className="mt-0.5 truncate text-sm text-gray-600">
-            {posting.company && <span className="font-medium text-gray-800">{posting.company}</span>}
+            {posting.company && (
+              <span className="font-medium text-gray-800">{posting.company}</span>
+            )}
             {posting.company && posting.location && <span aria-hidden="true"> · </span>}
             {posting.location}
             {salary && (

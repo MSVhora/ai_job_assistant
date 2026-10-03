@@ -1,10 +1,11 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.deps import get_db
+from app.core.pagination import TOTAL_COUNT_HEADER, Pagination
+from app.deps import get_db, pagination
 from app.schemas.gap_fill import GapFillRequest, GapFillResponse
 from app.schemas.job_search import SearchQueriesResponse, SearchQueryGenerateRequest
 from app.schemas.matching import MatchRebuildStatusResponse
@@ -22,9 +23,12 @@ router = APIRouter(prefix="/api", tags=["profile"])
 
 @router.get("/profiles", response_model=list[ProfileSummary])
 async def list_profiles(
+    response: Response,
     session: Annotated[AsyncSession, Depends(get_db)],
+    page: Annotated[Pagination, Depends(pagination())],
 ) -> list[ProfileSummary]:
-    return await profile_service.list_profiles(session)
+    response.headers[TOTAL_COUNT_HEADER] = str(await profile_service.count_profiles(session))
+    return await profile_service.list_profiles(session, page)
 
 
 @router.post("/profiles", response_model=ProfileResponse, status_code=201)

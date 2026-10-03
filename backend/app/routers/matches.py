@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, Query, Response
 from fastapi.responses import RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.pagination import TOTAL_COUNT_HEADER
 from app.deps import get_db
 from app.schemas.matching import (
     MatchQueryParams,
@@ -23,8 +24,7 @@ async def list_matches(
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> list[MatchResponse]:
     total = await matching.count_matches(session, params)
-    response.headers["X-Total-Count"] = str(total)
-    response.headers["Access-Control-Expose-Headers"] = "X-Total-Count"
+    response.headers[TOTAL_COUNT_HEADER] = str(total)
     return await matching.list_matches(session, params)
 
 

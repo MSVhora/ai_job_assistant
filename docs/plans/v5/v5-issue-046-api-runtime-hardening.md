@@ -1,6 +1,6 @@
 # Issue #46 — API and runtime hardening: CORS, timeouts, list limits, logging and error-contract audits
 
-**Status:** Proposed — for owner review
+**Status:** Implemented — see notes below
 **Tracks:** GitHub issue #46 (milestone `v5`, branch `v5/46-api-runtime-hardening`)
 **Plan of record:** [v5 plan](v5-hardening-plan.md) · standards: [backend-fastapi.md](../../instructions/backend-fastapi.md) (*v5 #46* rules), [api-design.md](../../instructions/api-design.md), [security-privacy.md](../../instructions/security-privacy.md)
 **Depends on:** #41 (strict tooling) · **Blocks:** nothing hard (v6 builds on it)
@@ -63,3 +63,11 @@ Make the runtime rules in the standards true and keep them true with tests: expl
 ## Out of scope
 
 Authentication, rate limiting, pagination UI, structured JSON logging.
+
+## Implementation notes
+
+- **CORS:** explicit methods/headers; `expose_headers=["X-Total-Count"]` replaces the hand-set header in the matches route. The frontend only sends `Content-Type` (and `FormData` uploads), with `GET/POST/PATCH/DELETE`, so no UI change.
+- **LLM timeout:** `LLM_TIMEOUT_S` (default 60, 0 < value ≤ 600) passed to `acompletion` and `aembedding`; in `.env.example` (the #40 guard covers it).
+- **List limits:** a shared `pagination()` dependency (`app/deps.py`) and `Pagination` dataclass (`app/core/pagination.py`). Profiles and resumes: default 100, max 200. Recent runs keep their previous cap of 20 as the default (max 200). **Deviation:** a run's postings default to 250 and max 1000, not 100/200, because a run can hold up to 250 Apify results and the UI treats the list as complete. `X-Total-Count` on all four lists, not only where the UI could page. Services keep returning lists; `count_*` functions feed the header. Ordering gained an `id` tiebreaker so paging is stable.
+- **Tests:** `tests/core/test_cors.py`, `test_error_contract.py` (every `DomainError` subclass), `test_lint_config.py` (banned-api guard); `tests/adapters/test_llm_timeout.py`; `tests/routers/test_list_limits.py`, `test_logging_privacy.py`. The logging guard re-enables the `app.*` loggers because alembic's `fileConfig` (run by the migration fixture) disables loggers created earlier; a manual mutation (logging the resume text) makes it fail.
+- Frontend: no `lib/api` change needed; the existing calls use the defaults. Docs: `docs/guide/` not touched (no visible behaviour change); `docs/architecture.md` privacy posture and the three instruction files updated.

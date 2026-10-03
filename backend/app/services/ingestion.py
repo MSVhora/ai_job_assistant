@@ -34,6 +34,7 @@ from app.core.errors import (
     ProfileNotFoundError,
     UnknownJobSourceError,
 )
+from app.core.pagination import SEARCH_POSTINGS_PAGE, SEARCHES_PAGE, Pagination
 from app.models import JobPosting, JobSearch, JobSearchStatus, Profile, SearchPosting
 from app.schemas.job_search import (
     JobPostingDetail,
@@ -436,16 +437,28 @@ async def get_search_status(
     )
 
 
+async def count_profile_searches(session: AsyncSession, profile_id: uuid.UUID) -> int:
+    await _require_profile(session, profile_id)
+    return (
+        await session.execute(
+            select(func.count()).select_from(JobSearch).where(JobSearch.profile_id == profile_id)
+        )
+    ).scalar_one()
+
+
 async def list_profile_searches(
-    session: AsyncSession, profile_id: uuid.UUID
+    session: AsyncSession,
+    profile_id: uuid.UUID,
+    page: Pagination = SEARCHES_PAGE,
 ) -> list[JobSearchSummary]:
     """Recent runs for a profile (fresh first) — drives run banners after a reload."""
     await _require_profile(session, profile_id)
     result = await session.execute(
         select(JobSearch)
         .where(JobSearch.profile_id == profile_id)
-        .order_by(JobSearch.created_at.desc())
-        .limit(20)
+        .order_by(JobSearch.created_at.desc(), JobSearch.id)
+        .limit(page.limit)
+        .offset(page.offset)
     )
     runs = result.scalars().all()
     return [
@@ -461,15 +474,34 @@ async def list_profile_searches(
     ]
 
 
-async def get_search_postings(
+async def count_search_postings(
     session: AsyncSession, search_id: uuid.UUID, profile_id: uuid.UUID
+) -> int:
+    await _require_owned_search(session, search_id, profile_id)
+    return (
+        await session.execute(
+            select(func.count())
+            .select_from(JobPosting)
+            .join(SearchPosting, SearchPosting.posting_id == JobPosting.id)
+            .where(SearchPosting.search_id == search_id, matching.freshness_condition())
+        )
+    ).scalar_one()
+
+
+async def get_search_postings(
+    session: AsyncSession,
+    search_id: uuid.UUID,
+    profile_id: uuid.UUID,
+    page: Pagination = SEARCH_POSTINGS_PAGE,
 ) -> list[JobPostingSummary]:
     await _require_owned_search(session, search_id, profile_id)
     result = await session.execute(
         select(JobPosting)
         .join(SearchPosting, SearchPosting.posting_id == JobPosting.id)
         .where(SearchPosting.search_id == search_id, matching.freshness_condition())
-        .order_by(JobPosting.posted_at.desc().nulls_last(), JobPosting.title)
+        .order_by(JobPosting.posted_at.desc().nulls_last(), JobPosting.title, JobPosting.id)
+        .limit(page.limit)
+        .offset(page.offset)
     )
     return [JobPostingSummary.from_posting(posting) for posting in result.scalars().all()]
 

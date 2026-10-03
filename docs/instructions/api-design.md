@@ -30,7 +30,7 @@ Applies to every HTTP endpoint in `backend/app/routers/`.
 
 ## Collections
 
-- List endpoints are bounded: `limit` with a documented maximum and, where growth is unbounded, `offset` *(v5 #46)*; paginated lists expose the total in `X-Total-Count` (already used by `GET /api/matches`, with the header exposed to CORS).
+- List endpoints are bounded: `limit` with a documented maximum and, where growth is unbounded, `offset`; paginated lists expose the total in `X-Total-Count` (profiles, resumes, recent runs, a run's postings and matches), with the header exposed to CORS. Defaults: limit 100 / max 200; recent runs 20; a run's postings 250 / max 1000.
 - Filters and sort are query parameters validated by a pydantic model; filters apply at read time so changing a filter never triggers recomputation.
 
 ## Background work

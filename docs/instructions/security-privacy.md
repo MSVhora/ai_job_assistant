@@ -23,7 +23,7 @@ Applies to all code, config and docs. The app is self-hosted, single-user and BY
 - **SQL**: parameterized queries only (see [database-postgres.md](database-postgres.md)).
 - **Uploads**: size and type checked (magic bytes, not the extension); stored under a `uuid` filename, never a user-supplied path; original filename kept as metadata only.
 - **Outbound requests**: connectors call only their configured hosts; URLs taken from third-party data (posting links, `source_urls`) are never fetched server-side, only rendered as links or passed through the apply redirect.
-- **CORS**: restricted to `CORS_ORIGINS` with explicit methods and headers *(v5 #46)*.
+- **CORS**: restricted to `CORS_ORIGINS` with explicit methods (`GET`, `POST`, `PATCH`, `DELETE`, `OPTIONS`) and headers (`Content-Type`, `Accept`).
 - **Auth**: none while single-user and local. Before any shared or hosted deployment, add authentication, per-user ownership on every query, rate limiting and HTTPS first — this is a gate, not a nice-to-have.
 - **Errors**: responses never include stack traces or provider payloads; the message says what to do ("rate limited by the provider — retry shortly").
 

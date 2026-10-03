@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     # Outbound retry policy shared by LLM calls and job-source HTTP calls.
     llm_retry_attempts: int = 3
     llm_retry_base_delay_s: float = 1.0
+    llm_timeout_s: Annotated[float, Field(gt=0, le=600)] = 60.0
 
     adzuna_app_id: str | None = None
     adzuna_app_key: str | None = None

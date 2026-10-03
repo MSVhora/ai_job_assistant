@@ -1,0 +1,19 @@
+from dataclasses import dataclass
+
+TOTAL_COUNT_HEADER = "X-Total-Count"
+DEFAULT_LIST_LIMIT = 100
+MAX_LIST_LIMIT = 200
+SEARCHES_DEFAULT_LIMIT = 20
+SEARCH_POSTINGS_DEFAULT_LIMIT = 250
+SEARCH_POSTINGS_MAX_LIMIT = 1000
+
+
+@dataclass(frozen=True)
+class Pagination:
+    limit: int = DEFAULT_LIST_LIMIT
+    offset: int = 0
+
+
+DEFAULT_PAGE = Pagination()
+SEARCHES_PAGE = Pagination(limit=SEARCHES_DEFAULT_LIMIT)
+SEARCH_POSTINGS_PAGE = Pagination(limit=SEARCH_POSTINGS_DEFAULT_LIMIT)

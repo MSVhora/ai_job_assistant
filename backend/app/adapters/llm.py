@@ -101,6 +101,7 @@ async def _completion_with_retry(
             temperature=temperature,
             max_tokens=max_tokens,
             api_key=settings.gemini_api_key,
+            timeout=settings.llm_timeout_s,
         )
 
     try:
@@ -162,6 +163,7 @@ async def embed(texts: list[str]) -> EmbeddingResult:
             input=texts,
             dimensions=settings.embedding_dimensions,
             api_key=settings.gemini_api_key,
+            timeout=settings.llm_timeout_s,
         )
 
     try:

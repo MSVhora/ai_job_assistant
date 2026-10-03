@@ -449,3 +449,16 @@ to the embedding model) live in
 - Resume text is stored locally (Postgres + uploads volume) and sent only to your LLM provider
 - Scraping-based sources run under your own Apify account after an explicit disclosure
   acknowledgment
+- CORS allows only `CORS_ORIGINS`, the methods `GET/POST/PATCH/DELETE/OPTIONS` and the request
+  headers `Content-Type`/`Accept`; `X-Total-Count` is exposed so the UI can read list totals
+- Every outbound call has an explicit timeout: job-source clients 30 s, LLM and embedding
+  calls `LLM_TIMEOUT_S` (default 60 s); a timeout is retried by the shared policy and reported
+  as "request timed out"
+- List endpoints are bounded (`limit` default 100, max 200, plus `offset`, total in
+  `X-Total-Count`): profiles, resumes, matches; recent runs default to 20; a run's postings
+  default to 250 (max 1000) so a full run is returned
+- Error contract: every error body is `{"detail": "<message>"}`, with extra machine keys only
+  where documented (`active_search_id` on the duplicate-run 409); a test enumerates every
+  `DomainError` subclass against it
+- Logs never contain resume text, prompts, job descriptions or key-shaped strings (a regression
+  test runs upload → extract → profile → search under log capture)

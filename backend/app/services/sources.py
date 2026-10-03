@@ -16,14 +16,14 @@ async def list_sources_with_state(session: AsyncSession) -> list[SourceInfoRespo
 
 
 async def enable_source(
-    session: AsyncSession, name: str, acknowledged_disclosure: bool
+    session: AsyncSession, name: str, *, acknowledged_disclosure: bool
 ) -> SourceInfoResponse:
     source = registry.get_source(name)
     if source is None:
-        raise JobSourceNotFoundError()
+        raise JobSourceNotFoundError
     if source.disclosure_required:
         if not acknowledged_disclosure:
-            raise DisclosureNotAcknowledgedError()
+            raise DisclosureNotAcknowledgedError
         await _acknowledge(session, name)
     return _source_info(source, await _acknowledged_names(session))
 

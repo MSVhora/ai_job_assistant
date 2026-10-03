@@ -1,12 +1,26 @@
+from sqlalchemy import MetaData
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.core.config import get_settings
 
+NAMING_CONVENTION = {
+    "pk": "%(table_name)s_pkey",
+    "fk": "%(table_name)s_%(column_0_name)s_fkey",
+    "uq": "%(table_name)s_%(column_0_name)s_key",
+    "ck": "%(table_name)s_%(constraint_name)s_check",
+    "ix": "ix_%(column_0_label)s",
+}
+
 
 class Base(DeclarativeBase):
-    pass
+    """Declarative base. The naming convention mirrors PostgreSQL's default
+    names so unnamed constraints get predictable names without renaming existing
+    ones; tables with `updated_at` get the `set_updated_at` trigger from
+    `app.core.migration_helpers` in the migration that creates them."""
+
+    metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
 
 engine = create_async_engine(get_settings().database_url, pool_pre_ping=True)

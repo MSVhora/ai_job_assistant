@@ -25,30 +25,28 @@ export function ProfileSelector({
         {disabled
           ? "Loading profiles…"
           : "No profile yet — select or create one before starting a search, because every run is scoped to its profile. "}
-        {!disabled &&
-          profiles.length === 0 && (
-            <Link
-              href="/profile"
-              className="font-semibold text-violet-700 underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
-            >
-              Create a profile
-            </Link>
-          )}
+        {!disabled && profiles.length === 0 && (
+          <Link
+            href="/profile"
+            className="font-semibold text-violet-700 underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
+          >
+            Create a profile
+          </Link>
+        )}
       </p>
     );
   }
   return (
     <div className="flex flex-col gap-1.5">
-      <label
-        htmlFor={id}
-        className="text-xs font-semibold uppercase tracking-wide text-gray-500"
-      >
+      <label htmlFor={id} className="text-xs font-semibold tracking-wide text-gray-500 uppercase">
         Searching as profile
       </label>
       <Select
         id={id}
         value={activeProfileId ?? ""}
-        onChange={(event) => onSelect(event.target.value)}
+        onChange={(event) => {
+          onSelect(event.target.value);
+        }}
       >
         {profiles.map((profile) => (
           <option key={profile.profile_id} value={profile.profile_id}>

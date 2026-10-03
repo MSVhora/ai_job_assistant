@@ -101,7 +101,9 @@ describe("Accordion", () => {
       <Accordion
         id="test-item"
         open={open}
-        onToggle={() => setOpen((previous) => !previous)}
+        onToggle={() => {
+          setOpen((previous) => !previous);
+        }}
         trigger="Header"
       >
         <p>Body</p>

@@ -69,10 +69,11 @@ def _adopt_orphans() -> None:
         .scalar_one()
     )
     if orphans:
-        raise RuntimeError(
+        msg = (
             "job_search rows with no profile to adopt found during backfill; "
             "the app requires at least one profile before searching"
         )
+        raise RuntimeError(msg)
 
 
 def _backfill_search_posting() -> None:

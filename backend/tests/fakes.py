@@ -3,7 +3,7 @@ import math
 import random
 from collections.abc import Callable
 from types import SimpleNamespace
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import litellm
 
@@ -16,6 +16,9 @@ from app.adapters.job_sources.base import (
 )
 from app.schemas.profile import StructuredProfile
 from app.services import profile_derivation
+
+if TYPE_CHECKING:
+    import uuid
 
 VALID_PROFILE: dict[str, Any] = {
     "contact": {
@@ -148,7 +151,8 @@ class FakeJobSource:
         for posting in self._postings:
             if posting.external_id == raw.external_id:
                 return posting
-        raise ConnectorError(f"un-mappable posting {raw.external_id}")
+        msg = f"un-mappable posting {raw.external_id}"
+        raise ConnectorError(msg)
 
 
 def fake_vector(text: str, dim: int = 768) -> list[float]:
@@ -182,7 +186,6 @@ def install_aembedding(monkeypatch: Any, handler: Callable[..., object]) -> list
 
 async def seed_profile_light(name: str = "Seeker") -> Any:
     """Create a profile (no embedding) and return its id."""
-    import uuid
 
     from sqlalchemy import select
 

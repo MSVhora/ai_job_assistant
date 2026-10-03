@@ -18,7 +18,9 @@ export function RunBanners({
           key={searchId}
           searchId={searchId}
           profileId={profileId}
-          onDismiss={() => onDismiss(searchId)}
+          onDismiss={() => {
+            onDismiss(searchId);
+          }}
         />
       ))}
     </>

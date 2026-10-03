@@ -12,3 +12,5 @@ uploads/
 .pytest-uploads/
 pgdata/
 *.egg-info/
+.coverage
+htmlcov/

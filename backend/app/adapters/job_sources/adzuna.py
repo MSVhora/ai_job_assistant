@@ -1,5 +1,6 @@
 import logging
 import time
+from http import HTTPStatus
 from typing import Any
 
 import httpx
@@ -14,9 +15,11 @@ from app.adapters.job_sources.base import (
     SourceFilterDecl,
     SourceFilterOption,
     clean_text,
+    json_array,
+    json_object,
     parse_datetime,
 )
-from app.adapters.retry import Transient, retry_after_header, retryable_status, with_retry
+from app.adapters.retry import TransientError, retry_after_header, retryable_status, with_retry
 from app.core.config import get_settings
 from app.models import JobType
 
@@ -70,7 +73,8 @@ def _apply_search_terms(params: dict[str, str], query: JobSearchQuery) -> None:
         if query.query:
             params["what"] = query.query
             return
-        raise ConnectorError("adzuna search needs a query or a title phrase")
+        msg = "adzuna search needs a query or a title phrase"
+        raise ConnectorError(msg)
     if plan.what_phrase:
         params["what_phrase"] = plan.what_phrase
     if plan.what_and:
@@ -82,7 +86,8 @@ def _apply_search_terms(params: dict[str, str], query: JobSearchQuery) -> None:
     if not plan.what_phrase and plan.what:
         params["what"] = plan.what
     if not any(key in params for key in ("what", "what_phrase", "what_and", "what_or")):
-        raise ConnectorError("adzuna search needs a query or a title phrase")
+        msg = "adzuna search needs a query or a title phrase"
+        raise ConnectorError(msg)
 
 
 def _apply_salary_filter(params: dict[str, str], query: JobSearchQuery) -> None:
@@ -198,7 +203,8 @@ class AdzunaJobSource:
     async def search(self, query: JobSearchQuery) -> list[RawJobPosting]:
         settings = get_settings()
         if not self.is_configured():
-            raise ConnectorError("adzuna credentials are not configured")
+            msg = "adzuna credentials are not configured"
+            raise ConnectorError(msg)
 
         results_per_page = min(query.results_wanted, _MAX_RESULTS_PER_PAGE)
         params: dict[str, str] = {
@@ -263,36 +269,32 @@ class AdzunaJobSource:
         return list(merged.values())[: query.results_wanted]
 
     def _extract_postings(self, data: dict[str, Any]) -> list[RawJobPosting]:
-        results = data.get("results")
         postings: list[RawJobPosting] = []
-        if isinstance(results, list):
-            for item in results:
-                if not isinstance(item, dict):
-                    continue
-                external_id = str(item.get("id", "")).strip()
-                if not external_id:
-                    continue
-                postings.append(RawJobPosting(external_id=external_id, payload=item))
+        for entry in json_array(data.get("results")) or []:
+            item = json_object(entry)
+            if item is None:
+                continue
+            external_id = str(item.get("id", "")).strip()
+            if not external_id:
+                continue
+            postings.append(RawJobPosting(external_id=external_id, payload=item))
         return postings
 
     def normalize(self, raw: RawJobPosting) -> JobPostingData:
         payload = raw.payload
         title = clean_text(payload.get("title"))
         if title is None:
-            raise ConnectorError("adzuna posting has no title")
+            msg = "adzuna posting has no title"
+            raise ConnectorError(msg)
         company = payload.get("company")
         location = payload.get("location")
         try:
             return JobPostingData(
                 external_id=raw.external_id,
                 title=title,
-                company=clean_text(
-                    company.get("display_name") if isinstance(company, dict) else company
-                ),
+                company=clean_text(_display_name(company)),
                 url=clean_text(payload.get("redirect_url")),
-                location=clean_text(
-                    location.get("display_name") if isinstance(location, dict) else location
-                ),
+                location=clean_text(_display_name(location)),
                 job_type=_job_type(payload),
                 description=clean_text(payload.get("description")),
                 posted_at=parse_datetime(payload.get("created")),
@@ -301,35 +303,45 @@ class AdzunaJobSource:
                 raw_payload=payload,
             )
         except ValidationError as exc:
-            raise ConnectorError(f"adzuna posting failed normalization: {exc}") from exc
+            msg = f"adzuna posting failed normalization: {exc}"
+            raise ConnectorError(msg) from exc
 
     async def _get_json(self, url: str, params: dict[str, str]) -> dict[str, Any]:
         def _describe(exc: Exception) -> str:
             return f"transport error: {exc}" if isinstance(exc, httpx.HTTPError) else str(exc)
 
-        try:
-            async with self._client_factory() as client:
+        async with self._client_factory() as client:
 
-                async def _call() -> dict[str, Any]:
-                    response = await client.get(url, params=params)
-                    if response.status_code < 400:
-                        try:
-                            return response.json()
-                        except ValueError as exc:
-                            raise ConnectorError("adzuna returned invalid JSON") from exc
-                    if retryable_status(response.status_code):
-                        raise Transient(
-                            f"status {response.status_code}",
-                            retry_after_s=retry_after_header(response.headers.get("retry-after")),
-                        )
-                    raise ConnectorError(f"adzuna request failed (status {response.status_code})")
+            async def _call() -> dict[str, Any]:
+                response = await client.get(url, params=params)
+                if response.status_code < HTTPStatus.BAD_REQUEST:
+                    try:
+                        return response.json()
+                    except ValueError as exc:
+                        msg = "adzuna returned invalid JSON"
+                        raise ConnectorError(msg) from exc
+                if retryable_status(response.status_code):
+                    msg = f"status {response.status_code}"
+                    raise TransientError(
+                        msg,
+                        retry_after_s=retry_after_header(response.headers.get("retry-after")),
+                    )
+                msg = f"adzuna request failed (status {response.status_code})"
+                raise ConnectorError(msg)
 
+            try:
                 return await with_retry("adzuna", _call, is_retryable=_is_retryable)
-        except ConnectorError:
-            raise
-        except (httpx.HTTPError, Transient) as exc:
-            raise ConnectorError(f"adzuna request failed ({_describe(exc)})") from exc
+            except ConnectorError:
+                raise
+            except (httpx.HTTPError, TransientError) as exc:
+                msg = f"adzuna request failed ({_describe(exc)})"
+                raise ConnectorError(msg) from exc
+
+
+def _display_name(value: object) -> object:
+    mapping = json_object(value)
+    return mapping.get("display_name") if mapping is not None else value
 
 
 def _is_retryable(exc: Exception) -> bool:
-    return isinstance(exc, (httpx.HTTPError, Transient))
+    return isinstance(exc, (httpx.HTTPError, TransientError))

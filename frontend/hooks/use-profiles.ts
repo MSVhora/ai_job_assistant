@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   createProfile,
@@ -21,8 +21,7 @@ export function useProfiles() {
 export function useProfile(profileId: string | null) {
   return useQuery({
     queryKey: ["profile", profileId],
-    queryFn: () => getProfile(profileId as string),
-    enabled: profileId !== null,
+    queryFn: profileId !== null ? () => getProfile(profileId) : skipToken,
   });
 }
 

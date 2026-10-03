@@ -33,9 +33,7 @@ export function BackendStatus() {
 
   return (
     <div aria-live="polite" className="flex flex-col items-center gap-4">
-      {healthQuery.isPending && (
-        <div className="h-8 w-64 animate-pulse rounded-full bg-gray-200" />
-      )}
+      {healthQuery.isPending && <div className="h-8 w-64 animate-pulse rounded-full bg-gray-200" />}
       {healthQuery.isError && (
         <div className="flex flex-col items-center gap-3">
           <p className="text-sm text-red-700">

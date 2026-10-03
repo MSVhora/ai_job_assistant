@@ -66,7 +66,12 @@ class JobPosting(Base):
     # canonical; a duplicate points at its canonical (which always has
     # canonical_id NULL — chains are resolved on write by posting_dedupe).
     canonical_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("job_posting.id", use_alter=True, name="fk_job_posting_canonical_id"),
+        ForeignKey(
+            "job_posting.id",
+            use_alter=True,
+            name="fk_job_posting_canonical_id",
+            ondelete="SET NULL",
+        ),
         nullable=True,
         index=True,
     )

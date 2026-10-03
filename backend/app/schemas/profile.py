@@ -126,10 +126,11 @@ class StructuredProfile(BaseModel):
         if not (
             self.skills or self.experience or self.projects or self.awards or self.extra_sections
         ):
-            raise ValueError(
+            msg = (
                 "profile must contain at least one skill, experience, project, "
                 "or extra section entry"
             )
+            raise ValueError(msg)
         return self
 
 

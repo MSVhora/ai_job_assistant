@@ -1,10 +1,12 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.deps import get_db
+from app.core.pagination import TOTAL_COUNT_HEADER, Pagination
+from app.deps import get_db, pagination
+from app.schemas.cost import CostEstimateResponse
 from app.schemas.gap_fill import GapFillRequest, GapFillResponse
 from app.schemas.job_search import SearchQueriesResponse, SearchQueryGenerateRequest
 from app.schemas.matching import MatchRebuildStatusResponse
@@ -22,9 +24,12 @@ router = APIRouter(prefix="/api", tags=["profile"])
 
 @router.get("/profiles", response_model=list[ProfileSummary])
 async def list_profiles(
+    response: Response,
     session: Annotated[AsyncSession, Depends(get_db)],
+    page: Annotated[Pagination, Depends(pagination())],
 ) -> list[ProfileSummary]:
-    return await profile_service.list_profiles(session)
+    response.headers[TOTAL_COUNT_HEADER] = str(await profile_service.count_profiles(session))
+    return await profile_service.list_profiles(session, page)
 
 
 @router.post("/profiles", response_model=ProfileResponse, status_code=201)
@@ -83,12 +88,35 @@ async def regenerate_search_queries(
     )
 
 
+@router.post("/profiles/{profile_id}/search-queries/estimate", response_model=CostEstimateResponse)
+async def estimate_regenerate_search_queries(
+    profile_id: uuid.UUID,
+    session: Annotated[AsyncSession, Depends(get_db)],
+    payload: SearchQueryGenerateRequest | None = None,
+) -> CostEstimateResponse:
+    return CostEstimateResponse.from_estimate(
+        await query_builder.estimate_regeneration_cost(
+            session, profile_id, payload.sources if payload else None
+        )
+    )
+
+
 @router.post("/profiles/{profile_id}/tune-queries", response_model=SearchQueriesResponse)
 async def tune_search_queries(
     profile_id: uuid.UUID,
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> SearchQueriesResponse:
     return await query_tuner.tune_for_profile(session, profile_id)
+
+
+@router.post("/profiles/{profile_id}/tune-queries/estimate", response_model=CostEstimateResponse)
+async def estimate_tune_search_queries(
+    profile_id: uuid.UUID,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> CostEstimateResponse:
+    return CostEstimateResponse.from_estimate(
+        await query_tuner.estimate_tuning_cost(session, profile_id)
+    )
 
 
 @router.post(

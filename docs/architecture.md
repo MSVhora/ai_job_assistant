@@ -41,7 +41,10 @@ Non-negotiable layering rules (enforced by the
 - `routers/` — HTTP only: parse, call a service, return a response model
 - `services/` — business logic; raise domain errors
 - `models/` — SQLAlchemy 2.0 ORM; the schema source of truth
-- `adapters/llm.py` — the **only** place that talks to an LLM provider; it also owns
+- `adapters/llm.py` — the **only** place that talks to an LLM provider; it prices calls
+  (`estimate_cost`: LiteLLM's price map, optional `LLM_PRICE_*` overrides, `unknown` when
+  neither knows the model), logs `cost_usd` on every call and backs the confirm-gated
+  cost estimates; it also owns
   resilience: the shared retry policy (`adapters/retry.py`, configurable via
   `LLM_RETRY_*`, default 3 attempts) applies exponential backoff with jitter on
   429/5xx/transport errors across LLM and job-source calls, honouring a provider's
@@ -271,6 +274,13 @@ never a run failure. With no salary floor set the connector also sends
 Source of truth: `backend/app/models/` + Alembic migrations. See
 [plan §4](plans/v1/v1-implementation-plan.md#4-data-model) for the data model narrative.
 
+`updated_at` on `candidate`, `profile`, `job_search`, `match` and `match_rebuild` is maintained by a
+`set_updated_at()` database trigger (migration `0021`), so bulk `UPDATE`s bump it too; an update that
+changes nothing leaves it alone, and one that sets it explicitly keeps that value. New tables with the
+column add the trigger through `app/core/migration_helpers.py`. `job_posting.canonical_id` is
+`ON DELETE SET NULL` (migration `0022`). `backend/scripts/audit_schema.py` is the read-only audit
+(unindexed FKs, missing `ON DELETE`, nullable timestamps, unconventional names) that a test keeps empty.
+
 <!-- diagram: database-schema-er -->
 ```mermaid
 erDiagram
@@ -442,3 +452,16 @@ to the embedding model) live in
 - Resume text is stored locally (Postgres + uploads volume) and sent only to your LLM provider
 - Scraping-based sources run under your own Apify account after an explicit disclosure
   acknowledgment
+- CORS allows only `CORS_ORIGINS`, the methods `GET/POST/PATCH/DELETE/OPTIONS` and the request
+  headers `Content-Type`/`Accept`; `X-Total-Count` is exposed so the UI can read list totals
+- Every outbound call has an explicit timeout: job-source clients 30 s, LLM and embedding
+  calls `LLM_TIMEOUT_S` (default 60 s); a timeout is retried by the shared policy and reported
+  as "request timed out"
+- List endpoints are bounded (`limit` default 100, max 200, plus `offset`, total in
+  `X-Total-Count`): profiles, resumes, matches; recent runs default to 20; a run's postings
+  default to 250 (max 1000) so a full run is returned
+- Error contract: every error body is `{"detail": "<message>"}`, with extra machine keys only
+  where documented (`active_search_id` on the duplicate-run 409); a test enumerates every
+  `DomainError` subclass against it
+- Logs never contain resume text, prompts, job descriptions or key-shaped strings (a regression
+  test runs upload → extract → profile → search under log capture)

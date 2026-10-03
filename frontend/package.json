@@ -7,6 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "generate:api": "openapi-typescript http://127.0.0.1:8000/openapi.json -o lib/api/schema.d.ts"
   },
@@ -30,12 +33,19 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitest/eslint-plugin": "^1.6.27",
     "eslint": "^9",
     "eslint-config-next": "16.3.3",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-testing-library": "^7.16.2",
     "jsdom": "^27.0.1",
     "openapi-typescript": "^7.13.0",
+    "prettier": "^3.9.9",
+    "prettier-plugin-tailwindcss": "^0.8.1",
     "tailwindcss": "^4",
     "typescript": "^5",
+    "typescript-eslint": "^8.71.0",
     "vitest": "^3.2.7"
   }
 }

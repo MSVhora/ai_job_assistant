@@ -1,7 +1,12 @@
 function SparkleBadge() {
   return (
     <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-500 shadow-md shadow-violet-300">
-      <svg viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5 text-white" aria-hidden="true">
+      <svg
+        viewBox="0 0 20 20"
+        fill="currentColor"
+        className="h-3.5 w-3.5 text-white"
+        aria-hidden="true"
+      >
         <path d="M10 1.5l1.8 4.7 4.7 1.8-4.7 1.8L10 14.5 8.2 9.8 3.5 8l4.7-1.8L10 1.5z" />
       </svg>
     </span>
@@ -10,9 +15,7 @@ function SparkleBadge() {
 
 function Line({ width, highlight }: { width: string; highlight?: boolean }) {
   return (
-    <div
-      className={`h-2 rounded-full ${highlight ? "bg-violet-200" : "bg-gray-100"} ${width}`}
-    />
+    <div className={`h-2 rounded-full ${highlight ? "bg-violet-200" : "bg-gray-100"} ${width}`} />
   );
 }
 
@@ -35,8 +38,8 @@ export function ResumeBuilderMock() {
           <Line width="w-3/5" />
         </div>
       </div>
-      <div className="absolute -bottom-1 left-1/2 flex w-[90%] -translate-x-1/2 items-center gap-2 rounded-full border-2 border-violet-500 bg-white py-2 pl-4 pr-2 shadow-xl shadow-violet-200">
-        <span className="feature-type overflow-hidden whitespace-nowrap text-xs font-medium text-gray-700">
+      <div className="absolute -bottom-1 left-1/2 flex w-[90%] -translate-x-1/2 items-center gap-2 rounded-full border-2 border-violet-500 bg-white py-2 pr-2 pl-4 shadow-xl shadow-violet-200">
+        <span className="feature-type overflow-hidden text-xs font-medium whitespace-nowrap text-gray-700">
           Make it less wordy
         </span>
         <span className="feature-caret h-3.5 w-px bg-violet-600" />
@@ -53,7 +56,10 @@ export function AtsScoreMock() {
   const c = 2 * Math.PI * r;
   const offset = c * 0.08;
   return (
-    <div aria-hidden="true" className="mx-auto mt-10 flex w-full max-w-xs flex-col items-center gap-4 pb-2">
+    <div
+      aria-hidden="true"
+      className="mx-auto mt-10 flex w-full max-w-xs flex-col items-center gap-4 pb-2"
+    >
       <div className="relative">
         <svg viewBox="0 0 88 88" className="h-28 w-28 -rotate-90">
           <circle cx="44" cy="44" r={r} fill="none" strokeWidth="9" className="stroke-violet-100" />
@@ -71,7 +77,7 @@ export function AtsScoreMock() {
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
           <span className="text-2xl font-bold text-gray-900">92</span>
-          <span className="text-[9px] font-semibold uppercase tracking-wider text-violet-600">
+          <span className="text-[9px] font-semibold tracking-wider text-violet-600 uppercase">
             ATS Score
           </span>
         </div>
@@ -128,7 +134,7 @@ export function ProfileMock() {
         {rows.map((row, i) => (
           <li
             key={row.field}
-            className={`feature-row flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 ${`feature-d${i + 1}`}`}
+            className={`feature-row flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 feature-d${i + 1}`}
           >
             <span className="text-xs font-medium text-gray-500">{row.field}</span>
             <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-900">

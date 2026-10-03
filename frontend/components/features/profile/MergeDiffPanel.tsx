@@ -6,56 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { StructuredProfile } from "@/lib/api";
 
-import { AiExtractedBadge, SectionCard } from "./fields";
+import { AiExtractedBadge } from "./fields";
+import { SectionCard } from "./cards";
+import { FIELD_KEYS, FIELD_LABELS, summarize, valuesEqual, type FieldKey } from "./merge-diff";
 import { SaveStatus } from "./SaveStatus";
-
-const FIELD_KEYS = [
-  "contact",
-  "headline",
-  "summary",
-  "skills",
-  "experience",
-  "projects",
-  "education",
-  "certifications",
-  "awards",
-  "extra_sections",
-  "preferences",
-] as const;
-
-type FieldKey = (typeof FIELD_KEYS)[number];
-
-const FIELD_LABELS: Record<FieldKey, string> = {
-  contact: "Contact",
-  headline: "Headline",
-  summary: "Summary",
-  skills: "Skills",
-  experience: "Experience",
-  projects: "Projects",
-  education: "Education",
-  certifications: "Certifications",
-  awards: "Awards",
-  extra_sections: "Extra sections",
-  preferences: "Preferences",
-};
-
-function summarize(value: unknown): string {
-  if (value === null || value === undefined || value === "") return "Not set";
-  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-    return String(value);
-  }
-  if (Array.isArray(value)) {
-    return value.length === 0 ? "Not set" : `${value.length} entr${value.length === 1 ? "y" : "ies"}`;
-  }
-  const filled = Object.values(value).filter(
-    (entry) => entry !== null && entry !== undefined && entry !== "",
-  );
-  return filled.length === 0 ? "Not set" : `${filled.length} field(s) set`;
-}
-
-function valuesEqual(a: unknown, b: unknown): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
-}
 
 export function MergeDiffPanel({
   current,
@@ -127,7 +81,9 @@ export function MergeDiffPanel({
             <Button
               variant="secondary"
               className="rounded-full px-4 py-1.5 text-xs"
-              onClick={() => setTakenDraft(new Set(differing))}
+              onClick={() => {
+                setTakenDraft(new Set(differing));
+              }}
               disabled={isSaving}
             >
               Use all draft values
@@ -135,7 +91,9 @@ export function MergeDiffPanel({
             <Button
               variant="secondary"
               className="rounded-full px-4 py-1.5 text-xs"
-              onClick={() => setTakenDraft(new Set())}
+              onClick={() => {
+                setTakenDraft(new Set());
+              }}
               disabled={isSaving}
             >
               Keep all current values
@@ -150,15 +108,19 @@ export function MergeDiffPanel({
                 aria-label={FIELD_LABELS[key]}
               >
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-sm font-semibold text-gray-900">
-                    {FIELD_LABELS[key]}
-                  </span>
-                  <div className="flex gap-1" role="group" aria-label={`Choose value for ${FIELD_LABELS[key]}`}>
+                  <span className="text-sm font-semibold text-gray-900">{FIELD_LABELS[key]}</span>
+                  <div
+                    className="flex gap-1"
+                    role="group"
+                    aria-label={`Choose value for ${FIELD_LABELS[key]}`}
+                  >
                     <Button
                       variant={takenDraft.has(key) ? "secondary" : "primary"}
                       className="rounded-full px-3 py-1 text-xs"
                       aria-pressed={!takenDraft.has(key)}
-                      onClick={() => toggle(key)}
+                      onClick={() => {
+                        toggle(key);
+                      }}
                       disabled={isSaving}
                     >
                       Keep current
@@ -167,7 +129,9 @@ export function MergeDiffPanel({
                       variant={takenDraft.has(key) ? "primary" : "secondary"}
                       className="rounded-full px-3 py-1 text-xs"
                       aria-pressed={takenDraft.has(key)}
-                      onClick={() => toggle(key)}
+                      onClick={() => {
+                        toggle(key);
+                      }}
                       disabled={isSaving}
                     >
                       Use draft
@@ -190,7 +154,11 @@ export function MergeDiffPanel({
         </>
       )}
       <div className="mt-6 flex items-center justify-between gap-3 border-t border-gray-100 pt-4">
-        <SaveStatus isSaving={isSaving} error={saveError} savedRevisionSource={savedRevisionSource} />
+        <SaveStatus
+          isSaving={isSaving}
+          error={saveError}
+          savedRevisionSource={savedRevisionSource}
+        />
         <Button
           onClick={saveMerged}
           disabled={isSaving || differing.length === 0}

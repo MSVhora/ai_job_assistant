@@ -1,0 +1,47 @@
+exclude: \.svg$
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-added-large-files
+        args: ["--maxkb=500"]
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: bash -c 'cd backend && .venv/bin/ruff check --fix .'
+        language: system
+        files: ^backend/.*\.py$|^backend/pyproject\.toml$
+        pass_filenames: false
+      - id: ruff-format
+        name: ruff format
+        entry: bash -c 'cd backend && .venv/bin/ruff format .'
+        language: system
+        files: ^backend/.*\.py$|^backend/pyproject\.toml$
+        pass_filenames: false
+      - id: pyright
+        name: pyright
+        entry: bash -c 'cd backend && .venv/bin/pyright'
+        language: system
+        files: ^backend/(app/.*\.py|pyproject\.toml)$
+        pass_filenames: false
+      - id: prettier
+        name: prettier
+        entry: bash -c 'cd frontend && npx prettier --write .'
+        language: system
+        files: ^frontend/
+        pass_filenames: false
+      - id: eslint
+        name: eslint
+        entry: bash -c 'cd frontend && npx eslint'
+        language: system
+        files: ^frontend/.*\.(ts|tsx|mjs)$
+        pass_filenames: false

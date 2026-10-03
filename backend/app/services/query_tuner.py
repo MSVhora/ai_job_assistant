@@ -15,12 +15,21 @@ regen endpoint. Never automatic: tuning only runs because the user asked.
 import logging
 import re
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from sqlalchemy import and_, case, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.adapters.llm import LLMError, is_llm_configured, parse_structured
+from app.adapters.job_sources.base import SourceFilterDecl
+from app.adapters.llm import (
+    CostEstimate,
+    LLMError,
+    estimate_structured_cost,
+    format_cost,
+    is_llm_configured,
+    parse_structured,
+)
 from app.core.config import get_settings
 from app.core.errors import (
     LLMQueryGenerationError,
@@ -32,14 +41,16 @@ from app.models import JobPosting, Match, Profile
 from app.schemas.job_search import SearchQueriesResponse, StoredSearchQueries
 from app.schemas.profile import StructuredProfile
 from app.services import sources as sources_service
+from app.services.embedding import profile_digest_parts
 from app.services.matching import signal_skills
 from app.services.query_builder import (
     PROMPT_VERSION,
-    _GeneratedQueries,
-    _options_block,
-    _strip_undeclared_options,
+    GeneratedQueries,
     compute_queries_input_hash,
+    expected_completion_tokens,
+    options_block,
     parse_stored,
+    strip_undeclared_options,
 )
 
 logger = logging.getLogger(__name__)
@@ -157,17 +168,27 @@ def _bucket_block(buckets: dict[str, dict[str, dict[str, int]]]) -> str:
     return "\n".join(lines)
 
 
-async def tune_for_profile(session: AsyncSession, profile_id: uuid.UUID) -> SearchQueriesResponse:
-    """Rewrite the profile's stored query specs from engagement signals."""
+@dataclass(frozen=True)
+class _TunePlan:
+    profile: Profile
+    structured: StructuredProfile
+    names: list[str]
+    declaration_map: dict[str, list[SourceFilterDecl]]
+    engaged: int
+    prompt: str
+
+
+async def _prepare_tuning(session: AsyncSession, profile_id: uuid.UUID) -> _TunePlan:
     profile = await session.get(Profile, profile_id)
     if profile is None:
-        raise ProfileNotFoundError()
+        raise ProfileNotFoundError
     if not is_llm_configured():
-        raise LLMQueryGenerationError("LLM provider is not configured")
+        msg = "LLM provider is not configured"
+        raise LLMQueryGenerationError(msg)
 
     enabled = await sources_service.enabled_sources(session)
     if not enabled:
-        raise NoJobSourcesConfiguredError()
+        raise NoJobSourcesConfiguredError
     names = sorted(source.name for source in enabled)
     declaration_map = {source.name: source.filters() for source in enabled}
 
@@ -181,13 +202,11 @@ async def tune_for_profile(session: AsyncSession, profile_id: uuid.UUID) -> Sear
         )
     )
     if not engaged:
-        raise NoTunableSignalsError()
+        raise NoTunableSignalsError
 
     buckets = await aggregate_signal_buckets(session, profile_id, signal_skills(structured))
 
     stored = parse_stored(profile.search_queries)
-    from app.services.embedding import profile_digest_parts
-
     digest = "\n".join(profile_digest_parts(structured))
     previous_block = ""
     if stored:
@@ -195,20 +214,45 @@ async def tune_for_profile(session: AsyncSession, profile_id: uuid.UUID) -> Sear
             f"- {name}: {spec.model_dump_json()}" for name, spec in stored.queries.items()
         )
     prompt_parts = [f"Candidate context:\n{digest}"]
-    if options_block := _options_block(declaration_map):
-        prompt_parts.append(options_block)
+    if options_text := options_block(declaration_map):
+        prompt_parts.append(options_text)
     prompt_parts.append(_bucket_block(buckets))
     if previous_block:
         prompt_parts.append(previous_block.strip("\n"))
     prompt_parts.append(
         f"Sources needing a tuned query spec: {', '.join(names)}\n\nWrite the query spec JSON."
     )
-    prompt = "\n\n".join(prompt_parts)
+    return _TunePlan(
+        profile=profile,
+        structured=structured,
+        names=names,
+        declaration_map=declaration_map,
+        engaged=engaged,
+        prompt="\n\n".join(prompt_parts),
+    )
+
+
+async def estimate_tuning_cost(session: AsyncSession, profile_id: uuid.UUID) -> CostEstimate:
+    """Cost of `tune_for_profile` without calling the model; same checks, same prompt."""
+    plan = await _prepare_tuning(session, profile_id)
+    return estimate_structured_cost(
+        plan.prompt,
+        schema=GeneratedQueries,
+        system=_TUNE_SYSTEM,
+        expected_completion_tokens=expected_completion_tokens(len(plan.names)),
+    )
+
+
+async def tune_for_profile(session: AsyncSession, profile_id: uuid.UUID) -> SearchQueriesResponse:
+    """Rewrite the profile's stored query specs from engagement signals."""
+    plan = await _prepare_tuning(session, profile_id)
+    profile, structured, names = plan.profile, plan.structured, plan.names
+    declaration_map, engaged, prompt = plan.declaration_map, plan.engaged, plan.prompt
 
     try:
         result = await parse_structured(
             prompt,
-            schema=_GeneratedQueries,
+            schema=GeneratedQueries,
             system=_TUNE_SYSTEM,
             temperature=TUNE_TEMPERATURE,
         )
@@ -218,10 +262,11 @@ async def tune_for_profile(session: AsyncSession, profile_id: uuid.UUID) -> Sear
 
     missing = [name for name in names if name not in result.data.queries]
     if missing:
-        raise LLMQueryGenerationError(f"query tuning missing sources: {', '.join(missing)}")
+        msg = f"query tuning missing sources: {', '.join(missing)}"
+        raise LLMQueryGenerationError(msg)
 
     tuned = StoredSearchQueries(
-        queries=_strip_undeclared_options(
+        queries=strip_undeclared_options(
             {name: result.data.queries[name] for name in names}, declaration_map
         ),
         generated_at=datetime.now(UTC),
@@ -233,12 +278,14 @@ async def tune_for_profile(session: AsyncSession, profile_id: uuid.UUID) -> Sear
     await session.flush()
 
     logger.info(
-        "queries.tuned profile_id=%s engaged=%s sources=%s prompt_tokens=%s completion_tokens=%s",
+        "queries.tuned profile_id=%s engaged=%s sources=%s prompt_tokens=%s completion_tokens=%s "
+        "cost_usd=%s",
         profile_id,
         engaged,
         names,
         result.prompt_tokens,
         result.completion_tokens,
+        format_cost(result.cost_usd),
     )
     return SearchQueriesResponse(
         queries=tuned.queries,

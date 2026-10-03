@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { getMatchRebuildStatus, startMatchRebuild } from "@/lib/api";
 
@@ -14,8 +14,7 @@ export function isRebuildActive(status: string | undefined): boolean {
 export function useMatchRebuildStatus(profileId: string | null) {
   return useQuery({
     queryKey: ["match-rebuild", profileId],
-    queryFn: () => getMatchRebuildStatus(profileId as string),
-    enabled: profileId !== null,
+    queryFn: profileId !== null ? () => getMatchRebuildStatus(profileId) : skipToken,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
       return status !== undefined && ACTIVE_STATUSES.has(status) ? POLL_INTERVAL_MS : false;

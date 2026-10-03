@@ -29,7 +29,9 @@ export function PrioritySlider({
         value={percent}
         disabled={disabled}
         aria-valuetext={valueText}
-        onChange={(event) => onChange(Number(event.target.value) / 100)}
+        onChange={(event) => {
+          onChange(Number(event.target.value) / 100);
+        }}
         className="w-full max-w-md accent-violet-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 disabled:opacity-50"
       />
       <p aria-live="polite" className="text-xs text-gray-500">

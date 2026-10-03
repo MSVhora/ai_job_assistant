@@ -2,10 +2,11 @@ import logging
 import time
 import uuid
 from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING, cast
 
 from fastapi import BackgroundTasks
 from pydantic import ValidationError
-from sqlalchemy import func, select, update
+from sqlalchemy import Select, func, select, update
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.exc import IntegrityError
@@ -33,6 +34,7 @@ from app.core.errors import (
     ProfileNotFoundError,
     UnknownJobSourceError,
 )
+from app.core.pagination import SEARCH_POSTINGS_PAGE, SEARCHES_PAGE, Pagination
 from app.models import JobPosting, JobSearch, JobSearchStatus, Profile, SearchPosting
 from app.schemas.job_search import (
     JobPostingDetail,
@@ -48,6 +50,9 @@ from app.schemas.profile import StructuredProfile
 from app.services import embedding, matching, posting_dedupe, query_rendering
 from app.services import sources as sources_service
 
+if TYPE_CHECKING:
+    from sqlalchemy.engine import CursorResult
+
 logger = logging.getLogger(__name__)
 
 
@@ -56,7 +61,7 @@ def resolve_profile_defaults(payload: JobSearchRequest, profile: Profile) -> Job
     structured = StructuredProfile.model_validate(profile.structured_profile)
     preferences = structured.preferences
     if payload.country is None and structured.contact.country is None:
-        raise MissingSearchCountryError()
+        raise MissingSearchCountryError
     update: dict[str, object] = {"country": payload.country or structured.contact.country}
     if payload.location is None and preferences is not None:
         update["location"] = preferences.target_location
@@ -80,29 +85,32 @@ def _validate_queries(payload: JobSearchRequest, source: JobSource) -> None:
             return
     if payload.query:
         return
-    raise MissingSearchQueryError(f"no search query for source: {source.name}")
+    msg = f"no search query for source: {source.name}"
+    raise MissingSearchQueryError(msg)
 
 
 async def _selected_source(session: AsyncSession, payload: JobSearchRequest) -> JobSource:
     source = registry.get_source(payload.source)
     if source is None:
-        raise UnknownJobSourceError(f"unknown job source: {payload.source}")
+        msg = f"unknown job source: {payload.source}"
+        raise UnknownJobSourceError(msg)
     enabled = {
         enabled_source.name: enabled_source
         for enabled_source in await sources_service.enabled_sources(session)
     }
     selected = enabled.get(payload.source)
     if selected is None:
-        raise JobSourceNotEnabledError(f"job source is not enabled: {payload.source}")
+        msg = f"job source is not enabled: {payload.source}"
+        raise JobSourceNotEnabledError(msg)
     return selected
 
 
 async def _require_profile(session: AsyncSession, profile_id: uuid.UUID | None) -> Profile:
     if profile_id is None:
-        raise MissingProfileIdError()
+        raise MissingProfileIdError
     profile = await session.get(Profile, profile_id)
     if profile is None:
-        raise ProfileNotFoundError()
+        raise ProfileNotFoundError
     return profile
 
 
@@ -133,10 +141,13 @@ async def _sweep_stale_runs(session: AsyncSession) -> int:
             _ABANDONED_WARNING,
         )
     ).cast(JSONB)
-    result = await session.execute(
-        update(JobSearch)
-        .where(JobSearch.status.in_(ACTIVE_STATUSES), JobSearch.updated_at < cutoff)
-        .values(status=JobSearchStatus.failed, results=stored_result, updated_at=func.now())
+    result = cast(
+        "CursorResult[tuple[()]]",
+        await session.execute(
+            update(JobSearch)
+            .where(JobSearch.status.in_(ACTIVE_STATUSES), JobSearch.updated_at < cutoff)
+            .values(status=JobSearchStatus.failed, results=stored_result, updated_at=func.now())
+        ),
     )
     swept = result.rowcount
     if swept:
@@ -148,7 +159,7 @@ async def _sweep_stale_runs(session: AsyncSession) -> int:
     return swept
 
 
-def _select_active_run(profile_id: uuid.UUID, source_name: str):
+def _select_active_run(profile_id: uuid.UUID, source_name: str) -> Select[tuple[JobSearch]]:
     return (
         select(JobSearch)
         .where(
@@ -348,53 +359,49 @@ async def _upsert_posting(
     embedding_vector: list[float] | None,
     country: str | None,
 ) -> uuid.UUID:
-    stmt = (
-        pg_insert(JobPosting)
-        .values(
-            source=source_name,
-            external_id=data.external_id,
-            title=data.title,
-            company=data.company,
-            url=data.url,
-            location=data.location,
-            country=country,
-            job_type=data.job_type,
-            remote_type=data.remote_type,
-            description=data.description,
-            embedding=embedding_vector,
-            posted_at=data.posted_at,
-            expires_at=data.expires_at,
-            is_closed=data.is_closed,
-            salary_min=data.salary_min,
-            salary_max=data.salary_max,
-            currency=data.currency.upper() if data.currency else None,
-            raw_payload=data.raw_payload,
-            fetched_at=datetime.now(UTC),
-        )
-        .returning(JobPosting.id)
+    insert_stmt = pg_insert(JobPosting).values(
+        source=source_name,
+        external_id=data.external_id,
+        title=data.title,
+        company=data.company,
+        url=data.url,
+        location=data.location,
+        country=country,
+        job_type=data.job_type,
+        remote_type=data.remote_type,
+        description=data.description,
+        embedding=embedding_vector,
+        posted_at=data.posted_at,
+        expires_at=data.expires_at,
+        is_closed=data.is_closed,
+        salary_min=data.salary_min,
+        salary_max=data.salary_max,
+        currency=data.currency.upper() if data.currency else None,
+        raw_payload=data.raw_payload,
+        fetched_at=datetime.now(UTC),
     )
-    stmt = stmt.on_conflict_do_update(
+    stmt = insert_stmt.on_conflict_do_update(
         constraint="uq_job_posting_source_external_id",
         set_={
-            "title": stmt.excluded.title,
-            "company": stmt.excluded.company,
-            "url": stmt.excluded.url,
-            "location": stmt.excluded.location,
-            "country": stmt.excluded.country,
-            "job_type": stmt.excluded.job_type,
-            "remote_type": stmt.excluded.remote_type,
-            "description": stmt.excluded.description,
-            "embedding": stmt.excluded.embedding,
-            "posted_at": stmt.excluded.posted_at,
-            "expires_at": stmt.excluded.expires_at,
-            "is_closed": stmt.excluded.is_closed,
-            "salary_min": stmt.excluded.salary_min,
-            "salary_max": stmt.excluded.salary_max,
-            "currency": stmt.excluded.currency,
-            "raw_payload": stmt.excluded.raw_payload,
-            "fetched_at": stmt.excluded.fetched_at,
+            "title": insert_stmt.excluded.title,
+            "company": insert_stmt.excluded.company,
+            "url": insert_stmt.excluded.url,
+            "location": insert_stmt.excluded.location,
+            "country": insert_stmt.excluded.country,
+            "job_type": insert_stmt.excluded.job_type,
+            "remote_type": insert_stmt.excluded.remote_type,
+            "description": insert_stmt.excluded.description,
+            "embedding": insert_stmt.excluded.embedding,
+            "posted_at": insert_stmt.excluded.posted_at,
+            "expires_at": insert_stmt.excluded.expires_at,
+            "is_closed": insert_stmt.excluded.is_closed,
+            "salary_min": insert_stmt.excluded.salary_min,
+            "salary_max": insert_stmt.excluded.salary_max,
+            "currency": insert_stmt.excluded.currency,
+            "raw_payload": insert_stmt.excluded.raw_payload,
+            "fetched_at": insert_stmt.excluded.fetched_at,
         },
-    )
+    ).returning(JobPosting.id)
     posting_id = (await session.execute(stmt)).scalar_one()
     await session.execute(
         pg_insert(SearchPosting)
@@ -409,7 +416,7 @@ async def _require_owned_search(
 ) -> JobSearch:
     run = await session.get(JobSearch, search_id)
     if run is None or run.profile_id != profile_id:
-        raise JobSearchNotFoundError()
+        raise JobSearchNotFoundError
     return run
 
 
@@ -430,16 +437,28 @@ async def get_search_status(
     )
 
 
+async def count_profile_searches(session: AsyncSession, profile_id: uuid.UUID) -> int:
+    await _require_profile(session, profile_id)
+    return (
+        await session.execute(
+            select(func.count()).select_from(JobSearch).where(JobSearch.profile_id == profile_id)
+        )
+    ).scalar_one()
+
+
 async def list_profile_searches(
-    session: AsyncSession, profile_id: uuid.UUID
+    session: AsyncSession,
+    profile_id: uuid.UUID,
+    page: Pagination = SEARCHES_PAGE,
 ) -> list[JobSearchSummary]:
     """Recent runs for a profile (fresh first) — drives run banners after a reload."""
     await _require_profile(session, profile_id)
     result = await session.execute(
         select(JobSearch)
         .where(JobSearch.profile_id == profile_id)
-        .order_by(JobSearch.created_at.desc())
-        .limit(20)
+        .order_by(JobSearch.created_at.desc(), JobSearch.id)
+        .limit(page.limit)
+        .offset(page.offset)
     )
     runs = result.scalars().all()
     return [
@@ -455,15 +474,34 @@ async def list_profile_searches(
     ]
 
 
-async def get_search_postings(
+async def count_search_postings(
     session: AsyncSession, search_id: uuid.UUID, profile_id: uuid.UUID
+) -> int:
+    await _require_owned_search(session, search_id, profile_id)
+    return (
+        await session.execute(
+            select(func.count())
+            .select_from(JobPosting)
+            .join(SearchPosting, SearchPosting.posting_id == JobPosting.id)
+            .where(SearchPosting.search_id == search_id, matching.freshness_condition())
+        )
+    ).scalar_one()
+
+
+async def get_search_postings(
+    session: AsyncSession,
+    search_id: uuid.UUID,
+    profile_id: uuid.UUID,
+    page: Pagination = SEARCH_POSTINGS_PAGE,
 ) -> list[JobPostingSummary]:
     await _require_owned_search(session, search_id, profile_id)
     result = await session.execute(
         select(JobPosting)
         .join(SearchPosting, SearchPosting.posting_id == JobPosting.id)
         .where(SearchPosting.search_id == search_id, matching.freshness_condition())
-        .order_by(JobPosting.posted_at.desc().nulls_last(), JobPosting.title)
+        .order_by(JobPosting.posted_at.desc().nulls_last(), JobPosting.title, JobPosting.id)
+        .limit(page.limit)
+        .offset(page.offset)
     )
     return [JobPostingSummary.from_posting(posting) for posting in result.scalars().all()]
 
@@ -471,5 +509,5 @@ async def get_search_postings(
 async def get_posting_detail(session: AsyncSession, posting_id: uuid.UUID) -> JobPostingDetail:
     posting = await session.get(JobPosting, posting_id)
     if posting is None:
-        raise JobPostingNotFoundError()
+        raise JobPostingNotFoundError
     return JobPostingDetail.from_posting(posting)

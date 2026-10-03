@@ -55,9 +55,10 @@ A first successful match takes about five minutes (details in the [user guide](d
 | Where | Command |
 |---|---|
 | `backend/` | `uvicorn app.main:app --reload` |
-| `backend/` | `ruff check . && ruff format .` / `pytest` |
+| `backend/` | `ruff check . && ruff format . && pyright` / `pytest --cov=app` |
+| repo root | `pre-commit install` once; `pre-commit run --all-files` to check everything |
 | `frontend/` | `npm run dev` |
-| `frontend/` | `npm run lint` / `npm run build` / `npm test` (vitest) |
+| `frontend/` | `npm run lint` / `npm run format` (`format:check`) / `npm run typecheck` / `npm test` (vitest) / `npm run build` |
 | `frontend/` | `npm run generate:api` (regenerate API types from backend OpenAPI; backend must be running) |
 | repo root | `docker compose up -d` |
 
@@ -68,6 +69,9 @@ session start and downgrades to `base` at the end — never point it at your dev
 docker compose exec db psql -U postgres -c "create database ai_job_assistant_test"
 cd backend && TEST_DATABASE_URL="postgresql+asyncpg://postgres:postgres@localhost:5432/ai_job_assistant_test" pytest
 ```
+
+Tests mirror `app/` (`tests/services/`, `tests/routers/`, …), so run one layer or file by path:
+`pytest tests/services` or `pytest tests/routers/test_job_endpoints.py`.
 
 To explore the UI without any keys or live searches, seed a synthetic demo dataset
 (profile "Jane Doe (demo)" + deterministic postings and matches, zero LLM calls):

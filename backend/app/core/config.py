@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     # Outbound retry policy shared by LLM calls and job-source HTTP calls.
     llm_retry_attempts: int = 3
     llm_retry_base_delay_s: float = 1.0
+    llm_timeout_s: Annotated[float, Field(gt=0, le=600)] = 60.0
+    # Optional USD-per-million-token overrides for models LiteLLM's price map lacks or has stale.
+    llm_price_in_per_mtok: Annotated[float | None, Field(ge=0)] = None
+    llm_price_out_per_mtok: Annotated[float | None, Field(ge=0)] = None
+    embedding_price_per_mtok: Annotated[float | None, Field(ge=0)] = None
 
     adzuna_app_id: str | None = None
     adzuna_app_key: str | None = None
@@ -107,10 +112,11 @@ class Settings(BaseSettings):
             return value
         total = sum(weights[name] for name in _MATCH_WEIGHTS)
         if not math.isclose(total, 1.0, rel_tol=0.0, abs_tol=0.01):
-            raise ValueError(
+            msg = (
                 f"match weights must sum to 1.0 (±0.01), got {total:.4f} from "
                 f"{ {name: weights[name] for name in _MATCH_WEIGHTS} }"
             )
+            raise ValueError(msg)
         return value
 
 

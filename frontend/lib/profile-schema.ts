@@ -157,66 +157,64 @@ export function toFormValues(profile: StructuredProfile): ProfileFormValues {
       phone: profile.contact.phone ?? "",
       location: profile.contact.location ?? "",
       country: profile.contact.country ?? "",
-      links: (profile.contact.links ?? []).map((link) => ({
+      links: profile.contact.links.map((link) => ({
         label: link.label ?? "",
         url: link.url,
       })),
     },
     headline: profile.headline ?? "",
     summary: profile.summary ?? "",
-    skills: profile.skills ?? [],
-    experience: (profile.experience ?? []).map((item) => ({
+    skills: profile.skills,
+    experience: profile.experience.map((item) => ({
       company: item.company ?? "",
       title: item.title ?? "",
       location: item.location ?? "",
       start_date: item.start_date ?? "",
       end_date: item.end_date ?? "",
-      is_current: item.is_current ?? false,
-      bullets: item.bullets ?? [],
+      is_current: item.is_current,
+      bullets: item.bullets,
     })),
-    projects: (profile.projects ?? []).map((item) => ({
+    projects: profile.projects.map((item) => ({
       name: item.name,
       role: item.role ?? "",
       url: item.url ?? "",
       start_date: item.start_date ?? "",
       end_date: item.end_date ?? "",
       description: item.description ?? "",
-      bullets: item.bullets ?? [],
-      technologies: item.technologies ?? [],
+      bullets: item.bullets,
+      technologies: item.technologies,
     })),
-    education: (profile.education ?? []).map((item) => ({
+    education: profile.education.map((item) => ({
       institution: item.institution ?? "",
       degree: item.degree ?? "",
       field: item.field ?? "",
       start_date: item.start_date ?? "",
       end_date: item.end_date ?? "",
     })),
-    certifications: (profile.certifications ?? []).map((item) => ({
+    certifications: profile.certifications.map((item) => ({
       name: item.name,
       issuer: item.issuer ?? "",
       issued_date: item.issued_date ?? "",
     })),
-    awards: (profile.awards ?? []).map((item) => ({
+    awards: profile.awards.map((item) => ({
       title: item.title,
       issuer: item.issuer ?? "",
       issued_date: item.issued_date ?? "",
     })),
-    extra_sections: (profile.extra_sections ?? []).map((section) => ({
+    extra_sections: profile.extra_sections.map((section) => ({
       title: section.title,
-      entries: section.entries ?? [],
+      entries: section.entries,
     })),
     years_of_experience: profile.years_of_experience?.toString() ?? "",
     preferences: profile.preferences
       ? {
           target_title: profile.preferences.target_title ?? "",
           target_location: profile.preferences.target_location ?? "",
-          remote_preference: (profile.preferences.remote_preference ??
-            "") as (typeof remotePreference)["options"][number],
+          remote_preference: profile.preferences.remote_preference ?? "",
           salary_min: profile.preferences.salary_min?.toString() ?? "",
           salary_max: profile.preferences.salary_max?.toString() ?? "",
           currency: profile.preferences.currency ?? "",
-          seniority: (profile.preferences.seniority ??
-            "") as (typeof seniority)["options"][number],
+          seniority: profile.preferences.seniority ?? "",
           seniority_source: profile.preferences.seniority_source ?? "",
           work_authorization: profile.preferences.work_authorization ?? "",
         }

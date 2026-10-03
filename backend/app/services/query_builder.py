@@ -2,13 +2,20 @@ import hashlib
 import json
 import logging
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from pydantic import BaseModel, ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.adapters.job_sources.base import SourceFilterDecl
-from app.adapters.llm import LLMError, is_llm_configured, parse_structured
+from app.adapters.llm import (
+    CostEstimate,
+    LLMError,
+    estimate_structured_cost,
+    is_llm_configured,
+    parse_structured,
+)
 from app.core.config import get_settings
 from app.core.errors import (
     LLMQueryGenerationError,
@@ -24,12 +31,15 @@ from app.schemas.job_search import (
 )
 from app.schemas.profile import StructuredProfile
 from app.services import sources as sources_service
+from app.services.embedding import profile_digest_parts
 
 logger = logging.getLogger(__name__)
 
 PROMPT_VERSION = "search_query_v4"
 DEFAULT_GENERATION_TEMPERATURE = 0.0
 GENERATION_TEMPERATURE = 0.8
+QUERY_COMPLETION_TOKENS_PER_SOURCE = 120
+QUERY_COMPLETION_TOKENS_BASE = 40
 MAX_CONTEXT_CHARS = 2500
 
 QUERY_SYSTEM = (
@@ -55,7 +65,7 @@ _FILTER_TYPE_LABELS = {
 }
 
 
-def _options_block(declarations: dict[str, list[SourceFilterDecl]] | None) -> str:
+def options_block(declarations: dict[str, list[SourceFilterDecl]] | None) -> str:
     if not declarations:
         return ""
     lines: list[str] = []
@@ -71,7 +81,7 @@ def _options_block(declarations: dict[str, list[SourceFilterDecl]] | None) -> st
     return "\n\n" + header + "\n" + "\n".join(lines)
 
 
-class _GeneratedQueries(BaseModel):
+class GeneratedQueries(BaseModel):
     queries: dict[str, SourceQuerySpec]
 
 
@@ -98,7 +108,7 @@ def _preference_lines(profile: StructuredProfile) -> list[str]:
     if preferences.remote_preference:
         lines.append(f"remote preference: {preferences.remote_preference}")
     if preferences.salary_min is not None or preferences.salary_max is not None:
-        band = []
+        band: list[str] = []
         if preferences.salary_min is not None:
             band.append(f"{preferences.salary_min:g}+")
         if preferences.salary_max is not None:
@@ -109,8 +119,6 @@ def _preference_lines(profile: StructuredProfile) -> list[str]:
 
 
 def _candidate_context(profile: StructuredProfile) -> str:
-    from app.services.embedding import profile_digest_parts
-
     lines = profile_digest_parts(profile)
     if profile.contact.country:
         lines.append(f"country: {profile.contact.country}")
@@ -143,7 +151,7 @@ def compute_queries_input_hash(
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-def _strip_undeclared_options(
+def strip_undeclared_options(
     queries: dict[str, SourceQuerySpec], declarations: dict[str, list[SourceFilterDecl]] | None
 ) -> dict[str, SourceQuerySpec]:
     if not declarations:
@@ -152,11 +160,38 @@ def _strip_undeclared_options(
     for name, spec in queries.items():
         allowed = {decl.key for decl in declarations.get(name, [])}
         if allowed or spec.options:
-            spec = spec.model_copy(
+            cleaned[name] = spec.model_copy(
                 update={"options": {k: v for k, v in spec.options.items() if k in allowed}}
             )
-        cleaned[name] = spec
+        else:
+            cleaned[name] = spec
     return cleaned
+
+
+def _generation_prompt(
+    profile: StructuredProfile,
+    sources: list[str],
+    declarations: dict[str, list[SourceFilterDecl]] | None,
+    previous: dict[str, SourceQuerySpec] | None,
+) -> str:
+    context = _candidate_context(profile)
+    context += options_block(declarations)
+    previous_block = ""
+    if previous:
+        previous_block = (
+            "\n\nThe previously generated queries were:\n"
+            + "\n".join(f"- {name}: {spec.model_dump_json()}" for name, spec in previous.items())
+            + "\n\nProduce a fresh, equally strong variant for each source. "
+            "Do not repeat the previous text verbatim."
+        )
+    return (
+        f"{context}\n\nSources needing a query spec: {', '.join(sources)}{previous_block}\n\n"
+        "Write the query spec JSON."
+    )
+
+
+def expected_completion_tokens(source_count: int) -> int:
+    return QUERY_COMPLETION_TOKENS_PER_SOURCE * source_count + QUERY_COMPLETION_TOKENS_BASE
 
 
 async def generate_queries(
@@ -174,33 +209,22 @@ async def generate_queries(
     at 0 for reproducibility.
     """
     if not is_llm_configured():
-        raise LLMQueryGenerationError("LLM provider is not configured")
+        msg = "LLM provider is not configured"
+        raise LLMQueryGenerationError(msg)
     if not sources:
-        raise LLMQueryGenerationError("no sources requested")
+        msg = "no sources requested"
+        raise LLMQueryGenerationError(msg)
 
     effective_temperature = (
         temperature if temperature is not None else (GENERATION_TEMPERATURE if previous else 0.0)
     )
 
-    context = _candidate_context(profile)
-    context += _options_block(declarations)
-    previous_block = ""
-    if previous:
-        previous_block = (
-            "\n\nThe previously generated queries were:\n"
-            + "\n".join(f"- {name}: {spec.model_dump_json()}" for name, spec in previous.items())
-            + "\n\nProduce a fresh, equally strong variant for each source. "
-            "Do not repeat the previous text verbatim."
-        )
-    prompt = (
-        f"{context}\n\nSources needing a query spec: {', '.join(sources)}{previous_block}\n\n"
-        "Write the query spec JSON."
-    )
+    prompt = _generation_prompt(profile, sources, declarations, previous)
 
     try:
         result = await parse_structured(
             prompt,
-            schema=_GeneratedQueries,
+            schema=GeneratedQueries,
             system=QUERY_SYSTEM,
             temperature=effective_temperature,
         )
@@ -210,11 +234,12 @@ async def generate_queries(
 
     missing = [name for name in sources if name not in result.data.queries]
     if missing:
-        raise LLMQueryGenerationError(f"query generation missing sources: {', '.join(missing)}")
+        msg = f"query generation missing sources: {', '.join(missing)}"
+        raise LLMQueryGenerationError(msg)
 
     settings = get_settings()
     return StoredSearchQueries(
-        queries=_strip_undeclared_options(
+        queries=strip_undeclared_options(
             {name: result.data.queries[name] for name in sources}, declarations
         ),
         generated_at=datetime.now(UTC),
@@ -223,25 +248,66 @@ async def generate_queries(
     )
 
 
-async def regenerate_for_profile(
+@dataclass(frozen=True)
+class _RegenerationPlan:
+    profile: Profile
+    structured: StructuredProfile
+    names: list[str]
+    declaration_map: dict[str, list[SourceFilterDecl]]
+    stored: StoredSearchQueries | None
+
+
+async def _prepare_regeneration(
     session: AsyncSession, profile_id: uuid.UUID, sources: list[str] | None
-) -> SearchQueriesResponse:
+) -> _RegenerationPlan:
     profile = await session.get(Profile, profile_id)
     if profile is None:
-        raise ProfileNotFoundError()
+        raise ProfileNotFoundError
     structured = StructuredProfile.model_validate(profile.structured_profile)
 
     enabled = await sources_service.enabled_sources(session)
     if not enabled:
-        raise NoJobSourcesConfiguredError()
+        raise NoJobSourcesConfiguredError
     known = {source.name for source in enabled}
     names = sources if sources is not None else sorted(known)
     for name in names:
         if name not in known:
-            raise UnknownJobSourceError(f"job source is not enabled: {name}")
+            msg = f"job source is not enabled: {name}"
+            raise UnknownJobSourceError(msg)
 
-    stored = parse_stored(profile.search_queries)
-    declaration_map = {source.name: source.filters() for source in enabled}
+    return _RegenerationPlan(
+        profile=profile,
+        structured=structured,
+        names=names,
+        declaration_map={source.name: source.filters() for source in enabled},
+        stored=parse_stored(profile.search_queries),
+    )
+
+
+async def estimate_regeneration_cost(
+    session: AsyncSession, profile_id: uuid.UUID, sources: list[str] | None
+) -> CostEstimate:
+    """Cost of `regenerate_for_profile` without calling the model; same checks, same prompt."""
+    plan = await _prepare_regeneration(session, profile_id, sources)
+    return estimate_structured_cost(
+        _generation_prompt(
+            plan.structured,
+            plan.names,
+            plan.declaration_map,
+            plan.stored.queries if plan.stored else None,
+        ),
+        schema=GeneratedQueries,
+        system=QUERY_SYSTEM,
+        expected_completion_tokens=expected_completion_tokens(len(plan.names)),
+    )
+
+
+async def regenerate_for_profile(
+    session: AsyncSession, profile_id: uuid.UUID, sources: list[str] | None
+) -> SearchQueriesResponse:
+    plan = await _prepare_regeneration(session, profile_id, sources)
+    profile, structured, names = plan.profile, plan.structured, plan.names
+    declaration_map, stored = plan.declaration_map, plan.stored
     result = await generate_queries(
         structured,
         names,

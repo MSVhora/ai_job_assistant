@@ -60,8 +60,8 @@ docs/plans/         # versioned implementation plans (v1/, v2/, v3/ per-version 
 
 ## Definition of done (before reporting a task complete)
 
-- Backend touched: `ruff check . && ruff format --check . && pytest` pass (run in `backend/`). *Target gate once v5 #41 lands:* `ruff check . && ruff format --check . && pyright && pytest --cov=app`.
-- Frontend touched: `npm run lint && npm run build` pass (run in `frontend/`). *Target gate once v5 #44 lands:* `npm run lint && npm run format:check && npm test && npm run build`.
+- Backend touched: `ruff check . && ruff format --check . && pyright && pytest --cov=app` pass (run in `backend/`, scratch `TEST_DATABASE_URL` set so the DB tests and the coverage floor are real), and `pre-commit run --all-files` is clean.
+- Frontend touched: `npm run lint && npm run format:check && npm run typecheck && npm test && npm run build` pass (run in `frontend/`).
 - Model changes: migration generated, reviewed, and included in the same change.
 - New external dep: justified in the response (prefer stdlib / what the stack already uses).
 - Setup or behavior changed: `.env.example` / README updated.
@@ -72,12 +72,13 @@ docs/plans/         # versioned implementation plans (v1/, v2/, v3/ per-version 
 | What | Command |
 |---|---|
 | Backend dev | `uvicorn app.main:app --reload` (in `backend/`) |
-| Backend lint/format | `ruff check .` / `ruff format .` (in `backend/`) |
-| Backend tests | `pytest` (in `backend/`) |
+| Backend lint/format/types | `ruff check .` / `ruff format .` / `pyright` (in `backend/`) |
+| Backend tests | `pytest --cov=app` (in `backend/`) |
 | New migration | `alembic revision --autogenerate -m "descriptive_message"` (in `backend/`) |
 | Apply migrations | `alembic upgrade head` (in `backend/`) |
 | Frontend dev | `npm run dev` (in `frontend/`) |
-| Frontend lint/build | `npm run lint` / `npm run build` (in `frontend/`) |
+| Frontend lint/format/types/tests | `npm run lint` / `npm run format` (`format:check`) / `npm run typecheck` / `npm test` (in `frontend/`) |
+| Frontend build | `npm run build` (in `frontend/`) |
 | Full stack | `docker compose up -d` |
 | Re-render doc diagrams | `node scripts/render-diagrams.mjs` (repo root; needs `@mermaid-js/mermaid-cli`) |
 

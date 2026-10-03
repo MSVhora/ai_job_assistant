@@ -9,11 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { useProfile, useUpdateProfile } from "@/hooks/use-profiles";
-import {
-  profileFormSchema,
-  toFormValues,
-  type ProfileFormValues,
-} from "@/lib/profile-schema";
+import { profileFormSchema, toFormValues, type ProfileFormValues } from "@/lib/profile-schema";
 import { standardSchemaResolver } from "@hookform/resolvers/standard-schema";
 import type { GapFillResponse, ProfileResponse } from "@/lib/api";
 
@@ -24,9 +20,7 @@ export function ProfileEditor({ profileId }: { profileId: string }) {
   const profileQuery = useProfile(profileId);
 
   if (profileQuery.isPending) {
-    return (
-      <div className="h-96 animate-pulse rounded-3xl bg-white/60" aria-live="polite" />
-    );
+    return <div className="h-96 animate-pulse rounded-3xl bg-white/60" aria-live="polite" />;
   }
 
   if (profileQuery.isError) {
@@ -78,7 +72,7 @@ export function EditorBody({ profile }: { profile: ProfileResponse }) {
       next.contact.location = values.contact.location;
     }
     if (touched.has("contact.country")) {
-      next.contact.country = values.contact.country ?? "";
+      next.contact.country = values.contact.country;
     }
     if (touched.has("preferences.target_location")) {
       next.preferences.target_location = values.preferences.target_location;
@@ -121,7 +115,9 @@ export function EditorBody({ profile }: { profile: ProfileResponse }) {
               <Input
                 id="rename-profile"
                 value={nameInput}
-                onChange={(event) => setNameInput(event.target.value)}
+                onChange={(event) => {
+                  setNameInput(event.target.value);
+                }}
               />
             </Field>
           </div>
@@ -140,7 +136,7 @@ export function EditorBody({ profile }: { profile: ProfileResponse }) {
           <div className="flex gap-2">
             <Button
               disabled={renameProfile.isPending || nameInput.trim() === ""}
-              onClick={() =>
+              onClick={() => {
                 renameProfile.mutate(
                   { profileId: profile.profile_id, payload: { name: nameInput.trim() } },
                   {
@@ -148,12 +144,17 @@ export function EditorBody({ profile }: { profile: ProfileResponse }) {
                       setRenaming(false);
                     },
                   },
-                )
-              }
+                );
+              }}
             >
               {renameProfile.isPending ? "Saving…" : "Save name"}
             </Button>
-            <Button variant="secondary" onClick={() => setRenaming(false)}>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setRenaming(false);
+              }}
+            >
               Cancel
             </Button>
           </div>
@@ -180,15 +181,18 @@ export function EditorBody({ profile }: { profile: ProfileResponse }) {
           isSaving={updateProfile.isPending}
           saveError={updateProfile.error?.message ?? null}
           savedRevisionSource={updateProfile.data?.last_revision?.source ?? null}
-          onSave={(structuredProfile) =>
+          onSave={(structuredProfile) => {
             updateProfile.mutate({
               profileId: profile.profile_id,
               payload: { structured_profile: structuredProfile },
-            })
-          }
+            });
+          }}
         />
       </FormProvider>
-      <Link href="/profile" className="text-center text-sm font-medium text-gray-600 underline underline-offset-2 hover:text-gray-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600">
+      <Link
+        href="/profile"
+        className="text-center text-sm font-medium text-gray-600 underline underline-offset-2 hover:text-gray-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
+      >
         Back to all profiles
       </Link>
     </div>

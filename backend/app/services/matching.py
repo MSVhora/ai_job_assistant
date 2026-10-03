@@ -2,6 +2,7 @@ import logging
 import re
 import uuid
 from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING, cast
 
 from pydantic import ValidationError
 from sqlalchemy import (
@@ -21,7 +22,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.adapters.llm import LLMError, parse_structured
+from app.adapters.llm import LLMError, format_cost, parse_structured
 from app.core.config import get_settings
 from app.core.errors import ProfileNotEmbeddedError, ProfileNotFoundError
 from app.models import JobPosting, JobSearch, Match, Profile, SearchPosting
@@ -36,6 +37,9 @@ from app.schemas.matching import (
 )
 from app.schemas.profile import StructuredProfile, parse_stored_preferences
 from app.services.embedding import profile_digest_parts
+
+if TYPE_CHECKING:
+    from sqlalchemy.engine import CursorResult
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +82,9 @@ def ranked_postings_query(
     return _apply_posting_filters(query, filters)
 
 
-def _apply_status_filter[RowT](query: Select[RowT], status: MatchListStatus) -> Select[RowT]:
+def _apply_status_filter[RowT: tuple[object, ...]](
+    query: Select[RowT], status: MatchListStatus
+) -> Select[RowT]:
     """Issue #39 engagement-status view: `active` (the default view) hides
     dismissed matches; `saved`/`dismissed` are their respective buckets; `all`
     is everything."""
@@ -107,7 +113,9 @@ def freshness_condition() -> ColumnElement[bool]:
     )
 
 
-def _apply_posting_filters[RowT](query: Select[RowT], filters: MatchFilters) -> Select[RowT]:
+def _apply_posting_filters[RowT: tuple[object, ...]](
+    query: Select[RowT], filters: MatchFilters
+) -> Select[RowT]:
     query = query.where(freshness_condition())
     if filters.location is not None:
         escaped = filters.location.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
@@ -141,10 +149,10 @@ def skill_hit_terms(title: str | None, description: str | None, skills: list[str
     ]
 
 
-def _skill_score_expression(skills: list[str]) -> ColumnElement:
+def _skill_score_expression(skills: list[str]) -> ColumnElement[float]:
     """Top-skill word-boundary hit fraction over `title + description` (#37).
 
-    Each top skill contributes one `CASE … ~ '\m<skill>\M'` (word-anchored,
+    Each top skill contributes one `CASE … ~ '\\m<skill>\\M'` (word-anchored,
     case-insensitive regex); the sum normalizes by the skill count. Word
     anchors mirror `\\b` in the Python twin (`\\m`/`\\M` in PG; terms ending
     in non-word chars fail identically on both sides). No pg_trgm — that
@@ -161,7 +169,7 @@ def _skill_score_expression(skills: list[str]) -> ColumnElement:
     return func.least(1.0, hits / float(len(skills)))
 
 
-def _recency_expression() -> ColumnElement:
+def _recency_expression() -> ColumnElement[float]:
     """`exp(-days/<decay>)` on posted_at; unknown dates stay neutral (#37)."""
     days = func.greatest(0.0, func.extract("epoch", func.now() - JobPosting.posted_at) / 86400.0)
     decay = float(get_settings().match_recency_decay_days)
@@ -199,10 +207,7 @@ def salary_fit_score(
     hi = float(pref_max) if pref_max is not None else float("inf")
     if max(post_lo, lo) <= min(post_hi, hi):
         return 1.0
-    if post_hi < lo:
-        gap = lo - post_hi
-    else:
-        gap = post_lo - hi
+    gap = lo - post_hi if post_hi < lo else post_lo - hi
     if pref_min is not None and pref_max is not None:
         width = max(hi - lo, 1.0)
     elif pref_max is None:
@@ -214,14 +219,12 @@ def salary_fit_score(
 
 def _salary_score_expression(
     pref_min: float | None, pref_max: float | None, pref_currency: str | None
-) -> ColumnElement:
+) -> ColumnElement[float]:
     """SQL mirror of `salary_fit_score` (above) — the same branches in CASE.
 
     The preference band is static per profile, so the preference side is
     resolved in Python and only the posting side stays in SQL.
     """
-    if pref_min is None and pref_max is None:
-        return literal(_NO_PREFERENCE_SCORE)
     posting_min, posting_max = JobPosting.salary_min, JobPosting.salary_max
     pref_cur = pref_currency.lower() if pref_currency is not None else ""
     mismatch = and_(
@@ -230,32 +233,37 @@ def _salary_score_expression(
     )
     unknown_band = and_(posting_min.is_(None), posting_max.is_(None))
     if pref_min is None:
-        overlap = or_(posting_min.is_(None), posting_min <= float(pref_max))
+        if pref_max is None:
+            return literal(_NO_PREFERENCE_SCORE)
+        hi = float(pref_max)
+        overlap = or_(posting_min.is_(None), posting_min <= hi)
         gap = case(
             (posting_min.is_(None), 0.0),
-            (posting_min <= float(pref_max), 0.0),
-            else_=posting_min - float(pref_max),
+            (posting_min <= hi, 0.0),
+            else_=posting_min - hi,
         )
-        width_col = func.greatest(float(pref_max), 1.0)
+        width_col = func.greatest(hi, 1.0)
     elif pref_max is None:
-        overlap = or_(posting_max.is_(None), posting_max >= float(pref_min))
+        lo = float(pref_min)
+        overlap = or_(posting_max.is_(None), posting_max >= lo)
         gap = case(
             (posting_max.is_(None), 0.0),
-            (posting_max < float(pref_min), float(pref_min) - posting_max),
+            (posting_max < lo, lo - posting_max),
             else_=0.0,
         )
-        width_col = func.greatest(float(pref_min), 1.0)
+        width_col = func.greatest(lo, 1.0)
     else:
+        lo, hi = float(pref_min), float(pref_max)
         overlap = or_(
             posting_min.is_(None),
             posting_max.is_(None),
-            and_(posting_max >= float(pref_min), posting_min <= float(pref_max)),
+            and_(posting_max >= lo, posting_min <= hi),
         )
         gap = case(
-            (posting_max < float(pref_min), float(pref_min) - posting_max),
-            else_=posting_min - float(pref_max),
+            (posting_max < lo, lo - posting_max),
+            else_=posting_min - hi,
         )
-        width_col = func.greatest(float(pref_max) - float(pref_min), 1.0)
+        width_col = func.greatest(hi - lo, 1.0)
     return case(
         (mismatch, 1.0),
         (unknown_band, 1.0),
@@ -286,7 +294,7 @@ def default_priority() -> float:
     return settings.match_weight_role_fit / total
 
 
-def _priority_sort_expression(priority: float) -> ColumnElement:
+def _priority_sort_expression(priority: float) -> ColumnElement[float]:
     """Read-time blend of stored sub-scores under a custom priority (#11, #37).
 
     Rows without re-rank verdicts keep their stored final_score (fallback
@@ -342,7 +350,7 @@ def _final_score(
     return max(0.0, min(1.0, total))
 
 
-def _hybrid_blend_expression() -> ColumnElement:
+def _hybrid_blend_expression() -> ColumnElement[float]:
     """Stored-columns hybrid, coalesced — rerank-pool ordering (#37).
 
     NULL sub-scores coalesce to 0 so legacy rows never crash the pool query;
@@ -464,7 +472,7 @@ async def rescore_matches(
             ),
         )
     )
-    rows = []
+    rows: list[dict[str, object]] = []
     fallback_count = 0
     for rep_id, (_, (vector, skill, recency, salary)) in rows_by_representative.items():
         if vector is None:
@@ -587,11 +595,14 @@ async def delete_out_of_corpus_matches(session: AsyncSession, profile_id: uuid.U
     Only called on an explicit rebuild (D7): stale rows from the pre-#25
     global corpus are removed the moment the user opts back in per profile.
     """
-    result = await session.execute(
-        delete(Match).where(
-            Match.profile_id == profile_id,
-            Match.job_posting_id.not_in(_corpus_ids_subquery(profile_id)),
-        )
+    result = cast(
+        "CursorResult[tuple[()]]",
+        await session.execute(
+            delete(Match).where(
+                Match.profile_id == profile_id,
+                Match.job_posting_id.not_in(_corpus_ids_subquery(profile_id)),
+            )
+        ),
     )
     return int(result.rowcount or 0)
 
@@ -637,7 +648,7 @@ async def _rerank_top_matches(
         )
 
     by_id: dict[uuid.UUID, RerankItem] = {item.posting_id: item for item in result.data.items}
-    rows = []
+    rows: list[dict[str, object]] = []
     for match, posting in candidates:
         item = by_id.get(posting.id)
         if item is None:
@@ -672,12 +683,13 @@ async def _rerank_top_matches(
 
     logger.info(
         "matching.rerank profile_id=%s candidates=%d rationale=%d prompt_tokens=%d "
-        "completion_tokens=%d",
+        "completion_tokens=%d cost_usd=%s",
         profile.id,
         len(candidates),
         len(rows),
         result.prompt_tokens,
         result.completion_tokens,
+        format_cost(result.cost_usd),
     )
     return MatchingOutcome(
         status="ok",
@@ -685,6 +697,7 @@ async def _rerank_top_matches(
         rationale_count=len(rows),
         rerank_prompt_tokens=result.prompt_tokens,
         rerank_completion_tokens=result.completion_tokens,
+        rerank_cost_usd=result.cost_usd,
     )
 
 
@@ -744,9 +757,9 @@ _SORT_ORDERS = {
 async def count_matches(session: AsyncSession, params: MatchQueryParams) -> int:
     profile = await session.get(Profile, params.profile_id)
     if profile is None:
-        raise ProfileNotFoundError()
+        raise ProfileNotFoundError
     if profile.embedding is None:
-        raise ProfileNotEmbeddedError()
+        raise ProfileNotEmbeddedError
     query: Select[tuple[int]] = (
         select(func.count())
         .select_from(Match)
@@ -761,9 +774,9 @@ async def count_matches(session: AsyncSession, params: MatchQueryParams) -> int:
 async def list_matches(session: AsyncSession, params: MatchQueryParams) -> list[MatchResponse]:
     profile = await session.get(Profile, params.profile_id)
     if profile is None:
-        raise ProfileNotFoundError()
+        raise ProfileNotFoundError
     if profile.embedding is None:
-        raise ProfileNotEmbeddedError()
+        raise ProfileNotEmbeddedError
 
     stored = parse_stored_preferences(profile.preferences)
     priority = (
@@ -774,7 +787,11 @@ async def list_matches(session: AsyncSession, params: MatchQueryParams) -> list[
         and priority is not None
         and abs(priority - default_priority()) > _PRIORITY_EPSILON
     )
-    effective = _priority_sort_expression(priority) if custom else Match.final_score
+    effective = (
+        _priority_sort_expression(priority)
+        if custom and priority is not None
+        else Match.final_score
+    )
 
     query: Select[tuple[Match, JobPosting, float]] = (
         select(Match, JobPosting, effective.label("effective_score"))

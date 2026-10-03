@@ -1,6 +1,6 @@
 import logging
 import re
-from datetime import date
+from datetime import date, datetime
 
 from app.core.config import get_settings
 from app.schemas.profile import ExperienceItem, Preferences, SeniorityLevel, StructuredProfile
@@ -22,7 +22,13 @@ _MONTHS = {
     "nov": 11,
     "dec": 12,
 }
-_PRESENT = re.compile(r"^(present|current|now|today|ongoing|current role|to date)$", re.I)
+
+
+def _today() -> date:
+    return datetime.now().astimezone().date()
+
+
+_PRESENT = re.compile(r"^(present|current|now|today|ongoing|current role|to date)$", re.IGNORECASE)
 _MONTH_NAME = re.compile(r"^(?P<month>[A-Za-z]{3,9})\.?\s*,?\s*(?P<year>\d{4})$")
 _YEAR_ONLY = re.compile(r"^\d{4}$")
 _ISO_MONTH = re.compile(r"^(?P<year>\d{4})-(?P<month>\d{1,2})$")
@@ -40,11 +46,11 @@ def resolve_date(value: str | None) -> date | None:
     if not text:
         return None
     if _PRESENT.match(text):
-        return date.today()
+        return _today()
     parsed = _parse_absolute(text)
     if parsed is None:
         return None
-    today = date.today()
+    today = _today()
     if parsed > today and (parsed - today).days > _MAX_FUTURE_GRACE_DAYS:
         return None
     return parsed
@@ -80,7 +86,7 @@ def parse_years_of_experience(experience: list[ExperienceItem]) -> int | None:
     Overlapping roles are absorbed by the span (no per-role summation);
     unparseable items are skipped. Returns None when no dates parse at all.
     """
-    today = date.today()
+    today = _today()
     starts: list[date] = []
     ends: list[date] = []
     for item in experience:

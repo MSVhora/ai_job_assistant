@@ -28,13 +28,13 @@ def retry_after_header(value: object) -> float | None:
     if isinstance(value, bool) or not isinstance(value, int | float | str):
         return None
     try:
-        seconds = float(value) if isinstance(value, str) else float(value)
+        seconds = float(value)
     except ValueError:
         return None
     return seconds if seconds >= 0 else None
 
 
-class Transient(Exception):
+class TransientError(Exception):
     """A retry-worthy outcome that is not an exception at the call site
     (e.g. an HTTP 429 response). Carries an optional server-provided delay."""
 
@@ -58,15 +58,16 @@ async def with_retry[RunT](
 ) -> RunT:
     """Run `call()` with the shared retry policy; re-raises the last failure.
 
-    `is_retryable` classifies exceptions; Transient marks retry-worthy
+    `is_retryable` classifies exceptions; TransientError marks retry-worthy
     non-exceptions and may pin the delay via its retry_after_s.
     """
     attempts = max(1, get_settings().llm_retry_attempts)
+    last: Exception = RuntimeError(f"{what}: retry loop did not run")
     for attempt in range(attempts):
         try:
             return await call()
-        except Transient as exc:
-            last: Exception = exc
+        except TransientError as exc:
+            last = exc
             pinned_delay = exc.retry_after_s
         except Exception as exc:
             if not is_retryable(exc):

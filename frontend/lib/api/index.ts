@@ -32,13 +32,19 @@ export type SearchQueriesResponse = components["schemas"]["SearchQueriesResponse
 export type JobPostingSummary = components["schemas"]["JobPostingSummary"];
 export type JobPostingDetail = components["schemas"]["JobPostingDetail"];
 export type MatchResponse = components["schemas"]["MatchResponse"];
+export type CostEstimate = components["schemas"]["CostEstimateResponse"];
 export type MatchingOutcome = components["schemas"]["MatchingOutcome"];
 export type StoredPreferences = components["schemas"]["StoredPreferences"];
 export type MatchListParams = operations["list_matches_api_matches_get"]["parameters"]["query"];
 export type MatchRebuildStatus = components["schemas"]["MatchRebuildStatusResponse"];
 
-export { ApiError, DuplicateRunError, ExtractionFailedError, apiFetch, apiFetchWithTotal } from "./client";
-
+export {
+  ApiError,
+  DuplicateRunError,
+  ExtractionFailedError,
+  apiFetch,
+  apiFetchWithTotal,
+} from "./client";
 
 export async function getHealth(): Promise<HealthResponse> {
   return apiFetch<HealthResponse>("/api/health");
@@ -113,10 +119,10 @@ export async function updatePreferences(
   profileId: string,
   payload: StoredPreferences,
 ): Promise<StoredPreferences> {
-  return apiFetch<StoredPreferences>(
-    `/api/profiles/${encodeURIComponent(profileId)}/preferences`,
-    { method: "PATCH", body: JSON.stringify(payload) },
-  );
+  return apiFetch<StoredPreferences>(`/api/profiles/${encodeURIComponent(profileId)}/preferences`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function gapFillTurn(
@@ -211,16 +217,14 @@ export async function getMatchRebuildStatus(profileId: string): Promise<MatchReb
 export async function listMatches(params: MatchListParams): Promise<MatchResponse[]> {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined && value !== null && value !== "") {
-      query.set(key, String(value));
-    }
+    query.set(key, String(value));
   }
   return apiFetch<MatchResponse[]>(`/api/matches?${query.toString()}`);
 }
 
-export async function listMatchesPage(
-  params: MatchListParams,
-): Promise<{ items: MatchResponse[]; total: number }> {
+export async function listMatchesPage(params: {
+  [K in keyof MatchListParams]: MatchListParams[K] | undefined;
+}): Promise<{ items: MatchResponse[]; total: number }> {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined && value !== null && value !== "") {
@@ -254,6 +258,20 @@ export async function recordMatchSignal(
 
 export function applyMatchUrl(matchId: string): string {
   return `/api/matches/${encodeURIComponent(matchId)}/apply`;
+}
+
+export async function estimateTuneQueries(profileId: string): Promise<CostEstimate> {
+  return apiFetch<CostEstimate>(
+    `/api/profiles/${encodeURIComponent(profileId)}/tune-queries/estimate`,
+    { method: "POST" },
+  );
+}
+
+export async function estimateRegenerateQueries(profileId: string): Promise<CostEstimate> {
+  return apiFetch<CostEstimate>(
+    `/api/profiles/${encodeURIComponent(profileId)}/search-queries/estimate`,
+    { method: "POST", body: JSON.stringify({}) },
+  );
 }
 
 export async function tuneSearchQueries(profileId: string): Promise<SearchQueriesResponse> {

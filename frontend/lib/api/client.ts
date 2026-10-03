@@ -50,10 +50,10 @@ function formatValidationDetail(detail: unknown[]): string {
     const location = Array.isArray(entry.loc)
       ? entry.loc.filter((part) => part !== "body").join(".")
       : "";
-    const message = String(entry.msg ?? "invalid value");
+    const message = typeof entry.msg === "string" ? entry.msg : "invalid value";
     parts.push(location === "" ? message : `${location}: ${message}`);
   }
-  if (parts.length === 0) return STATUS_FALLBACK_MESSAGES[422];
+  if (parts.length === 0) return STATUS_FALLBACK_MESSAGES[422] ?? "The request was invalid.";
   return `Invalid input — ${parts.join("; ")}`;
 }
 
@@ -75,8 +75,7 @@ async function parseErrorBody(
     // fall through to the fallback message
   }
   return {
-    message:
-      STATUS_FALLBACK_MESSAGES[response.status] ?? `API error ${response.status} on ${path}`,
+    message: STATUS_FALLBACK_MESSAGES[response.status] ?? `API error ${response.status} on ${path}`,
     body: undefined,
   };
 }
@@ -111,7 +110,10 @@ export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T>
   return (await response.json()) as T;
 }
 
-export async function apiFetchWithTotal<T>(path: string, init?: ApiFetchInit): Promise<{ items: T; total: number }> {
+export async function apiFetchWithTotal<T>(
+  path: string,
+  init?: ApiFetchInit,
+): Promise<{ items: T; total: number }> {
   const { timeoutMs = DEFAULT_TIMEOUT_MS, ...requestInit } = init ?? {};
   let response: Response;
   const headers = new Headers(requestInit.headers);

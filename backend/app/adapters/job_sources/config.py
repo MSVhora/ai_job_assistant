@@ -32,11 +32,11 @@ class ActorConfig(BaseModel):
     actor_id: str = Field(min_length=1)
     external_id_field: str = Field(min_length=1)
     input: dict[str, object] = Field(default_factory=dict)
-    filters: list[SourceFilterDecl] = Field(default_factory=list)
+    filters: list[SourceFilterDecl] = Field(default_factory=list[SourceFilterDecl])
 
 
 class ConnectorsConfig(BaseModel):
-    sources: list[ActorConfig] = Field(default_factory=list)
+    sources: list[ActorConfig] = Field(default_factory=list[ActorConfig])
 
 
 def build_actor_input(actor: ActorConfig, query: JobSearchQuery) -> dict[str, object]:
@@ -59,22 +59,24 @@ def _resolve_value(value: object, query: JobSearchQuery) -> object:
             case "query":
                 return query.query
             case "keywords":
-                if plan is not None and plan.keywords is not None:
-                    return plan.keywords
-                return _OMIT
+                return plan.keywords if plan is not None and plan.keywords is not None else _OMIT
             case "location":
-                if plan is not None and plan.location is not None:
-                    return plan.location
-                return query.location if query.location is not None else _OMIT
+                fallback = _OMIT if query.location is None else query.location
+                return plan.location if plan is not None and plan.location is not None else fallback
             case "country":
                 return query.country
             case "results_wanted":
                 max_results = get_settings().max_apify_results_per_run
                 return min(query.results_wanted, max_results)
             case "date_posted_bucket":
-                if plan is not None and plan.date_posted is not None:
-                    return plan.date_posted
-                return date_posted_bucket(query.max_days_old)
+                bucket = date_posted_bucket(query.max_days_old)
+                return (
+                    plan.date_posted
+                    if plan is not None and plan.date_posted is not None
+                    else bucket
+                )
+            case _:
+                pass
     return value
 
 
@@ -82,15 +84,18 @@ def load_actor_configs(path: Path = DEFAULT_CONFIG_PATH) -> list[ActorConfig]:
     try:
         raw = yaml.safe_load(path.read_text())
     except OSError as exc:
-        raise ConnectorConfigError(f"cannot read connector config {path}: {exc}") from exc
+        msg = f"cannot read connector config {path}: {exc}"
+        raise ConnectorConfigError(msg) from exc
     try:
         config = ConnectorsConfig.model_validate(raw)
     except (ValidationError, TypeError) as exc:
-        raise ConnectorConfigError(f"invalid connector config {path}: {exc}") from exc
+        msg = f"invalid connector config {path}: {exc}"
+        raise ConnectorConfigError(msg) from exc
     names = [actor.name for actor in config.sources]
     duplicates = {name for name in names if names.count(name) > 1}
     if duplicates:
-        raise ConnectorConfigError(f"duplicate source names in config: {sorted(duplicates)}")
+        msg = f"duplicate source names in config: {sorted(duplicates)}"
+        raise ConnectorConfigError(msg)
     for actor in config.sources:
         _validate_placeholders(actor)
     return config.sources
@@ -107,15 +112,17 @@ def _validate_placeholders(actor: ActorConfig) -> None:
         if stripped.startswith(_OPTION_PLACEHOLDER_PREFIX):
             option_key = stripped.removeprefix(_OPTION_PLACEHOLDER_PREFIX)
             if option_key not in declared_option_keys:
-                raise ConnectorConfigError(
+                msg = (
                     f"actor {actor.name}: placeholder {{{stripped}}} declares no filter; "
                     f"declared filters: {_describe_filters(actor)}"
                 )
+                raise ConnectorConfigError(msg)
         elif stripped not in _PLACEHOLDER_KEYS:
-            raise ConnectorConfigError(
+            msg = (
                 f"actor {actor.name}: unknown placeholder {{{stripped}}} "
                 f"(supported: {_PLACEHOLDER_KEYS} or {{option:<declared filter key>}})"
             )
+            raise ConnectorConfigError(msg)
 
 
 def _describe_filters(actor: ActorConfig) -> str:

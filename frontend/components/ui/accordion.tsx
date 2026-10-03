@@ -45,7 +45,11 @@ export function Accordion({
         <ChevronIcon open={open} />
       </button>
       {open && (
-        <div id={`${id}-content`} role="region" className="flex flex-col gap-2.5 border-t border-gray-100 p-3">
+        <div
+          id={`${id}-content`}
+          role="region"
+          className="flex flex-col gap-2.5 border-t border-gray-100 p-3"
+        >
           {children}
         </div>
       )}

@@ -2,9 +2,6 @@
 
 Applies to every feature that calls a language or embedding model.
 
-> **Target state.** Cost estimation *(v5 #47)* is brought into the code by the
-> [v5 plans](../plans/v5/v5-hardening-plan.md).
-
 ## One door
 
 - All model calls go through `app/adapters/llm.py` (LiteLLM). Never import a provider SDK in routers or services. Provider and model are configuration (`LLM_MODEL`, `EMBEDDING_MODEL`), so swapping a provider is a settings change.
@@ -26,7 +23,7 @@ Applies to every feature that calls a language or embedding model.
 
 - Persisted defaults are generated at temperature 0; only explicit "regenerate/alternatives" actions use a hot temperature.
 - Cache LLM output by a content hash of its inputs (for example `profile.queries_input_hash`) and skip the call when the hash is unchanged. Changing the prompt version changes the hash.
-- Every call returns and logs token usage and duration. **Batch or user-triggered LLM actions are confirm-gated and show an estimated cost before running** *(#47: `estimate_cost`, price settings)*. Automatic background generation must be hash-gated so unchanged inputs never pay twice.
+- Every call returns and logs token usage and duration. **Batch or user-triggered LLM actions are confirm-gated and show an estimated cost before running** (`estimate_cost` prices tokens from LiteLLM's price map, overridden by `LLM_PRICE_IN_PER_MTOK` / `LLM_PRICE_OUT_PER_MTOK` / `EMBEDDING_PRICE_PER_MTOK`; an unknown price is reported as unavailable, never guessed). Automatic background generation must be hash-gated so unchanged inputs never pay twice.
 - LLM work never runs in the request path of a read endpoint; it runs in explicit actions or background tasks with queryable status.
 
 ## Graceful degradation

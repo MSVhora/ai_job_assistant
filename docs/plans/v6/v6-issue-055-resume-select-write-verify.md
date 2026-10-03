@@ -1,7 +1,7 @@
 # Issue #55 — Resume content generation: JD analysis, priority ranking, writing, verification, comments (Week 3)
 
-**Status:** Proposed — for owner review (revised 2026-10-02 after owner decisions on review flow, priority, overlap)
-**Tracks:** GitHub issue #55 (milestone `v6`, branch `v6/47-resume-select-write-verify`)
+**Status:** Implemented (2026-10-03) — see *Implementation notes* for deviations. Plan revised 2026-10-02 after owner decisions on review flow, priority, overlap
+**Tracks:** GitHub issue #55 (milestone `v6`, branch `v6/55-resume-select-write-verify`)
 **Plan of record:** [v6-implementation-plan.md](v6-implementation-plan.md) §6.2, §6.4, §6.5, §8
 **Depends on:** #49 (routing, cache), #52–#54
 **Blocks:** #56 (needs the ranked pool and written bullets), #57
@@ -81,3 +81,18 @@ the backend gate (`ruff check . && ruff format --check . && pyright && pytest --
 ## Out of scope
 
 Layout/inclusion (#56), UI (#57), cover letters, multiple tailored variants per call, learning from the user's past comments.
+
+## Implementation notes — deviations from the plan above
+
+- **One migration, `0027_add_resume_document_generation`:** the plan said no schema change, but `omitted_roles`, the gaps report, the ranked pool, the JD analysis, warnings and usage have no home in `layout` (which #56 owns), so `resume_document.generation` (JSONB, default `{}`) holds them. The agent-session migration planned as `0027` (#58) becomes `0028`.
+- **Stable ids and bullet flags in the schema:** `WorkEntry`, `ProjectEntry` and `Bullet` gained a deterministic `id` (hash of what the block or bullet is; `ensure_ids` fills them at creation and lazily for older documents), and `Bullet` gained `pinned`, `approved_anyway` and `flags` (the violations, kept after an override). `ResumeDocumentResponse` now returns typed `comments` and `generation`. Needed for `PATCH …/bullets/{id}`, comment targets and "include anyway".
+- **`POST /api/resume-documents` always generates.** `resume_documents.create_document` stays the CRUD copy of the profile; the router calls `resume_builder.create_and_generate`. Creation never fails because a model call failed: a failed JD analysis, embedding or block write degrades with a `generation.warnings` entry (untailored, keyword-only, or the block's existing bullets kept). The golden profile's overlapping roles make creation bump the version to 2 (an existing endpoint test was updated).
+- **Alignment saturates at two JD-term hits** (`min(1, hits / 2)`) rather than dividing by every JD term, so a single true hit is a clear lift instead of being diluted by a long keyword list. Alignment = 0.6 × cosine(JD digest, achievement embedding) + 0.4 × term overlap; without embeddings it is the overlap alone.
+- **"Include anyway" neither blocks nor is blocked:** forced roles are kept and ignored by the greedy resolver, so both overlapping roles can appear.
+- **Comment targets are `work` or `projects` blocks (plus an optional bullet).** Skills/summary are not model-written in this issue. A comment is rejected (with `add_note`) when it names a tool the block's evidence never mentions, when the writer declines (`unsupported_reason`), or when all its target bullets are pinned/edited/profile text. `DELETE …/comments/{id}` returns the updated document (200), like the other comment routes.
+- **Verification details:** tool names come from the alias table, except ordinary-word aliases (`go`, `rest`, `next`, …) which only match in their canonical spelling or not at all; a figure must appear as a value in the evidence (`40%` = `40 percent`, `10k` = `10,000`), so derived totals are caught. The "scope" bullet rule is prompt-only (no deterministic lint). If the judge call is unavailable, bullets are flagged `needs_review` without a regeneration.
+- **User-added and edited bullets are pinned:** `write/{achievement_id}` pins the new bullet; `PATCH …/bullets/{id}` with text makes it `user_edited` and re-checks claims by code only (length/tense lint is not applied to the user's own wording).
+- **Skills** are the profile skills plus evidence-backed ones from placed achievements, JD-relevant first. Achievements with no confirmed employer or matching project are not placed in a block (`generation.unplaced_count`).
+- **Layout is a content-only stub** until #56: `included_ids` are the passing bullets, `not_included` lists `needs_review`, `not_written` and `overlap_omitted`; `short_on_evidence` compares against the page budget seed.
+- **Tests use `FakeResumeLLM` (in `tests/fakes.py`)**, not #60's `RecordedLLM`, which does not exist yet; it scripts the JD, writer and judge prompts and records calls.
+- **Verification:** backend gate green against the scratch database (1155 tests, 93.3 % coverage; ruff, format and pyright clean), `pre-commit run --all-files` clean, `alembic check` clean and the `0027` round trip tested; frontend `lint`, `format:check`, `typecheck`, `test` and `build` pass after regenerating `lib/api/schema.d.ts`. The prompts were exercised only through fakes, not against a live model.

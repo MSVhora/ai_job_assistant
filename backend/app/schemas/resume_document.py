@@ -2,10 +2,11 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.schemas.profile import SourceLink
 
+MAX_JD_CHARS = 20_000
 BulletOrigin = Literal["generated", "profile_verbatim", "user_edited"]
 BulletCheck = Literal["passed", "needs_review", "failed"]
 ConflictKind = Literal[
@@ -21,9 +22,13 @@ ConflictSeverity = Literal["info", "warning", "error"]
 ConflictAction = Literal["edit_profile", "keep_as_is"]
 DocumentStatus = Literal["draft", "final"]
 NotIncludedReason = Literal["did_not_fit", "needs_review", "overlap_omitted", "not_written"]
+TailoringStrength = Literal["light", "balanced", "strong"]
+CommentSection = Literal["work", "projects"]
+CommentStatus = Literal["open", "applied", "rejected"]
 
 
 class Bullet(BaseModel):
+    id: str = ""
     text: str = Field(min_length=1)
     achievement_id: uuid.UUID | None = None
     evidence_ids: list[uuid.UUID] = []
@@ -32,6 +37,9 @@ class Bullet(BaseModel):
     score: float = 0.0
     origin: BulletOrigin = "generated"
     check: BulletCheck = "passed"
+    pinned: bool = False
+    approved_anyway: bool = False
+    flags: list[str] = []
 
 
 class Basics(BaseModel):
@@ -46,6 +54,7 @@ class Basics(BaseModel):
 
 
 class WorkEntry(BaseModel):
+    id: str = ""
     company: str | None = None
     title: str | None = None
     location: str | None = None
@@ -64,6 +73,7 @@ class EducationEntry(BaseModel):
 
 
 class ProjectEntry(BaseModel):
+    id: str = ""
     name: str
     role: str | None = None
     url: str | None = None
@@ -156,6 +166,17 @@ class ResumeDocumentCreate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=200)
     page_target: int = Field(default=1, ge=1, le=4)
     match_id: uuid.UUID | None = None
+    template: str = Field(default="classic", min_length=1, max_length=50)
+    job_description: str | None = Field(default=None, min_length=1, max_length=MAX_JD_CHARS)
+    tailoring_strength: TailoringStrength = "balanced"
+    exclude_private: bool = False
+
+    @model_validator(mode="after")
+    def _one_jd_source(self) -> "ResumeDocumentCreate":
+        if self.job_description is not None and self.match_id is not None:
+            msg = "send either job_description or match_id, not both"
+            raise ValueError(msg)
+        return self
 
 
 class ResumeDocumentUpdate(BaseModel):
@@ -166,6 +187,105 @@ class ResumeDocumentUpdate(BaseModel):
     template: str | None = Field(default=None, min_length=1, max_length=50)
     status: DocumentStatus | None = None
     content: ResumeContent | None = None
+
+
+class CommentTarget(BaseModel):
+    section: CommentSection
+    block_id: str = Field(min_length=1, max_length=64)
+    bullet_id: str | None = Field(default=None, min_length=1, max_length=64)
+
+
+class CommentCreate(BaseModel):
+    target: CommentTarget
+    text: str = Field(min_length=1, max_length=1000)
+
+
+class CommentUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    text: str = Field(min_length=1, max_length=1000)
+
+
+class ResumeComment(BaseModel):
+    id: str
+    target: CommentTarget
+    text: str
+    status: CommentStatus = "open"
+    reason: str | None = None
+    action: Literal["add_note"] | None = None
+    created_at: datetime
+    resolved_at: datetime | None = None
+
+
+class BulletUpdate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    text: str | None = Field(default=None, min_length=1, max_length=600)
+    pinned: bool | None = None
+
+
+class RegenerateRequest(BaseModel):
+    block_id: str | None = Field(default=None, min_length=1, max_length=64)
+
+
+class JDAnalysis(BaseModel):
+    must_haves: list[str] = Field(default_factory=list[str], max_length=15)
+    nice_to_haves: list[str] = Field(default_factory=list[str], max_length=15)
+    keywords: list[str] = Field(default_factory=list[str], max_length=30)
+    seniority: str | None = None
+    domain: str | None = None
+
+
+class PoolEntry(BaseModel):
+    achievement_id: uuid.UUID
+    block_id: str
+    title: str
+    priority: float
+    rank: int
+    written: bool = False
+
+
+class OmittedRole(BaseModel):
+    block_id: str
+    company: str | None
+    title: str | None
+    priority: float
+    overlaps_with: str | None
+    reason: str
+    position: int = 0
+    entry: WorkEntry
+
+
+class GapItem(BaseModel):
+    requirement: str
+    nearest_evidence: str | None = None
+    nearest_achievement_id: uuid.UUID | None = None
+    action: Literal["add_note"] = "add_note"
+
+
+class GenerationUsage(BaseModel):
+    calls: int = 0
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    cost_usd: float | None = None
+    cache_hits: int = 0
+    cache_misses: int = 0
+
+
+class Generation(BaseModel):
+    """What a content run produced besides the content: the ranked pool, dropped roles, gaps."""
+
+    tailoring_strength: TailoringStrength = "balanced"
+    exclude_private: bool = False
+    jd: JDAnalysis | None = None
+    pool: list[PoolEntry] = []
+    omitted_roles: list[OmittedRole] = []
+    included_roles: list[str] = []
+    gaps: list[GapItem] = []
+    warnings: list[str] = []
+    unplaced_count: int = 0
+    private_bullet_count: int = 0
+    usage: GenerationUsage = GenerationUsage()
 
 
 class ResumeDocumentSummary(BaseModel):
@@ -186,5 +306,6 @@ class ResumeDocumentResponse(ResumeDocumentSummary):
     template: str
     content: ResumeContent
     layout: Layout
-    comments: list[dict[str, object]]
+    comments: list[ResumeComment]
+    generation: Generation
     created_at: datetime

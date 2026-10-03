@@ -196,6 +196,26 @@ class InvalidResumeDocumentError(DomainError):
     default_detail = "the resume document change is not valid"
 
 
+class ResumeBlockNotFoundError(DomainError):
+    status_code = 404
+    default_detail = "resume section not found"
+
+
+class BulletNotFoundError(DomainError):
+    status_code = 404
+    default_detail = "bullet not found"
+
+
+class CommentNotFoundError(DomainError):
+    status_code = 404
+    default_detail = "comment not found"
+
+
+class InvalidCommentTargetError(DomainError):
+    status_code = 422
+    default_detail = "the comment must target a section or bullet of this document"
+
+
 class InvalidEmployerError(DomainError):
     status_code = 400
     default_detail = "employer must be one of your profile's experience entries or personal"

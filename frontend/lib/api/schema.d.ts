@@ -1088,6 +1088,143 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/resume-documents/{document_id}/regenerate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Regenerate Resume Document */
+        post: operations["regenerate_resume_document_api_resume_documents__document_id__regenerate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/resume-documents/{document_id}/bullets/{bullet_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Resume Bullet */
+        patch: operations["update_resume_bullet_api_resume_documents__document_id__bullets__bullet_id__patch"];
+        trace?: never;
+    };
+    "/api/resume-documents/{document_id}/bullets/{bullet_id}/approve-anyway": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve Resume Bullet Anyway */
+        post: operations["approve_resume_bullet_anyway_api_resume_documents__document_id__bullets__bullet_id__approve_anyway_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/resume-documents/{document_id}/roles/{block_id}/include-anyway": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Include Resume Role Anyway */
+        post: operations["include_resume_role_anyway_api_resume_documents__document_id__roles__block_id__include_anyway_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/resume-documents/{document_id}/write/{achievement_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Write Resume Achievement */
+        post: operations["write_resume_achievement_api_resume_documents__document_id__write__achievement_id__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/resume-documents/{document_id}/comments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Resume Comment */
+        post: operations["add_resume_comment_api_resume_documents__document_id__comments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/resume-documents/{document_id}/comments/{comment_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete Resume Comment */
+        delete: operations["delete_resume_comment_api_resume_documents__document_id__comments__comment_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Resume Comment */
+        patch: operations["update_resume_comment_api_resume_documents__document_id__comments__comment_id__patch"];
+        trace?: never;
+    };
+    "/api/resume-documents/{document_id}/apply-comments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply Resume Comments */
+        post: operations["apply_resume_comments_api_resume_documents__document_id__apply_comments_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1285,6 +1422,11 @@ export interface components {
         };
         /** Bullet */
         Bullet: {
+            /**
+             * Id
+             * @default
+             */
+            id: string;
             /** Text */
             text: string;
             /** Achievement Id */
@@ -1321,6 +1463,28 @@ export interface components {
              * @enum {string}
              */
             check: "passed" | "needs_review" | "failed";
+            /**
+             * Pinned
+             * @default false
+             */
+            pinned: boolean;
+            /**
+             * Approved Anyway
+             * @default false
+             */
+            approved_anyway: boolean;
+            /**
+             * Flags
+             * @default []
+             */
+            flags: string[];
+        };
+        /** BulletUpdate */
+        BulletUpdate: {
+            /** Text */
+            text?: string | null;
+            /** Pinned */
+            pinned?: boolean | null;
         };
         /** CertificateEntry */
         CertificateEntry: {
@@ -1358,6 +1522,29 @@ export interface components {
             by_kind: {
                 [key: string]: number;
             };
+        };
+        /** CommentCreate */
+        CommentCreate: {
+            target: components["schemas"]["CommentTarget"];
+            /** Text */
+            text: string;
+        };
+        /** CommentTarget */
+        CommentTarget: {
+            /**
+             * Section
+             * @enum {string}
+             */
+            section: "work" | "projects";
+            /** Block Id */
+            block_id: string;
+            /** Bullet Id */
+            bullet_id?: string | null;
+        };
+        /** CommentUpdate */
+        CommentUpdate: {
+            /** Text */
+            text: string;
         };
         /** ConfirmMetricRequest */
         ConfirmMetricRequest: {
@@ -1743,6 +1930,114 @@ export interface components {
             structured_profile: components["schemas"]["StructuredProfile"];
             revision?: components["schemas"]["RevisionSummary"] | null;
         };
+        /** GapItem */
+        GapItem: {
+            /** Requirement */
+            requirement: string;
+            /** Nearest Evidence */
+            nearest_evidence?: string | null;
+            /** Nearest Achievement Id */
+            nearest_achievement_id?: string | null;
+            /**
+             * Action
+             * @default add_note
+             * @constant
+             */
+            action: "add_note";
+        };
+        /**
+         * Generation
+         * @description What a content run produced besides the content: the ranked pool, dropped roles, gaps.
+         */
+        Generation: {
+            /**
+             * Tailoring Strength
+             * @default balanced
+             * @enum {string}
+             */
+            tailoring_strength: "light" | "balanced" | "strong";
+            /**
+             * Exclude Private
+             * @default false
+             */
+            exclude_private: boolean;
+            jd?: components["schemas"]["JDAnalysis"] | null;
+            /**
+             * Pool
+             * @default []
+             */
+            pool: components["schemas"]["PoolEntry"][];
+            /**
+             * Omitted Roles
+             * @default []
+             */
+            omitted_roles: components["schemas"]["OmittedRole"][];
+            /**
+             * Included Roles
+             * @default []
+             */
+            included_roles: string[];
+            /**
+             * Gaps
+             * @default []
+             */
+            gaps: components["schemas"]["GapItem"][];
+            /**
+             * Warnings
+             * @default []
+             */
+            warnings: string[];
+            /**
+             * Unplaced Count
+             * @default 0
+             */
+            unplaced_count: number;
+            /**
+             * Private Bullet Count
+             * @default 0
+             */
+            private_bullet_count: number;
+            /**
+             * @default {
+             *       "calls": 0,
+             *       "prompt_tokens": 0,
+             *       "completion_tokens": 0,
+             *       "cache_hits": 0,
+             *       "cache_misses": 0
+             *     }
+             */
+            usage: components["schemas"]["GenerationUsage"];
+        };
+        /** GenerationUsage */
+        GenerationUsage: {
+            /**
+             * Calls
+             * @default 0
+             */
+            calls: number;
+            /**
+             * Prompt Tokens
+             * @default 0
+             */
+            prompt_tokens: number;
+            /**
+             * Completion Tokens
+             * @default 0
+             */
+            completion_tokens: number;
+            /** Cost Usd */
+            cost_usd?: number | null;
+            /**
+             * Cache Hits
+             * @default 0
+             */
+            cache_hits: number;
+            /**
+             * Cache Misses
+             * @default 0
+             */
+            cache_misses: number;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -1806,6 +2101,19 @@ export interface components {
              * @enum {string}
              */
             status: "kept" | "excluded";
+        };
+        /** JDAnalysis */
+        JDAnalysis: {
+            /** Must Haves */
+            must_haves?: string[];
+            /** Nice To Haves */
+            nice_to_haves?: string[];
+            /** Keywords */
+            keywords?: string[];
+            /** Seniority */
+            seniority?: string | null;
+            /** Domain */
+            domain?: string | null;
         };
         /** JobPostingDetail */
         JobPostingDetail: {
@@ -2228,6 +2536,48 @@ export interface components {
             /** Body */
             body?: string | null;
         };
+        /** OmittedRole */
+        OmittedRole: {
+            /** Block Id */
+            block_id: string;
+            /** Company */
+            company: string | null;
+            /** Title */
+            title: string | null;
+            /** Priority */
+            priority: number;
+            /** Overlaps With */
+            overlaps_with: string | null;
+            /** Reason */
+            reason: string;
+            /**
+             * Position
+             * @default 0
+             */
+            position: number;
+            entry: components["schemas"]["WorkEntry"];
+        };
+        /** PoolEntry */
+        PoolEntry: {
+            /**
+             * Achievement Id
+             * Format: uuid
+             */
+            achievement_id: string;
+            /** Block Id */
+            block_id: string;
+            /** Title */
+            title: string;
+            /** Priority */
+            priority: number;
+            /** Rank */
+            rank: number;
+            /**
+             * Written
+             * @default false
+             */
+            written: boolean;
+        };
         /** Preferences */
         Preferences: {
             /** Target Title */
@@ -2320,6 +2670,11 @@ export interface components {
         };
         /** ProjectEntry */
         ProjectEntry: {
+            /**
+             * Id
+             * @default
+             */
+            id: string;
             /** Name */
             name: string;
             /** Role */
@@ -2374,6 +2729,11 @@ export interface components {
              */
             technologies: string[];
         };
+        /** RegenerateRequest */
+        RegenerateRequest: {
+            /** Block Id */
+            block_id?: string | null;
+        };
         /**
          * RemoteType
          * @enum {string}
@@ -2386,6 +2746,31 @@ export interface components {
              * @enum {string}
              */
             action: "keep_as_is" | "reopen";
+        };
+        /** ResumeComment */
+        ResumeComment: {
+            /** Id */
+            id: string;
+            target: components["schemas"]["CommentTarget"];
+            /** Text */
+            text: string;
+            /**
+             * Status
+             * @default open
+             * @enum {string}
+             */
+            status: "open" | "applied" | "rejected";
+            /** Reason */
+            reason?: string | null;
+            /** Action */
+            action?: "add_note" | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Resolved At */
+            resolved_at?: string | null;
         };
         /**
          * ResumeContent
@@ -2448,6 +2833,24 @@ export interface components {
             page_target: number;
             /** Match Id */
             match_id?: string | null;
+            /**
+             * Template
+             * @default classic
+             */
+            template: string;
+            /** Job Description */
+            job_description?: string | null;
+            /**
+             * Tailoring Strength
+             * @default balanced
+             * @enum {string}
+             */
+            tailoring_strength: "light" | "balanced" | "strong";
+            /**
+             * Exclude Private
+             * @default false
+             */
+            exclude_private: boolean;
         };
         /** ResumeDocumentResponse */
         ResumeDocumentResponse: {
@@ -2486,9 +2889,8 @@ export interface components {
             content: components["schemas"]["ResumeContent"];
             layout: components["schemas"]["Layout"];
             /** Comments */
-            comments: {
-                [key: string]: unknown;
-            }[];
+            comments: components["schemas"]["ResumeComment"][];
+            generation: components["schemas"]["Generation"];
             /**
              * Created At
              * Format: date-time
@@ -3010,6 +3412,11 @@ export interface components {
         };
         /** WorkEntry */
         WorkEntry: {
+            /**
+             * Id
+             * @default
+             */
+            id: string;
             /** Company */
             company?: string | null;
             /** Title */
@@ -5393,6 +5800,307 @@ export interface operations {
                     "text/plain; charset=utf-8": unknown;
                     "text/markdown; charset=utf-8": unknown;
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    regenerate_resume_document_api_resume_documents__document_id__regenerate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["RegenerateRequest"] | null;
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumeDocumentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_resume_bullet_api_resume_documents__document_id__bullets__bullet_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+                bullet_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulletUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumeDocumentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_resume_bullet_anyway_api_resume_documents__document_id__bullets__bullet_id__approve_anyway_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+                bullet_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumeDocumentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    include_resume_role_anyway_api_resume_documents__document_id__roles__block_id__include_anyway_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+                block_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumeDocumentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    write_resume_achievement_api_resume_documents__document_id__write__achievement_id__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+                achievement_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumeDocumentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_resume_comment_api_resume_documents__document_id__comments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommentCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumeDocumentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_resume_comment_api_resume_documents__document_id__comments__comment_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+                comment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumeDocumentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_resume_comment_api_resume_documents__document_id__comments__comment_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+                comment_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CommentUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumeDocumentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_resume_comments_api_resume_documents__document_id__apply_comments_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumeDocumentResponse"];
                 };
             };
             /** @description Validation Error */

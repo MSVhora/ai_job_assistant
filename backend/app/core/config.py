@@ -3,7 +3,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Annotated
 
-from pydantic import Field, ValidationInfo, field_validator
+from pydantic import Field, ValidationInfo, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 _MATCH_WEIGHTS = (
@@ -104,6 +104,14 @@ class Settings(BaseSettings):
     evidence_lookback_years: Annotated[int, Field(ge=1, le=30)] = 6
     # v6 #54: two employment roles overlapping by at least this many days are flagged.
     resume_overlap_min_days: Annotated[int, Field(ge=1, le=366)] = 60
+    # v6 #55: the JD is a bounded boost on a JD-independent base priority (impact, difficulty,
+    # recency; weights sum to 1); bullets are written for budget x oversample candidates.
+    resume_jd_weight: Annotated[float, Field(ge=0, le=0.5)] = 0.30
+    resume_weight_impact: Annotated[float, Field(ge=0, le=1)] = 0.45
+    resume_weight_difficulty: Annotated[float, Field(ge=0, le=1)] = 0.35
+    resume_weight_recency: Annotated[float, Field(ge=0, le=1)] = 0.20
+    resume_candidate_oversample: Annotated[float, Field(ge=1, le=3)] = 1.3
+    resume_max_pages: Annotated[int, Field(ge=1, le=4)] = 4
     evidence_bot_logins: list[str] = [
         "dependabot",
         "renovate",
@@ -153,6 +161,16 @@ class Settings(BaseSettings):
             )
             raise ValueError(msg)
         return value
+
+    @model_validator(mode="after")
+    def _check_resume_priority_weights(self) -> "Settings":
+        total = (
+            self.resume_weight_impact + self.resume_weight_difficulty + self.resume_weight_recency
+        )
+        if not math.isclose(total, 1.0, rel_tol=0.0, abs_tol=0.01):
+            msg = f"resume priority weights must sum to 1.0 (±0.01), got {total:.4f}"
+            raise ValueError(msg)
+        return self
 
 
 @lru_cache

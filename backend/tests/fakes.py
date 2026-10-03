@@ -1,6 +1,8 @@
 import hashlib
+import json
 import math
 import random
+import re
 from collections.abc import Callable
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
@@ -430,3 +432,257 @@ def transient_achievement(**fields: Any) -> Any:
         "time_end": None,
     }
     return Achievement(**{**defaults, **fields})
+
+
+ACME = {"company": "Acme Corp", "start_date": "Jan 2019", "source": "user"}
+BETA = {"company": "Beta Inc", "start_date": "Mar 2022", "source": "user"}
+SIDE = {"company": "Side Gig", "start_date": "Jun 2021", "source": "user"}
+WORLD_PROFILE: dict[str, Any] = {
+    "contact": {"full_name": "Jane Roe", "email": "jane@example.com", "phone": "+44 20 7946 0001"},
+    "headline": "Data platform engineer",
+    "skills": ["Python", "SQL"],
+    "experience": [
+        {
+            "company": "Beta Inc",
+            "title": "Engineer",
+            "start_date": "Mar 2022",
+            "end_date": None,
+            "is_current": True,
+            "bullets": ["Owns the deploy tooling"],
+        },
+        {
+            "company": "Acme Corp",
+            "title": "Senior Engineer",
+            "start_date": "Jan 2019",
+            "end_date": "Dec 2021",
+            "is_current": False,
+            "bullets": ["Built reports"],
+        },
+    ],
+    "projects": [{"name": "pipeline-kit", "bullets": ["Wrote a small ETL toolkit"]}],
+}
+SIDE_ROLE: dict[str, Any] = {
+    "company": "Side Gig",
+    "title": "Consultant",
+    "start_date": "Jun 2021",
+    "end_date": "Sep 2021",
+    "is_current": False,
+    "bullets": ["Advised on warehouses"],
+}
+WORLD_ACHIEVEMENTS: list[dict[str, Any]] = [
+    {
+        "key": "import",
+        "title": "Faster nightly import",
+        "employer_ref": ACME,
+        "body": "Cut the nightly import from 42 minutes to 9 minutes by batching writes in Python "
+        "against PostgreSQL",
+        "metrics": [
+            {"text": "42 minutes to 9 minutes", "source_quote": "q", "verified": "evidence"}
+        ],
+        "skills": ["Python", "PostgreSQL"],
+        "difficulty": 4,
+        "impact_type": "performance",
+        "start": (2020, 5, 1),
+    },
+    {
+        "key": "retry",
+        "title": "Retry budget for the loader",
+        "employer_ref": ACME,
+        "body": "Contributed a retry budget for the loader",
+        "skills": ["Python"],
+        "difficulty": 2,
+        "impact_type": "reliability",
+        "start": (2020, 8, 1),
+    },
+    {
+        "key": "rollout",
+        "title": "Kubernetes rollout",
+        "employer_ref": BETA,
+        "body": "Deployed the services with Helm charts to our cluster",
+        "skills": ["Kubernetes"],
+        "difficulty": 4,
+        "impact_type": "scale",
+        "start": (2023, 2, 1),
+    },
+    {
+        "key": "docs",
+        "title": "Docs generator",
+        "employer_ref": BETA,
+        "body": "Wrote a docs generator for the internal API",
+        "skills": ["Python"],
+        "difficulty": 2,
+        "impact_type": "other",
+        "start": (2023, 6, 1),
+    },
+    {
+        "key": "toolkit",
+        "title": "Streaming toolkit",
+        "project_key": "ada/pipeline-kit",
+        "body": "Built a streaming toolkit with Kafka consumers",
+        "skills": ["Kafka"],
+        "difficulty": 3,
+        "impact_type": "scale",
+        "start": (2022, 4, 1),
+    },
+]
+
+
+async def seed_resume_world(
+    *,
+    extra: "list[dict[str, Any]] | None" = None,
+    with_side_role: bool = False,
+    private: "set[str] | None" = None,
+    embeddings: bool = False,
+) -> dict[str, Any]:
+    """A candidate, a two-role profile and approved achievements, each with kept evidence."""
+    from datetime import UTC, date, datetime
+
+    from app.core.db import session_factory
+    from app.models import (
+        Achievement,
+        AchievementEvidence,
+        AchievementStatus,
+        Candidate,
+        EvidenceItem,
+        EvidenceItemStatus,
+        EvidenceKind,
+        Profile,
+    )
+
+    profile_json = {**WORLD_PROFILE}
+    if with_side_role:
+        profile_json = {**profile_json, "experience": [*WORLD_PROFILE["experience"], SIDE_ROLE]}
+    ids: dict[str, Any] = {}
+    async with session_factory() as session:
+        candidate = Candidate()
+        session.add(candidate)
+        await session.flush()
+        profile = Profile(candidate_id=candidate.id, name="Jane", structured_profile=profile_json)
+        session.add(profile)
+        await session.flush()
+        for spec in [*WORLD_ACHIEVEMENTS, *(extra or [])]:
+            year, month, day = spec["start"]
+            is_private = spec["key"] in (private or set())
+            item = EvidenceItem(
+                candidate_id=candidate.id,
+                kind=EvidenceKind.note,
+                external_id=f"ev-{spec['key']}",
+                project_key=spec.get("project_key"),
+                title=spec["title"],
+                body=spec["body"],
+                occurred_at=datetime(year, month, day, tzinfo=UTC),
+                status=EvidenceItemStatus.kept,
+                is_private=is_private,
+                content_hash=spec["key"].ljust(64, "0"),
+            )
+            session.add(item)
+            await session.flush()
+            achievement = Achievement(
+                candidate_id=candidate.id,
+                status=AchievementStatus.approved,
+                title=spec["title"],
+                situation="Situation",
+                task="Task",
+                action=spec["body"],
+                metrics=spec.get("metrics", []),
+                skills=spec["skills"],
+                impact_type=spec["impact_type"],
+                difficulty=spec["difficulty"],
+                project_key=spec.get("project_key"),
+                employer_ref=spec.get("employer_ref"),
+                time_start=date(year, month, day),
+                embedding=fake_vector(spec["title"]) if embeddings else None,
+                derived_from_private=is_private,
+            )
+            session.add(achievement)
+            await session.flush()
+            session.add(
+                AchievementEvidence(achievement_id=achievement.id, item_id=item.id, role="primary")
+            )
+            ids[spec["key"]] = achievement.id
+        ids["candidate"] = candidate.id
+        ids["profile"] = profile.id
+        await session.commit()
+    return ids
+
+
+class FakeResumeLLM:
+    """Scripted completion handler for the JD, bullet-writer and judge prompts."""
+
+    def __init__(
+        self,
+        *,
+        jd: "dict[str, Any] | None" = None,
+        texts: "dict[str, str] | None" = None,
+        writer: "Callable[[str, dict[str, Any], bool], str | None] | None" = None,
+        judge_fail: "set[str] | None" = None,
+        drop_first_write: bool = False,
+    ) -> None:
+        self.drop_first_write = drop_first_write
+        self.jd = jd or {"must_haves": [], "nice_to_haves": [], "keywords": []}
+        self.texts = texts or {}
+        self.writer = writer
+        self.judge_fail = judge_fail or set()
+        self.calls: list[dict[str, Any]] = []
+
+    def count(self, kind: str) -> int:
+        return sum(1 for call in self.calls if call["kind"] == kind)
+
+    def items(self, title: str) -> "list[dict[str, Any]]":
+        """Every writer request item (facts) for the achievement with this title."""
+        return [
+            item
+            for call in self.calls
+            if call["kind"] == "write"
+            for item in call["facts"].values()
+            if item["title"] == title
+        ]
+
+    def __call__(self, **kwargs: Any) -> object:
+        system = kwargs["messages"][0]["content"]
+        prompt = kwargs["messages"][-1]["content"]
+        if "analyse a job description" in system:
+            self.calls.append({"kind": "jd", "prompt": prompt})
+            return llm_response(json.dumps(self.jd))
+        if "write resume bullets" in system:
+            return llm_response(json.dumps(self._write(prompt)))
+        if "check resume bullets" in system:
+            return llm_response(json.dumps(self._judge(prompt)))
+        msg = "unexpected prompt"
+        raise AssertionError(msg)
+
+    def _write(self, prompt: str) -> dict[str, Any]:
+        current = "present tense" in prompt
+        facts = {
+            match.group(1): json.loads(match.group(2))
+            for match in re.finditer(r"Item (A\d+):\n(\{.*?\n\})\n<<<EVIDENCE", prompt, re.DOTALL)
+        }
+        self.calls.append({"kind": "write", "facts": facts, "current": current})
+        if self.drop_first_write and self.count("write") == 1:
+            return {"bullets": []}
+        bullets: list[dict[str, Any]] = []
+        for key, item in facts.items():
+            text = self.writer(key, item, current) if self.writer else None
+            if text is None:
+                text = self.texts.get(item["title"]) or (
+                    f"{'Deliver' if current else 'Delivered'} {item['title'].lower()} "
+                    "for the platform"
+                )
+            if text == "":
+                bullets.append({"key": key, "text": "", "unsupported_reason": "not in evidence"})
+            else:
+                bullets.append({"key": key, "text": text, "evidence_ids": ["E1"]})
+        return {"bullets": bullets}
+
+    def _judge(self, prompt: str) -> dict[str, Any]:
+        claims = re.findall(r"Bullet (A\d+): (.*)", prompt)
+        self.calls.append({"kind": "judge", "claims": claims})
+        verdicts = [
+            {
+                "key": key,
+                "entailed": not any(marker in text for marker in self.judge_fail),
+                "reason": "unsupported claim",
+            }
+            for key, text in claims
+        ]
+        return {"verdicts": verdicts}

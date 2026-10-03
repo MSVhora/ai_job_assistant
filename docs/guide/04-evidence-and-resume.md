@@ -215,6 +215,82 @@ Resume documents keep a snapshot of the content on every save (the newest 20) an
 as plain text, Markdown or JSON Resume. Exports are clean: no private-repo marks, badges or
 provenance, and the contact details come from the document's basics, copied from the profile.
 
+## Writing the resume content
+
+Creating a resume document now also **writes its content** from your approved achievements. It
+returns data only — nothing is rendered to a PDF here. You choose a page target (1 to 4, at most
+`RESUME_MAX_PAGES`), optionally a job description (pasted, or taken from one of your matches
+together with its rationale), a tailoring strength and whether to leave out achievements derived
+from private repositories.
+
+For each employer and project block the builder ranks your approved achievements by one priority
+score, writes a short bullet for the best ones (action verb, scope and — only when you confirmed
+one — the measured impact), checks every bullet against its evidence, and keeps the rest of your
+achievements ranked and *available* so you can add them later. Bullets are written for about 30 %
+more achievements than the page target needs (`RESUME_CANDIDATE_OVERSAMPLE`), so the page fit has
+spare material. A role with no approved achievements keeps its own bullets from your profile, so no
+role and no document is ever blank. Contact details are never sent to the model.
+
+### Tailoring to a job
+
+A job description is analysed once (cached by its text) into must-haves, nice-to-haves, keywords,
+seniority and domain. It changes **which true achievements are chosen and how they are ordered and
+phrased — never what is claimed.**
+
+- Every achievement has a base priority that does not depend on the job: impact (its type, and
+  whether a metric is confirmed), difficulty and recency (`RESUME_WEIGHT_IMPACT`,
+  `RESUME_WEIGHT_DIFFICULTY`, `RESUME_WEIGHT_RECENCY`, summing to 1).
+- With a job description, priority = (1 − w) × base + w × alignment, where alignment blends how close
+  the achievement is to the job description with how many of its terms the achievement shows. The
+  tailoring strength sets w: **Light** half of `RESUME_JD_WEIGHT`, **Balanced** `RESUME_JD_WEIGHT`
+  (default 0.30), **Strong** 0.50. Without a job description w is 0.
+- The job description is a **boost, not a filter**: aligned work rises, strong work that does not
+  align keeps its own priority and still appears. Near-duplicates are demoted so the pool is varied.
+- The writer may use the job description's wording only for terms your evidence supports (the
+  achievement's tags or terms in its linked evidence, including synonyms such as *K8s* for
+  *Kubernetes*). Anything else from the job description is off limits and is checked afterwards.
+- The skills list keeps your skills, adds evidence-backed ones, and puts the job-relevant ones
+  first. Job keywords with no support are never added.
+- **Gaps:** each must-have with no supporting evidence is listed with the nearest achievement, if
+  any, and an *Add a note* action. A note becomes evidence, then an achievement you review, and is
+  eligible next time. A tailored resume may match fewer keywords than a stuffed one; the gaps list
+  shows what is missing and how to close it honestly.
+
+### Why a bullet is flagged
+
+Every bullet passes two checks. First, code: each number, version, year and recognised tool must
+appear in the bullet's evidence or confirmed metrics (`40%`, `40 percent` and `40 percent` agree;
+`10k` equals `10,000`), and the bullet must start with an action verb in the right tense, stay
+within 28 words, avoid filler such as *successfully* or *robust*, and not claim more ownership
+(*led*, *owned*, *architected*) than the evidence shows. Second, a model checks that every claim is
+supported by the evidence. A bullet that fails is rewritten once with the problems listed; if it
+still fails it is marked **needs review**, keeps its reasons, and stays out of the layout until you
+fix it or choose **Approve anyway** (the override is recorded with the original reasons). If the
+checking model is unavailable, bullets are flagged for review rather than trusted.
+
+Your own edits are pinned: an edited bullet is re-checked by code only (a figure or tool the
+evidence lacks flags it, but it is your wording), and regenerating never overwrites a pinned or
+edited bullet.
+
+### Comments
+
+Attach a comment to a role, a project or one bullet ("emphasize the migration, drop the tooling
+detail"). **Apply comments** rewrites only the commented blocks, passing each comment to the writer
+as a request that is followed only where the evidence supports it; the result is verified like any
+other bullet. A comment that asks for something the evidence does not support (for example "add
+Kubernetes" when nothing mentions it) is **not applied**: it is marked rejected with the reason and
+an *Add a note* action. A comment on a pinned or edited bullet is also rejected — edit it directly.
+Applied and rejected comments stay on the document as history.
+
+### Overlapping roles
+
+If two employment roles overlap by at least `RESUME_OVERLAP_MIN_DAYS` (default 60; the current role
+ends today; unparsable dates are never compared), only the higher-priority role is written, ties go
+to the more recent one, and the other is listed as omitted with the reason. Role priority is the
+weighted sum of its top three achievement priorities plus a small recency term. Projects and open
+source are exempt. **Include anyway** restores an omitted role for this document without removing
+the other one.
+
 ## Not yet verified against live GitHub
 
 The connector was built from GitHub's documented REST/GraphQL contracts and tested with synthetic

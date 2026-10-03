@@ -29,8 +29,10 @@ from app.schemas.resume_document import (
     Conflict,
     ConflictResolution,
     ConflictsResponse,
+    Generation,
     Layout,
     ResolveConflictRequest,
+    ResumeComment,
     ResumeContent,
     ResumeDocumentCreate,
     ResumeDocumentResponse,
@@ -38,6 +40,7 @@ from app.schemas.resume_document import (
     ResumeDocumentUpdate,
 )
 from app.services.evidence_items import candidate_id_or_none
+from app.services.resume_blocks import ensure_ids
 from app.services.resume_mapping import profile_to_content
 from app.services.resume_reconcile import GitHubIdentity, reconcile
 
@@ -48,7 +51,7 @@ NO_GITHUB_NOTE = "GitHub is not configured, so the identity check was skipped."
 GITHUB_FAILED_NOTE = "GitHub could not be reached, so the identity check was skipped."
 
 
-def _response(document: ResumeDocument) -> ResumeDocumentResponse:
+def to_response(document: ResumeDocument) -> ResumeDocumentResponse:
     return ResumeDocumentResponse(
         id=document.id,
         profile_id=document.profile_id,
@@ -62,7 +65,8 @@ def _response(document: ResumeDocument) -> ResumeDocumentResponse:
         template=document.template,
         content=ResumeContent.model_validate(document.content),
         layout=Layout.model_validate(document.layout),
-        comments=document.comments,
+        comments=[ResumeComment.model_validate(item) for item in document.comments],
+        generation=Generation.model_validate(document.generation),
         created_at=document.created_at,
     )
 
@@ -83,7 +87,7 @@ async def owned_document(session: AsyncSession, document_id: uuid.UUID) -> Resum
     return document
 
 
-async def _snapshot(session: AsyncSession, document: ResumeDocument, source: str) -> None:
+async def snapshot_revision(session: AsyncSession, document: ResumeDocument, source: str) -> None:
     session.add(
         ResumeDocumentRevision(
             document_id=document.id,
@@ -116,23 +120,25 @@ async def create_document(
         if match is None or match.profile_id != profile.id:
             raise MatchNotFoundError
     structured = StructuredProfile.model_validate(profile.structured_profile)
+    content = profile_to_content(structured)
+    ensure_ids(content)
     document = ResumeDocument(
         candidate_id=profile.candidate_id,
         profile_id=profile.id,
         match_id=payload.match_id,
         title=payload.title or f"{profile.name} resume"[:200],
         page_target=payload.page_target,
-        content=profile_to_content(structured).model_dump(mode="json"),
+        content=content.model_dump(mode="json"),
     )
     session.add(document)
     await session.flush()
     await session.refresh(document)
-    await _snapshot(session, document, "create")
-    return _response(document)
+    await snapshot_revision(session, document, "create")
+    return to_response(document)
 
 
 async def get_document(session: AsyncSession, document_id: uuid.UUID) -> ResumeDocumentResponse:
-    return _response(await owned_document(session, document_id))
+    return to_response(await owned_document(session, document_id))
 
 
 async def count_documents(session: AsyncSession, profile_id: uuid.UUID | None = None) -> int:
@@ -194,10 +200,10 @@ async def update_document(
             document.content = content
             document.version += 1
             await session.flush()
-            await _snapshot(session, document, "manual_edit")
+            await snapshot_revision(session, document, "manual_edit")
     await session.flush()
     await session.refresh(document)
-    return _response(document)
+    return to_response(document)
 
 
 async def delete_document(session: AsyncSession, document_id: uuid.UUID) -> None:
@@ -206,7 +212,7 @@ async def delete_document(session: AsyncSession, document_id: uuid.UUID) -> None
     await session.flush()
 
 
-async def _approved_achievements(
+async def approved_achievements(
     session: AsyncSession, candidate_id: uuid.UUID
 ) -> list[Achievement]:
     rows = await session.execute(
@@ -245,7 +251,7 @@ async def detect_conflicts(
     if profile is None:
         raise ProfileNotFoundError
     structured = StructuredProfile.model_validate(profile.structured_profile)
-    achievements = await _approved_achievements(session, document.candidate_id)
+    achievements = await approved_achievements(session, document.candidate_id)
     return reconcile(structured, achievements, identity)
 
 

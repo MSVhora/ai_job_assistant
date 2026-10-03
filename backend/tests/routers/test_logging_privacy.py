@@ -136,3 +136,46 @@ async def test_resume_document_flow_logs_no_profile_text_or_keys(
     assert RESUME_MARKER not in logged
     assert API_KEY not in logged
     assert not KEY_SHAPED.search(logged)
+
+
+async def test_resume_generation_flow_logs_no_jd_comment_prompt_or_evidence_text(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    from fakes import FakeResumeLLM, seed_resume_world
+
+    caplog.set_level(logging.DEBUG)
+    for name, existing in logging.root.manager.loggerDict.items():
+        if name.startswith("app") and isinstance(existing, logging.Logger):
+            existing.disabled = False
+    world = await seed_resume_world()
+    llm = FakeResumeLLM(jd={"must_haves": [POSTING_MARKER], "keywords": ["Snowflake"]})
+    prompts = install_acompletion(monkeypatch, llm)
+
+    created = await client.post(
+        "/api/resume-documents",
+        json={
+            "profile_id": str(world["profile"]),
+            "job_description": f"We need {POSTING_MARKER} and Snowflake",
+        },
+    )
+    document = created.json()
+    entry = next(job for job in document["content"]["work"] if job["company"] == "Acme Corp")
+    base = f"/api/resume-documents/{document['id']}"
+    await client.post(
+        f"{base}/comments",
+        json={"target": {"section": "work", "block_id": entry["id"]}, "text": RESUME_MARKER},
+    )
+    applied = await client.post(f"{base}/apply-comments")
+    edited = await client.patch(
+        f"{base}/bullets/{entry['highlights'][0]['id']}", json={"text": f"Shipped {RESUME_MARKER}"}
+    )
+
+    assert (created.status_code, applied.status_code, edited.status_code) == (201, 200, 200)
+    assert prompts, "the flow must have exercised the LLM wrapper"
+    logged = "\n".join(record.getMessage() for record in caplog.records)
+    assert "cost_usd=" in logged
+    for secret in (RESUME_MARKER, POSTING_MARKER, "Faster nightly import", "Helm charts"):
+        assert secret not in logged
+    for call in prompts:
+        for message in call["messages"]:
+            assert message["content"][:80] not in logged

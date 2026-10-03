@@ -210,6 +210,50 @@ async def test_resume_document_migration_round_trip_and_checks(migrated_database
         await _alembic("upgrade", "head")
 
 
+async def test_resume_document_generation_migration_round_trip(migrated_database: None) -> None:
+    from fakes import seed_profile_light
+
+    async def has_column() -> bool:
+        async with session_factory() as session:
+            return bool(
+                (
+                    await session.execute(
+                        text(
+                            "SELECT count(*) FROM information_schema.columns"
+                            " WHERE table_name = 'resume_document' AND column_name = 'generation'"
+                        )
+                    )
+                ).scalar_one()
+            )
+
+    try:
+        await _alembic("downgrade", "0026")
+        assert await has_column() is False
+
+        await _alembic("upgrade", "head")
+        assert await has_column() is True
+
+        profile_id = await seed_profile_light()
+        async with session_factory() as session:
+            await session.execute(
+                text(
+                    "INSERT INTO resume_document (candidate_id, profile_id, title)"
+                    " SELECT candidate_id, id, 't' FROM profile WHERE id = :profile_id"
+                ),
+                {"profile_id": profile_id},
+            )
+            await session.commit()
+            stored = (
+                await session.execute(text("SELECT generation FROM resume_document"))
+            ).scalar_one()
+        assert stored == {}
+    finally:
+        async with session_factory() as session:
+            await session.execute(text("TRUNCATE profile, candidate, resume_document CASCADE"))
+            await session.commit()
+        await _alembic("upgrade", "head")
+
+
 async def test_schema_audit_has_no_findings(migrated_database: None) -> None:
     from audit_schema import audit
 

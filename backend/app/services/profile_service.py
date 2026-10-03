@@ -5,7 +5,7 @@ from typing import Any, cast
 
 from fastapi import BackgroundTasks
 from pydantic import ValidationError
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import session_factory
@@ -14,6 +14,7 @@ from app.core.errors import (
     ResumeDraftUnavailableError,
     ResumeNotFoundError,
 )
+from app.core.pagination import DEFAULT_PAGE, Pagination
 from app.models import Profile, ProfileRevision, Resume, RevisionSource
 from app.schemas.profile import (
     ProfileCreate,
@@ -152,8 +153,19 @@ def _profile_response(
     )
 
 
-async def list_profiles(session: AsyncSession) -> list[ProfileSummary]:
-    result = await session.execute(select(Profile).order_by(Profile.created_at))
+async def count_profiles(session: AsyncSession) -> int:
+    return (await session.execute(select(func.count()).select_from(Profile))).scalar_one()
+
+
+async def list_profiles(
+    session: AsyncSession, page: Pagination = DEFAULT_PAGE
+) -> list[ProfileSummary]:
+    result = await session.execute(
+        select(Profile)
+        .order_by(Profile.created_at, Profile.id)
+        .limit(page.limit)
+        .offset(page.offset)
+    )
     summaries: list[ProfileSummary] = []
     for profile in result.scalars().all():
         filename = await _resume_filename(session, profile.source_resume_id)

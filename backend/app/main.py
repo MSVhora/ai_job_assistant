@@ -12,6 +12,7 @@ from app.core.errors import (
     domain_error_handler,
     request_validation_error_handler,
 )
+from app.core.pagination import TOTAL_COUNT_HEADER
 from app.routers import health, jobs, matches, profile, resume, setup
 
 if TYPE_CHECKING:
@@ -27,8 +28,9 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=settings.cors_origins,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "Accept"],
+        expose_headers=[TOTAL_COUNT_HEADER],
     )
     application.include_router(health.router)
     application.include_router(setup.router)

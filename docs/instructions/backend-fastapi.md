@@ -2,7 +2,7 @@
 
 Applies to everything under `backend/`.
 
-> **Target state.** Rules marked *(v5 #46)* or *(v5 #47)* describe tooling or behaviour that the
+> **Target state.** Rules marked *(v5 #47)* describe tooling or behaviour that the
 > [v5 plans](../plans/v5/v5-hardening-plan.md) bring the code up to. Until each lands, the code
 > may not yet comply; the plan for each gap exists and nothing here is aspirational filler.
 
@@ -36,10 +36,10 @@ Applies to everything under `backend/`.
 - **LLM calls**: only via `adapters/llm.py`, which returns token usage and logs it; user-triggered batch LLM actions are confirm-gated and show an estimated cost before they run *(v5 #47)*. Structured extraction must validate against a pydantic schema and retry/repair once on failure before erroring.
 - **Job sources**: only via the `JobSource` protocol. A failing source degrades gracefully (skip + warn), never fails the whole search.
 - **Long-running work** (ingestion runs, batch scoring, embeddings): `BackgroundTasks` with status queryable from the DB — never a synchronous request that hangs. A run guard (partial unique index) prevents duplicate concurrent runs and a sweeper reclaims stuck runs.
-- **Outbound HTTP** *(v5 #46)*: every client call has an explicit timeout and goes through the shared retry policy (`adapters/retry.py`).
-- **List endpoints** *(v5 #46)*: bounded by a `limit` (with a documented maximum) and, where unbounded growth is possible, `offset`; the total is exposed via `X-Total-Count` where the UI paginates.
+- **Outbound HTTP**: every client call has an explicit timeout (job-source clients 30 s, LLM/embedding calls `LLM_TIMEOUT_S`) and goes through the shared retry policy (`adapters/retry.py`).
+- **List endpoints**: bounded by a `limit` (default 100, maximum 200; recent runs default 20, a run's postings default 250 and max 1000) and `offset`, using the shared `pagination()` dependency; the total is exposed via `X-Total-Count`, which CORS exposes.
 - **Logging**: stdlib logging with `key=value` messages (operation, duration, token counts for LLM calls). Never log resume content, API keys, tokens, or full prompts.
-- **Security**: file uploads size- and type-checked (magic bytes); paths built with `uuid` names, never user-supplied filenames; CORS restricted to configured origins with explicit methods and headers *(v5 #46)* — never `*` together with credentials in production.
+- **Security**: file uploads size- and type-checked (magic bytes); paths built with `uuid` names, never user-supplied filenames; CORS restricted to configured origins with explicit methods and headers — never `*` together with credentials in production.
 
 ## Tooling (gates)
 

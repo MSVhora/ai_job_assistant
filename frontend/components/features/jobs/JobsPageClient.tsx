@@ -11,10 +11,7 @@ import {
   SearchStepperModal,
   StartSearchButton,
 } from "@/components/features/jobs/SearchStepperModal";
-import {
-  DEFAULT_MATCH_FILTERS,
-  type MatchFilterValues,
-} from "@/hooks/use-matches";
+import { DEFAULT_MATCH_FILTERS, type MatchFilterValues } from "@/hooks/use-matches";
 import { MatchList, type MatchSelection } from "@/components/features/jobs/MatchList";
 import { JobDetailPanel } from "@/components/features/jobs/JobDetailPanel";
 import { MatchFilterPanel } from "@/components/features/jobs/MatchFilterPanel";
@@ -57,15 +54,18 @@ export function JobsPageClient() {
   const sources = useSources();
   const profiles = useProfiles();
   const profilesList = profiles.data ?? [];
-  const fallbackProfileId =
-    urlProfileId === null ? (profilesList[0]?.profile_id ?? null) : urlProfileId;
+  const fallbackProfileId = urlProfileId ?? profilesList[0]?.profile_id ?? null;
   const activeProfileId = fallbackProfileId;
   const selectedRunStatus = useJobSearchStatus(selectedSearchId, activeProfileId);
   const setup = useSetupCheck();
   const selection: MatchSelection = {
     match: selectedMatch,
-    toggle: (match) => setSelectedMatch((current) => (current?.id === match.id ? null : match)),
-    clear: () => setSelectedMatch(null),
+    toggle: (match) => {
+      setSelectedMatch((current) => (current?.id === match.id ? null : match));
+    },
+    clear: () => {
+      setSelectedMatch(null);
+    },
   };
   const changeFilters = (next: MatchFilterValues) => {
     setFilters(next);
@@ -76,7 +76,7 @@ export function JobsPageClient() {
     setDismissedIds([]);
     setSelectedSearchId(null);
     setSelectedMatch(null);
-    void router.replace(`/jobs?profile=${profileId}`);
+    router.replace(`/jobs?profile=${profileId}`);
   };
 
   // Persisted runs: banners for still-active runs are derived from the
@@ -101,12 +101,10 @@ export function JobsPageClient() {
     );
   }
 
-  if (sources.isError || sources.data === undefined) {
+  if (sources.isError) {
     return (
       <Card title="Job sources">
-        <p className="text-sm text-red-700">
-          Could not load the job sources from the backend.
-        </p>
+        <p className="text-sm text-red-700">Could not load the job sources from the backend.</p>
         <button
           type="button"
           onClick={() => void sources.refetch()}
@@ -134,9 +132,7 @@ export function JobsPageClient() {
     );
   }
 
-  const unconfigured = sources.data.filter(
-    (source) => source.enabled && !source.is_configured,
-  );
+  const unconfigured = sources.data.filter((source) => source.enabled && !source.is_configured);
   const setupWarnings = setup.data?.warnings ?? [];
   const layoutClassName =
     selectedMatch !== null
@@ -159,7 +155,10 @@ export function JobsPageClient() {
           </div>
         </div>
         <div className="scrollbar-hidden flex min-h-0 flex-1 grow flex-col gap-5 overflow-y-auto p-5">
-          <section className="rounded-2xl border border-violet-100 bg-violet-50/40 p-3" aria-label="Profile scope">
+          <section
+            className="rounded-2xl border border-violet-100 bg-violet-50/40 p-3"
+            aria-label="Profile scope"
+          >
             <ProfileSelector
               profiles={profilesList}
               activeProfileId={activeProfileId}
@@ -169,15 +168,15 @@ export function JobsPageClient() {
               hint="Every search run and the match list below are scoped to this profile."
             />
           </section>
-          <MatchFilterPanel
-            filters={filters}
-            onChange={changeFilters}
-            priority={priority}
-          />
+          <MatchFilterPanel filters={filters} onChange={changeFilters} priority={priority} />
         </div>
         <div className="flex shrink-0 flex-col gap-2 border-t border-gray-100 p-3">
           <RebuildBanner profileId={activeProfileId} />
-          <StartSearchButton onClick={() => setSearchOpen(true)} />
+          <StartSearchButton
+            onClick={() => {
+              setSearchOpen(true);
+            }}
+          />
         </div>
       </aside>
 
@@ -234,7 +233,7 @@ export function JobsPageClient() {
           onFiltersChange={changeFilters}
         />
         <SearchResults
-          searchId={selectedSearchId ?? (searches.data?.[0]?.search_id ?? null)}
+          searchId={selectedSearchId ?? searches.data?.[0]?.search_id ?? null}
           profileId={activeProfileId}
           status={selectedRunStatus.data?.status}
         />

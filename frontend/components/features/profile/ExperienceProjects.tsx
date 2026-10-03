@@ -52,7 +52,13 @@ export function ExperienceSection() {
       defaultOpen={fields.length > 0}
       hasError={errors !== undefined}
       action={
-        <Button variant="secondary" className={addBtn} onClick={() => append(emptyExperience)}>
+        <Button
+          variant="secondary"
+          className={addBtn}
+          onClick={() => {
+            append(emptyExperience);
+          }}
+        >
           + Add role
         </Button>
       }
@@ -61,7 +67,13 @@ export function ExperienceSection() {
         <EmptyState
           message="No roles yet — add your work experience, internships and freelance work."
           action={
-            <Button variant="secondary" className={addBtn} onClick={() => append(emptyExperience)}>
+            <Button
+              variant="secondary"
+              className={addBtn}
+              onClick={() => {
+                append(emptyExperience);
+              }}
+            >
               + Add role
             </Button>
           }
@@ -73,7 +85,9 @@ export function ExperienceSection() {
               key={field.id}
               index={index}
               count={fields.length}
-              onRemove={() => remove(index)}
+              onRemove={() => {
+                remove(index);
+              }}
               onMove={move}
               title={
                 field.title || field.company
@@ -89,12 +103,34 @@ export function ExperienceSection() {
               }
             >
               <div className="grid gap-3 sm:grid-cols-2">
-                <TextField label="Company" name={`experience.${index}.company`} placeholder="e.g. Acme Corp" error={errors?.[index]?.company?.message} />
-                <TextField label="Title" name={`experience.${index}.title`} placeholder="e.g. Senior Engineer" error={errors?.[index]?.title?.message} />
-                <TextField label="Location" name={`experience.${index}.location`} placeholder="e.g. Berlin or Remote" />
+                <TextField
+                  label="Company"
+                  name={`experience.${index}.company`}
+                  placeholder="e.g. Acme Corp"
+                  error={errors?.[index]?.company?.message}
+                />
+                <TextField
+                  label="Title"
+                  name={`experience.${index}.title`}
+                  placeholder="e.g. Senior Engineer"
+                  error={errors?.[index]?.title?.message}
+                />
+                <TextField
+                  label="Location"
+                  name={`experience.${index}.location`}
+                  placeholder="e.g. Berlin or Remote"
+                />
                 <div className="grid grid-cols-2 gap-3">
-                  <TextField label="Start date" name={`experience.${index}.start_date`} placeholder="Mar 2021" />
-                  <TextField label="End date" name={`experience.${index}.end_date`} placeholder="Present" />
+                  <TextField
+                    label="Start date"
+                    name={`experience.${index}.start_date`}
+                    placeholder="Mar 2021"
+                  />
+                  <TextField
+                    label="End date"
+                    name={`experience.${index}.end_date`}
+                    placeholder="Present"
+                  />
                 </div>
               </div>
               <label className="mt-3 flex w-fit items-center gap-2 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-800">
@@ -135,7 +171,13 @@ export function ProjectsSection() {
       defaultOpen={fields.length > 0}
       hasError={errors !== undefined}
       action={
-        <Button variant="secondary" className={addBtn} onClick={() => append(emptyProject)}>
+        <Button
+          variant="secondary"
+          className={addBtn}
+          onClick={() => {
+            append(emptyProject);
+          }}
+        >
           + Add project
         </Button>
       }
@@ -144,7 +186,13 @@ export function ProjectsSection() {
         <EmptyState
           message="No projects yet — add personal, open-source or academic projects."
           action={
-            <Button variant="secondary" className={addBtn} onClick={() => append(emptyProject)}>
+            <Button
+              variant="secondary"
+              className={addBtn}
+              onClick={() => {
+                append(emptyProject);
+              }}
+            >
               + Add project
             </Button>
           }
@@ -156,18 +204,37 @@ export function ProjectsSection() {
               key={field.id}
               index={index}
               count={fields.length}
-              onRemove={() => remove(index)}
+              onRemove={() => {
+                remove(index);
+              }}
               onMove={move}
               title={field.name || (fields.length > 1 ? `Project ${index + 1}` : undefined)}
               subtitle={field.role || undefined}
             >
               <div className="grid gap-3 sm:grid-cols-2">
-                <TextField label="Name" name={`projects.${index}.name`} placeholder="e.g. JobMatch" error={errors?.[index]?.name?.message} />
-                <TextField label="Role" name={`projects.${index}.role`} placeholder="e.g. Creator, Maintainer" />
+                <TextField
+                  label="Name"
+                  name={`projects.${index}.name`}
+                  placeholder="e.g. JobMatch"
+                  error={errors?.[index]?.name?.message}
+                />
+                <TextField
+                  label="Role"
+                  name={`projects.${index}.role`}
+                  placeholder="e.g. Creator, Maintainer"
+                />
                 <TextField label="URL" name={`projects.${index}.url`} placeholder="https://…" />
                 <div className="grid grid-cols-2 gap-3">
-                  <TextField label="Start date" name={`projects.${index}.start_date`} placeholder="Jan 2024" />
-                  <TextField label="End date" name={`projects.${index}.end_date`} placeholder="Present" />
+                  <TextField
+                    label="Start date"
+                    name={`projects.${index}.start_date`}
+                    placeholder="Jan 2024"
+                  />
+                  <TextField
+                    label="End date"
+                    name={`projects.${index}.end_date`}
+                    placeholder="Present"
+                  />
                 </div>
               </div>
               <div className="mt-3">

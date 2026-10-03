@@ -9,7 +9,7 @@ function EstimateLine({ estimate }: { estimate: CostEstimate }) {
   return (
     <p className="mt-1.5 text-xs text-gray-700" aria-live="polite">
       Estimated cost: ≈ {tokens.toLocaleString()} tokens
-      {estimate.usd !== null && estimate.usd !== undefined
+      {estimate.usd !== null
         ? `, ≈ ${formatUsd(estimate.usd)}`
         : ` — ${estimate.message ?? "cost unavailable for this model"}`}
       . Approximate; up to double if the model has to repair its answer.
@@ -21,9 +21,9 @@ const COPY = {
   tune: {
     description: (
       <>
-        Tuning reads your opened, saved and dismissed matches and rewrites the query specs for
-        every source with <strong>one LLM call</strong> — your API key pays. Your currently
-        stored specs are shown below and are replaced.
+        Tuning reads your opened, saved and dismissed matches and rewrites the query specs for every
+        source with <strong>one LLM call</strong> — your API key pays. Your currently stored specs
+        are shown below and are replaced.
       </>
     ),
     confirmLabel: "Tune my queries",
@@ -32,8 +32,7 @@ const COPY = {
     description: (
       <>
         Regenerating asks the model for fresh query specs for every enabled source with{" "}
-        <strong>one LLM call</strong> — your API key pays. Your currently stored specs are
-        replaced.
+        <strong>one LLM call</strong> — your API key pays. Your currently stored specs are replaced.
       </>
     ),
     confirmLabel: "Regenerate",

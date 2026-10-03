@@ -56,7 +56,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full scroll-smooth antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col" suppressHydrationWarning>
+      <body className="flex min-h-full flex-col" suppressHydrationWarning>
         <SiteHeader />
         <Providers>{children}</Providers>
         <Toaster />

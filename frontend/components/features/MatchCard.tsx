@@ -7,7 +7,11 @@ export const MATCH_STORIES = [
     summary:
       "Own core services of a health platform used by 4M people. Ship features weekly across a 12-person product engineering guild.",
     why: "Your 7 years of Kotlin and TypeScript, Play Store launch experience and offline-first architecture work line up exactly.",
-    quals: ["Shipped 3 top-100 apps", "Led modularization of a 200k-LOC monolith", "CI/CD for mobile at scale"],
+    quals: [
+      "Shipped 3 top-100 apps",
+      "Led modularization of a 200k-LOC monolith",
+      "CI/CD for mobile at scale",
+    ],
     score: 94,
     bar: "w-[94%]",
     label: "Perfect fit",
@@ -20,7 +24,11 @@ export const MATCH_STORIES = [
     summary:
       "Drive the roadmap for a B2B analytics suite. Own discovery, prioritization and launch across two squads.",
     why: "Your PLG background and track record of 0→1 launches match the growth-stage roadmap perfectly.",
-    quals: ["Launched 2 products past $5M ARR", "Led squads of 8+ engineers", "Strong SQL + experimentation"],
+    quals: [
+      "Launched 2 products past $5M ARR",
+      "Led squads of 8+ engineers",
+      "Strong SQL + experimentation",
+    ],
     score: 92,
     bar: "w-[92%]",
     label: "Perfect fit",
@@ -59,7 +67,11 @@ export const MATCH_STORIES = [
     summary:
       "Turn operational data into decisions: requirements, dashboards and process models for the logistics arm.",
     why: "Your SQL depth, Tableau dashboards and logistics domain knowledge cover every line of their brief.",
-    quals: ["Built 30+ exec dashboards", "Six Sigma Green Belt", "Automated weekly reporting suite"],
+    quals: [
+      "Built 30+ exec dashboards",
+      "Six Sigma Green Belt",
+      "Automated weekly reporting suite",
+    ],
     score: 87,
     bar: "w-[87%]",
     label: "Strong fit",
@@ -95,7 +107,7 @@ export function MatchCard({ story }: { story: (typeof MATCH_STORIES)[number] }) 
   return (
     <article className="h-full rounded-3xl bg-gradient-to-br from-violet-600 via-purple-600 to-fuchsia-500 p-px shadow-2xl shadow-violet-300/50">
       <div className="relative flex h-full flex-col gap-5 overflow-hidden rounded-[calc(1.5rem-1px)] bg-white p-6 sm:flex-row sm:gap-6 sm:p-7">
-        <SparkleIcon className="pointer-events-none absolute -right-3 -top-3 h-20 w-20 text-violet-100" />
+        <SparkleIcon className="pointer-events-none absolute -top-3 -right-3 h-20 w-20 text-violet-100" />
         <SparkleIcon className="pointer-events-none absolute -bottom-4 left-1/3 h-14 w-14 text-fuchsia-100/80" />
 
         <div className="min-w-0 flex-1">
@@ -123,7 +135,7 @@ export function MatchCard({ story }: { story: (typeof MATCH_STORIES)[number] }) 
             ))}
           </div>
           <div className="mt-4 rounded-2xl border border-violet-100 bg-violet-50/50 p-4">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-violet-500">
+            <p className="text-[10px] font-bold tracking-widest text-violet-500 uppercase">
               Summary
             </p>
             <p className="mt-1.5 text-sm leading-relaxed text-gray-600">{story.summary}</p>

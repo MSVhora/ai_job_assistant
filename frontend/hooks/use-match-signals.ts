@@ -23,9 +23,7 @@ export function useMatchSignal(profileId: string | null) {
             ? page
             : {
                 ...page,
-                items: page.items.map((match) =>
-                  match.id === updated.id ? updated : match,
-                ),
+                items: page.items.map((match) => (match.id === updated.id ? updated : match)),
               },
       );
     },

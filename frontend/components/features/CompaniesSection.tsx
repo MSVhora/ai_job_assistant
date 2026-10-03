@@ -17,7 +17,12 @@ const COMPANIES = [
 
 const HIRES = [
   { company: "Tesla", role: "Firmware Engineer, Autopilot", dot: "bg-red-500", ago: "15 min ago" },
-  { company: "Salesforce", role: "Lead Full-Stack Developer", dot: "bg-sky-500", ago: "18 min ago" },
+  {
+    company: "Salesforce",
+    role: "Lead Full-Stack Developer",
+    dot: "bg-sky-500",
+    ago: "18 min ago",
+  },
   { company: "Airbnb", role: "Senior Data Scientist", dot: "bg-rose-500", ago: "22 min ago" },
   { company: "Uber", role: "Engineering Manager", dot: "bg-gray-800", ago: "25 min ago" },
   { company: "Stripe", role: "Staff Frontend Engineer", dot: "bg-indigo-500", ago: "31 min ago" },
@@ -51,7 +56,7 @@ function HiringTicker() {
         {doubled.map((hire, i) => (
           <li
             key={`${hire.company}-${i}`}
-            className="flex items-center gap-2 rounded-full border border-gray-100 bg-white py-1.5 pl-1.5 pr-4 shadow-md shadow-violet-100/60"
+            className="flex items-center gap-2 rounded-full border border-gray-100 bg-white py-1.5 pr-4 pl-1.5 shadow-md shadow-violet-100/60"
           >
             <span
               className={`flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-bold text-white ${hire.dot}`}

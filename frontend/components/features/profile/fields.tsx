@@ -175,7 +175,9 @@ export function SectionCard({
       <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 bg-gray-50/60 px-5 py-4 sm:px-6">
         <button
           type="button"
-          onClick={() => setOpen((current) => !current)}
+          onClick={() => {
+            setOpen((current) => !current);
+          }}
           aria-expanded={open}
           className="flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
         >
@@ -200,7 +202,10 @@ export function SectionCard({
         {action !== undefined && <div className="flex shrink-0 items-center">{action}</div>}
       </div>
       {hasError && !open && (
-        <p role="alert" className="border-b border-red-100 bg-red-50 px-6 py-2 text-xs font-medium text-red-700">
+        <p
+          role="alert"
+          className="border-b border-red-100 bg-red-50 px-6 py-2 text-xs font-medium text-red-700"
+        >
           This section has fields that need attention — reopen to review them.
         </p>
       )}
@@ -237,16 +242,16 @@ export function ItemCard({
             {title !== undefined && (
               <p className="truncate text-sm font-semibold text-gray-900">{title}</p>
             )}
-            {subtitle !== undefined && (
-              <p className="truncate text-xs text-gray-500">{subtitle}</p>
-            )}
+            {subtitle !== undefined && <p className="truncate text-xs text-gray-500">{subtitle}</p>}
           </div>
         </div>
         <div className="flex shrink-0 gap-1">
           <Button
             variant="secondary"
             className="rounded-full px-2.5 py-1 text-xs"
-            onClick={() => onMove(index, index - 1)}
+            onClick={() => {
+              onMove(index, index - 1);
+            }}
             disabled={index === 0}
             aria-label="Move up"
           >
@@ -255,7 +260,9 @@ export function ItemCard({
           <Button
             variant="secondary"
             className="rounded-full px-2.5 py-1 text-xs"
-            onClick={() => onMove(index, index + 1)}
+            onClick={() => {
+              onMove(index, index + 1);
+            }}
             disabled={index === count - 1}
             aria-label="Move down"
           >
@@ -296,7 +303,7 @@ export function StringListField({
   name: string;
   label: string;
   addLabel: string;
-  placeholder?: string;
+  placeholder?: string | undefined;
 }) {
   const { register } = useFormContext<ProfileFormValues>();
   const { fields, append, remove, move } = useFieldArray({
@@ -317,7 +324,9 @@ export function StringListField({
           <Button
             variant="secondary"
             className="rounded-full px-2.5 py-1.5 text-xs"
-            onClick={() => move(index, index - 1)}
+            onClick={() => {
+              move(index, index - 1);
+            }}
             disabled={index === 0}
             aria-label={`Move ${label} ${index + 1} up`}
           >
@@ -326,7 +335,9 @@ export function StringListField({
           <Button
             variant="secondary"
             className="rounded-full px-2.5 py-1.5 text-xs"
-            onClick={() => move(index, index + 1)}
+            onClick={() => {
+              move(index, index + 1);
+            }}
             disabled={index === fields.length - 1}
             aria-label={`Move ${label} ${index + 1} down`}
           >
@@ -335,7 +346,9 @@ export function StringListField({
           <Button
             variant="danger"
             className="rounded-full px-2.5 py-1.5 text-xs"
-            onClick={() => remove(index)}
+            onClick={() => {
+              remove(index);
+            }}
             aria-label={`Remove ${label} ${index + 1}`}
           >
             ✕
@@ -346,7 +359,9 @@ export function StringListField({
         <Button
           variant="secondary"
           className="rounded-full border-dashed px-4 py-1.5 text-xs font-semibold text-violet-700 hover:border-violet-400 hover:bg-violet-50"
-          onClick={() => append("" as never)}
+          onClick={() => {
+            append("" as never);
+          }}
         >
           + {addLabel}
         </Button>
@@ -367,11 +382,11 @@ export function TextField({
 }: {
   label: string;
   name: string;
-  error?: string;
+  error?: string | undefined;
   badge?: ReactNode;
-  placeholder?: string;
-  type?: string;
-  hint?: string;
+  placeholder?: string | undefined;
+  type?: string | undefined;
+  hint?: string | undefined;
   readOnly?: boolean;
 }) {
   const { register } = useFormContext<ProfileFormValues>();
@@ -402,14 +417,18 @@ export function SelectField({
   label: string;
   name: string;
   options: readonly { value: string; label: string }[];
-  error?: string;
+  error?: string | undefined;
   badge?: ReactNode;
-  hint?: string;
+  hint?: string | undefined;
 }) {
   const { register } = useFormContext<ProfileFormValues>();
   return (
     <Field label={label} htmlFor={name} error={error} badge={badge} hint={hint}>
-      <select id={name} className={SELECT_STYLES} {...register(name as FieldPath<ProfileFormValues>)}>
+      <select
+        id={name}
+        className={SELECT_STYLES}
+        {...register(name as FieldPath<ProfileFormValues>)}
+      >
         <option value="">Not set</option>
         {options.map((option) => (
           <option key={option.value} value={option.value}>

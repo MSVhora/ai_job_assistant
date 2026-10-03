@@ -83,13 +83,17 @@ export function MatchCard({
             <span className="truncate font-semibold text-gray-900 group-hover:text-violet-700">
               {posting.title}
             </span>
-            <Badge variant={posting.source.startsWith("apify") ? "third-party-scraper" : "official-api"}>
+            <Badge
+              variant={posting.source.startsWith("apify") ? "third-party-scraper" : "official-api"}
+            >
               {posting.source}
             </Badge>
             <FreshnessBadge expiresAt={posting.expires_at} postedAt={posting.posted_at} />
           </div>
           <p className="mt-0.5 truncate text-sm text-gray-600">
-            {posting.company && <span className="font-medium text-gray-800">{posting.company}</span>}
+            {posting.company && (
+              <span className="font-medium text-gray-800">{posting.company}</span>
+            )}
             {posting.company && posting.location && <span aria-hidden="true"> · </span>}
             {posting.location}
             {salary && (
@@ -125,7 +129,9 @@ export function MatchCard({
             type="button"
             aria-expanded={open}
             aria-controls={detailsId}
-            onClick={() => setOpen((value) => !value)}
+            onClick={() => {
+              setOpen((value) => !value);
+            }}
             className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-semibold text-violet-700 transition-colors hover:bg-violet-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
           >
             <SparkleIcon />
@@ -174,7 +180,9 @@ export function MatchCard({
           <span className="flex items-center gap-1.5">
             <button
               type="button"
-              onClick={() => sendSignal(saved ? "unsave" : "save")}
+              onClick={() => {
+                sendSignal(saved ? "unsave" : "save");
+              }}
               aria-pressed={saved}
               disabled={signal.isPending}
               aria-label={saved ? `Remove ${posting.title} from saved` : `Save ${posting.title}`}
@@ -188,7 +196,9 @@ export function MatchCard({
             </button>
             <button
               type="button"
-              onClick={() => sendSignal(dismissed ? "undismiss" : "dismiss")}
+              onClick={() => {
+                sendSignal(dismissed ? "undismiss" : "dismiss");
+              }}
               disabled={signal.isPending}
               aria-label={
                 dismissed ? `Restore ${posting.title} to the list` : `Dismiss ${posting.title}`

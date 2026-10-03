@@ -55,12 +55,12 @@ export function SourceStep({
 }: {
   sources: SourceInfo[];
   selectedSourceId: string;
-  error?: string;
+  error?: string | undefined;
   onSelect: (sourceId: string) => void;
 }) {
   return (
     <fieldset aria-label="Step 2: source" className="flex flex-col gap-2">
-      <legend className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+      <legend className="text-xs font-semibold tracking-wide text-gray-500 uppercase">
         Search one source
       </legend>
       {sources.map((source) => (
@@ -78,7 +78,9 @@ export function SourceStep({
             className="accent-violet-600"
             disabled={!source.is_configured}
             checked={selectedSourceId === source.name}
-            onChange={() => onSelect(source.name)}
+            onChange={() => {
+              onSelect(source.name);
+            }}
             aria-label={`Search ${source.name}`}
           />
           <span>{source.name}</span>
@@ -136,12 +138,7 @@ export function DetailsStep({
           error={errors.country?.message}
           hint="Two letters, e.g. in."
         >
-          <Input
-            id="job-country"
-            {...form.register("country")}
-            placeholder="in"
-            maxLength={2}
-          />
+          <Input id="job-country" {...form.register("country")} placeholder="in" maxLength={2} />
         </Field>
         <Field
           label="Min. salary"
@@ -159,12 +156,14 @@ export function DetailsStep({
         >
           <Input id="job-max-salary" type="number" min={0} {...form.register("maxSalary")} />
         </Field>
-        <Field
-          label="Results wanted"
-          htmlFor="job-results"
-          error={errors.results_wanted?.message}
-        >
-          <Input id="job-results" type="number" min={1} max={100} {...form.register("results_wanted")} />
+        <Field label="Results wanted" htmlFor="job-results" error={errors.results_wanted?.message}>
+          <Input
+            id="job-results"
+            type="number"
+            min={1}
+            max={100}
+            {...form.register("results_wanted")}
+          />
         </Field>
         <Field
           label="Posted within"
@@ -191,7 +190,9 @@ function SourceFiltersAccordion({ decls }: { decls: SourceFilterDecl[] }) {
     <Accordion
       id="details-advanced-filters"
       open={open}
-      onToggle={() => setOpen((previous) => !previous)}
+      onToggle={() => {
+        setOpen((previous) => !previous);
+      }}
       trigger={
         <span className="text-sm font-semibold text-gray-900">
           More filters for this source (optional)
@@ -210,7 +211,10 @@ function optionDisplay(value: string | boolean | undefined, type: string): strin
   return String(value);
 }
 
-type ReviewRow = { label: string; value: string };
+interface ReviewRow {
+  label: string;
+  value: string;
+}
 
 export function ReviewSummary({
   source,
@@ -223,17 +227,17 @@ export function ReviewSummary({
 }) {
   const { control } = useFormContext<SearchFormValues>();
   const values = useWatch({ control });
-  const query = values?.query ?? {};
+  const query = values.query ?? {};
   const title = query.title?.trim();
   const skillsAll = query.skills_all?.trim();
   const skills = query.skills?.trim();
   const exclude = source.supports_exclusions ? (query.exclude?.trim() ?? "") : null;
   const postedWithin =
-    POSTED_WITHIN_OPTIONS.find((option) => option.value === values?.posted_within)?.label ?? "—";
+    POSTED_WITHIN_OPTIONS.find((option) => option.value === values.posted_within)?.label ?? "—";
   const advanced = (source.filters ?? [])
     .map((decl) => ({
       label: decl.label,
-      display: optionDisplay((query.options ?? {})[decl.key], decl.type),
+      display: optionDisplay(query.options?.[decl.key], decl.type),
     }))
     .filter((entry): entry is { label: string; display: string } => entry.display !== null);
 
@@ -252,25 +256,28 @@ export function ReviewSummary({
     },
     {
       label: "Location",
-      value: (values?.location ?? "").trim() === "" ? "—" : (values?.location ?? "").trim(),
+      value: (values.location ?? "").trim() === "" ? "—" : (values.location ?? "").trim(),
     },
     {
       label: "Country",
-      value: (values?.country ?? "").trim() === "" ? "—" : (values?.country ?? "").trim(),
+      value: (values.country ?? "").trim() === "" ? "—" : (values.country ?? "").trim(),
     },
     { label: "Posted within", value: postedWithin },
     {
       label: "Min. salary",
       value:
-        (values?.minSalary ?? "").trim() === ""
+        (values.minSalary ?? "").trim() === ""
           ? "—"
           : `${values.minSalary}${currency !== null ? ` ${currency}` : ""}`,
     },
     {
       label: "Max. salary",
-      value: (values?.maxSalary ?? "").trim() === "" ? "—" : `${values.maxSalary}${currency !== null ? ` ${currency}` : ""}`,
+      value:
+        (values.maxSalary ?? "").trim() === ""
+          ? "—"
+          : `${values.maxSalary}${currency !== null ? ` ${currency}` : ""}`,
     },
-    { label: "Results wanted", value: String(values?.results_wanted ?? "—") },
+    { label: "Results wanted", value: String(values.results_wanted ?? "—") },
     {
       label: "Advanced filters",
       value:
@@ -289,10 +296,10 @@ export function ReviewSummary({
             key={row.label}
             className="flex items-baseline justify-between gap-4 border-b border-violet-100/70 py-1.5 text-sm last:border-0 last:pb-0"
           >
-            <dt className="shrink-0 text-xs font-semibold uppercase tracking-wide text-gray-500">
+            <dt className="shrink-0 text-xs font-semibold tracking-wide text-gray-500 uppercase">
               {row.label}
             </dt>
-            <dd className="min-w-0 break-words text-right text-gray-900">{row.value}</dd>
+            <dd className="min-w-0 text-right break-words text-gray-900">{row.value}</dd>
           </div>
         ))}
       </dl>

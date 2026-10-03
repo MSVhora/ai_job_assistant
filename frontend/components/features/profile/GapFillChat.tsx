@@ -8,7 +8,10 @@ import { Input } from "@/components/ui/input";
 import { useGapFillTurn } from "@/hooks/use-gap-fill";
 import type { GapFillResponse } from "@/lib/api";
 
-type ChatEntry = { role: "user" | "assistant"; content: string };
+interface ChatEntry {
+  role: "user" | "assistant";
+  content: string;
+}
 
 export function GapFillChat({
   profileId,
@@ -35,7 +38,11 @@ export function GapFillChat({
   };
 
   const start = () => {
-    turn.mutate([], { onSuccess: (data) => applyTurn(data, []) });
+    turn.mutate([], {
+      onSuccess: (data) => {
+        applyTurn(data, []);
+      },
+    });
   };
 
   const send = () => {
@@ -49,7 +56,9 @@ export function GapFillChat({
     setInput("");
     setEntries(nextEntries);
     turn.mutate(messages, {
-      onSuccess: (data) => applyTurn(data, nextEntries),
+      onSuccess: (data) => {
+        applyTurn(data, nextEntries);
+      },
       onError: () => {
         setEntries(entries);
         setInput(text);
@@ -167,7 +176,9 @@ export function GapFillChat({
                 aria-label="Your reply"
                 placeholder="Type your answer…"
                 value={input}
-                onChange={(event) => setInput(event.target.value)}
+                onChange={(event) => {
+                  setInput(event.target.value);
+                }}
                 disabled={turn.isPending}
               />
               <Button

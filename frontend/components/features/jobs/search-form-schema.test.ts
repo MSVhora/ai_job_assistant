@@ -97,7 +97,8 @@ describe("makeSearchFormSchema", () => {
       ...baseValues(adzuna),
       query: {
         title: "Engineer",
-        skills_all: "", skills: "",
+        skills_all: "",
+        skills: "",
         exclude: "",
         options: { title_only: true, distance_km: "25", sort_by: "date" },
       },
@@ -111,7 +112,8 @@ describe("makeSearchFormSchema", () => {
       ...baseValues(adzuna),
       query: {
         title: "Engineer",
-        skills_all: "", skills: "",
+        skills_all: "",
+        skills: "",
         exclude: "",
         options: { nonexistent: "x" },
       },
@@ -126,7 +128,8 @@ describe("makeSearchFormSchema", () => {
       ...baseValues(adzuna),
       query: {
         title: "Engineer",
-        skills_all: "", skills: "",
+        skills_all: "",
+        skills: "",
         exclude: "",
         options: { sort_by: "salary" },
       },
@@ -139,7 +142,13 @@ describe("makeSearchFormSchema", () => {
     const schema = makeSearchFormSchema(adzuna);
     const result = schema.safeParse({
       ...baseValues(adzuna),
-      query: { title: "", skills_all: "", skills: "", exclude: "", options: { distance_km: "2.5" } },
+      query: {
+        title: "",
+        skills_all: "",
+        skills: "",
+        exclude: "",
+        options: { distance_km: "2.5" },
+      },
     });
     expect(result.success).toBe(false);
     expect(JSON.stringify(result.error?.issues)).toContain("whole number");
@@ -157,7 +166,8 @@ describe("toSearchRequest", () => {
     const values = baseValues(adzuna);
     values.query = {
       title: "Engineer",
-      skills_all: "", skills: "",
+      skills_all: "",
+      skills: "",
       exclude: "intern",
       options: {
         title_only: true,
@@ -190,7 +200,8 @@ describe("toSearchRequest", () => {
     const values = baseValues(linkedin);
     values.query = {
       title: "Engineer",
-      skills_all: "", skills: "",
+      skills_all: "",
+      skills: "",
       exclude: "interns",
       options: { workplace_type: "hybrid", company_ids: "123, 456" },
     };

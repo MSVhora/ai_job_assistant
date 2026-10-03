@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   estimateRegenerateQueries,
@@ -20,8 +20,10 @@ const TERMINAL_STATUSES = new Set(["succeeded", "partial", "failed"]);
 export function useJobSearchStatus(searchId: string | null, profileId: string | null) {
   return useQuery({
     queryKey: ["job-search", searchId, profileId],
-    queryFn: () => getJobSearchStatus(searchId as string, profileId as string),
-    enabled: searchId !== null && profileId !== null,
+    queryFn:
+      searchId !== null && profileId !== null
+        ? () => getJobSearchStatus(searchId, profileId)
+        : skipToken,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
       return status !== undefined && ACTIVE_STATUSES.has(status) ? POLL_INTERVAL_MS : false;
@@ -36,8 +38,10 @@ export function useSearchPostings(
 ) {
   return useQuery({
     queryKey: ["job-search-postings", searchId, profileId],
-    queryFn: () => getSearchPostings(searchId as string, profileId as string),
-    enabled: searchId !== null && profileId !== null && enabled,
+    queryFn:
+      searchId !== null && profileId !== null && enabled
+        ? () => getSearchPostings(searchId, profileId)
+        : skipToken,
   });
 }
 
@@ -52,8 +56,7 @@ export function isRunActive(status: string): boolean {
 export function useProfileSearches(profileId: string | null) {
   return useQuery({
     queryKey: ["profile-searches", profileId],
-    queryFn: () => listProfileSearches(profileId as string),
-    enabled: profileId !== null,
+    queryFn: profileId !== null ? () => listProfileSearches(profileId) : skipToken,
   });
 }
 
@@ -75,8 +78,7 @@ export function useRegenerateQueries() {
 export function useRegenerateEstimate(profileId: string | null, enabled: boolean) {
   return useQuery({
     queryKey: ["regenerate-estimate", profileId],
-    queryFn: () => estimateRegenerateQueries(profileId as string),
-    enabled: enabled && profileId !== null,
+    queryFn: enabled && profileId !== null ? () => estimateRegenerateQueries(profileId) : skipToken,
     gcTime: 0,
     retry: false,
   });
@@ -85,8 +87,7 @@ export function useRegenerateEstimate(profileId: string | null, enabled: boolean
 export function useTuneEstimate(profileId: string | null, enabled: boolean) {
   return useQuery({
     queryKey: ["tune-estimate", profileId],
-    queryFn: () => estimateTuneQueries(profileId as string),
-    enabled: enabled && profileId !== null,
+    queryFn: enabled && profileId !== null ? () => estimateTuneQueries(profileId) : skipToken,
     gcTime: 0,
     retry: false,
   });

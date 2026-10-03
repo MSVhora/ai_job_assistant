@@ -5,20 +5,16 @@ import { useState } from "react";
 
 import { MatchCard } from "@/components/features/jobs/MatchCard";
 import { hasActiveFilters } from "@/components/features/jobs/MatchFilterPanel";
-import {
-  DEFAULT_MATCH_FILTERS,
-  useMatches,
-  type MatchFilterValues,
-} from "@/hooks/use-matches";
+import { DEFAULT_MATCH_FILTERS, useMatches, type MatchFilterValues } from "@/hooks/use-matches";
 import type { MatchResponse } from "@/lib/api";
 
 const MATCH_PAGE_SIZE = 20;
 
-export type MatchSelection = {
+export interface MatchSelection {
   match: MatchResponse | null;
   toggle: (match: MatchResponse) => void;
   clear: () => void;
-};
+}
 
 function hasFiltersActive(filters: MatchFilterValues): boolean {
   return hasActiveFilters(filters);
@@ -148,7 +144,7 @@ export function MatchList({
       id="matches-top"
       aria-labelledby="matches-heading"
       aria-live="polite"
-      className="scroll-mt-6 flex min-h-0 flex-col rounded-3xl border border-gray-200 bg-white shadow-lg shadow-gray-100"
+      className="flex min-h-0 scroll-mt-6 flex-col rounded-3xl border border-gray-200 bg-white shadow-lg shadow-gray-100"
     >
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-gray-100 px-5 py-4 sm:px-6">
         <h2 id="matches-heading" className="text-lg font-bold tracking-tight text-gray-900">
@@ -163,7 +159,10 @@ export function MatchList({
           Page {page + 1} of {pageCount}
         </span>
       </div>
-      <nav aria-label="Match views" className="flex gap-1.5 border-b border-gray-100 px-5 pb-3 sm:px-6">
+      <nav
+        aria-label="Match views"
+        className="flex gap-1.5 border-b border-gray-100 px-5 pb-3 sm:px-6"
+      >
         {(
           [
             ["active", "Active"],
@@ -175,7 +174,9 @@ export function MatchList({
           <button
             key={value}
             type="button"
-            onClick={() => changeStatus(value)}
+            onClick={() => {
+              changeStatus(value);
+            }}
             aria-pressed={status === value}
             className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 ${
               status === value
@@ -216,7 +217,7 @@ export function MatchList({
           <>
             <ul
               className={`flex flex-col gap-3 transition-opacity${
-                matches.isFetching ? " opacity-60" : ""
+                matches.isFetching ? "opacity-60" : ""
               }`}
             >
               {list.map((match, index) => (
@@ -226,7 +227,9 @@ export function MatchList({
                   rank={page * MATCH_PAGE_SIZE + index + 1}
                   profileId={profileId}
                   selected={selection.match?.id === match.id}
-                  onOpenDetails={() => selection.toggle(match)}
+                  onOpenDetails={() => {
+                    selection.toggle(match);
+                  }}
                 />
               ))}
             </ul>
@@ -245,9 +248,11 @@ export function MatchList({
         >
           <button
             type="button"
-            onClick={() => changePage(page - 1)}
+            onClick={() => {
+              changePage(page - 1);
+            }}
             disabled={page === 0}
-            className="inline-flex items-center gap-1 rounded-full border border-gray-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:border-violet-300 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
+            className="inline-flex items-center gap-1 rounded-full border border-gray-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:border-violet-300 hover:text-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <ChevronLeftIcon />
             Previous
@@ -257,9 +262,11 @@ export function MatchList({
           </span>
           <button
             type="button"
-            onClick={() => changePage(page + 1)}
+            onClick={() => {
+              changePage(page + 1);
+            }}
             disabled={page >= pageCount - 1}
-            className="inline-flex items-center gap-1 rounded-full border border-gray-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:border-violet-300 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
+            className="inline-flex items-center gap-1 rounded-full border border-gray-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:border-violet-300 hover:text-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 disabled:cursor-not-allowed disabled:opacity-40"
           >
             Next
             <ChevronRightIcon />

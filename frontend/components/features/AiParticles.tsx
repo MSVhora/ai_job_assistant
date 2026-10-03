@@ -35,10 +35,7 @@ function Sparkle({ className }: { className: string }) {
 
 export function AiParticles() {
   return (
-    <div
-      aria-hidden="true"
-      className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
-    >
+    <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
       {TWINKLES.map((className) => (
         <Sparkle key={className} className={`ai-twinkle absolute opacity-0 ${className}`} />
       ))}

@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { useSetupCheck } from "@/hooks/use-setup";
 import { CheckCircleIcon, ExternalLinkIcon, KeyIcon } from "./icons";
 
-type ProviderStep = {
+interface ProviderStep {
   name: string;
   description: string;
   guideHref: string;
@@ -16,7 +16,7 @@ type ProviderStep = {
     adzuna_configured: boolean;
     apify_configured: boolean;
   }) => boolean;
-};
+}
 
 const STEPS: ProviderStep[] = [
   {
@@ -68,7 +68,7 @@ export function SetupChecklist() {
     );
   }
 
-  if (isError || data === undefined) {
+  if (isError) {
     return (
       <section className="rounded-3xl border border-violet-100 bg-white/80 p-6 shadow-xl shadow-violet-100/60 backdrop-blur">
         <p className="text-sm text-red-700">
@@ -110,7 +110,7 @@ export function SetupChecklist() {
           type="button"
           onClick={() => void refetch()}
           disabled={isFetching}
-          className="rounded-full border border-violet-200 bg-white px-4 py-2 text-sm font-semibold text-violet-700 shadow-sm shadow-violet-100 transition hover:-translate-y-0.5 hover:shadow-md hover:shadow-violet-200 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
+          className="rounded-full border border-violet-200 bg-white px-4 py-2 text-sm font-semibold text-violet-700 shadow-sm shadow-violet-100 transition hover:-translate-y-0.5 hover:shadow-md hover:shadow-violet-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
         >
           {isFetching ? "Checking…" : "Re-check status"}
         </button>
@@ -130,9 +130,7 @@ export function SetupChecklist() {
             <li
               key={step.name}
               className={`rounded-2xl border p-4 transition-colors ${
-                done
-                  ? "border-emerald-200 bg-emerald-50/50"
-                  : "border-violet-100 bg-violet-50/40"
+                done ? "border-emerald-200 bg-emerald-50/50" : "border-violet-100 bg-violet-50/40"
               }`}
             >
               <div className="flex items-start gap-3">

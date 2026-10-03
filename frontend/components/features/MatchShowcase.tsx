@@ -22,11 +22,14 @@ export function MatchShowcase() {
     const id = setInterval(() => {
       if (!paused.current) setActive((current) => (current + 1) % MATCH_STORIES.length);
     }, CYCLE_MS);
-    return () => clearInterval(id);
+    return () => {
+      clearInterval(id);
+    };
   }, []);
 
   return (
     <div
+      role="presentation"
       className="relative mx-auto mt-16 max-w-4xl"
       onMouseEnter={() => {
         paused.current = true;

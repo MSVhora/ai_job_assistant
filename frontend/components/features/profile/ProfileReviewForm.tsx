@@ -5,10 +5,7 @@ import { useFieldArray, useFormContext } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import {
-  toProfilePayload,
-  type ProfileFormValues,
-} from "@/lib/profile-schema";
+import { toProfilePayload, type ProfileFormValues } from "@/lib/profile-schema";
 import type { StructuredProfile } from "@/lib/api";
 
 import {
@@ -78,7 +75,13 @@ export function ProfileReviewForm({
   });
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-5" noValidate>
+    <form
+      onSubmit={(event) => {
+        void submit(event);
+      }}
+      className="flex flex-col gap-5"
+      noValidate
+    >
       <SectionCard
         title="Contact"
         description="How employers can reach you"
@@ -102,8 +105,18 @@ export function ProfileReviewForm({
             error={errors.contact?.email?.message}
             badge={aiBadge}
           />
-          <TextField label="Phone" name="contact.phone" placeholder="+1 555 000 0000" badge={aiBadge} />
-          <TextField label="Location" name="contact.location" placeholder="Berlin, Germany" badge={aiBadge} />
+          <TextField
+            label="Phone"
+            name="contact.phone"
+            placeholder="+1 555 000 0000"
+            badge={aiBadge}
+          />
+          <TextField
+            label="Location"
+            name="contact.location"
+            placeholder="Berlin, Germany"
+            badge={aiBadge}
+          />
           <TextField
             label="Country code"
             name="contact.country"
@@ -119,7 +132,9 @@ export function ProfileReviewForm({
             <Button
               variant="secondary"
               className="rounded-full border-dashed px-4 py-1.5 text-xs font-semibold text-violet-700 hover:border-violet-400 hover:bg-violet-50"
-              onClick={() => append(emptyLink)}
+              onClick={() => {
+                append(emptyLink);
+              }}
             >
               + Add link
             </Button>
@@ -152,7 +167,9 @@ export function ProfileReviewForm({
                 <Button
                   variant="danger"
                   className="mt-7 rounded-full px-2.5 py-1.5 text-xs"
-                  onClick={() => remove(index)}
+                  onClick={() => {
+                    remove(index);
+                  }}
                   aria-label={`Remove link ${index + 1}`}
                 >
                   ✕
@@ -259,7 +276,12 @@ export function ProfileReviewForm({
             placeholder="e.g. EU citizen, H-1B needs sponsorship"
             badge={aiBadge}
           />
-          <TextField label="Currency" name="preferences.currency" placeholder="EUR" badge={aiBadge} />
+          <TextField
+            label="Currency"
+            name="preferences.currency"
+            placeholder="EUR"
+            badge={aiBadge}
+          />
           <TextField
             label="Salary min"
             name="preferences.salary_min"
@@ -278,7 +300,11 @@ export function ProfileReviewForm({
       </SectionCard>
 
       <div className="sticky bottom-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-violet-100 bg-white/95 p-4 shadow-xl shadow-violet-100/60 backdrop-blur">
-        <SaveStatus isSaving={isSaving} error={saveError} savedRevisionSource={savedRevisionSource} />
+        <SaveStatus
+          isSaving={isSaving}
+          error={saveError}
+          savedRevisionSource={savedRevisionSource}
+        />
         {errors.root?.message && (
           <p role="alert" className="text-sm text-red-600">
             {errors.root.message}

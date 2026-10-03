@@ -47,7 +47,13 @@ export function EducationSection() {
       defaultOpen={fields.length > 0}
       hasError={errors !== undefined}
       action={
-        <Button variant="secondary" className={addBtn} onClick={() => append(emptyEducation)}>
+        <Button
+          variant="secondary"
+          className={addBtn}
+          onClick={() => {
+            append(emptyEducation);
+          }}
+        >
           + Add education
         </Button>
       }
@@ -56,7 +62,13 @@ export function EducationSection() {
         <EmptyState
           message="No education entries yet — add your degrees, bootcamps or courses."
           action={
-            <Button variant="secondary" className={addBtn} onClick={() => append(emptyEducation)}>
+            <Button
+              variant="secondary"
+              className={addBtn}
+              onClick={() => {
+                append(emptyEducation);
+              }}
+            >
               + Add education
             </Button>
           }
@@ -68,7 +80,9 @@ export function EducationSection() {
               key={field.id}
               index={index}
               count={fields.length}
-              onRemove={() => remove(index)}
+              onRemove={() => {
+                remove(index);
+              }}
               onMove={move}
               title={fields.length > 1 ? `Education ${index + 1}` : undefined}
               subtitle={
@@ -84,11 +98,27 @@ export function EducationSection() {
                   placeholder="e.g. TU Munich"
                   error={errors?.[index]?.institution?.message}
                 />
-                <TextField label="Degree" name={`education.${index}.degree`} placeholder="e.g. BSc Computer Science" />
-                <TextField label="Field of study" name={`education.${index}.field`} placeholder="e.g. Software Engineering" />
+                <TextField
+                  label="Degree"
+                  name={`education.${index}.degree`}
+                  placeholder="e.g. BSc Computer Science"
+                />
+                <TextField
+                  label="Field of study"
+                  name={`education.${index}.field`}
+                  placeholder="e.g. Software Engineering"
+                />
                 <div className="grid grid-cols-2 gap-3">
-                  <TextField label="Start date" name={`education.${index}.start_date`} placeholder="2020" />
-                  <TextField label="End date" name={`education.${index}.end_date`} placeholder="2024" />
+                  <TextField
+                    label="Start date"
+                    name={`education.${index}.start_date`}
+                    placeholder="2020"
+                  />
+                  <TextField
+                    label="End date"
+                    name={`education.${index}.end_date`}
+                    placeholder="2024"
+                  />
                 </div>
               </div>
             </ItemCard>
@@ -112,7 +142,13 @@ export function CertificationsSection() {
       defaultOpen={fields.length > 0}
       hasError={errors !== undefined}
       action={
-        <Button variant="secondary" className={addBtn} onClick={() => append(emptyCertification)}>
+        <Button
+          variant="secondary"
+          className={addBtn}
+          onClick={() => {
+            append(emptyCertification);
+          }}
+        >
           + Add certification
         </Button>
       }
@@ -121,7 +157,13 @@ export function CertificationsSection() {
         <EmptyState
           message="No certifications yet — add AWS, Azure, Scrum and similar credentials."
           action={
-            <Button variant="secondary" className={addBtn} onClick={() => append(emptyCertification)}>
+            <Button
+              variant="secondary"
+              className={addBtn}
+              onClick={() => {
+                append(emptyCertification);
+              }}
+            >
               + Add certification
             </Button>
           }
@@ -133,7 +175,9 @@ export function CertificationsSection() {
               key={field.id}
               index={index}
               count={fields.length}
-              onRemove={() => remove(index)}
+              onRemove={() => {
+                remove(index);
+              }}
               onMove={move}
               title={field.name || (fields.length > 1 ? `Certification ${index + 1}` : undefined)}
               subtitle={field.issuer || undefined}
@@ -145,8 +189,16 @@ export function CertificationsSection() {
                   placeholder="e.g. AWS Solutions Architect"
                   error={errors?.[index]?.name?.message}
                 />
-                <TextField label="Issuer" name={`certifications.${index}.issuer`} placeholder="e.g. Amazon" />
-                <TextField label="Issued" name={`certifications.${index}.issued_date`} placeholder="2022" />
+                <TextField
+                  label="Issuer"
+                  name={`certifications.${index}.issuer`}
+                  placeholder="e.g. Amazon"
+                />
+                <TextField
+                  label="Issued"
+                  name={`certifications.${index}.issued_date`}
+                  placeholder="2022"
+                />
               </div>
             </ItemCard>
           ))}
@@ -169,7 +221,13 @@ export function AwardsSection() {
       defaultOpen={fields.length > 0}
       hasError={errors !== undefined}
       action={
-        <Button variant="secondary" className={addBtn} onClick={() => append(emptyAward)}>
+        <Button
+          variant="secondary"
+          className={addBtn}
+          onClick={() => {
+            append(emptyAward);
+          }}
+        >
           + Add award
         </Button>
       }
@@ -178,7 +236,13 @@ export function AwardsSection() {
         <EmptyState
           message="No awards yet — add hackathon wins, scholarships or employee-of-the-month style recognitions."
           action={
-            <Button variant="secondary" className={addBtn} onClick={() => append(emptyAward)}>
+            <Button
+              variant="secondary"
+              className={addBtn}
+              onClick={() => {
+                append(emptyAward);
+              }}
+            >
               + Add award
             </Button>
           }
@@ -190,14 +254,25 @@ export function AwardsSection() {
               key={field.id}
               index={index}
               count={fields.length}
-              onRemove={() => remove(index)}
+              onRemove={() => {
+                remove(index);
+              }}
               onMove={move}
               title={field.title || (fields.length > 1 ? `Award ${index + 1}` : undefined)}
               subtitle={field.issuer || undefined}
             >
               <div className="grid gap-3 sm:grid-cols-3">
-                <TextField label="Title" name={`awards.${index}.title`} placeholder="e.g. Hackathon winner" error={errors?.[index]?.title?.message} />
-                <TextField label="Issuer" name={`awards.${index}.issuer`} placeholder="e.g. TechCrunch" />
+                <TextField
+                  label="Title"
+                  name={`awards.${index}.title`}
+                  placeholder="e.g. Hackathon winner"
+                  error={errors?.[index]?.title?.message}
+                />
+                <TextField
+                  label="Issuer"
+                  name={`awards.${index}.issuer`}
+                  placeholder="e.g. TechCrunch"
+                />
                 <TextField label="Issued" name={`awards.${index}.issued_date`} placeholder="2023" />
               </div>
             </ItemCard>
@@ -221,7 +296,13 @@ export function ExtraSectionsSection() {
       defaultOpen={fields.length > 0}
       hasError={errors !== undefined}
       action={
-        <Button variant="secondary" className={addBtn} onClick={() => append(emptyExtraSection)}>
+        <Button
+          variant="secondary"
+          className={addBtn}
+          onClick={() => {
+            append(emptyExtraSection);
+          }}
+        >
           + Add section
         </Button>
       }
@@ -230,7 +311,13 @@ export function ExtraSectionsSection() {
         <EmptyState
           message="Nothing here yet — add publications, languages, volunteer work or any other resume section."
           action={
-            <Button variant="secondary" className={addBtn} onClick={() => append(emptyExtraSection)}>
+            <Button
+              variant="secondary"
+              className={addBtn}
+              onClick={() => {
+                append(emptyExtraSection);
+              }}
+            >
               + Add section
             </Button>
           }
@@ -242,7 +329,9 @@ export function ExtraSectionsSection() {
               key={field.id}
               index={index}
               count={fields.length}
-              onRemove={() => remove(index)}
+              onRemove={() => {
+                remove(index);
+              }}
               onMove={move}
               title={field.title || (fields.length > 1 ? `Section ${index + 1}` : undefined)}
             >

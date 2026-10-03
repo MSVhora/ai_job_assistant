@@ -43,18 +43,32 @@ export function SearchQueriesCard({
 
   const regenerateQueries = () => {
     if (profileId === null || regenerate.isPending) return;
-    regenerate.mutate({ profileId }, { onSettled: () => setConfirming(null) });
+    regenerate.mutate(
+      { profileId },
+      {
+        onSettled: () => {
+          setConfirming(null);
+        },
+      },
+    );
   };
 
   const startTune = () => {
     if (profileId === null || tune.isPending) return;
-    tune.mutate(profileId, { onSettled: () => setConfirming(null) });
+    tune.mutate(profileId, {
+      onSettled: () => {
+        setConfirming(null);
+      },
+    });
   };
 
   return (
-    <section className="rounded-2xl border border-gray-200 bg-gray-50/60 p-3" aria-label="Search query">
+    <section
+      className="rounded-2xl border border-gray-200 bg-gray-50/60 p-3"
+      aria-label="Search query"
+    >
       <div className="mb-1 flex flex-wrap items-center justify-between gap-2 px-1">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+        <h2 className="text-xs font-semibold tracking-wide text-gray-500 uppercase">
           AI search queries
         </h2>
         {profileId !== null && structuredProfile !== null && (
@@ -76,17 +90,21 @@ export function SearchQueriesCard({
             </span>
             <button
               type="button"
-              onClick={() => setConfirming("regenerate")}
+              onClick={() => {
+                setConfirming("regenerate");
+              }}
               disabled={busier}
-              className="rounded-full border border-violet-300 bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700 hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
+              className="rounded-full border border-violet-300 bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700 hover:bg-violet-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {regenerate.isPending ? "Regenerating…" : "↻ Regenerate"}
             </button>
             <button
               type="button"
-              onClick={() => setConfirming("tune")}
+              onClick={() => {
+                setConfirming("tune");
+              }}
               disabled={busier}
-              className="rounded-full border border-gray-300 bg-white px-3 py-1 text-xs font-semibold text-gray-700 hover:border-violet-300 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
+              className="rounded-full border border-gray-300 bg-white px-3 py-1 text-xs font-semibold text-gray-700 hover:border-violet-300 hover:text-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Tune my queries
             </button>
@@ -98,7 +116,9 @@ export function SearchQueriesCard({
           kind={confirming}
           profileId={profileId}
           onConfirm={confirming === "tune" ? startTune : regenerateQueries}
-          onCancel={() => setConfirming(null)}
+          onCancel={() => {
+            setConfirming(null);
+          }}
           pending={busier}
         />
       )}
@@ -151,11 +171,7 @@ export function SearchQueriesCard({
             htmlFor="query-exclude"
             hint="Supported by this source."
           >
-            <Input
-              id="query-exclude"
-              {...form.register("query.exclude")}
-              placeholder="intern"
-            />
+            <Input id="query-exclude" {...form.register("query.exclude")} placeholder="intern" />
           </Field>
         ) : (
           <p className="text-xs text-gray-500">This source does not support exclusions.</p>

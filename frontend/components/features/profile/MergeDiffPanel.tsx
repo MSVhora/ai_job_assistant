@@ -45,7 +45,9 @@ function summarize(value: unknown): string {
     return String(value);
   }
   if (Array.isArray(value)) {
-    return value.length === 0 ? "Not set" : `${value.length} entr${value.length === 1 ? "y" : "ies"}`;
+    return value.length === 0
+      ? "Not set"
+      : `${value.length} entr${value.length === 1 ? "y" : "ies"}`;
   }
   const filled = Object.values(value).filter(
     (entry) => entry !== null && entry !== undefined && entry !== "",
@@ -127,7 +129,9 @@ export function MergeDiffPanel({
             <Button
               variant="secondary"
               className="rounded-full px-4 py-1.5 text-xs"
-              onClick={() => setTakenDraft(new Set(differing))}
+              onClick={() => {
+                setTakenDraft(new Set(differing));
+              }}
               disabled={isSaving}
             >
               Use all draft values
@@ -135,7 +139,9 @@ export function MergeDiffPanel({
             <Button
               variant="secondary"
               className="rounded-full px-4 py-1.5 text-xs"
-              onClick={() => setTakenDraft(new Set())}
+              onClick={() => {
+                setTakenDraft(new Set());
+              }}
               disabled={isSaving}
             >
               Keep all current values
@@ -150,15 +156,19 @@ export function MergeDiffPanel({
                 aria-label={FIELD_LABELS[key]}
               >
                 <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                  <span className="text-sm font-semibold text-gray-900">
-                    {FIELD_LABELS[key]}
-                  </span>
-                  <div className="flex gap-1" role="group" aria-label={`Choose value for ${FIELD_LABELS[key]}`}>
+                  <span className="text-sm font-semibold text-gray-900">{FIELD_LABELS[key]}</span>
+                  <div
+                    className="flex gap-1"
+                    role="group"
+                    aria-label={`Choose value for ${FIELD_LABELS[key]}`}
+                  >
                     <Button
                       variant={takenDraft.has(key) ? "secondary" : "primary"}
                       className="rounded-full px-3 py-1 text-xs"
                       aria-pressed={!takenDraft.has(key)}
-                      onClick={() => toggle(key)}
+                      onClick={() => {
+                        toggle(key);
+                      }}
                       disabled={isSaving}
                     >
                       Keep current
@@ -167,7 +177,9 @@ export function MergeDiffPanel({
                       variant={takenDraft.has(key) ? "primary" : "secondary"}
                       className="rounded-full px-3 py-1 text-xs"
                       aria-pressed={takenDraft.has(key)}
-                      onClick={() => toggle(key)}
+                      onClick={() => {
+                        toggle(key);
+                      }}
                       disabled={isSaving}
                     >
                       Use draft
@@ -190,7 +202,11 @@ export function MergeDiffPanel({
         </>
       )}
       <div className="mt-6 flex items-center justify-between gap-3 border-t border-gray-100 pt-4">
-        <SaveStatus isSaving={isSaving} error={saveError} savedRevisionSource={savedRevisionSource} />
+        <SaveStatus
+          isSaving={isSaving}
+          error={saveError}
+          savedRevisionSource={savedRevisionSource}
+        />
         <Button
           onClick={saveMerged}
           disabled={isSaving || differing.length === 0}

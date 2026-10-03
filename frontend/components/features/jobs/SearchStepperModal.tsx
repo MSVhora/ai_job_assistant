@@ -23,7 +23,7 @@ import {
 const STEP_LABELS = ["Profile", "Source", "Details", "Review"] as const;
 const LAST_STEP = 4;
 
-const STEP_FIELDS: (keyof SearchFormValues | string)[][] = [
+const STEP_FIELDS: string[][] = [
   [],
   ["source"],
   [
@@ -106,11 +106,11 @@ export function SearchStepperModal({
   // Reset the wizard whenever it opens: adjust state during render when the
   // `open` prop flips (the render-phase adjustment pattern).
   const [wasOpen, setWasOpen] = useState(open);
-  if (open === true && wasOpen === false) {
+  if (open && !wasOpen) {
     setWasOpen(true);
     setStep(1);
     setSourceName("");
-  } else if (open === false && wasOpen === true) {
+  } else if (!open && wasOpen) {
     setWasOpen(false);
   }
 
@@ -119,7 +119,6 @@ export function SearchStepperModal({
     if (!open) return;
     step4AtRef.current = null;
   }, [open]);
-
 
   useEffect(() => {
     form.setValue("source", sourceName, { shouldValidate: false });
@@ -147,11 +146,11 @@ export function SearchStepperModal({
       location: preferences?.target_location || structured.contact.location || "",
       country: structured.contact.country || "",
       minSalary:
-        preferences?.salary_min !== undefined && preferences?.salary_min !== null
+        preferences?.salary_min !== undefined && preferences.salary_min !== null
           ? String(preferences.salary_min)
           : "",
       maxSalary:
-        preferences?.salary_max !== undefined && preferences?.salary_max !== null
+        preferences?.salary_max !== undefined && preferences.salary_max !== null
           ? String(preferences.salary_max)
           : "",
       posted_within: "any" as const,
@@ -206,14 +205,16 @@ export function SearchStepperModal({
     }
     form.clearErrors("root");
     start.mutate(payload, {
-      onSuccess: (data) => onSearchStarted(data.search_id),
+      onSuccess: (data) => {
+        onSearchStarted(data.search_id);
+      },
     });
   });
 
   // Submissions only come from the review step's button in principle, but
   // implicit submit events (Enter in any input at any step) land on the form
   // too. They advance the wizard instead of ever starting a run early.
-  const onFormSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const onFormSubmit = (event: React.SubmitEvent<HTMLFormElement>) => {
     // A submit must come from an explicit press on the review step AFTER it
     // rendered: the tail end of the pointer gesture that advanced the wizard
     // (pointer-up landing on the submit button that mounts in the Next
@@ -236,8 +237,7 @@ export function SearchStepperModal({
     setStep((current) => Math.max(current - 1, 1));
   };
 
-  const duplicateRunError =
-    start.error instanceof DuplicateRunError ? start.error : null;
+  const duplicateRunError = start.error instanceof DuplicateRunError ? start.error : null;
 
   return (
     <Modal
@@ -281,11 +281,7 @@ export function SearchStepperModal({
             />
           )}
           {step === 2 && (
-            <SourceStep
-              sources={sources}
-              selectedSourceId={sourceName}
-              onSelect={setSourceName}
-            />
+            <SourceStep sources={sources} selectedSourceId={sourceName} onSelect={setSourceName} />
           )}
           {step === 3 && selectedSource !== null && (
             <DetailsStep
@@ -308,12 +304,7 @@ export function SearchStepperModal({
           )}
 
           <div className="flex items-center justify-between gap-3 border-t border-gray-100 pt-4">
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={step === 1}
-              onClick={goingBack}
-            >
+            <Button type="button" variant="secondary" disabled={step === 1} onClick={goingBack}>
               Back
             </Button>
             {step < LAST_STEP ? (
@@ -357,7 +348,7 @@ export function SearchStepperModal({
           )}
           {start.isError && duplicateRunError === null && (
             <p role="alert" className="text-xs text-red-600">
-              {start.error?.message}
+              {start.error.message}
             </p>
           )}
         </form>

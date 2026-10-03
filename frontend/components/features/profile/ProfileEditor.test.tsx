@@ -2,8 +2,8 @@
 
 import type { ReactElement } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 
 import type { ProfileResponse } from "@/lib/api";
 
@@ -30,21 +30,36 @@ vi.mock("./GapFillChat", () => ({
 const queryClient = new QueryClient();
 
 function wrapper(ui: ReactElement) {
-  return (
-    <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>
-  );
+  return <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>;
 }
 
 function profileFixture(missingFields: string[]): ProfileResponse {
   return {
     profile_id: "p-1",
     name: "Main",
-    structured_profile: { contact: { full_name: "Jane Doe" }, skills: ["SQL"] },
+    structured_profile: {
+      contact: {
+        full_name: "Jane Doe",
+        email: null,
+        phone: null,
+        location: null,
+        country: null,
+        links: [],
+      },
+      headline: null,
+      summary: null,
+      skills: ["SQL"],
+      experience: [],
+      projects: [],
+      education: [],
+      certifications: [],
+      awards: [],
+      extra_sections: [],
+      preferences: null,
+    },
     missing_fields: missingFields,
   } as unknown as ProfileResponse;
 }
-
-afterEach(cleanup);
 
 describe("EditorBody gap-fill visibility", () => {
   it("hides the chat when the profile has no missing fields", () => {

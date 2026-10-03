@@ -151,6 +151,7 @@ class MatchingOutcome(BaseModel):
     rationale_count: int = 0
     rerank_prompt_tokens: int = 0
     rerank_completion_tokens: int = 0
+    rerank_cost_usd: float | None = None
     warning: str | None = None
 
 

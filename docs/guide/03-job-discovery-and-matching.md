@@ -349,7 +349,8 @@ re-finds one of them — there is no one-time backfill.
   verdicts on top of the SQL base; everything else keeps the SQL blend.
 - **Repeat searches are cheap** — postings whose rationale is still valid are not sent to
   the LLM again; a search that adds nothing new to the top costs zero LLM tokens. The run
-  banner shows the matching stage's outcome, including the re-rank token usage.
+  banner shows the matching stage's outcome, including the re-rank token usage and,
+  when the model's price is known, its approximate cost.
 - **Profile edits clear rationales** — saving profile content or applying gap-fill answers
   re-scores all matches in SQL and clears the now-stale rationales and sub-scores (no LLM
   call on the save path). The next search re-ranks the new top N against the updated
@@ -466,8 +467,10 @@ The queries card offers a manual, confirm-gated **Tune my queries** action. It
 aggregates your engagement signals — which titles, companies, and of your profile's
 top skills appear in *clicked-or-saved* matches vs *never-opened* matches vs
 *dismissed* matches — and rewrites the stored query specs for every enabled source in
-one LLM call (a few thousand tokens; your API key pays, so the dialog asks you to
-confirm first).
+one LLM call (your API key pays, so the dialog shows an estimate — approximate tokens
+and dollars — and asks you to confirm first; the dollar figure comes from LiteLLM's
+price map or your `LLM_PRICE_*` overrides, and reads "cost unavailable for this model"
+when neither knows the model).
 
 - **It cannot be silently reverted** — after tuning, the stored query hash matches the
   profile's current inputs, so the automatic freshness regeneration skips until the

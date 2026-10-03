@@ -5,8 +5,9 @@ from typing import Any
 
 import pytest
 from fakes import VALID_PROFILE, install_acompletion, llm_response
+from httpx import ASGITransport, AsyncClient
 
-from app.adapters.llm import LLMError
+from app.adapters.llm import LLMError, estimate_tokens
 from app.core.config import get_settings
 from app.core.db import session_factory
 from app.core.errors import (
@@ -14,12 +15,17 @@ from app.core.errors import (
     NoJobSourcesConfiguredError,
     NoTunableSignalsError,
 )
+from app.main import app
 from app.models import Candidate, JobPosting, Match, Profile, SourceState
 from app.services.query_builder import (
     ensure_queries_fresh,
     parse_stored,
 )
-from app.services.query_tuner import aggregate_signal_buckets, tune_for_profile
+from app.services.query_tuner import (
+    aggregate_signal_buckets,
+    estimate_tuning_cost,
+    tune_for_profile,
+)
 
 pytestmark = pytest.mark.usefixtures("clean_tables")
 
@@ -223,3 +229,71 @@ async def test_tune_llm_failure_keeps_stored_specs(monkeypatch: pytest.MonkeyPat
         stored_specs = parse_stored(stored.search_queries)
         assert stored_specs is not None
         assert stored_specs.queries["adzuna"].title == "Kept Title"
+
+
+async def test_estimate_prices_the_prompt_without_calling_the_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    profile_id = await _seed_profile()
+    await _seed_match(profile_id, "Data Saved", "Acme", saved_at=datetime.now(UTC))
+    calls = install_acompletion(monkeypatch, lambda **kw: llm_response(json.dumps(SPEC_PAYLOAD)))
+
+    async with session_factory() as session:
+        estimate = await estimate_tuning_cost(session, profile_id)
+    async with session_factory() as session:
+        await tune_for_profile(session, profile_id)
+
+    assert len(calls) == 1, "only the real tune call reaches the provider"
+    sent = estimate_tokens(calls[0]["messages"])
+    assert estimate.prompt_tokens == pytest.approx(sent, rel=0.25)
+    assert estimate.completion_tokens > 0
+
+
+async def test_estimate_applies_the_same_preconditions_as_tuning() -> None:
+    profile_id = await _seed_profile()
+
+    async with session_factory() as session:
+        with pytest.raises(NoTunableSignalsError):
+            await estimate_tuning_cost(session, profile_id)
+
+
+async def test_estimate_endpoint_returns_tokens_and_cost(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    profile_id = await _seed_profile()
+    await _seed_match(profile_id, "Data Saved", "Acme", saved_at=datetime.now(UTC))
+    monkeypatch.setattr(get_settings(), "llm_price_in_per_mtok", 1.0)
+    monkeypatch.setattr(get_settings(), "llm_price_out_per_mtok", 2.0)
+    calls = install_acompletion(monkeypatch, lambda **kw: llm_response("{}"))
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://testserver"
+    ) as client:
+        response = await client.post(f"/api/profiles/{profile_id}/tune-queries/estimate")
+
+    body = response.json()
+    assert response.status_code == 200
+    assert calls == []
+    assert body["basis"] == "configured_prices"
+    assert body["message"] is None
+    expected = (body["prompt_tokens"] * 1.0 + body["completion_tokens"] * 2.0) / 1_000_000
+    assert body["usd"] == pytest.approx(expected)
+
+
+async def test_estimate_endpoint_reports_unavailable_cost_for_unknown_models(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    profile_id = await _seed_profile()
+    await _seed_match(profile_id, "Data Saved", "Acme", saved_at=datetime.now(UTC))
+    monkeypatch.setattr(get_settings(), "llm_model", "nope/unknown-model")
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://testserver"
+    ) as client:
+        response = await client.post(f"/api/profiles/{profile_id}/tune-queries/estimate")
+
+    body = response.json()
+    assert response.status_code == 200
+    assert body["usd"] is None
+    assert body["basis"] == "unavailable"
+    assert body["message"] == "cost unavailable for this model"

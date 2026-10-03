@@ -17,16 +17,13 @@ import {
 import { ExperienceSection, ProjectsSection } from "./ExperienceProjects";
 import {
   AiExtractedBadge,
-  ContactIcon,
   DerivedFromExperienceBadge,
-  HeadlineIcon,
-  PreferencesIcon,
-  SectionCard,
   SelectField,
-  SkillsIcon,
   StringListField,
   TextField,
 } from "./fields";
+import { ContactIcon, HeadlineIcon, PreferencesIcon, SkillsIcon } from "./profile-icons";
+import { SectionCard } from "./cards";
 import { SaveStatus } from "./SaveStatus";
 
 const emptyLink = { label: "", url: "" };

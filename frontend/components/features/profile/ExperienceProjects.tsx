@@ -5,15 +5,9 @@ import { useFieldArray, useFormContext } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import type { ProfileFormValues } from "@/lib/profile-schema";
 
-import {
-  EmptyState,
-  ExperienceIcon,
-  ItemCard,
-  ProjectsIcon,
-  SectionCard,
-  StringListField,
-  TextField,
-} from "./fields";
+import { EmptyState, ItemCard, SectionCard } from "./cards";
+import { ExperienceIcon, ProjectsIcon } from "./profile-icons";
+import { StringListField, TextField } from "./fields";
 
 const emptyExperience = {
   company: "",

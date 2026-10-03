@@ -5,17 +5,9 @@ import { useFieldArray, useFormContext } from "react-hook-form";
 import { Button } from "@/components/ui/button";
 import type { ProfileFormValues } from "@/lib/profile-schema";
 
-import {
-  AwardsIcon,
-  CertificationsIcon,
-  EducationIcon,
-  EmptyState,
-  ExtraIcon,
-  ItemCard,
-  SectionCard,
-  StringListField,
-  TextField,
-} from "./fields";
+import { AwardsIcon, CertificationsIcon, EducationIcon, ExtraIcon } from "./profile-icons";
+import { EmptyState, ItemCard, SectionCard } from "./cards";
+import { StringListField, TextField } from "./fields";
 
 const emptyEducation = {
   institution: "",

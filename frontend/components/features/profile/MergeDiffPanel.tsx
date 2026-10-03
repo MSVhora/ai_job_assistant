@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { StructuredProfile } from "@/lib/api";
 
-import { AiExtractedBadge, SectionCard } from "./fields";
+import { AiExtractedBadge } from "./fields";
+import { SectionCard } from "./cards";
 import { SaveStatus } from "./SaveStatus";
 
 const FIELD_KEYS = [

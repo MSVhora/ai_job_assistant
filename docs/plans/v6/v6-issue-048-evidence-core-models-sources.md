@@ -1,7 +1,7 @@
 # Issue #48 — Evidence core: models, `EvidenceSource` interface, noise filter (Week 1)
 
-**Status:** Proposed — for owner review
-**Tracks:** GitHub issue #48 (milestone `v6`, branch `v6/40-evidence-core-models-sources`)
+**Status:** In progress — implemented on `v6/48-evidence-core-models-sources`, pending issue close
+**Tracks:** GitHub issue #48 (milestone `v6`, branch `v6/48-evidence-core-models-sources`)
 **Plan of record:** [v6-implementation-plan.md](v6-implementation-plan.md) §3.1, §4.2–4.3, §9 (migration `0023`)
 **Depends on:** v4 merged (Alembic head `0020`)
 **Blocks:** #49 (settings), #50 (connector + sync), #51 (chunking), everything downstream
@@ -90,3 +90,11 @@ None (no endpoints yet).
 ## Out of scope
 
 Any HTTP to GitHub, chunking, embeddings, LLM, endpoints, UI, the `achievement*` tables (#52).
+
+## Implementation notes (deviations from the plan above)
+
+- **Check constraint name:** the repo naming convention wraps check names as `<table>_<name>_check`, so the model names it `token_count_nonneg` (DB name `evidence_chunk_token_count_nonneg_check`) instead of a `ck_` prefix.
+- **`sync_status` is shared** by `evidence_scope.sync_state` and `evidence_sync_run.status`; the migration creates it once and the tables reference it with `create_type=False`. A fourth enum, `evidence_content_level`, backs `evidence_scope.content_level`.
+- **Noise rules:** `classify(item, bot_logins)` takes the bot list explicitly (callers pass `Settings.evidence_bot_logins`; no second default to keep in sync). Dependency-bump and size-gated rules only fire when the diff size is known — an unknown size is kept. The trivia regex additionally needs a first line of ≤ 5 words, so "format invoice totals using locale-aware rules" is kept. `*.gradle` is not treated as a lockfile path; Gradle bumps are caught by the message + size rule.
+- **Item facts live in `meta`:** `parents`, `additions`, `deletions`, `paths`, `author_login` (no file contents).
+- **Existing tests touched:** the `updated_at` trigger count (5 → 9) and table list in `tests/db/`.

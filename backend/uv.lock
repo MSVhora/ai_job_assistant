@@ -10,6 +10,7 @@ dependencies = [
     { name = "alembic" },
     { name = "asyncpg" },
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "litellm" },
     { name = "pdfplumber" },
     { name = "pgvector" },
@@ -24,7 +25,6 @@ dependencies = [
 
 [package.optional-dependencies]
 dev = [
-    { name = "httpx" },
     { name = "pip-audit" },
     { name = "pre-commit" },
     { name = "pyright" },
@@ -39,7 +39,7 @@ requires-dist = [
     { name = "alembic", specifier = ">=1.13" },
     { name = "asyncpg", specifier = ">=0.29" },
     { name = "fastapi", specifier = ">=0.115" },
-    { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27" },
+    { name = "httpx", specifier = ">=0.27" },
     { name = "litellm", specifier = ">=1.40" },
     { name = "pdfplumber", specifier = ">=0.11" },
     { name = "pgvector", specifier = ">=0.3" },

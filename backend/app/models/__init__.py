@@ -1,4 +1,16 @@
 from app.models.candidate import Candidate
+from app.models.evidence import (
+    ContentLevel,
+    EvidenceChunk,
+    EvidenceChunkItem,
+    EvidenceItem,
+    EvidenceItemStatus,
+    EvidenceKind,
+    EvidenceScope,
+    EvidenceSourceAccount,
+    EvidenceSyncRun,
+    SyncStatus,
+)
 from app.models.job_posting import JobPosting, JobType, RemoteType
 from app.models.job_search import JobSearch, JobSearchStatus, SearchPosting
 from app.models.match import Match, MatchRebuild, MatchRebuildStatus
@@ -9,6 +21,15 @@ from app.models.source_state import SourceState
 
 __all__ = [
     "Candidate",
+    "ContentLevel",
+    "EvidenceChunk",
+    "EvidenceChunkItem",
+    "EvidenceItem",
+    "EvidenceItemStatus",
+    "EvidenceKind",
+    "EvidenceScope",
+    "EvidenceSourceAccount",
+    "EvidenceSyncRun",
     "JobPosting",
     "JobSearch",
     "JobSearchStatus",
@@ -23,4 +44,5 @@ __all__ = [
     "RevisionSource",
     "SearchPosting",
     "SourceState",
+    "SyncStatus",
 ]

@@ -40,6 +40,23 @@ async def _updated_at_triggers() -> int:
         ).scalar_one()
 
 
+async def _evidence_objects() -> tuple[int, int, int]:
+    async with session_factory() as session:
+        row = (
+            await session.execute(
+                text(
+                    "SELECT"
+                    " (SELECT count(*) FROM pg_tables WHERE tablename LIKE 'evidence\\_%'),"
+                    " (SELECT count(*) FROM pg_type WHERE typname IN ('sync_status',"
+                    " 'evidence_kind', 'evidence_item_status', 'evidence_content_level')),"
+                    " (SELECT count(*) FROM pg_indexes"
+                    " WHERE indexname = 'uq_evidence_sync_active_run')"
+                )
+            )
+        ).one()
+    return (row[0], row[1], row[2])
+
+
 async def _canonical_fk_delete_action() -> str:
     async with session_factory() as session:
         return (
@@ -67,8 +84,21 @@ async def test_updated_at_trigger_and_set_null_migrations_round_trip(
         assert await _updated_at_triggers() == 0
 
         await _alembic("upgrade", "head")
-        assert await _updated_at_triggers() == 5
+        assert await _updated_at_triggers() == 9
         assert await _canonical_fk_delete_action() == "n"
+    finally:
+        await _alembic("upgrade", "head")
+
+
+async def test_evidence_core_migration_round_trip(migrated_database: None) -> None:
+    try:
+        await _alembic("downgrade", "0022")
+        assert await _evidence_objects() == (0, 0, 0)
+        assert await _updated_at_triggers() == 5
+
+        await _alembic("upgrade", "head")
+        assert await _evidence_objects() == (6, 4, 1)
+        assert await _updated_at_triggers() == 9
     finally:
         await _alembic("upgrade", "head")
 

@@ -87,8 +87,29 @@ class Settings(BaseSettings):
     seniority_band_staff: Annotated[int, Field(ge=0)] = 8
     seniority_band_principal: Annotated[int, Field(ge=0)] = 12
 
+    # v6 #48: GitHub evidence connector. The token is a fine-grained read-only PAT kept
+    # in .env only; the request budget and rate-limit floor pause a run before GitHub does.
+    github_token: str | None = None
+    github_api_url: str = "https://api.github.com"
+    github_max_requests_per_run: Annotated[int, Field(ge=1, le=5000)] = 1500
+    github_min_remaining_pct: Annotated[int, Field(ge=0, le=90)] = 10
+    evidence_lookback_years: Annotated[int, Field(ge=1, le=30)] = 6
+    evidence_bot_logins: list[str] = [
+        "dependabot",
+        "renovate",
+        "github-actions",
+        "snyk-bot",
+        "greenkeeper",
+        "imgbot",
+    ]
+
     @field_validator(
-        "gemini_api_key", "adzuna_app_id", "adzuna_app_key", "apify_token", mode="before"
+        "gemini_api_key",
+        "adzuna_app_id",
+        "adzuna_app_key",
+        "apify_token",
+        "github_token",
+        mode="before",
     )
     @classmethod
     def _blank_to_none(cls, value: object) -> object:

@@ -1,6 +1,6 @@
 # Issue #40 — `.env.example` correctness and a settings↔env guard
 
-**Status:** Proposed — for owner review
+**Status:** Implemented — no deviations from the plan
 **Tracks:** GitHub issue #40 (milestone `v5`, branch `v5/40-env-example-and-settings`)
 **Plan of record:** [v5 plan](v5-hardening-plan.md) · standards: [backend-fastapi.md](../../instructions/backend-fastapi.md) (config only via `Settings`), `AGENTS.md` ("setup or behavior changed: `.env.example` updated")
 **Depends on:** nothing · **Blocks:** nothing (first in order)

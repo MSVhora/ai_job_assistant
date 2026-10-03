@@ -2,9 +2,9 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 
-from app.models.evidence import ContentLevel, EvidenceKind
+from app.models.evidence import ContentLevel, EvidenceItemStatus, EvidenceKind
 
 __all__ = [
     "EvidenceItemData",
@@ -146,3 +146,70 @@ class ScopeUpdateItem(BaseModel):
 class ScopeUpdateRequest(BaseModel):
     scopes: list[ScopeUpdateItem] = Field(min_length=1, max_length=200)
     acknowledged_disclosure: bool = False
+
+
+class ItemResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    kind: EvidenceKind
+    external_id: str
+    project_key: str | None
+    title: str | None
+    body: str
+    url: str | None
+    occurred_at: datetime | None
+    authored_by_user: bool
+    status: EvidenceItemStatus
+    filter_reason: str | None
+    is_private: bool
+    meta: dict[str, object]
+    created_at: datetime
+    updated_at: datetime
+
+
+class ItemUpdate(BaseModel):
+    status: Literal["kept", "excluded"]
+
+
+class NoteCreate(BaseModel):
+    title: str | None = Field(default=None, max_length=200)
+    body: str = Field(min_length=1, max_length=20_000)
+
+
+class NoteUpdate(BaseModel):
+    title: str | None = Field(default=None, max_length=200)
+    body: str | None = Field(default=None, min_length=1, max_length=20_000)
+
+    @model_validator(mode="after")
+    def _require_a_change(self) -> "NoteUpdate":
+        if not self.model_fields_set & {"title", "body"}:
+            msg = "send a title or a body to change"
+            raise ValueError(msg)
+        return self
+
+
+class LinkCreate(BaseModel):
+    url: HttpUrl
+    title: str | None = Field(default=None, max_length=200)
+    text: str | None = Field(default=None, min_length=1, max_length=20_000)
+
+
+class ResumeIngestRequest(BaseModel):
+    profile_id: uuid.UUID
+
+
+class ResumeIngestResponse(BaseModel):
+    created: int
+    unchanged: int
+    excluded: int
+
+
+class ChunkSummaryResponse(BaseModel):
+    chunks: int
+    tokens: int
+    private_chunks: int
+    private_share: float
+    embedded: int
+    pending_embedding: int
+    by_kind: dict[str, int]

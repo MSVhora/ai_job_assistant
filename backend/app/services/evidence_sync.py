@@ -53,6 +53,8 @@ from app.schemas.evidence import (
     SyncRunResponse,
     SyncStartResponse,
 )
+from app.services.evidence_chunks import rebuild_chunks_background
+from app.services.evidence_pipeline.dedupe import SQUASH_REASON
 from app.services.evidence_pipeline.noise import classify
 from app.services.resume_service import get_or_create_candidate
 
@@ -65,7 +67,6 @@ SyncMode = Literal["incremental", "full"]
 SOURCE_KIND = "github"
 ACTIVE_STATUSES = (SyncStatus.pending, SyncStatus.running)
 ABANDONED_ERROR = "run abandoned - in-flight lock released"
-SQUASH_REASON = "squash_of_pull_request"
 STORAGE_WARNING = "could not store evidence"
 ITEM_UPDATE_COLUMNS = (
     "scope_id",
@@ -332,6 +333,7 @@ class _RunOutcome:
     scopes_failed: int = 0
     warnings: list[str] = field(default_factory=list[str])
     paused: EvidenceSourcePausedError | None = None
+    chunks: dict[str, object] | None = None
 
 
 def _content_hash(item: EvidenceItemData) -> str:
@@ -586,6 +588,8 @@ async def run_sync(run_id: uuid.UUID, mode: SyncMode) -> None:
             outcome.warnings.append(scope_result.warning)
         else:
             outcome.scopes_ok += 1
+    if outcome.scopes_ok or outcome.paused is not None:
+        outcome.chunks = await _rebuild_chunks(candidate_id)
     status = await _finish_run(run_id, outcome)
     logger.info(
         "evidence.done sync_id=%s status=%s items=%d duration_ms=%.0f",
@@ -594,6 +598,15 @@ async def run_sync(run_id: uuid.UUID, mode: SyncMode) -> None:
         outcome.items,
         (time.monotonic() - started) * 1000,
     )
+
+
+async def _rebuild_chunks(candidate_id: uuid.UUID) -> dict[str, object]:
+    """Chunk and embed what the run stored; a failure degrades to a warning, never fails the run."""
+    try:
+        return (await rebuild_chunks_background(candidate_id)).as_progress()
+    except SQLAlchemyError as exc:
+        logger.warning("evidence.chunks failed error_type=%s", type(exc).__name__)
+        return {"error": "could not build chunks"}
 
 
 async def _finish_run(run_id: uuid.UUID, outcome: _RunOutcome) -> SyncStatus:
@@ -612,6 +625,8 @@ async def _finish_run(run_id: uuid.UUID, outcome: _RunOutcome) -> SyncStatus:
             status = SyncStatus.succeeded
         progress = dict(run.progress)
         progress["warnings"] = outcome.warnings
+        if outcome.chunks is not None:
+            progress["chunks"] = outcome.chunks
         run.progress = progress
         run.status = status
         if status is SyncStatus.succeeded:

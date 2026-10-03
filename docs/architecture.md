@@ -38,7 +38,7 @@ flowchart TB
 Non-negotiable layering rules (enforced by the
 [coding standards](instructions/)):
 
-- `routers/` — HTTP only: parse, call a service, return a response model (evidence: `routers/evidence.py` → `services/evidence_sync.py`)
+- `routers/` — HTTP only: parse, call a service, return a response model (evidence: `routers/evidence.py` → `services/evidence_sync.py`, `evidence_chunks.py`, `evidence_notes.py`, `evidence_items.py`; pure stages in `services/evidence_pipeline/`: `noise`, `chunking`, `dedupe`, `resume_ingest`)
 - `services/` — business logic; raise domain errors
 - `models/` — SQLAlchemy 2.0 ORM; the schema source of truth
 - `adapters/llm.py` — the **only** place that talks to an LLM provider; it prices calls
@@ -170,6 +170,7 @@ sequenceDiagram
         A->>D: upsert evidence_item, cursor and progress in one commit
     end
     A->>D: attach squash commits to their PR, status succeeded | paused (resume_at) | failed
+    A->>D: rebuild chunks (redact, hash, diff), embed only chunks without a vector
     B->>A: GET /api/evidence/syncs/{id}
 ```
 

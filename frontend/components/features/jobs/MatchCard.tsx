@@ -4,33 +4,10 @@ import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { FreshnessBadge } from "@/components/features/jobs/FreshnessBadge";
-import { useMatchSignal } from "@/hooks/use-match-signals";
+import { MatchSignalButtons } from "./MatchSignalButtons";
+import { CompanyAvatar, SparkleIcon } from "./match-card-parts";
 import { applyMatchUrl, type MatchResponse } from "@/lib/api";
 import { salaryLine, scorePercent } from "@/lib/salary";
-
-function SparkleIcon() {
-  return (
-    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className="h-3.5 w-3.5">
-      <path d="M10 1.5l1.8 4.7 4.7 1.8-4.7 1.8L10 14.5 8.2 9.8 3.5 8l4.7-1.8L10 1.5zM15.5 13l.9 2.3 2.3.9-2.3.9-.9 2.3-.9-2.3-2.3-.9 2.3-.9.9-2.3z" />
-    </svg>
-  );
-}
-
-function CompanyAvatar({ name }: { name: string }) {
-  const initials = name
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((word) => word[0]?.toUpperCase() ?? "")
-    .join("");
-  return (
-    <span
-      aria-hidden="true"
-      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-fuchsia-500 text-xs font-bold text-white shadow-md shadow-violet-200"
-    >
-      {initials || "?"}
-    </span>
-  );
-}
 
 export function MatchCard({
   match,
@@ -49,14 +26,8 @@ export function MatchCard({
   const posting = match.job_posting;
   const salary = salaryLine(posting.salary_min, posting.salary_max, posting.currency);
   const detailsId = `match-rationale-${match.id}`;
-  const signal = useMatchSignal(profileId);
   const saved = match.saved_at !== null && match.saved_at !== undefined;
   const dismissed = match.dismissed_at !== null && match.dismissed_at !== undefined;
-
-  const sendSignal = (kind: "save" | "unsave" | "dismiss" | "undismiss") => {
-    if (profileId === null || signal.isPending) return;
-    signal.mutate({ matchId: match.id, kind });
-  };
 
   return (
     <li
@@ -177,37 +148,13 @@ export function MatchCard({
           </span>
         )}
         {profileId !== null && (
-          <span className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => {
-                sendSignal(saved ? "unsave" : "save");
-              }}
-              aria-pressed={saved}
-              disabled={signal.isPending}
-              aria-label={saved ? `Remove ${posting.title} from saved` : `Save ${posting.title}`}
-              className={`rounded-lg px-2 py-1 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 disabled:cursor-not-allowed disabled:opacity-50 ${
-                saved
-                  ? "bg-violet-100 text-violet-700"
-                  : "text-gray-500 hover:bg-violet-50 hover:text-violet-700"
-              }`}
-            >
-              {saved ? "Saved" : "Save"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                sendSignal(dismissed ? "undismiss" : "dismiss");
-              }}
-              disabled={signal.isPending}
-              aria-label={
-                dismissed ? `Restore ${posting.title} to the list` : `Dismiss ${posting.title}`
-              }
-              className="rounded-lg px-2 py-1 text-xs font-semibold text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {dismissed ? "Restore" : "Dismiss"}
-            </button>
-          </span>
+          <MatchSignalButtons
+            matchId={match.id}
+            title={posting.title}
+            profileId={profileId}
+            saved={saved}
+            dismissed={dismissed}
+          />
         )}
       </div>
       {open && match.rationale && (

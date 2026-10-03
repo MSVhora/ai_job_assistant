@@ -1,6 +1,6 @@
 # Issue #45 — Split oversized frontend components (≤ 200 lines)
 
-**Status:** Proposed — for owner review
+**Status:** Implemented — see notes below
 **Tracks:** GitHub issue #45 (milestone `v5`, branch `v5/45-frontend-component-splits`)
 **Plan of record:** [v5 plan](v5-hardening-plan.md) · standards: [frontend-nextjs.md](../../instructions/frontend-nextjs.md) ("components under ~200 lines")
 **Depends on:** #44 (`max-lines` rule, formatting, strict lint) · **Blocks:** v5 UI work (new screens build on smaller parts)
@@ -54,3 +54,12 @@ Bring every component file under ~200 lines **without changing behaviour or appe
 ## Out of scope
 
 Visual redesign, state-management changes, renaming public components, splitting non-component modules.
+
+## Implementation notes
+
+- **Scope grew from 8 to 15 files.** The plan's table was measured before #44's Prettier pass and fixes; by then 7 more files were over 200 lines (`HowItWorksSection`, `ResumeUploadForm`, `JobDetailPanel`, `MatchCard`, `ExperienceProjects`, `MergeDiffPanel`, `SourceList`). All 15 are split so `max-lines` could become an error. Order followed the plan table, then the added files.
+- **Result:** `max-lines` (200, blanks and comments skipped) is now `error` for `app/**/*.tsx` and `components/**/*.tsx`; `lib/` modules stay out of scope. `npm run lint`, `format:check`, `typecheck`, `test` (39) and `build` are clean.
+- **How "no behaviour change" was checked.** Before splitting I rendered `HowItWorksSection`, the get-started page, `MatchCard` (two variants), `MergeDiffPanel`, `SourceList`, `ResumeUploadForm` and `ProfileReviewForm` (AI badges on and off, with every section populated), and later `MatchList` (no profile, loading, error, empty, empty with filters, populated with pagination), as throwaway snapshots of `container.innerHTML` against mocked hooks. They were compared after each split and are not committed (the standard discourages large snapshot tests). `SearchStepperModal`/`ProfileEditor`/`RunBanners`/`SourceFiltersForm` kept their existing tests. `JobsPageClient`, `JobDetailPanel` and the wizard's effects had no render baseline: they are JSX/prop moves checked by `tsc`, lint and the existing tests, so they deserve the manual smoke below.
+- **Splits:** `fields.tsx` -> `fields` + `cards` + `profile-icons`; `EducationCredentials` -> `EducationSection` / `CertificationsAwards` / `ExtraSections`; `ExperienceProjects` -> `ExperienceSection` / `ProjectsSection`; `ProfileReviewForm` -> `ContactSection` + `PreferencesSection` (the links field array and the derived-seniority `watch` moved into them); `MergeDiffPanel` -> `merge-diff.ts` helpers; `SearchSteps` -> `ProfileSourceSteps` / `DetailsStep` / `ReviewSummary`; `SearchStepperModal` -> `StartSearchButton`, `StepIndicator`, `SearchStepContent`, `SearchRunErrors`, `useSeedSearchForm` (same effect, deps and order), `search-steps.ts`, plus `emptySearchFormValues`/`missingFieldMessage` in `search-form-schema.ts`; `MatchList` -> `MatchListStates`, `MatchStatusTabs`, `MatchEmptyState`, `MatchPagination`; `MatchCard` -> `MatchSignalButtons` (owns the signal mutation) + `match-card-parts`; `JobsPageClient` -> `JobsFilterSidebar`, `JobsNotices`, `JobsSourceStates`; `JobDetailPanel` -> `job-detail-parts` + `MatchBreakdown`; get-started page -> `components/features/get-started/{icons,previews,options,OptionCard}`; `HowItWorksSection` icons and `SourceList`'s `DisclosureDialog` and `ResumeUploadForm`'s icons/progress panel moved out.
+- **Deliberate non-fix found on the way:** in `MatchList` the list's class is `` `transition-opacity${matches.isFetching ? "opacity-60" : ""}` `` (no space), so the "dimmed while refetching" style never applies. Left as is to keep this a pure refactor (it is now in the moved code path of `MatchList.tsx`); worth a separate one-line fix.
+- **Not done:** bundle-size comparison (`next build` in this Next version prints no per-route sizes); the manual smoke script from the plan was not run in a browser.

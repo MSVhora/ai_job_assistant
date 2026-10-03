@@ -6,58 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { StructuredProfile } from "@/lib/api";
 
-import { AiExtractedBadge, SectionCard } from "./fields";
+import { AiExtractedBadge } from "./fields";
+import { SectionCard } from "./cards";
+import { FIELD_KEYS, FIELD_LABELS, summarize, valuesEqual, type FieldKey } from "./merge-diff";
 import { SaveStatus } from "./SaveStatus";
-
-const FIELD_KEYS = [
-  "contact",
-  "headline",
-  "summary",
-  "skills",
-  "experience",
-  "projects",
-  "education",
-  "certifications",
-  "awards",
-  "extra_sections",
-  "preferences",
-] as const;
-
-type FieldKey = (typeof FIELD_KEYS)[number];
-
-const FIELD_LABELS: Record<FieldKey, string> = {
-  contact: "Contact",
-  headline: "Headline",
-  summary: "Summary",
-  skills: "Skills",
-  experience: "Experience",
-  projects: "Projects",
-  education: "Education",
-  certifications: "Certifications",
-  awards: "Awards",
-  extra_sections: "Extra sections",
-  preferences: "Preferences",
-};
-
-function summarize(value: unknown): string {
-  if (value === null || value === undefined || value === "") return "Not set";
-  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-    return String(value);
-  }
-  if (Array.isArray(value)) {
-    return value.length === 0
-      ? "Not set"
-      : `${value.length} entr${value.length === 1 ? "y" : "ies"}`;
-  }
-  const filled = Object.values(value).filter(
-    (entry) => entry !== null && entry !== undefined && entry !== "",
-  );
-  return filled.length === 0 ? "Not set" : `${filled.length} field(s) set`;
-}
-
-function valuesEqual(a: unknown, b: unknown): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
-}
 
 export function MergeDiffPanel({
   current,

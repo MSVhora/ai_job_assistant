@@ -2,9 +2,8 @@
 
 Applies to everything under `frontend/`.
 
-> **Target state.** Rules marked *(v5 #45)* are brought into the code by the
-> [v5 plans](../plans/v5/v5-hardening-plan.md). This repo runs Next.js 16: before writing
-> framework code, read the relevant guide in `node_modules/next/dist/docs/` (see `frontend/AGENTS.md`).
+> This repo runs Next.js 16: before writing framework code, read the relevant guide in
+> `node_modules/next/dist/docs/` (see `frontend/AGENTS.md`).
 
 ## Structure
 
@@ -35,7 +34,7 @@ Shared app types live next to the code that owns them; prefer generated API type
 - **Background work UX**: ingestion/scoring runs are async — poll status, show progress, allow navigation away without breaking the run.
 - **Scraping sources**: source badges ("Official API" / "Third-party scraper") always visible on cards and settings; the disclosure modal must be acknowledged before a scraping source can be enabled.
 - **Accessibility**: semantic HTML, labeled inputs, keyboard-navigable modals (focus trap + escape), visible focus rings, `aria-live` for async status changes.
-- **Components**: under ~200 lines (ESLint `max-lines` warns above 200 lines in `app/` and `components/`; #45 splits the existing exceptions and flips it to an error); extract subcomponents/hooks when larger. No comments except non-obvious decisions.
+- **Components**: under ~200 lines (ESLint `max-lines` errors above 200 lines, ignoring blanks and comments, in `app/` and `components/`); extract subcomponents/hooks when larger. No comments except non-obvious decisions.
 - Prefer App Router idioms: `app/` conventions, route handlers for proxying, `next/image` for images, metadata exports for titles.
 
 ## Tooling (target gates)

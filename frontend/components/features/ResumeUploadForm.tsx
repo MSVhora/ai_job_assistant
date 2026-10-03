@@ -7,60 +7,8 @@ import { Button } from "@/components/ui/button";
 import { useExtractResume, useUploadAndExtract } from "@/hooks/use-upload-and-extract";
 import { ExtractionFailedError } from "@/lib/api";
 
-function UploadCloudIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      className="h-8 w-8"
-    >
-      <path d="M12 16V8m0 0l-3 3m3-3l3 3" />
-      <path d="M6.5 19a4.5 4.5 0 01-.4-8.98 6 6 0 0111.66-1.6A4.25 4.25 0 0117.75 19H6.5z" />
-    </svg>
-  );
-}
-
-function FileIcon() {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      className="h-5 w-5"
-    >
-      <path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8l-5-5z" />
-      <path d="M14 3v5h5" />
-    </svg>
-  );
-}
-
-function CheckIcon() {
-  return (
-    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className="h-3.5 w-3.5">
-      <path
-        fillRule="evenodd"
-        d="M16.7 5.3a1 1 0 010 1.4l-7.5 7.5a1 1 0 01-1.4 0L3.3 9.7a1 1 0 011.4-1.4l3.8 3.8 6.8-6.8a1 1 0 011.4 0z"
-        clipRule="evenodd"
-      />
-    </svg>
-  );
-}
-
-const STAGES = [
-  { label: "Uploading resume", end: 35 },
-  { label: "Reading your resume", end: 60 },
-  { label: "Drafting your profile with AI", end: 90 },
-  { label: "Almost done", end: 100 },
-] as const;
+import { ExtractionProgress } from "./ExtractionProgress";
+import { FileIcon, UploadCloudIcon } from "./upload-icons";
 
 const ACCEPTED =
   ".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
@@ -79,8 +27,6 @@ export function ResumeUploadForm() {
     uploadAndExtract.error instanceof ExtractionFailedError ? uploadAndExtract.error : null;
   const pending = uploadAndExtract.isPending || retryExtract.isPending;
   const showProgress = uploadAndExtract.isPending || (retryExtract.isPending && progress > 0);
-  const stageIndex = STAGES.findIndex((stage) => progress < stage.end);
-  const currentStage = STAGES[stageIndex === -1 ? STAGES.length - 1 : stageIndex] ?? STAGES[0];
 
   useEffect(() => {
     if (!showProgress) {
@@ -208,52 +154,7 @@ export function ResumeUploadForm() {
         </p>
       </div>
 
-      {showProgress && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="flex flex-col gap-2 rounded-2xl border border-violet-100 bg-white p-4 shadow-sm"
-        >
-          <div className="flex items-center justify-between text-sm">
-            <span className="font-semibold text-gray-900">{currentStage.label}…</span>
-            <span className="font-semibold text-violet-700">{progress}%</span>
-          </div>
-          <div
-            className="h-2.5 w-full overflow-hidden rounded-full bg-violet-100"
-            role="progressbar"
-            aria-valuenow={progress}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-label="Extraction progress"
-          >
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 transition-all duration-300 ease-out"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-          <ol className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs">
-            {STAGES.map((stage, index) => {
-              const done = progress >= stage.end;
-              const active = index === stageIndex;
-              return (
-                <li
-                  key={stage.label}
-                  className={`flex items-center gap-1 ${
-                    done
-                      ? "text-emerald-600"
-                      : active
-                        ? "font-semibold text-violet-700"
-                        : "text-gray-400"
-                  }`}
-                >
-                  {done ? <CheckIcon /> : <span aria-hidden>{index + 1}.</span>}
-                  {stage.label}
-                </li>
-              );
-            })}
-          </ol>
-        </div>
-      )}
+      {showProgress && <ExtractionProgress progress={progress} />}
 
       {extractFailure !== null && (
         <div className="flex flex-col gap-2 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">

@@ -15,6 +15,8 @@ from app.adapters.job_sources.base import (
     SourceFilterDecl,
     SourceFilterOption,
     clean_text,
+    json_array,
+    json_object,
     parse_datetime,
 )
 from app.adapters.retry import TransientError, retry_after_header, retryable_status, with_retry
@@ -267,16 +269,15 @@ class AdzunaJobSource:
         return list(merged.values())[: query.results_wanted]
 
     def _extract_postings(self, data: dict[str, Any]) -> list[RawJobPosting]:
-        results = data.get("results")
         postings: list[RawJobPosting] = []
-        if isinstance(results, list):
-            for item in results:
-                if not isinstance(item, dict):
-                    continue
-                external_id = str(item.get("id", "")).strip()
-                if not external_id:
-                    continue
-                postings.append(RawJobPosting(external_id=external_id, payload=item))
+        for entry in json_array(data.get("results")) or []:
+            item = json_object(entry)
+            if item is None:
+                continue
+            external_id = str(item.get("id", "")).strip()
+            if not external_id:
+                continue
+            postings.append(RawJobPosting(external_id=external_id, payload=item))
         return postings
 
     def normalize(self, raw: RawJobPosting) -> JobPostingData:
@@ -291,13 +292,9 @@ class AdzunaJobSource:
             return JobPostingData(
                 external_id=raw.external_id,
                 title=title,
-                company=clean_text(
-                    company.get("display_name") if isinstance(company, dict) else company
-                ),
+                company=clean_text(_display_name(company)),
                 url=clean_text(payload.get("redirect_url")),
-                location=clean_text(
-                    location.get("display_name") if isinstance(location, dict) else location
-                ),
+                location=clean_text(_display_name(location)),
                 job_type=_job_type(payload),
                 description=clean_text(payload.get("description")),
                 posted_at=parse_datetime(payload.get("created")),
@@ -339,6 +336,11 @@ class AdzunaJobSource:
             except (httpx.HTTPError, TransientError) as exc:
                 msg = f"adzuna request failed ({_describe(exc)})"
                 raise ConnectorError(msg) from exc
+
+
+def _display_name(value: object) -> object:
+    mapping = json_object(value)
+    return mapping.get("display_name") if mapping is not None else value
 
 
 def _is_retryable(exc: Exception) -> bool:

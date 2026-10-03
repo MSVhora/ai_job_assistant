@@ -4,7 +4,7 @@ import logging
 import time
 from collections.abc import Callable
 from http import HTTPStatus
-from typing import Any
+from typing import Any, cast
 
 import httpx
 
@@ -16,6 +16,8 @@ from app.adapters.job_sources.base import (
     JobSearchQuery,
     RawJobPosting,
     SourceFilterDecl,
+    json_array,
+    json_object,
 )
 from app.adapters.job_sources.config import ActorConfig, build_actor_input
 from app.adapters.retry import TransientError, retry_after_header, retryable_status, with_retry
@@ -69,7 +71,7 @@ def _load_mapper(source_name: str) -> MapperFn:
     if not callable(mapper):
         msg = f"mapper module {module_name} does not define normalize()"
         raise ConnectorConfigError(msg)
-    return mapper
+    return cast("MapperFn", mapper)
 
 
 class ApifyActorSource:
@@ -150,10 +152,9 @@ class ApifyActorSource:
 
     def _to_raw_postings(self, items: object) -> list[RawJobPosting]:
         postings: list[RawJobPosting] = []
-        if not isinstance(items, list):
-            return postings
-        for item in items:
-            if not isinstance(item, dict):
+        for entry in json_array(items) or []:
+            item = json_object(entry)
+            if item is None:
                 continue
             external_id = str(item.get(self._config.external_id_field, "")).strip()
             if not external_id:
@@ -168,10 +169,10 @@ class ApifyActorSource:
         path: str,
         token: str,
         *,
-        params: dict[str, object] | None = None,
+        params: dict[str, str] | None = None,
         json_body: dict[str, object] | None = None,
     ) -> dict[str, Any]:
-        query = {"token": token, **(params or {})}
+        query: dict[str, str] = {"token": token, **(params or {})}
 
         async def _call() -> dict[str, Any]:
             response = await client.request(
@@ -213,6 +214,8 @@ def _unwrap_json(response: httpx.Response, source_name: str) -> dict[str, Any]:
         raise ConnectorError(msg) from exc
     if isinstance(payload, list):
         return {"items": payload}
-    if isinstance(payload, dict) and isinstance(payload.get("data"), dict):
-        return payload["data"]
-    return payload if isinstance(payload, dict) else {}
+    document = json_object(payload)
+    if document is None:
+        return {}
+    data = json_object(document.get("data"))
+    return data if data is not None else document

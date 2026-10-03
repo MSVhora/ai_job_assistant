@@ -180,7 +180,7 @@ class SourceInfoResponse(BaseModel):
     is_configured: bool
     enabled: bool
     supports_exclusions: bool = False
-    filters: list[SourceFilterDecl] = Field(default_factory=list)
+    filters: list[SourceFilterDecl] = Field(default_factory=list[SourceFilterDecl])
 
 
 class SourceEnableRequest(BaseModel):
@@ -241,7 +241,7 @@ class JobPostingDetail(JobPostingSummary):
             salary_max=float(posting.salary_max) if posting.salary_max is not None else None,
             currency=posting.currency,
             description=posting.description,
-            job_type=posting.job_type.value if posting.job_type is not None else None,
-            remote_type=posting.remote_type.value if posting.remote_type is not None else None,
+            job_type=posting.job_type,
+            remote_type=posting.remote_type,
             fetched_at=posting.fetched_at,
         )

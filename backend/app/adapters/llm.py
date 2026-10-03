@@ -3,6 +3,7 @@ import logging
 import time
 from dataclasses import dataclass
 from http import HTTPStatus
+from typing import cast
 
 import litellm
 from pydantic import BaseModel, ValidationError
@@ -71,22 +72,36 @@ def is_llm_configured() -> bool:
     return get_settings().gemini_api_key is not None
 
 
+def _token_counts(response: object) -> tuple[int, int]:
+    usage = getattr(response, "usage", None)
+    prompt = getattr(usage, "prompt_tokens", None)
+    completion = getattr(usage, "completion_tokens", None)
+    return (
+        prompt if isinstance(prompt, int) else 0,
+        completion if isinstance(completion, int) else 0,
+    )
+
+
+def _completion_text(response: object) -> str:
+    choices = getattr(response, "choices", None)
+    content = getattr(getattr(choices[0], "message", None), "content", None) if choices else None
+    return content if isinstance(content, str) else ""
+
+
 async def _completion_with_retry(
     settings: Settings,
     messages: list[dict[str, str]],
     temperature: float,
     max_tokens: int | None,
-) -> litellm.ModelResponse:
-    kwargs: dict[str, object] = {
-        "model": settings.llm_model,
-        "messages": messages,
-        "temperature": temperature,
-        "max_tokens": max_tokens,
-        "api_key": settings.gemini_api_key,
-    }
-
-    async def _call() -> litellm.ModelResponse:
-        return await litellm.acompletion(**kwargs)
+) -> object:
+    async def _call() -> object:
+        return await litellm.acompletion(  # pyright: ignore[reportUnknownMemberType]  # litellm: partially unknown signature
+            model=settings.llm_model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            api_key=settings.gemini_api_key,
+        )
 
     try:
         return await with_retry("llm.generate", _call, is_retryable=_is_transport_retryable)
@@ -114,19 +129,24 @@ async def generate(
     response = await _completion_with_retry(settings, messages, temperature, max_tokens)
 
     duration_ms = (time.perf_counter() - start) * 1000
-    usage = response.usage
+    prompt_tokens, completion_tokens = _token_counts(response)
     logger.info(
         "llm.generate model=%s duration_ms=%.0f prompt_tokens=%s completion_tokens=%s",
         settings.llm_model,
         duration_ms,
-        usage.prompt_tokens,
-        usage.completion_tokens,
+        prompt_tokens,
+        completion_tokens,
     )
     return GenerationResult(
-        text=response.choices[0].message.content or "",
-        prompt_tokens=usage.prompt_tokens or 0,
-        completion_tokens=usage.completion_tokens or 0,
+        text=_completion_text(response),
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
     )
+
+
+def _embedding_vectors(response: object) -> list[list[float]]:
+    items: list[dict[str, list[float]]] = getattr(response, "data", [])
+    return [item["embedding"] for item in items]
 
 
 async def embed(texts: list[str]) -> EmbeddingResult:
@@ -136,8 +156,8 @@ async def embed(texts: list[str]) -> EmbeddingResult:
     settings = get_settings()
     start = time.perf_counter()
 
-    async def _call() -> litellm.EmbeddingResponse:
-        return await litellm.aembedding(
+    async def _call() -> object:
+        return await litellm.aembedding(  # pyright: ignore[reportUnknownMemberType]  # litellm: partially unknown signature
             model=settings.embedding_model,
             input=texts,
             dimensions=settings.embedding_dimensions,
@@ -153,18 +173,15 @@ async def embed(texts: list[str]) -> EmbeddingResult:
         raise LLMError(msg) from exc
 
     duration_ms = (time.perf_counter() - start) * 1000
-    usage = response.usage
+    prompt_tokens, _ = _token_counts(response)
     logger.info(
         "llm.embed model=%s duration_ms=%.0f count=%d prompt_tokens=%s",
         settings.embedding_model,
         duration_ms,
         len(texts),
-        usage.prompt_tokens,
+        prompt_tokens,
     )
-    return EmbeddingResult(
-        vectors=[item["embedding"] for item in response.data],
-        prompt_tokens=usage.prompt_tokens or 0,
-    )
+    return EmbeddingResult(vectors=_embedding_vectors(response), prompt_tokens=prompt_tokens)
 
 
 async def parse_structured[ModelT: BaseModel](
@@ -253,20 +270,27 @@ def _format_validation_errors(exc: ValidationError) -> str:
 
 def _inline_json_schema_refs(schema: dict[str, object]) -> dict[str, object]:
     defs = schema.get("$defs")
-    resolved = _resolve_refs(schema, defs if isinstance(defs, dict) else {})
+    resolved = _resolve_refs(
+        schema, cast("dict[str, object]", defs) if isinstance(defs, dict) else {}
+    )
     if isinstance(resolved, dict):
+        resolved = cast("dict[str, object]", resolved)
         resolved.pop("$defs", None)
-    return resolved
+        return resolved
+    return schema
 
 
 def _resolve_refs(node: object, defs: dict[str, object]) -> object:
     if isinstance(node, dict):
-        ref = node.get("$ref")
+        mapping = cast("dict[str, object]", node)
+        ref = mapping.get("$ref")
         if isinstance(ref, str):
             name = ref.rsplit("/", maxsplit=1)[-1]
             target = defs.get(name)
-            return _resolve_refs(target if isinstance(target, dict) else {}, defs)
-        return {key: _resolve_refs(value, defs) for key, value in node.items()}
+            return _resolve_refs(
+                cast("dict[str, object]", target) if isinstance(target, dict) else {}, defs
+            )
+        return {key: _resolve_refs(value, defs) for key, value in mapping.items()}
     if isinstance(node, list):
-        return [_resolve_refs(item, defs) for item in node]
+        return [_resolve_refs(item, defs) for item in cast("list[object]", node)]
     return node

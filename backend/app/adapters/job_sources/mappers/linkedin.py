@@ -10,6 +10,7 @@ from app.adapters.job_sources.base import (
     JobPostingData,
     RawJobPosting,
     clean_text,
+    json_array,
     parse_datetime,
 )
 from app.models import JobType, RemoteType
@@ -34,8 +35,9 @@ _WORKPLACE_TYPE_MAP: dict[str, RemoteType] = {
 
 def _salary_pair(value: object) -> tuple[float | None, float | None]:
     numbers: list[float] = []
-    if isinstance(value, list):
-        for entry in value:
+    entries = json_array(value)
+    if entries is not None:
+        for entry in entries:
             numbers.extend(_numbers(entry))
     else:
         numbers = _numbers(value)

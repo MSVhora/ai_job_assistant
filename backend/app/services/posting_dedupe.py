@@ -19,7 +19,7 @@ import logging
 import re
 import uuid
 
-from sqlalchemy import Select, select, text, tuple_
+from sqlalchemy import Select, literal, select, text, tuple_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
@@ -93,7 +93,9 @@ def _candidate_query(posting: JobPosting) -> Select[tuple[JobPosting]]:
     their own canonical may absorb a duplicate; the tuple comparison keeps
     the deterministic oldest-row winner (`fetched_at`, then `id`).
     """
-    older = tuple_(JobPosting.fetched_at, JobPosting.id) < tuple_(posting.fetched_at, posting.id)
+    older = tuple_(JobPosting.fetched_at, JobPosting.id) < tuple_(
+        literal(posting.fetched_at), literal(posting.id)
+    )
     country_condition = (
         JobPosting.country.is_(None)
         if posting.country is None
@@ -121,7 +123,7 @@ def _merge_into_canonical(canonical: JobPosting, duplicate: JobPosting) -> None:
         canonical.posted_at = duplicate.posted_at
     if duplicate.description and len(duplicate.description) > len(canonical.description or ""):
         canonical.description = duplicate.description
-    entry = {"source": duplicate.source, "url": duplicate.url}
+    entry: dict[str, object] = {"source": duplicate.source, "url": duplicate.url}
     merged = list(canonical.source_urls or [])
     if entry not in merged:
         merged.append(entry)

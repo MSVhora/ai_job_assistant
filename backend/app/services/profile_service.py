@@ -1,7 +1,7 @@
 import logging
 import uuid
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, cast
 
 from fastapi import BackgroundTasks
 from pydantic import ValidationError
@@ -90,12 +90,17 @@ def _diff_objects(
         new_value = new.get(key)
         path = f"{prefix}{key}"
         if isinstance(old_value, dict) or isinstance(new_value, dict):
-            _diff_objects(old_value or {}, new_value or {}, f"{path}.", diff)
+            _diff_objects(
+                cast("dict[str, Any]", old_value or {}),
+                cast("dict[str, Any]", new_value or {}),
+                f"{path}.",
+                diff,
+            )
         elif old_value != new_value:
             diff[path] = {"old": old_value, "new": new_value}
 
 
-def _next_timestamp(previous: datetime | None) -> datetime:
+def next_timestamp(previous: datetime | None) -> datetime:
     timestamp = datetime.now(UTC)
     if previous is not None and timestamp <= previous:
         timestamp = previous + timedelta(microseconds=1)
@@ -184,7 +189,7 @@ def _first_save_revisions(
                 profile_id=profile_id,
                 source=RevisionSource.ai_extraction,
                 diff=diff_profiles(None, draft),
-                created_at=_next_timestamp(None),
+                created_at=next_timestamp(None),
             )
         ]
         if new_profile != draft:
@@ -193,7 +198,7 @@ def _first_save_revisions(
                     profile_id=profile_id,
                     source=RevisionSource.manual_edit,
                     diff=diff_profiles(draft, new_profile),
-                    created_at=_next_timestamp(revisions[-1].created_at),
+                    created_at=next_timestamp(revisions[-1].created_at),
                 )
             )
         return revisions
@@ -202,7 +207,7 @@ def _first_save_revisions(
             profile_id=profile_id,
             source=RevisionSource.manual_edit,
             diff=diff_profiles(None, new_profile),
-            created_at=_next_timestamp(None),
+            created_at=next_timestamp(None),
         )
     ]
 
@@ -279,15 +284,16 @@ async def save_profile(
     if profile is None:
         raise ProfileNotFoundError
 
-    renamed = payload.name is not None and payload.name.strip() != profile.name
-    if renamed:
-        profile.name = payload.name.strip()
+    new_name = payload.name.strip() if payload.name is not None else None
+    renamed = new_name is not None and new_name != profile.name
+    if new_name is not None and renamed:
+        profile.name = new_name
 
     last_revision: ProfileRevision | None = None
     content_changed = False
-    if payload.structured_profile is not None:
+    structured = payload.structured_profile
+    if structured is not None:
         _resolve_seniority_source(payload, profile)
-        structured = payload.structured_profile
         profile_derivation.apply_derived_fields(structured)
         new_profile = structured.model_dump(mode="json")
         if payload.source_resume_id is not None:
@@ -305,14 +311,14 @@ async def save_profile(
             profile_id=profile.id,
             source=source,
             diff=diff_profiles(_normalized(profile.structured_profile), new_profile),
-            created_at=_next_timestamp(None),
+            created_at=next_timestamp(None),
         )
         content_changed = profile.structured_profile != new_profile
         profile.structured_profile = new_profile
         session.add(last_revision)
 
     await session.flush()
-    if payload.structured_profile is not None:
+    if structured is not None:
         await embedding.refresh_profile_embedding(profile)
         await session.flush()
         await matching.rescore_matches(session, profile, invalidate_rationales=True)

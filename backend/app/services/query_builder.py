@@ -56,7 +56,7 @@ _FILTER_TYPE_LABELS = {
 }
 
 
-def _options_block(declarations: dict[str, list[SourceFilterDecl]] | None) -> str:
+def options_block(declarations: dict[str, list[SourceFilterDecl]] | None) -> str:
     if not declarations:
         return ""
     lines: list[str] = []
@@ -72,7 +72,7 @@ def _options_block(declarations: dict[str, list[SourceFilterDecl]] | None) -> st
     return "\n\n" + header + "\n" + "\n".join(lines)
 
 
-class _GeneratedQueries(BaseModel):
+class GeneratedQueries(BaseModel):
     queries: dict[str, SourceQuerySpec]
 
 
@@ -99,7 +99,7 @@ def _preference_lines(profile: StructuredProfile) -> list[str]:
     if preferences.remote_preference:
         lines.append(f"remote preference: {preferences.remote_preference}")
     if preferences.salary_min is not None or preferences.salary_max is not None:
-        band = []
+        band: list[str] = []
         if preferences.salary_min is not None:
             band.append(f"{preferences.salary_min:g}+")
         if preferences.salary_max is not None:
@@ -142,7 +142,7 @@ def compute_queries_input_hash(
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
-def _strip_undeclared_options(
+def strip_undeclared_options(
     queries: dict[str, SourceQuerySpec], declarations: dict[str, list[SourceFilterDecl]] | None
 ) -> dict[str, SourceQuerySpec]:
     if not declarations:
@@ -185,7 +185,7 @@ async def generate_queries(
     )
 
     context = _candidate_context(profile)
-    context += _options_block(declarations)
+    context += options_block(declarations)
     previous_block = ""
     if previous:
         previous_block = (
@@ -202,7 +202,7 @@ async def generate_queries(
     try:
         result = await parse_structured(
             prompt,
-            schema=_GeneratedQueries,
+            schema=GeneratedQueries,
             system=QUERY_SYSTEM,
             temperature=effective_temperature,
         )
@@ -217,7 +217,7 @@ async def generate_queries(
 
     settings = get_settings()
     return StoredSearchQueries(
-        queries=_strip_undeclared_options(
+        queries=strip_undeclared_options(
             {name: result.data.queries[name] for name in sources}, declarations
         ),
         generated_at=datetime.now(UTC),

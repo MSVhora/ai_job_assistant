@@ -21,7 +21,7 @@ from app.schemas.gap_fill import (
 )
 from app.schemas.profile import Preferences, RemotePreference, SeniorityLevel, StructuredProfile
 from app.services import embedding, matching, profile_derivation
-from app.services.profile_service import _next_timestamp, diff_profiles, schedule_query_refresh
+from app.services.profile_service import diff_profiles, next_timestamp, schedule_query_refresh
 
 logger = logging.getLogger(__name__)
 
@@ -316,7 +316,7 @@ async def run_gap_fill_turn(
             profile_id=profile.id,
             source=RevisionSource.gap_fill,
             diff=diff_profiles(current.model_dump(mode="json"), updated.model_dump(mode="json")),
-            created_at=_next_timestamp(None),
+            created_at=next_timestamp(None),
         )
         session.add(revision)
         await session.flush()

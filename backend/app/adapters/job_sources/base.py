@@ -2,7 +2,7 @@ import html
 import re
 from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Literal, Protocol
+from typing import Literal, Protocol, cast
 
 import httpx
 from pydantic import BaseModel, Field, field_validator
@@ -41,6 +41,14 @@ def parse_datetime(value: object) -> datetime | None:
         return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed
     seconds = value / 1000 if value > _EPOCH_MILLIS_THRESHOLD else value
     return datetime.fromtimestamp(seconds, tz=UTC)
+
+
+def json_object(value: object) -> dict[str, object] | None:
+    return cast("dict[str, object]", value) if isinstance(value, dict) else None
+
+
+def json_array(value: object) -> list[object] | None:
+    return cast("list[object]", value) if isinstance(value, list) else None
 
 
 _EPOCH_MILLIS_THRESHOLD = 1e12
@@ -199,16 +207,18 @@ def _validate_option_value(decl: SourceFilterDecl, value: object) -> None:
             raise InvalidSourceFilterError(msg)
         return
     if decl.type == "multiselect":
-        if not isinstance(value, list) or not value:
+        items = json_array(value)
+        if not items:
             msg = f"{noun} must be a non-empty list of strings"
             raise InvalidSourceFilterError(msg)
-        if any(type(item) is not str for item in value):
+        strings = [item for item in items if type(item) is str]
+        if len(strings) != len(items):
             msg = f"{noun} must be a non-empty list of strings"
             raise InvalidSourceFilterError(msg)
-        if len(value) > _MAX_OPTION_LIST_ITEMS:
+        if len(strings) > _MAX_OPTION_LIST_ITEMS:
             msg = f"{noun} must have at most {_MAX_OPTION_LIST_ITEMS} entries"
             raise InvalidSourceFilterError(msg)
-        if any(len(item) == 0 or len(item) > _MAX_OPTION_ITEM_LEN for item in value):
+        if any(len(item) == 0 or len(item) > _MAX_OPTION_ITEM_LEN for item in strings):
             msg = f"{noun} entries must be between 1 and {_MAX_OPTION_ITEM_LEN} characters"
             raise InvalidSourceFilterError(msg)
         return

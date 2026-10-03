@@ -102,7 +102,7 @@ class RerankItem(BaseModel):
 
 
 class RerankResult(BaseModel):
-    items: list[RerankItem] = Field(default_factory=list)
+    items: list[RerankItem] = Field(default_factory=list[RerankItem])
 
 
 class MatchResponse(BaseModel):

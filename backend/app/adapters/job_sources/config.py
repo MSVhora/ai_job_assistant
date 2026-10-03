@@ -32,11 +32,11 @@ class ActorConfig(BaseModel):
     actor_id: str = Field(min_length=1)
     external_id_field: str = Field(min_length=1)
     input: dict[str, object] = Field(default_factory=dict)
-    filters: list[SourceFilterDecl] = Field(default_factory=list)
+    filters: list[SourceFilterDecl] = Field(default_factory=list[SourceFilterDecl])
 
 
 class ConnectorsConfig(BaseModel):
-    sources: list[ActorConfig] = Field(default_factory=list)
+    sources: list[ActorConfig] = Field(default_factory=list[ActorConfig])
 
 
 def build_actor_input(actor: ActorConfig, query: JobSearchQuery) -> dict[str, object]:
@@ -75,6 +75,8 @@ def _resolve_value(value: object, query: JobSearchQuery) -> object:
                     if plan is not None and plan.date_posted is not None
                     else bucket
                 )
+            case _:
+                pass
     return value
 
 

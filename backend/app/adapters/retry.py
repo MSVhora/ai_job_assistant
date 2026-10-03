@@ -62,11 +62,12 @@ async def with_retry[RunT](
     non-exceptions and may pin the delay via its retry_after_s.
     """
     attempts = max(1, get_settings().llm_retry_attempts)
+    last: Exception = RuntimeError(f"{what}: retry loop did not run")
     for attempt in range(attempts):
         try:
             return await call()
         except TransientError as exc:
-            last: Exception = exc
+            last = exc
             pinned_delay = exc.retry_after_s
         except Exception as exc:
             if not is_retryable(exc):

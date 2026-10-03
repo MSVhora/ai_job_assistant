@@ -36,11 +36,11 @@ from app.services.embedding import profile_digest_parts
 from app.services.matching import signal_skills
 from app.services.query_builder import (
     PROMPT_VERSION,
-    _GeneratedQueries,
-    _options_block,
-    _strip_undeclared_options,
+    GeneratedQueries,
     compute_queries_input_hash,
+    options_block,
     parse_stored,
+    strip_undeclared_options,
 )
 
 logger = logging.getLogger(__name__)
@@ -195,8 +195,8 @@ async def tune_for_profile(session: AsyncSession, profile_id: uuid.UUID) -> Sear
             f"- {name}: {spec.model_dump_json()}" for name, spec in stored.queries.items()
         )
     prompt_parts = [f"Candidate context:\n{digest}"]
-    if options_block := _options_block(declaration_map):
-        prompt_parts.append(options_block)
+    if options_text := options_block(declaration_map):
+        prompt_parts.append(options_text)
     prompt_parts.append(_bucket_block(buckets))
     if previous_block:
         prompt_parts.append(previous_block.strip("\n"))
@@ -208,7 +208,7 @@ async def tune_for_profile(session: AsyncSession, profile_id: uuid.UUID) -> Sear
     try:
         result = await parse_structured(
             prompt,
-            schema=_GeneratedQueries,
+            schema=GeneratedQueries,
             system=_TUNE_SYSTEM,
             temperature=TUNE_TEMPERATURE,
         )
@@ -222,7 +222,7 @@ async def tune_for_profile(session: AsyncSession, profile_id: uuid.UUID) -> Sear
         raise LLMQueryGenerationError(msg)
 
     tuned = StoredSearchQueries(
-        queries=_strip_undeclared_options(
+        queries=strip_undeclared_options(
             {name: result.data.queries[name] for name in names}, declaration_map
         ),
         generated_at=datetime.now(UTC),

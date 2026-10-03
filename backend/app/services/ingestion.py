@@ -2,6 +2,7 @@ import logging
 import time
 import uuid
 from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING, cast
 
 from fastapi import BackgroundTasks
 from pydantic import ValidationError
@@ -47,6 +48,9 @@ from app.schemas.job_search import (
 from app.schemas.profile import StructuredProfile
 from app.services import embedding, matching, posting_dedupe, query_rendering
 from app.services import sources as sources_service
+
+if TYPE_CHECKING:
+    from sqlalchemy.engine import CursorResult
 
 logger = logging.getLogger(__name__)
 
@@ -136,10 +140,13 @@ async def _sweep_stale_runs(session: AsyncSession) -> int:
             _ABANDONED_WARNING,
         )
     ).cast(JSONB)
-    result = await session.execute(
-        update(JobSearch)
-        .where(JobSearch.status.in_(ACTIVE_STATUSES), JobSearch.updated_at < cutoff)
-        .values(status=JobSearchStatus.failed, results=stored_result, updated_at=func.now())
+    result = cast(
+        "CursorResult[tuple[()]]",
+        await session.execute(
+            update(JobSearch)
+            .where(JobSearch.status.in_(ACTIVE_STATUSES), JobSearch.updated_at < cutoff)
+            .values(status=JobSearchStatus.failed, results=stored_result, updated_at=func.now())
+        ),
     )
     swept = result.rowcount
     if swept:
@@ -351,53 +358,49 @@ async def _upsert_posting(
     embedding_vector: list[float] | None,
     country: str | None,
 ) -> uuid.UUID:
-    stmt = (
-        pg_insert(JobPosting)
-        .values(
-            source=source_name,
-            external_id=data.external_id,
-            title=data.title,
-            company=data.company,
-            url=data.url,
-            location=data.location,
-            country=country,
-            job_type=data.job_type,
-            remote_type=data.remote_type,
-            description=data.description,
-            embedding=embedding_vector,
-            posted_at=data.posted_at,
-            expires_at=data.expires_at,
-            is_closed=data.is_closed,
-            salary_min=data.salary_min,
-            salary_max=data.salary_max,
-            currency=data.currency.upper() if data.currency else None,
-            raw_payload=data.raw_payload,
-            fetched_at=datetime.now(UTC),
-        )
-        .returning(JobPosting.id)
+    insert_stmt = pg_insert(JobPosting).values(
+        source=source_name,
+        external_id=data.external_id,
+        title=data.title,
+        company=data.company,
+        url=data.url,
+        location=data.location,
+        country=country,
+        job_type=data.job_type,
+        remote_type=data.remote_type,
+        description=data.description,
+        embedding=embedding_vector,
+        posted_at=data.posted_at,
+        expires_at=data.expires_at,
+        is_closed=data.is_closed,
+        salary_min=data.salary_min,
+        salary_max=data.salary_max,
+        currency=data.currency.upper() if data.currency else None,
+        raw_payload=data.raw_payload,
+        fetched_at=datetime.now(UTC),
     )
-    stmt = stmt.on_conflict_do_update(
+    stmt = insert_stmt.on_conflict_do_update(
         constraint="uq_job_posting_source_external_id",
         set_={
-            "title": stmt.excluded.title,
-            "company": stmt.excluded.company,
-            "url": stmt.excluded.url,
-            "location": stmt.excluded.location,
-            "country": stmt.excluded.country,
-            "job_type": stmt.excluded.job_type,
-            "remote_type": stmt.excluded.remote_type,
-            "description": stmt.excluded.description,
-            "embedding": stmt.excluded.embedding,
-            "posted_at": stmt.excluded.posted_at,
-            "expires_at": stmt.excluded.expires_at,
-            "is_closed": stmt.excluded.is_closed,
-            "salary_min": stmt.excluded.salary_min,
-            "salary_max": stmt.excluded.salary_max,
-            "currency": stmt.excluded.currency,
-            "raw_payload": stmt.excluded.raw_payload,
-            "fetched_at": stmt.excluded.fetched_at,
+            "title": insert_stmt.excluded.title,
+            "company": insert_stmt.excluded.company,
+            "url": insert_stmt.excluded.url,
+            "location": insert_stmt.excluded.location,
+            "country": insert_stmt.excluded.country,
+            "job_type": insert_stmt.excluded.job_type,
+            "remote_type": insert_stmt.excluded.remote_type,
+            "description": insert_stmt.excluded.description,
+            "embedding": insert_stmt.excluded.embedding,
+            "posted_at": insert_stmt.excluded.posted_at,
+            "expires_at": insert_stmt.excluded.expires_at,
+            "is_closed": insert_stmt.excluded.is_closed,
+            "salary_min": insert_stmt.excluded.salary_min,
+            "salary_max": insert_stmt.excluded.salary_max,
+            "currency": insert_stmt.excluded.currency,
+            "raw_payload": insert_stmt.excluded.raw_payload,
+            "fetched_at": insert_stmt.excluded.fetched_at,
         },
-    )
+    ).returning(JobPosting.id)
     posting_id = (await session.execute(stmt)).scalar_one()
     await session.execute(
         pg_insert(SearchPosting)

@@ -11,7 +11,8 @@ import type { StructuredProfile } from "@/lib/api";
 import { CertificationsSection, AwardsSection } from "./CertificationsAwards";
 import { EducationSection } from "./EducationSection";
 import { ExtraSectionsSection } from "./ExtraSections";
-import { ExperienceSection, ProjectsSection } from "./ExperienceProjects";
+import { ExperienceSection } from "./ExperienceSection";
+import { ProjectsSection } from "./ProjectsSection";
 import {
   AiExtractedBadge,
   DerivedFromExperienceBadge,

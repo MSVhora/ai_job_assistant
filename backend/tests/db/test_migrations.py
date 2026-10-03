@@ -22,7 +22,7 @@ from app.core.db import session_factory
 def _alembic() -> Config:
     from pathlib import Path
 
-    backend_dir = Path(__file__).resolve().parent.parent
+    backend_dir = Path(__file__).resolve().parents[2]
     cfg = Config(backend_dir / "alembic.ini")
     cfg.set_main_option("script_location", str(backend_dir / "alembic"))
     return cfg

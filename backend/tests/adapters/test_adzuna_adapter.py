@@ -15,7 +15,7 @@ from app.adapters.job_sources.base import (
 )
 from app.core.config import get_settings
 
-FIXTURES = Path(__file__).parent / "fixtures"
+FIXTURES = Path(__file__).resolve().parents[1] / "fixtures"
 
 
 async def _no_delay(_: float) -> None:

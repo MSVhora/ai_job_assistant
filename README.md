@@ -69,6 +69,9 @@ docker compose exec db psql -U postgres -c "create database ai_job_assistant_tes
 cd backend && TEST_DATABASE_URL="postgresql+asyncpg://postgres:postgres@localhost:5432/ai_job_assistant_test" pytest
 ```
 
+Tests mirror `app/` (`tests/services/`, `tests/routers/`, …), so run one layer or file by path:
+`pytest tests/services` or `pytest tests/routers/test_job_endpoints.py`.
+
 To explore the UI without any keys or live searches, seed a synthetic demo dataset
 (profile "Jane Doe (demo)" + deterministic postings and matches, zero LLM calls):
 

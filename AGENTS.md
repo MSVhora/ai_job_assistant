@@ -1,14 +1,15 @@
 # AGENTS.md
 
 Guidance for AI coding agents working in this repo. These rules apply to every task.
-Detailed per-area standards live in `docs/instructions/` and are loaded automatically via `opencode.json`.
+Detailed per-area standards live in `docs/instructions/` and are loaded automatically: OpenCode via `opencode.json`, Claude Code via the root `CLAUDE.md` (which `@`-imports each instruction file — add new files there too).
+Rules marked *(H1)*–*(H7)* in those files are the target state that the [hardening plans](docs/plans/hardening/README.md) bring the code up to.
 
 ## Project
 
 AI Job Assistant — self-hosted, single-user, BYOK (bring-your-own-key) web app:
 resume upload → AI-extracted, human-reviewed profile → multi-source job discovery → ranked matches with explanations.
 
-- **Plan of record:** `docs/plans/v1/v1-implementation-plan.md` — read it before non-trivial work. Do not silently drift from its scope; if something in it is wrong or changed, say so in the response.
+- **Plan of record:** the plan for the version in progress under `docs/plans/v{N}/` (v1–v4 are shipped; `docs/plans/v1/v1-implementation-plan.md` defines the product scope) — read it before non-trivial work. Do not silently drift from its scope; if something in it is wrong or changed, say so in the response.
 
 ## Stack
 
@@ -59,8 +60,8 @@ docs/plans/         # versioned implementation plans (v1/, v2/, v3/ per-version 
 
 ## Definition of done (before reporting a task complete)
 
-- Backend touched: `ruff check . && ruff format --check . && pytest` pass (run in `backend/`).
-- Frontend touched: `npm run lint && npm run build` pass (run in `frontend/`).
+- Backend touched: `ruff check . && ruff format --check . && pytest` pass (run in `backend/`). *Target gate once hardening H1 lands:* `ruff check . && ruff format --check . && pyright && pytest --cov=app`.
+- Frontend touched: `npm run lint && npm run build` pass (run in `frontend/`). *Target gate once hardening H4 lands:* `npm run lint && npm run format:check && npm test && npm run build`.
 - Model changes: migration generated, reviewed, and included in the same change.
 - New external dep: justified in the response (prefer stdlib / what the stack already uses).
 - Setup or behavior changed: `.env.example` / README updated.

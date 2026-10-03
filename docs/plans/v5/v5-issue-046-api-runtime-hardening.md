@@ -1,9 +1,9 @@
-# H6 — API and runtime hardening: CORS, timeouts, list limits, logging and error-contract audits
+# Issue #46 — API and runtime hardening: CORS, timeouts, list limits, logging and error-contract audits
 
 **Status:** Proposed — for owner review
-**Tracks:** `hardening/H6-api-runtime-hardening`
-**Plan of record:** [README](README.md) · standards: [backend-fastapi.md](../../instructions/backend-fastapi.md) (*H6* rules), [api-design.md](../../instructions/api-design.md), [security-privacy.md](../../instructions/security-privacy.md)
-**Depends on:** H1 (strict tooling) · **Blocks:** nothing hard (v5 builds on it)
+**Tracks:** GitHub issue #46 (milestone `v5`, branch `v5/46-api-runtime-hardening`)
+**Plan of record:** [v5 plan](v5-hardening-plan.md) · standards: [backend-fastapi.md](../../instructions/backend-fastapi.md) (*v5 #46* rules), [api-design.md](../../instructions/api-design.md), [security-privacy.md](../../instructions/security-privacy.md)
+**Depends on:** #41 (strict tooling) · **Blocks:** nothing hard (v6 builds on it)
 
 ## Goal
 
@@ -27,7 +27,7 @@ Make the runtime rules in the standards true and keep them true with tests: expl
 | LLM timeout | New setting `LLM_TIMEOUT_S` (default 60) passed to every LiteLLM call; timeouts surface as the existing "request timed out" message and are retried by the shared policy | Standard requires explicit timeouts |
 | List limits | Add `limit` (default 100, max 200) and `offset` to the unbounded list endpoints, keep default behaviour for current clients; add `X-Total-Count` where the UI could page | Backward compatible, bounded |
 | Logging guard | A test that runs upload → extract → search with fakes under `caplog` and asserts no log record contains resume text, prompt text, or key-shaped strings | Turns the rule into a regression test |
-| `os.getenv` guard | Enforced by the ruff `banned-api` rule added in H1 (plus a test that fails if it is removed) | Mechanical |
+| `os.getenv` guard | Enforced by the ruff `banned-api` rule added in #41 (plus a test that fails if it is removed) | Mechanical |
 | Error-contract test | A parametrized test enumerates every `DomainError` subclass and asserts `{"detail": str}` and the declared `status_code` through the registered handler | Catches drift automatically |
 
 ## Scope
@@ -51,7 +51,7 @@ Make the runtime rules in the standards true and keep them true with tests: expl
 
 ## Doc impact
 
-`docs/architecture.md` (privacy posture: CORS, timeouts; error contract paragraph); `docs/guide/01-getting-started.md` troubleshooting (CORS wording confirmed against the final behaviour); `docs/guide/03-job-discovery-and-matching.md` if list endpoints gain visible `limit`/`offset`; `docs/instructions/{backend-fastapi,api-design,security-privacy}.md` (remove *(H6)* markers); `.env.example`.
+`docs/architecture.md` (privacy posture: CORS, timeouts; error contract paragraph); `docs/guide/01-getting-started.md` troubleshooting (CORS wording confirmed against the final behaviour); `docs/guide/03-job-discovery-and-matching.md` if list endpoints gain visible `limit`/`offset`; `docs/instructions/{backend-fastapi,api-design,security-privacy}.md` (remove *(v5 #46)* markers); `.env.example`.
 
 ## Risks
 

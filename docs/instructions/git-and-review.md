@@ -5,7 +5,6 @@ Branching rules (milestone branch per version, one branch per issue, merge on cl
 ## Branch names
 
 - Version work: `v{N}/milestone`, `v{N}/{issue-number}-{slug}` (see `AGENTS.md`).
-- Cross-cutting hardening work: `hardening/milestone`, `hardening/H{n}-{slug}`, following the same rules as a version milestone.
 - Docs-only changes may go straight to `main`; larger documentation efforts use `docs/{slug}`.
 
 ## Commit messages

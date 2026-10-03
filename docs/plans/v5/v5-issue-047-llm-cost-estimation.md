@@ -1,9 +1,9 @@
-# H7 — LLM cost estimation before batch operations
+# Issue #47 — LLM cost estimation before batch operations
 
 **Status:** Proposed — for owner review
-**Tracks:** `hardening/H7-llm-cost-estimation`
-**Plan of record:** [README](README.md) · standards: [llm-ai.md](../../instructions/llm-ai.md), [backend-fastapi.md](../../instructions/backend-fastapi.md) (*H7* rules)
-**Depends on:** H1 · **Blocks:** v5 #41 (extends this instead of building an estimator)
+**Tracks:** GitHub issue #47 (milestone `v5`, branch `v5/47-llm-cost-estimation`)
+**Plan of record:** [v5 plan](v5-hardening-plan.md) · standards: [llm-ai.md](../../instructions/llm-ai.md), [backend-fastapi.md](../../instructions/backend-fastapi.md) (*v5 #47* rules)
+**Depends on:** #41 · **Blocks:** v6 #49 (extends this instead of building an estimator)
 
 ## Goal
 
@@ -46,11 +46,11 @@ The standard says batch or user-triggered LLM actions show an estimated cost bef
 
 ## Gates
 
-Backend and frontend gates from H1/H4; `npm run generate:api` leaves no diff after regeneration.
+Backend and frontend gates from #41/#44; `npm run generate:api` leaves no diff after regeneration.
 
 ## Doc impact
 
-`docs/guide/02-upload-and-profile.md` / `03-job-discovery-and-matching.md` (Tune my queries shows the estimate; run banner shows actual cost); `docs/architecture.md` LLM-adapter paragraph; `.env.example` (price overrides); `docs/instructions/{llm-ai,backend-fastapi}.md` (remove *(H7)* markers).
+`docs/guide/02-upload-and-profile.md` / `03-job-discovery-and-matching.md` (Tune my queries shows the estimate; run banner shows actual cost); `docs/architecture.md` LLM-adapter paragraph; `.env.example` (price overrides); `docs/instructions/{llm-ai,backend-fastapi}.md` (remove *(v5 #47)* markers).
 
 ## Risks
 
@@ -61,4 +61,4 @@ Backend and frontend gates from H1/H4; `npm run generate:api` leaves no diff aft
 
 ## Out of scope
 
-Usage meters across runs, budgets/caps, cost dashboards (v5 #41 extends this plan's primitives).
+Usage meters across runs, budgets/caps, cost dashboards (v6 #49 extends this plan's primitives).

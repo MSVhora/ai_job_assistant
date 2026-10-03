@@ -1,9 +1,9 @@
-# H2 — Mirror `app/` in `backend/tests/`
+# Issue #42 — Mirror `app/` in `backend/tests/`
 
 **Status:** Proposed — for owner review
-**Tracks:** `hardening/H2-backend-test-layout`
-**Plan of record:** [README](README.md) · standards: [testing.md](../../instructions/testing.md), [backend-fastapi.md](../../instructions/backend-fastapi.md)
-**Depends on:** H0 (so its new test moves with the rest) · **Blocks:** H3, H1 (smaller, readable diffs), all v5 tests
+**Tracks:** GitHub issue #42 (milestone `v5`, branch `v5/42-backend-test-layout`)
+**Plan of record:** [v5 plan](v5-hardening-plan.md) · standards: [testing.md](../../instructions/testing.md), [backend-fastapi.md](../../instructions/backend-fastapi.md)
+**Depends on:** #40 (so its new test moves with the rest) · **Blocks:** #43, #41 (smaller, readable diffs), all v6 tests
 
 ## Goal
 
@@ -22,7 +22,7 @@ The standard says tests mirror the application layout. Today `backend/tests/` is
 ## Proposed mapping (confirm each by its imports while moving)
 
 - **adapters:** `test_adzuna_adapter`, `test_apify_adapter`, `test_llm_embed_retry`, `test_llm_generate_retry`, `test_llm_parse_structured`, `test_retry`, `test_source_filters`, `test_source_registry`
-- **core:** `test_db_commit_middleware`, `test_env_example` (from H0)
+- **core:** `test_db_commit_middleware`, `test_env_example` (from #40)
 - **db:** `test_migrations`
 - **routers:** `test_health`, `test_job_endpoints`, `test_matches_endpoint`, `test_profile_endpoints`, `test_setup_endpoint`, `test_resume_upload`
 - **schemas:** `test_profile_schema`, `test_matching_schema`
@@ -55,8 +55,8 @@ The standard says tests mirror the application layout. Today `backend/tests/` is
 | Risk | Mitigation |
 |---|---|
 | A test relies on its own directory (fixture paths) | Count + full-suite comparison; fix paths in the same commit |
-| Merge conflicts with in-flight branches | Do it first and merge quickly; v5 plans are docs-only until then |
+| Merge conflicts with in-flight branches | Do it first and merge quickly; v6 plans are docs-only until then |
 
 ## Out of scope
 
-Rewriting or deduplicating tests, adding coverage (H1), changing fixtures.
+Rewriting or deduplicating tests, adding coverage (#41), changing fixtures.

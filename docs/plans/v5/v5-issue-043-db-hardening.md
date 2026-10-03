@@ -1,9 +1,9 @@
-# H3 — Database hardening: `updated_at` trigger and standards audit
+# Issue #43 — Database hardening: `updated_at` trigger and standards audit
 
 **Status:** Proposed — for owner review
-**Tracks:** `hardening/H3-db-hardening`
-**Plan of record:** [README](README.md) · standards: [database-postgres.md](../../instructions/database-postgres.md) (*H3* rules)
-**Depends on:** H2 (tests live in the mirrored layout) · **Blocks:** v5 (migration numbering), H1
+**Tracks:** GitHub issue #43 (milestone `v5`, branch `v5/43-db-hardening`)
+**Plan of record:** [v5 plan](v5-hardening-plan.md) · standards: [database-postgres.md](../../instructions/database-postgres.md) (*v5 #43* rules)
+**Depends on:** #42 (tests live in the mirrored layout) · **Blocks:** v6 (migration numbering), #41
 
 ## Goal
 
@@ -41,7 +41,7 @@ Make the database standards true: `updated_at` is maintained by the database (OR
 - Sweeper and `update(Match)` paths bump `updated_at` without setting it explicitly.
 - Migration `0021` up/down round trip; `alembic check` clean.
 - `audit_schema` test: no unindexed FK columns, no unnamed constraints created after the convention, expected ON DELETE per table.
-- Grep-style test (or ruff rule in H1) that fails on f-string SQL.
+- Grep-style test (or ruff rule in #41) that fails on f-string SQL.
 
 ## Gates
 
@@ -49,7 +49,7 @@ Make the database standards true: `updated_at` is maintained by the database (OR
 
 ## Doc impact
 
-`docs/architecture.md`: ER notes mention the `updated_at` trigger and migration conventions; `docs/instructions/database-postgres.md`: remove the *(H3)* markers; **v5 plan migration numbers shift** (tracked in the README "v5 re-plan" step).
+`docs/architecture.md`: ER notes mention the `updated_at` trigger and migration conventions; `docs/instructions/database-postgres.md`: remove the *(v5 #43)* markers; **v6 plan migration numbers start after this issue** (see "Hand-off to v6" in the [v5 plan](v5-hardening-plan.md)).
 
 ## Risks
 
@@ -57,7 +57,7 @@ Make the database standards true: `updated_at` is maintained by the database (OR
 |---|---|
 | Trigger changes "heartbeat" semantics the sweeper relies on | Sweeper compares `updated_at` to a cutoff; any real column change refreshes it, which is the intended heartbeat; covered by a test |
 | Naming convention causes autogenerate to rename constraints | Use PG-default patterns; `alembic check` proves no drift |
-| Extra migration if the audit finds gaps | Planned as `0022`; v5 numbering shifts by one more |
+| Extra migration if the audit finds gaps | Planned as `0022`; v6 migrations are numbered from `0023` either way |
 
 ## Out of scope
 

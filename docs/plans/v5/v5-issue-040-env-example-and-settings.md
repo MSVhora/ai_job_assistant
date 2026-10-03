@@ -1,8 +1,8 @@
-# H0 — `.env.example` correctness and a settings↔env guard
+# Issue #40 — `.env.example` correctness and a settings↔env guard
 
 **Status:** Proposed — for owner review
-**Tracks:** `hardening/H0-env-example-and-settings`
-**Plan of record:** [README](README.md) · standards: [backend-fastapi.md](../../instructions/backend-fastapi.md) (config only via `Settings`), `AGENTS.md` ("setup or behavior changed: `.env.example` updated")
+**Tracks:** GitHub issue #40 (milestone `v5`, branch `v5/40-env-example-and-settings`)
+**Plan of record:** [v5 plan](v5-hardening-plan.md) · standards: [backend-fastapi.md](../../instructions/backend-fastapi.md) (config only via `Settings`), `AGENTS.md` ("setup or behavior changed: `.env.example` updated")
 **Depends on:** nothing · **Blocks:** nothing (first in order)
 
 ## Goal
@@ -27,7 +27,7 @@
 ## Scope
 
 - `.env.example`: rename the three keys to `SENIORITY_BAND_*`; add a commented `CORS_ORIGINS` entry with the default and a one-line explanation.
-- `backend/tests/test_env_example.py` (moved to `tests/core/` by H2): the guard above, with a clear failure message listing missing and unknown keys.
+- `backend/tests/test_env_example.py` (moved to `tests/core/` by #42): the guard above, with a clear failure message listing missing and unknown keys.
 
 ## Tests
 
@@ -36,7 +36,7 @@
 
 ## Gates
 
-`ruff check . && ruff format --check . && pytest` (target gates once H1 lands).
+`ruff check . && ruff format --check . && pytest` (target gates once #41 lands).
 
 ## Doc impact
 

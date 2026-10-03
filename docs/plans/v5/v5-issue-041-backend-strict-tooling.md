@@ -1,9 +1,9 @@
-# H1 — Backend strict tooling: ruff ALL, pyright strict, coverage, audit, pre-commit
+# Issue #41 — Backend strict tooling: ruff ALL, pyright strict, coverage, audit, pre-commit
 
 **Status:** Proposed — for owner review
-**Tracks:** `hardening/H1-backend-strict-tooling`
-**Plan of record:** [README](README.md) · standards: [backend-fastapi.md](../../instructions/backend-fastapi.md) (*H1* rules), [security-privacy.md](../../instructions/security-privacy.md)
-**Depends on:** H2, H3 · **Blocks:** H6, H7 (written to the strict standard)
+**Tracks:** GitHub issue #41 (milestone `v5`, branch `v5/41-backend-strict-tooling`)
+**Plan of record:** [v5 plan](v5-hardening-plan.md) · standards: [backend-fastapi.md](../../instructions/backend-fastapi.md) (*v5 #41* rules), [security-privacy.md](../../instructions/security-privacy.md)
+**Depends on:** #42, #43 · **Blocks:** #46, #47 (written to the strict standard)
 
 ## Goal
 
@@ -25,7 +25,7 @@ Give the backend the same kind of automated, strict standard the frontend gets f
 | Coverage | `pytest-cov`, `--cov=app`, `fail_under` set to the **measured** baseline and raised only | — |
 | Dependency lock | `uv` (`uv.lock`, `uv sync --frozen`), Dockerfile updated | `pip-tools` `requirements.lock` |
 | Supply chain | `pip-audit` clean or each waiver documented in `pyproject.toml` comments | — |
-| Hooks | Root `.pre-commit-config.yaml`: ruff (lint+format), pyright, gitleaks, `check-added-large-files`, trailing-whitespace/EOF; H4 adds the frontend hooks | — |
+| Hooks | Root `.pre-commit-config.yaml`: ruff (lint+format), pyright, gitleaks, `check-added-large-files`, trailing-whitespace/EOF; #44 adds the frontend hooks | — |
 
 ## Method (measure first)
 
@@ -46,7 +46,7 @@ No behaviour change is intended; the whole suite must stay green after every com
 
 ## Doc impact
 
-`README.md` Development table (new commands, `pre-commit install`); `AGENTS.md` definition of done (target gate becomes enforced, remove the "once H1 lands" note); `docs/instructions/backend-fastapi.md` (final ignore list, remove *(H1)* markers); `docs/instructions/security-privacy.md` (secret scanning is now real).
+`README.md` Development table (new commands, `pre-commit install`); `AGENTS.md` definition of done (target gate becomes enforced, remove the "once #41 lands" note); `docs/instructions/backend-fastapi.md` (final ignore list, remove *(v5 #41)* markers); `docs/instructions/security-privacy.md` (secret scanning is now real).
 
 ## Risks
 

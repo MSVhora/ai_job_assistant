@@ -1,9 +1,9 @@
-# H5 — Split oversized frontend components (≤ 200 lines)
+# Issue #45 — Split oversized frontend components (≤ 200 lines)
 
 **Status:** Proposed — for owner review
-**Tracks:** `hardening/H5-frontend-component-splits`
-**Plan of record:** [README](README.md) · standards: [frontend-nextjs.md](../../instructions/frontend-nextjs.md) ("components under ~200 lines")
-**Depends on:** H4 (`max-lines` rule, formatting, strict lint) · **Blocks:** v5 UI work (new screens build on smaller parts)
+**Tracks:** GitHub issue #45 (milestone `v5`, branch `v5/45-frontend-component-splits`)
+**Plan of record:** [v5 plan](v5-hardening-plan.md) · standards: [frontend-nextjs.md](../../instructions/frontend-nextjs.md) ("components under ~200 lines")
+**Depends on:** #44 (`max-lines` rule, formatting, strict lint) · **Blocks:** v5 UI work (new screens build on smaller parts)
 
 ## Goal
 
@@ -42,14 +42,14 @@ Bring every component file under ~200 lines **without changing behaviour or appe
 
 ## Doc impact
 
-`docs/instructions/frontend-nextjs.md` (remove *(H5)* marker); no user-facing guide changes.
+`docs/instructions/frontend-nextjs.md` (remove *(v5 #45)* marker); no user-facing guide changes.
 
 ## Risks
 
 | Risk | Mitigation |
 |---|---|
 | Subtle behaviour change (effect ordering, re-render boundaries) | Keep hooks' dependencies identical; render tests; manual smoke |
-| Conflicts with parallel UI work | Merge H5 before v5 UI issues start |
+| Conflicts with parallel UI work | Merge #45 before v5 UI issues start |
 
 ## Out of scope
 

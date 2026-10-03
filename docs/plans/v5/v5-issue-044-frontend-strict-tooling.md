@@ -1,9 +1,9 @@
-# H4 — Frontend strict tooling: Prettier, strict typed ESLint, stricter tsconfig, tests in the gate
+# Issue #44 — Frontend strict tooling: Prettier, strict typed ESLint, stricter tsconfig, tests in the gate
 
 **Status:** Proposed — for owner review
-**Tracks:** `hardening/H4-frontend-strict-tooling`
-**Plan of record:** [README](README.md) · standards: [frontend-nextjs.md](../../instructions/frontend-nextjs.md) (*H4* rules), [testing.md](../../instructions/testing.md)
-**Depends on:** H1 (shares the root `.pre-commit-config.yaml`) · **Blocks:** H5
+**Tracks:** GitHub issue #44 (milestone `v5`, branch `v5/44-frontend-strict-tooling`)
+**Plan of record:** [v5 plan](v5-hardening-plan.md) · standards: [frontend-nextjs.md](../../instructions/frontend-nextjs.md) (*v5 #44* rules), [testing.md](../../instructions/testing.md)
+**Depends on:** #41 (shares the root `.pre-commit-config.yaml`) · **Blocks:** #45
 
 ## Goal
 
@@ -19,10 +19,10 @@ The standard asks for formatting automation, strict typing and a test gate; toda
 |---|---|---|
 | Formatter | Prettier + `prettier-plugin-tailwindcss`; `.prettierrc` (match the existing code style: double quotes, semicolons), `.prettierignore` (`lib/api/schema.d.ts`, `.next`, `node_modules`) | Frontend-only; backend is formatted by `ruff format` |
 | ESLint | Flat config adds `typescript-eslint` `strictTypeChecked` + `stylisticTypeChecked` (with `parserOptions.projectService`), `eslint-config-prettier`, `jsx-a11y` strict, `eslint-plugin-testing-library`, `eslint-plugin-vitest` for tests | Industry-standard strict typed linting |
-| `max-lines` | `max-lines: ["warn"→"error", { max: 200, skipBlankLines: true, skipComments: true }]` for components; ignored for `*.test.*` and generated `schema.d.ts`. Set to **warn** in H4, flipped to **error** when H5 finishes | Enforces the ~200-line guideline without blocking H4 on the existing exceptions |
+| `max-lines` | `max-lines: ["warn"→"error", { max: 200, skipBlankLines: true, skipComments: true }]` for components; ignored for `*.test.*` and generated `schema.d.ts`. Set to **warn** in #44, flipped to **error** when #45 finishes | Enforces the ~200-line guideline without blocking #44 on the existing exceptions |
 | tsconfig | Add `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitOverride`, `noUnusedLocals`, `noUnusedParameters`, `noFallthroughCasesInSwitch`; add `"typecheck": "tsc --noEmit"` | Catches classes of bugs `strict` misses |
 | Scripts | `format` (`prettier --write .`), `format:check`, `typecheck` | Gate commands |
-| Hooks | Extend the root `.pre-commit-config.yaml` (from H1) with Prettier and ESLint on staged frontend files | One hook framework for both stacks |
+| Hooks | Extend the root `.pre-commit-config.yaml` (from #41) with Prettier and ESLint on staged frontend files | One hook framework for both stacks |
 | Format commit | One mechanical `prettier --write` commit, isolated so blame can skip it (`.git-blame-ignore-revs`) | Keeps history usable |
 | Tests | `npm test` is a gate; failing tests found here are fixed in this plan | Standard says tests gate "done" |
 
@@ -43,7 +43,7 @@ Existing vitest suites (`SearchStepperModal.test.tsx`, `ProfileEditor.test.tsx`,
 
 ## Doc impact
 
-`README.md` Development table (`format`, `format:check`, `typecheck`, `test`); `AGENTS.md` definition of done (target gate becomes enforced); `docs/instructions/frontend-nextjs.md` (remove *(H4)* markers); `docs/instructions/testing.md` (frontend gate).
+`README.md` Development table (`format`, `format:check`, `typecheck`, `test`); `AGENTS.md` definition of done (target gate becomes enforced); `docs/instructions/frontend-nextjs.md` (remove *(v5 #44)* markers); `docs/instructions/testing.md` (frontend gate).
 
 ## Risks
 
@@ -55,4 +55,4 @@ Existing vitest suites (`SearchStepperModal.test.tsx`, `ProfileEditor.test.tsx`,
 
 ## Out of scope
 
-Component splits (H5), CI (see [future-tasks](../future-tasks.md)), changing the UI design system.
+Component splits (#45), CI (see [future-tasks](../future-tasks.md)), changing the UI design system.

@@ -1,10 +1,10 @@
 # Future tasks (parked, not scheduled)
 
-Items raised during reviews that are deliberately **not** part of the current plans. Promote an item into a versioned or hardening plan before any work starts.
+Items raised during reviews that are deliberately **not** part of the current plans. Promote an item into a versioned plan before any work starts.
 
 | Task | Why | Notes |
 |---|---|---|
-| **CI workflow (GitHub Actions)** | Every "must pass before done" gate is currently honour-system (no `.github/workflows`) | Backend job: ruff, `ruff format --check`, pyright, `pytest --cov` on a `pgvector/pgvector:pg16` service, `alembic check`, `pip-audit`. Frontend job: lint, `format:check`, typecheck, test, build, `npm audit`. Docs job: link check and `render-diagrams` drift (`git diff --exit-code docs/assets`). Decide after hardening whether it is worth the maintenance for a solo project. |
+| **CI workflow (GitHub Actions)** | Every "must pass before done" gate is currently honour-system (no `.github/workflows`) | Backend job: ruff, `ruff format --check`, pyright, `pytest --cov` on a `pgvector/pgvector:pg16` service, `alembic check`, `pip-audit`. Frontend job: lint, `format:check`, typecheck, test, build, `npm audit`. Docs job: link check and `render-diagrams` drift (`git diff --exit-code docs/assets`). Decide after v5 whether it is worth the maintenance for a solo project. |
 | Dependency update automation | Keep locks and audits fresh | Dependabot or Renovate for `pyproject`/`uv.lock`, `package.json`, Docker base images |
 | Migration linter in CI | Catch unsafe DDL early | `squawk` or equivalent against the migrations |
 | Resume delete endpoint | `security-privacy.md` notes there is no way to delete a resume through the app | Needs ownership checks, file removal, and handling of profiles that cite `source_resume_id` (SET NULL) |

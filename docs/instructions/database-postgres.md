@@ -2,8 +2,8 @@
 
 Applies to all schema and data-access work. Alembic + SQLAlchemy 2.0 async.
 
-> **Target state.** Rules marked *(H3)* are brought into the code by the
-> [hardening plans](../plans/hardening/README.md).
+> **Target state.** Rules marked *(v5 #43)* are brought into the code by the
+> [v5 plans](../plans/v5/v5-hardening-plan.md).
 
 ## The migration rule (non-negotiable)
 
@@ -35,7 +35,7 @@ alembic upgrade head
 
 - **PKs**: UUID (`uuid4`), generated client-side or via `server_default=text("gen_random_uuid()")`.
 - **Timestamps**: `timestamptz` only; `created_at` with server default `now()`.
-- **`updated_at`** *(H3)*: maintained by a **database trigger** (`set_updated_at()` as `BEFORE UPDATE ... WHEN (OLD IS DISTINCT FROM NEW)`), created in the migration of every table that has the column. ORM-side `onupdate` does not fire for bulk `UPDATE` statements, so it is never the only mechanism.
+- **`updated_at`** *(v5 #43)*: maintained by a **database trigger** (`set_updated_at()` as `BEFORE UPDATE ... WHEN (OLD IS DISTINCT FROM NEW)`), created in the migration of every table that has the column. ORM-side `onupdate` does not fire for bulk `UPDATE` statements, so it is never the only mechanism.
 - **JSONB** for flexible payloads (`structured_profile`, `preferences`, `raw_payload`). Don't bury queryable relationships in JSONB — if we filter/group by it, it becomes a column or table.
 - **Indexes**: every FK column indexed; unique constraint on `(source, external_id)` for `job_posting` dedupe; index `match(profile_id, final_score DESC)` for the dashboard query (profiles are the matching unit — owner decision 2026-09-02). Partial indexes are fine and preferred for status-scoped guards (`uq_job_search_active_run`).
 - **Naming**: name every constraint and index explicitly with a prefix — `uq_`, `ix_`, `fk_`, `ck_` — so migrations and autogenerate stay stable.

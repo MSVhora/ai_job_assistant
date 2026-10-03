@@ -224,9 +224,9 @@ export async function listMatches(params: MatchListParams): Promise<MatchRespons
   return apiFetch<MatchResponse[]>(`/api/matches?${query.toString()}`);
 }
 
-export async function listMatchesPage(
-  params: MatchListParams,
-): Promise<{ items: MatchResponse[]; total: number }> {
+export async function listMatchesPage(params: {
+  [K in keyof MatchListParams]: MatchListParams[K] | undefined;
+}): Promise<{ items: MatchResponse[]; total: number }> {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined && value !== null && value !== "") {

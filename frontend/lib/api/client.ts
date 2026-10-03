@@ -53,7 +53,7 @@ function formatValidationDetail(detail: unknown[]): string {
     const message = String(entry.msg ?? "invalid value");
     parts.push(location === "" ? message : `${location}: ${message}`);
   }
-  if (parts.length === 0) return STATUS_FALLBACK_MESSAGES[422];
+  if (parts.length === 0) return STATUS_FALLBACK_MESSAGES[422] ?? "The request was invalid.";
   return `Invalid input — ${parts.join("; ")}`;
 }
 

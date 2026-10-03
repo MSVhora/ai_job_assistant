@@ -158,7 +158,7 @@ function tokens(value: string): string[] {
 
 export function seedSpec(profile: StructuredProfile): { title: string; skills: string[] } {
   const rawRole = profile.preferences?.target_title || profile.headline || "";
-  const title = rawRole.split("|")[0].trim() || rawRole.trim();
+  const title = (rawRole.split("|")[0] ?? "").trim() || rawRole.trim();
   const picked: string[] = [];
   for (const skill of profile.skills) {
     if (picked.length >= MAX_SEED_SKILLS) break;
@@ -252,26 +252,26 @@ export function toSearchRequest(
     profileCurrency && /^[A-Za-z]{3}$/.test(profileCurrency) ? profileCurrency : undefined;
   const spec = hasSpec
     ? {
-        title: title || undefined,
-        skills_all: skillsAll.length > 0 ? skillsAll : undefined,
-        skills: skills.length > 0 ? skills : undefined,
-        exclude: exclude.length > 0 ? exclude : undefined,
-        options: Object.keys(options).length > 0 ? options : undefined,
+        ...(title !== "" && { title }),
+        ...(skillsAll.length > 0 && { skills_all: skillsAll }),
+        ...(skills.length > 0 && { skills }),
+        ...(exclude.length > 0 && { exclude }),
+        ...(Object.keys(options).length > 0 && { options }),
       }
     : undefined;
 
   return {
     payload: {
-      profile_id: profileId ?? undefined,
       source: values.source,
       country: values.country,
       location: values.location.trim() === "" ? null : values.location.trim(),
       results_wanted: values.results_wanted,
-      max_days_old: values.posted_within === "any" ? undefined : Number(values.posted_within),
-      source_queries: spec !== undefined ? { [values.source]: spec } : undefined,
-      salary_min: minSalary === "" ? undefined : Number(minSalary),
-      salary_max: maxSalary === "" ? undefined : Number(maxSalary),
-      salary_currency: currency,
+      ...(profileId !== null && { profile_id: profileId }),
+      ...(values.posted_within !== "any" && { max_days_old: Number(values.posted_within) }),
+      ...(spec !== undefined && { source_queries: { [values.source]: spec } }),
+      ...(minSalary !== "" && { salary_min: Number(minSalary) }),
+      ...(maxSalary !== "" && { salary_max: Number(maxSalary) }),
+      ...(currency !== undefined && { salary_currency: currency }),
     },
     missing,
   };

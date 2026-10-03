@@ -297,7 +297,7 @@ export function StringListField({
   name: string;
   label: string;
   addLabel: string;
-  placeholder?: string;
+  placeholder?: string | undefined;
 }) {
   const { register } = useFormContext<ProfileFormValues>();
   const { fields, append, remove, move } = useFieldArray({
@@ -368,11 +368,11 @@ export function TextField({
 }: {
   label: string;
   name: string;
-  error?: string;
+  error?: string | undefined;
   badge?: ReactNode;
-  placeholder?: string;
-  type?: string;
-  hint?: string;
+  placeholder?: string | undefined;
+  type?: string | undefined;
+  hint?: string | undefined;
   readOnly?: boolean;
 }) {
   const { register } = useFormContext<ProfileFormValues>();
@@ -403,9 +403,9 @@ export function SelectField({
   label: string;
   name: string;
   options: readonly { value: string; label: string }[];
-  error?: string;
+  error?: string | undefined;
   badge?: ReactNode;
-  hint?: string;
+  hint?: string | undefined;
 }) {
   const { register } = useFormContext<ProfileFormValues>();
   return (

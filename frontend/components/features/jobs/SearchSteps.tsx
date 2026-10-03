@@ -55,7 +55,7 @@ export function SourceStep({
 }: {
   sources: SourceInfo[];
   selectedSourceId: string;
-  error?: string;
+  error?: string | undefined;
   onSelect: (sourceId: string) => void;
 }) {
   return (

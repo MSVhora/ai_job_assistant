@@ -80,7 +80,7 @@ export function ResumeUploadForm() {
   const pending = uploadAndExtract.isPending || retryExtract.isPending;
   const showProgress = uploadAndExtract.isPending || (retryExtract.isPending && progress > 0);
   const stageIndex = STAGES.findIndex((stage) => progress < stage.end);
-  const currentStage = STAGES[stageIndex === -1 ? STAGES.length - 1 : stageIndex];
+  const currentStage = STAGES[stageIndex === -1 ? STAGES.length - 1 : stageIndex] ?? STAGES[0];
 
   useEffect(() => {
     if (!showProgress) {
@@ -211,7 +211,7 @@ export function ResumeUploadForm() {
           className="flex flex-col gap-2 rounded-2xl border border-violet-100 bg-white p-4 shadow-sm"
         >
           <div className="flex items-center justify-between text-sm">
-            <span className="font-semibold text-gray-900">{currentStage.label}…</span>
+            <span className="font-semibold text-gray-900">{currentStage?.label}…</span>
             <span className="font-semibold text-violet-700">{progress}%</span>
           </div>
           <div

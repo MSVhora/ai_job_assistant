@@ -1,0 +1,50 @@
+# Synthetic labelled items for the evidence noise filter. `expect` is the reason
+# for a filtered item, or `kept`. Look-alikes at the bottom pin the rule boundaries.
+- {name: merge_by_parents, kind: commit, title: "Combine release work", meta: {parents: 2, additions: 40, deletions: 3}, expect: merge_commit}
+- {name: merge_branch_message, kind: commit, title: "Merge branch 'main' into feature/search", meta: {parents: 1}, expect: merge_commit}
+- {name: merge_pull_request_message, kind: commit, title: "Merge pull request #42 from ada/search", meta: {}, expect: merge_commit}
+- {name: merge_remote_message, kind: commit, title: "Merge remote-tracking branch 'origin/main'", meta: {}, expect: merge_commit}
+- {name: bot_suffix, kind: commit, title: "Update lockfile", meta: {author_login: "dependabot[bot]", additions: 300, deletions: 200}, expect: bot_author}
+- {name: bot_listed_name, kind: pull_request, title: "Configure Renovate", meta: {author_login: "Renovate", additions: 30, deletions: 0}, expect: bot_author}
+- {name: bot_github_actions, kind: commit, title: "Update badge", meta: {author_login: "github-actions", additions: 2, deletions: 2}, expect: bot_author}
+- {name: bot_snyk, kind: pull_request, title: "Fix vulnerabilities", meta: {author_login: "snyk-bot", additions: 12, deletions: 12}, expect: bot_author}
+- {name: bump_chore_deps, kind: commit, title: "chore(deps): bump lodash from 4.17.20 to 4.17.21", meta: {additions: 2, deletions: 2}, expect: dependency_bump}
+- {name: bump_plain, kind: commit, title: "Bump axios to 1.6.2", meta: {additions: 1, deletions: 1}, expect: dependency_bump}
+- {name: bump_update_dependency, kind: commit, title: "Update dependency eslint to v9", meta: {additions: 2, deletions: 2}, expect: dependency_bump}
+- {name: bump_upgrade, kind: commit, title: "Upgrade pytest", meta: {additions: 1, deletions: 1}, expect: dependency_bump}
+- {name: bump_scoped_deps, kind: commit, title: "chore(deps-dev): bump vitest", meta: {additions: 2, deletions: 2}, expect: dependency_bump}
+- {name: lockfile_only_pr, kind: pull_request, title: "Refresh dependencies", meta: {paths: ["package-lock.json"], additions: 900, deletions: 700}, expect: lockfile_only}
+- {name: lockfile_many_pr, kind: pull_request, title: "Sync lockfiles", meta: {paths: ["frontend/yarn.lock", "backend/poetry.lock", "go.sum"]}, expect: lockfile_only}
+- {name: lockfile_uv_pr, kind: pull_request, title: "Regenerate lock", meta: {paths: ["backend/uv.lock"], additions: 50, deletions: 40}, expect: lockfile_only}
+- {name: lockfile_cargo_pr, kind: pull_request, title: "Update crates", meta: {paths: ["Cargo.lock"]}, expect: lockfile_only}
+- {name: trivia_wip, kind: commit, title: "wip", meta: {additions: 40, deletions: 2}, expect: trivial_message}
+- {name: trivia_fix_typo, kind: commit, title: "fix typo", meta: {additions: 1, deletions: 1}, expect: trivial_message}
+- {name: trivia_typo_in_readme, kind: commit, title: "typo in readme", meta: {additions: 1, deletions: 1}, expect: trivial_message}
+- {name: trivia_format, kind: commit, title: "format", meta: {additions: 80, deletions: 80}, expect: trivial_message}
+- {name: trivia_initial_commit, kind: commit, title: "Initial commit", meta: {additions: 500, deletions: 0}, expect: trivial_message}
+- {name: trivia_dots, kind: commit, title: "...", meta: {additions: 9, deletions: 1}, expect: trivial_message}
+- {name: trivia_misc, kind: commit, title: "misc", meta: {}, expect: trivial_message}
+- {name: trivia_minor_changes, kind: commit, title: "minor changes", meta: {additions: 30, deletions: 10}, expect: trivial_message}
+- {name: trivia_two_words_small, kind: commit, title: "tweak spacing", meta: {additions: 2, deletions: 1}, expect: trivial_message}
+- {name: trivia_update_readme, kind: commit, title: "Update README", meta: {additions: 4, deletions: 1}, expect: trivial_message}
+- {name: trivia_cleanup, kind: commit, title: "cleanup", meta: {additions: 12, deletions: 20}, expect: trivial_message}
+- {name: generated_dist, kind: pull_request, title: "Rebuild bundle", meta: {paths: ["dist/app.js", "dist/app.js.map"]}, expect: generated_or_vendored}
+- {name: generated_vendor, kind: pull_request, title: "Vendor libs", meta: {paths: ["third/vendor/lib.go"]}, expect: generated_or_vendored}
+- {name: generated_min_and_snap, kind: pull_request, title: "Refresh generated assets", meta: {paths: ["static/app.min.js", "tests/__snapshots__/a.snap"]}, expect: generated_or_vendored}
+- {name: generated_build_dir, kind: commit, title: "Publish artifacts", meta: {paths: ["build/index.html"]}, expect: generated_or_vendored}
+- {name: merge_beats_bot, kind: commit, title: "Merge branch 'main'", meta: {author_login: "dependabot[bot]", parents: 2}, expect: merge_commit}
+- {name: bot_beats_bump, kind: commit, title: "Bump lodash", meta: {author_login: "dependabot[bot]", additions: 1, deletions: 1}, expect: bot_author}
+- {name: bump_beats_trivia, kind: commit, title: "Bump x", meta: {additions: 1, deletions: 1}, expect: dependency_bump}
+- {name: lockfile_beats_generated, kind: pull_request, title: "Rebuild", meta: {paths: ["vendor/Gemfile.lock"]}, expect: lockfile_only}
+- {name: kept_race_fix, kind: commit, title: "Fix race in token refresh", body: "Serialize refresh calls behind a lock.", meta: {additions: 34, deletions: 9}, expect: kept}
+- {name: kept_bump_retry_budget, kind: commit, title: "Bump retry budget to handle 429s", meta: {additions: 62, deletions: 14}, expect: kept}
+- {name: kept_upgrade_with_migration, kind: pull_request, title: "Upgrade to React 19 and migrate forms", meta: {paths: ["package.json", "src/forms.tsx"], additions: 400, deletions: 380}, expect: kept}
+- {name: kept_bump_unknown_size, kind: commit, title: "Bump cache TTL after load test", meta: {}, expect: kept}
+- {name: kept_format_invoices, kind: commit, title: "format invoice totals using locale-aware currency rules", meta: {additions: 40, deletions: 12}, expect: kept}
+- {name: kept_two_words_big_diff, kind: commit, title: "Add pagination", meta: {additions: 220, deletions: 18}, expect: kept}
+- {name: kept_lockfile_plus_source, kind: pull_request, title: "Add zod validation", meta: {paths: ["package-lock.json", "src/schema.ts"], additions: 120, deletions: 4}, expect: kept}
+- {name: kept_human_login, kind: commit, title: "Implement resumable sync cursors", meta: {author_login: "ada", additions: 180, deletions: 25}, expect: kept}
+- {name: kept_dist_plus_source, kind: pull_request, title: "Ship the parser rewrite", meta: {paths: ["dist/parser.js", "src/parser.ts"], additions: 300, deletions: 120}, expect: kept}
+- {name: kept_no_meta, kind: note, title: "Led the payments migration", body: "Moved 40 services to the new ledger.", meta: {}, expect: kept}
+- {name: kept_wip_with_description, kind: commit, title: "WIP: resumable uploads with checksum verification", meta: {additions: 90, deletions: 4}, expect: kept}
+- {name: kept_empty_title_uses_body, kind: commit, title: null, body: "Cache profile digests by content hash", meta: {additions: 30, deletions: 3}, expect: kept}

@@ -10,7 +10,17 @@ from app.core.db import session_factory
 
 pytestmark = pytest.mark.usefixtures("clean_tables")
 
-TABLES_WITH_UPDATED_AT = ["candidate", "job_search", "match", "match_rebuild", "profile"]
+TABLES_WITH_UPDATED_AT = [
+    "candidate",
+    "evidence_chunk",
+    "evidence_item",
+    "evidence_scope",
+    "evidence_sync_run",
+    "job_search",
+    "match",
+    "match_rebuild",
+    "profile",
+]
 
 
 async def _updated_at(profile_id: uuid.UUID) -> datetime:

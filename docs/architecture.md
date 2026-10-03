@@ -293,6 +293,14 @@ erDiagram
     job_posting ||--o{ search_posting : "found in search"
     job_posting ||--o{ match : "produces"
     profile ||--o{ match_rebuild : "rebuild runs"
+    candidate ||--o{ evidence_source : "connects"
+    candidate ||--o{ evidence_item : "owns evidence"
+    candidate ||--o{ evidence_chunk : "owns chunks"
+    evidence_source ||--o{ evidence_scope : "opted-in repos"
+    evidence_source ||--o{ evidence_sync_run : "sync runs"
+    evidence_scope |o--o{ evidence_item : "ingested from"
+    evidence_chunk ||--o{ evidence_chunk_item : "built from"
+    evidence_item ||--o{ evidence_chunk_item : "in chunks"
 
     candidate {
         uuid id PK
@@ -416,6 +424,83 @@ erDiagram
     source_state {
         text source_name PK
         timestamptz acknowledged_at "disclosure acknowledgment — null until enabled (issue #8)"
+    }
+
+    evidence_source {
+        uuid id PK
+        uuid candidate_id FK "RESTRICT"
+        text kind "github | notes | resume; unique per candidate"
+        text account_login
+        jsonb extra_identities "emails for commit matching"
+        timestamptz acknowledged_at "private-repo disclosure ack"
+        timestamptz last_synced_at
+        timestamptz created_at
+    }
+
+    evidence_scope {
+        uuid id PK
+        uuid source_id FK "CASCADE"
+        text ref "owner/repo; unique per source"
+        boolean is_private
+        boolean enabled "default false"
+        text content_level "messages_and_prs | metadata_only"
+        jsonb employer_ref
+        jsonb cursor "per-scope resume point"
+        text sync_state "pending | running | paused | succeeded | failed"
+        timestamptz last_synced_at
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    evidence_sync_run {
+        uuid id PK
+        uuid source_id FK "CASCADE; one pending/running run per source (partial unique index)"
+        text status "pending | running | paused | succeeded | failed"
+        jsonb progress
+        jsonb rate_limit
+        timestamptz resume_at
+        text error
+        jsonb usage
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    evidence_item {
+        uuid id PK
+        uuid candidate_id FK "RESTRICT"
+        uuid scope_id FK "SET NULL"
+        text kind "commit | pull_request | review_comment | issue | readme | repo_summary | note | link | resume_line"
+        text external_id "unique with candidate + kind"
+        text project_key
+        text body
+        timestamptz occurred_at
+        text status "kept | filtered | excluded"
+        text filter_reason "noise-filter rule that dropped it"
+        boolean is_private "copied from scope; drives provenance marking"
+        jsonb meta
+        text content_hash
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    evidence_chunk {
+        uuid id PK
+        uuid candidate_id FK "RESTRICT"
+        text kind
+        text text
+        integer token_count "CHECK >= 0"
+        text content_hash
+        text chunker_version
+        text extracted_hash
+        boolean contains_private
+        vector embedding "vector(768), nullable, no ANN index"
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    evidence_chunk_item {
+        uuid chunk_id PK "FK CASCADE"
+        uuid item_id PK "FK CASCADE"
     }
 ```
 

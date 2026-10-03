@@ -1,0 +1,49 @@
+{
+  "data": {
+    "rateLimit": {
+      "limit": 5000,
+      "remaining": 4990,
+      "resetAt": "2026-10-03T16:00:00Z"
+    },
+    "repository": {
+      "defaultBranchRef": {
+        "target": {
+          "history": {
+            "pageInfo": {
+              "hasNextPage": true,
+              "endCursor": "cursor-1"
+            },
+            "nodes": [
+              {
+                "oid": "a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+                "messageHeadline": "Implement punch-card loader",
+                "messageBody": "Streams cards through a bounded buffer.",
+                "committedDate": "2026-08-01T12:00:00Z",
+                "url": "https://github.com/ada/engine/commit/a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1",
+                "additions": 10,
+                "deletions": 2,
+                "changedFilesIfAvailable": 3,
+                "parents": {
+                  "totalCount": 1
+                }
+              },
+              {
+                "oid": "b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+                "messageHeadline": "chore(deps): bump pytest from 8.1 to 8.2",
+                "messageBody": "",
+                "committedDate": "2026-08-01T12:00:00Z",
+                "url": "https://github.com/ada/engine/commit/b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+                "additions": 1,
+                "deletions": 1,
+                "changedFilesIfAvailable": 3,
+                "parents": {
+                  "totalCount": 1
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "data": {
+    "rateLimit": {
+      "limit": 5000,
+      "remaining": 4980,
+      "resetAt": "2026-10-03T16:00:00Z"
+    },
+    "search": {
+      "pageInfo": {
+        "hasNextPage": false,
+        "endCursor": null
+      },
+      "nodes": [
+        {
+          "number": 21,
+          "title": "Fix cache eviction",
+          "url": "https://github.com/ada/engine/pull/21",
+          "createdAt": "2026-08-05T09:00:00Z",
+          "mergedAt": null,
+          "author": {
+            "login": "grace"
+          },
+          "reviews": {
+            "nodes": [
+              {
+                "id": "R1",
+                "body": "Needs a test for the empty case.",
+                "submittedAt": "2026-08-06T09:00:00Z",
+                "url": "https://github.com/ada/engine/pull/21#r1",
+                "comments": {
+                  "nodes": [
+                    {
+                      "body": "Off by one here.",
+                      "path": "src/cache.py"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "number": 22,
+          "title": "Approve only",
+          "url": "https://github.com/ada/engine/pull/22",
+          "createdAt": "2026-08-05T09:00:00Z",
+          "mergedAt": null,
+          "author": {
+            "login": "grace"
+          },
+          "reviews": {
+            "nodes": [
+              {
+                "id": "R2",
+                "body": "",
+                "submittedAt": "2026-08-06T09:00:00Z",
+                "url": "u",
+                "comments": {
+                  "nodes": []
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

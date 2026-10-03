@@ -1,7 +1,7 @@
 # Issue #50 — GitHub connector, guarded resumable sync, refresh modes (Week 1)
 
-**Status:** Proposed — for owner review
-**Tracks:** GitHub issue #50 (milestone `v6`, branch `v6/42-github-connector-sync`)
+**Status:** In progress — branch `v6/50-github-connector-sync`
+**Tracks:** GitHub issue #50 (milestone `v6`, branch `v6/50-github-connector-sync`)
 **Plan of record:** [v6-implementation-plan.md](v6-implementation-plan.md) §3.2, §3.5, §4.1, §4.6, §12
 **Depends on:** #48 (tables, protocol, settings), #49 (redaction is not needed here; retry reuse only)
 **Blocks:** #51 (needs ingested items), #53 (UI), #60 (golden fixtures)
@@ -12,7 +12,9 @@
 
 Pull the user's own GitHub work into `evidence_item` incrementally, within rate limits, and resumably after a crash or pause — with an explicit **refresh** action (incremental or full). Backend only; the UI arrives in #53, so this issue is exercised through the API and tests.
 
-## Spike first (≈ 1 hour, results written into this file before coding)
+## Spike (deferred to owner — not run; implementation follows GitHub's documented contracts with synthetic fixtures)
+
+The checklist below stays open: run it with your PAT and report any mismatch with plan §3.2/§12; each one becomes a follow-up fix.
 
 1. With the real PAT: `gh api` for `/user`, `/user/repos`, `/repos/{o}/{r}/commits?author=&since=`, one GraphQL PR query (reviews, comments, files, commits); record `X-RateLimit-*` headers and GraphQL `rateLimit { cost remaining }`.
 2. Confirm which **fine-grained PAT permissions** are required (expected: Metadata, Contents read, Pull requests read, Issues read) and what an org-owned repo returns without approval.
@@ -83,3 +85,17 @@ the backend gate (`ruff check . && ruff format --check . && pyright && pytest --
 ## Out of scope
 
 UI, chunking/embedding (#51), LLM calls, GitLab/Bitbucket, multiple emails/accounts, fetching code or diffs, webhooks, scheduled auto-sync (refresh is user-triggered).
+
+## Implementation notes (deviations from the plan above)
+
+- **Spike not run:** built from GitHub's documented contracts with synthetic fixtures (`tests/eval/golden/github/`); the spike checklist above is still open for the owner. Fine-grained PAT permissions in `.env.example`/guide 04 are the documented expectation, not a verified result.
+- **Commits via GraphQL, not REST:** commits come from `defaultBranchRef.history(author: {id})`, which carries `additions`/`deletions`/`changedFilesIfAvailable`/`parents`. REST commit lists have no sizes, so the noise filter's size gates (dependency bumps, tiny trivia) could never fire. Only the default branch is read. REST is used for `/user`, `/user/repos`, repo summary, languages and README.
+- **Search-backed stages:** PRs, reviews and issues use GraphQL `search(repo: author: updated:>=)` so the author filter is server-side. Review items are one `review_comment` per PR (review text plus inline comments), external id `owner/repo#N:review`.
+- **ETag** is used on the repo-summary request (`summary_etag` in the scope cursor); a 304 yields no summary item and is not counted against the request budget. It is not used for commits (a moving `since` makes it useless).
+- **Per-run source instance:** the registry now stores factories (`_FACTORIES`), because a run owns the request budget and rate trackers. The #48 registry test was updated accordingly.
+- **Cursor:** `evidence_scope.cursor` holds `{stage, since, started_at, watermark, summary_etag, *_after}`; each pass starts at `watermark - 1 day` (or the lookback floor), and `full` mode resets it to `{}`.
+- **Upsert** only rewrites a row whose `content_hash` changed, so a status the user restored later (#53) is not reset by an unchanged re-sync. Squash commits are attached to their PR (`filtered`, reason `squash_of_pull_request`, `meta.pr_number`) once per commit.
+- **`is_new`** on a scope means "stored by this listing call"; there is no persisted flag. `is_fork` and `description` come only from the live listing.
+- **Disclosure:** `acknowledged_disclosure` is required the first time a private scope is enabled; once `acknowledged_at` is set it is not required again.
+- **Not implemented:** the repo summary's "contribution span" (needs commit dates across the pass) and the "empty fork" marker; forks simply start disabled.
+- **Status endpoint** reports stored login/counts and never calls GitHub; the login is stored when scopes are listed.

@@ -28,6 +28,7 @@ def check() -> SetupCheckResponse:
         adzuna_configured=settings.adzuna_app_id is not None
         and settings.adzuna_app_key is not None,
         apify_configured=settings.apify_token is not None,
+        github_token_configured=settings.github_token is not None,
         task_models={task.value: model_for(task) for task in LLMTask},
         warnings=warnings,
     )

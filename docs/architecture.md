@@ -38,7 +38,7 @@ flowchart TB
 Non-negotiable layering rules (enforced by the
 [coding standards](instructions/)):
 
-- `routers/` — HTTP only: parse, call a service, return a response model
+- `routers/` — HTTP only: parse, call a service, return a response model (evidence: `routers/evidence.py` → `services/evidence_sync.py`)
 - `services/` — business logic; raise domain errors
 - `models/` — SQLAlchemy 2.0 ORM; the schema source of truth
 - `adapters/llm.py` — the **only** place that talks to an LLM provider; it prices calls
@@ -138,6 +138,42 @@ sequenceDiagram
 ```
 
 ![search-matching-sequence diagram](./assets/search-matching-sequence.svg)
+
+## Evidence sync (sequence)
+
+See [guide 04](guide/04-evidence-and-resume.md). The `EvidenceSource` interface
+(`adapters/evidence_sources/`) is a stateful sibling of `JobSource`; the registry builds one source
+instance per run because it owns the request budget and rate trackers.
+
+<!-- diagram: evidence-sync-sequence -->
+```mermaid
+sequenceDiagram
+    participant B as Browser
+    participant A as FastAPI
+    participant S as GitHubSource
+    participant H as GitHub (REST + GraphQL)
+    participant D as Postgres
+
+    B->>A: GET /api/evidence/github/scopes
+    A->>S: identify + list_scopes
+    S->>H: GET /user, GET /user/repos
+    A->>D: store new repos as evidence_scope (disabled)
+    B->>A: PATCH /api/evidence/github/scopes (enable, private needs the disclosure)
+    B->>A: POST /api/evidence/github/sync (mode: incremental | full)
+    A->>D: sweep stale runs, active-run check, insert evidence_sync_run (partial unique index)
+    A-->>B: 202 sync_id
+    loop each enabled scope, each page
+        A->>S: sync_scope(scope + cursor)
+        S->>H: repo summary (ETag) · commits · PRs · reviews · issues (budget + rate-limit floor checked first)
+        S-->>A: SyncPage(items, next_cursor, requests_used)
+        A->>A: noise.classify, content hash
+        A->>D: upsert evidence_item, cursor and progress in one commit
+    end
+    A->>D: attach squash commits to their PR, status succeeded | paused (resume_at) | failed
+    B->>A: GET /api/evidence/syncs/{id}
+```
+
+![evidence-sync-sequence diagram](./assets/evidence-sync-sequence.svg)
 
 Search runs start **only** from an explicit `POST /api/jobs/search` — never automatically —
 and are tracked in `job_search` (status + per-source `{source, status, count, warning}`

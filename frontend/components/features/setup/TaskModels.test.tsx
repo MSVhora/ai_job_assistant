@@ -16,6 +16,7 @@ function setupCheck(taskModels: Record<string, string>): SetupCheck {
     embedding_configured: true,
     adzuna_configured: true,
     apify_configured: false,
+    github_token_configured: false,
     task_models: taskModels,
     warnings: [],
   };

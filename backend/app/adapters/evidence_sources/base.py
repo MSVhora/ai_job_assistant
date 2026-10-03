@@ -1,4 +1,5 @@
 from collections.abc import AsyncIterator
+from datetime import datetime
 from typing import Protocol
 
 from app.schemas.evidence import (
@@ -18,6 +19,15 @@ class EvidenceSourceError(Exception):
 
 class EvidenceSourceConfigError(EvidenceSourceError):
     pass
+
+
+class EvidenceSourcePausedError(EvidenceSourceError):
+    """The run must stop and resume later (request budget, rate-limit floor, long Retry-After)."""
+
+    def __init__(self, reason: str, resume_at: datetime | None = None) -> None:
+        super().__init__(reason)
+        self.reason = reason
+        self.resume_at = resume_at
 
 
 class EvidenceSource(Protocol):

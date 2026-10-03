@@ -1,0 +1,35 @@
+{
+  "data": {
+    "rateLimit": {
+      "limit": 5000,
+      "remaining": 4980,
+      "resetAt": "2026-10-03T16:00:00Z"
+    },
+    "search": {
+      "pageInfo": {
+        "hasNextPage": false,
+        "endCursor": null
+      },
+      "nodes": [
+        {
+          "number": 3,
+          "title": "Loader drops the last card",
+          "body": "Repro: load a deck of 3.",
+          "url": "https://github.com/ada/engine/issues/3",
+          "createdAt": "2026-07-01T09:00:00Z",
+          "state": "CLOSED",
+          "author": {
+            "login": "ada"
+          },
+          "labels": {
+            "nodes": [
+              {
+                "name": "bug"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

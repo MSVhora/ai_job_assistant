@@ -37,8 +37,8 @@ class FakeEvidenceSource:
         return EvidenceItemData(kind="note", external_id=str(raw["id"]), body="b")
 
 
-def test_registry_is_empty_until_a_connector_registers() -> None:
-    assert registry.registered_sources() == ()
+def test_registry_lists_the_github_connector() -> None:
+    assert [source.name for source in registry.registered_sources()] == ["github"]
 
 
 def test_get_source_unknown_name_raises_typed_error() -> None:
@@ -54,11 +54,12 @@ async def test_fake_source_satisfies_protocol_and_resolves(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     fake = FakeEvidenceSource()
-    monkeypatch.setitem(registry._REGISTRY, fake.name, fake)
+    monkeypatch.setitem(registry._FACTORIES, fake.name, lambda: fake)
 
     source: EvidenceSource = registry.get_source("fake")
 
-    assert registry.registered_sources() == (fake,)
+    assert source is fake
+    assert fake in registry.registered_sources()
     assert (await source.identify()).login == "ada"
     pages = [page async for page in source.sync_scope(ScopeState(ref="ada/repo"))]
     assert pages == [SyncPage()]

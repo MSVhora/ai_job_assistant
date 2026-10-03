@@ -148,3 +148,6 @@ export function EmptyState({ message, action }: { message: string; action: React
     </div>
   );
 }
+
+export const addButtonClass =
+  "rounded-full border-dashed px-4 py-1.5 text-xs font-semibold text-violet-700 hover:border-violet-400 hover:bg-violet-50";

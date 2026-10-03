@@ -8,12 +8,9 @@ import { Input } from "@/components/ui/input";
 import { toProfilePayload, type ProfileFormValues } from "@/lib/profile-schema";
 import type { StructuredProfile } from "@/lib/api";
 
-import {
-  CertificationsSection,
-  EducationSection,
-  AwardsSection,
-  ExtraSectionsSection,
-} from "./EducationCredentials";
+import { CertificationsSection, AwardsSection } from "./CertificationsAwards";
+import { EducationSection } from "./EducationSection";
+import { ExtraSectionsSection } from "./ExtraSections";
 import { ExperienceSection, ProjectsSection } from "./ExperienceProjects";
 import {
   AiExtractedBadge,

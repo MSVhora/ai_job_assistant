@@ -1,9 +1,9 @@
 # Issue #56 — Typst rendering and the deterministic priority-first page fit (Week 3)
 
-**Status:** Proposed — for owner review (revised 2026-10-02: targets 1–4 pages, priority-first, no fill thresholds, PDF only on explicit request)
-**Tracks:** GitHub issue #56 (milestone `v6`, branch `v6/48-resume-typst-render-fit`)
+**Status:** Proposed — for owner review (revised 2026-10-03 against the shipped #55 code; earlier revision 2026-10-02: targets 1–4 pages, priority-first, no fill thresholds, PDF only on explicit request)
+**Tracks:** GitHub issue #56 (milestone `v6`, branch `v6/56-resume-typst-render-fit`)
 **Plan of record:** [v6-implementation-plan.md](v6-implementation-plan.md) §3.4, §6.3, ADR-3
-**Depends on:** #54 (schema), #55 (ranked pool and written bullets)
+**Depends on:** #54 (schema), #55 (ranked pool, written bullets, and the content-only stub layout this issue replaces)
 **Blocks:** #57 (review view needs `layout`; preview/download need `/render`)
 
 ---
@@ -12,12 +12,23 @@
 
 Decide **what is included** for the user's chosen page count (1, 2, 3 or 4) by maximizing the priority of included content, deterministically, and render an ATS-friendly PDF **only on explicit request**. Pages do not need to be full: the objective is the best-priority content for the space, never a blank resume. No LLM anywhere in this issue.
 
+## Starting point (state after #55)
+
+- `resume_builder.build_layout` is the content-only stub, called only from `persist()`, which is the single writer of `resume_document.layout` (generate, regenerate, include-anyway, write-on-demand, apply-comments, bullet edit, approve-anyway). The fit replaces its inclusion logic **inside `persist()`**, so no caller changes; the stub's non-fit `not_included` reasons (`needs_review`, `not_written`, `overlap_omitted`) are kept and `did_not_fit` is added.
+- `PATCH /resume-documents/{id}` and `resync-identity` bypass `persist`; `POST …/fit` is the explicit re-fit for them.
+- `Layout`, `NotIncluded` (already has `did_not_fit`) and the `layout`/`template`/`page_target` columns exist: **no migration**.
+- Contact lives in `content.basics`, so the renderer needs only `ResumeContent`. Priority is `Bullet.score`. `template` is a free string today; validate against `{classic, compact}` (400 `InvalidResumeDocumentError`) at fit time.
+- Eligible bullets: `check == "passed"` or `approved_anyway`; `needs_review`/`failed` → `not_included` (`needs_review`).
+- `Settings` has no fit setting yet: add `resume_fit_max_compiles` (+ `.env.example`). `CannotFitError(DomainError)` is 422; extra body keys need a handler branch and an `allowed_extra` entry in `tests/core/test_error_contract.py`.
+- The existing `GET …/export` route is the precedent for a non-`response_model` route (`response_class=Response`).
+
 ## Spike first (≈ 1 hour, recorded in this file before coding)
 
 1. `uv add typst` (scratch branch) and build the backend image (`python:3.12-slim`, arm64 and amd64): no system libs, compiles a sample with bundled fonts.
-2. Compile a sample, count pages with `pdfplumber`, extract text, check reading order and headings.
-3. Confirm font licences (OFL, e.g. Source Sans 3 / Libertinus); pin the compiler version.
-4. Note whether the pinned Typst version emits tagged PDF. If any check fails, switch to the fallback (WeasyPrint behind `PageMeter`) **before** writing the fit and report back.
+2. Decide how data reaches the template as data: `sys_inputs` is string-only (one JSON string + `json.decode` in Typst) vs. a temp `data.json` under a temp root.
+3. Compile a sample, count pages with `pdfplumber`, extract text, check reading order and headings.
+4. Confirm font licences (OFL, e.g. Source Sans 3 / Libertinus); pin the compiler version.
+5. Note whether the pinned Typst version emits tagged PDF. If any check fails, switch to the fallback (WeasyPrint behind `PageMeter`) **before** writing the fit and report back.
 
 ## Locked decisions
 
@@ -56,7 +67,8 @@ Single column; standard headings (Experience, Education, Skills, Projects); real
 - `resources/typst/resume.typ` (+ per-variant parameters), `resources/fonts/*`.
 - `services/resume_render/{typst_template.py,page_meter.py,fit.py}`: content → Typst data (passed to the template as **data**, never concatenated into markup), compile, measure, fit search, `RenderResult(pdf_bytes | None, layout)`.
 - `services/resume_builder.py` integration point: `fit_document(document)` called after generation, after edits/add/remove, and before render.
-- `routers/resume_documents.py`: `POST /api/resume-documents/{id}/fit`, `POST …/render` (binary download: declares `response_class=Response` and `responses={200: {"content": {"application/pdf": {}}}}`; update `backend-fastapi.md`, whose `response_model` exceptions currently list only redirect/204 routes; `application/pdf`, 422 `CannotFit` with details), `GET …/layout`. Contact info is injected from the profile at compile time; nothing private-marked is rendered into the file.
+- `routers/resume_documents.py`: `POST /api/resume-documents/{id}/fit`, `POST …/render` (binary download: declares `response_class=Response` and `responses={200: {"content": {"application/pdf": {}}}}`; update `backend-fastapi.md`, whose `response_model` exceptions currently list only redirect/204 routes; `application/pdf`, 422 `CannotFit` with details), `GET …/layout`. Contact info comes from `content.basics`; nothing private-marked is rendered into the file.
+- Resources are `Path(__file__)`-relative like `resources/skill_aliases.yaml` (the Dockerfile copies `app/`). Compiles run in `asyncio.to_thread`.
 - `pyproject.toml`: add `typst==<pinned>` to runtime `dependencies`, `uv lock`, rebuild the image (it installs with `uv sync --frozen --no-dev`), `pip-audit` clean. Pyright strict: wrap the compiler in one small typed function (`compile_pdf`) and narrow its return values there — no scattered ignores.
 - `core/config.py`: `resume_fit_max_compiles`.
 
@@ -78,7 +90,7 @@ Single column; standard headings (Experience, Education, Skills, Projects); real
 
 ### Gates / docs
 
-the backend gate (`ruff check . && ruff format --check . && pyright && pytest --cov=app` with a scratch `TEST_DATABASE_URL`) and `pre-commit run --all-files`; README (font licences, pinned `typst`, rebuild note); `architecture.md` (fit/render in the resume sequence); guide 04 "Choosing a length", "What gets included", "ATS".
+regenerate `backend/openapi.json` and `frontend/lib/api/schema.d.ts` (`npm run generate:api`) and run the frontend gate; update `docs/architecture.md` (~line 257 stub wording, ~706 ER note) and re-run `node scripts/render-diagrams.mjs`; the backend gate (`ruff check . && ruff format --check . && pyright && pytest --cov=app` with a scratch `TEST_DATABASE_URL`) and `pre-commit run --all-files`; README (font licences, pinned `typst`, rebuild note); `architecture.md` (fit/render in the resume sequence); guide 04 "Choosing a length", "What gets included", "ATS".
 
 ## Risks
 
@@ -86,7 +98,7 @@ the backend gate (`ruff check . && ruff format --check . && pyright && pytest --
 |---|---|
 | Typst version bump changes pagination | Exact pin; determinism test |
 | Template injection through user/evidence text | Content passed as data; dedicated escape tests |
-| Compile latency in the review loop | ~100 ms typical; fit runs on explicit actions (generate, add/remove, apply comments), not per keystroke |
+| Compile latency in the review loop (fit now runs inside `persist`, so also on bullet edit/approve) | ~100 ms typical, ≤ ~21 compiles; if slow in #57, add a `fit=false` fast path then |
 | Prefix-by-priority is greedy and may skip a short high-value bullet after a long one | Acceptable for MVP; brute-force reference test bounds the gap; a knapsack variant is a v7 idea |
 
 ## Out of scope

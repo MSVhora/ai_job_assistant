@@ -9,7 +9,7 @@ import type { SourceInfo, StoredSearchQueries, StructuredProfile } from "@/lib/a
 import { useFormContext } from "react-hook-form";
 
 import { seedSpec, type SearchFormValues } from "./search-form-schema";
-import { TuneConfirm } from "./TuneConfirm";
+import { QueryCostConfirm } from "./QueryCostConfirm";
 
 function isQueriesStale(
   queries: StoredSearchQueries | null | undefined,
@@ -35,7 +35,7 @@ export function SearchQueriesCard({
   const form = useFormContext<SearchFormValues>();
   const regenerate = useRegenerateQueries();
   const tune = useTuneQueries();
-  const [tuneConfirmOpen, setTuneConfirmOpen] = useState(false);
+  const [confirming, setConfirming] = useState<"tune" | "regenerate" | null>(null);
   const stale = isQueriesStale(storedQueries, updatedAt);
   const stored = storedQueries?.queries[source.name];
   const seed = structuredProfile !== null ? seedSpec(structuredProfile) : null;
@@ -43,12 +43,12 @@ export function SearchQueriesCard({
 
   const regenerateQueries = () => {
     if (profileId === null || regenerate.isPending) return;
-    regenerate.mutate({ profileId });
+    regenerate.mutate({ profileId }, { onSettled: () => setConfirming(null) });
   };
 
   const startTune = () => {
     if (profileId === null || tune.isPending) return;
-    tune.mutate(profileId, { onSettled: () => setTuneConfirmOpen(false) });
+    tune.mutate(profileId, { onSettled: () => setConfirming(null) });
   };
 
   return (
@@ -76,7 +76,7 @@ export function SearchQueriesCard({
             </span>
             <button
               type="button"
-              onClick={regenerateQueries}
+              onClick={() => setConfirming("regenerate")}
               disabled={busier}
               className="rounded-full border border-violet-300 bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700 hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
             >
@@ -84,7 +84,7 @@ export function SearchQueriesCard({
             </button>
             <button
               type="button"
-              onClick={() => setTuneConfirmOpen(true)}
+              onClick={() => setConfirming("tune")}
               disabled={busier}
               className="rounded-full border border-gray-300 bg-white px-3 py-1 text-xs font-semibold text-gray-700 hover:border-violet-300 hover:text-violet-700 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
             >
@@ -93,12 +93,13 @@ export function SearchQueriesCard({
           </div>
         )}
       </div>
-      {tuneConfirmOpen && !tune.isPending && profileId !== null && (
-        <TuneConfirm
+      {confirming !== null && !busier && profileId !== null && (
+        <QueryCostConfirm
+          kind={confirming}
           profileId={profileId}
-          onConfirm={startTune}
-          onCancel={() => setTuneConfirmOpen(false)}
-          pending={tune.isPending}
+          onConfirm={confirming === "tune" ? startTune : regenerateQueries}
+          onCancel={() => setConfirming(null)}
+          pending={busier}
         />
       )}
       {tune.isError && (

@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
+  estimateRegenerateQueries,
   estimateTuneQueries,
   getJobSearchStatus,
   getSearchPostings,
@@ -68,6 +69,16 @@ export function useRegenerateQueries() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["profile"] });
     },
+  });
+}
+
+export function useRegenerateEstimate(profileId: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: ["regenerate-estimate", profileId],
+    queryFn: () => estimateRegenerateQueries(profileId as string),
+    enabled: enabled && profileId !== null,
+    gcTime: 0,
+    retry: false,
   });
 }
 

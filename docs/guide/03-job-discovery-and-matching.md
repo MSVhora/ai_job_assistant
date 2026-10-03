@@ -50,7 +50,9 @@ Supporting details that carry over from earlier versions:
   `not …` clause (the only exclusion channel LinkedIn's AI search has) and no salary text
   (issue #35). Since the classic keyword search is
   being retired, a **Regenerate** button re-runs the LLM against your profile's *current*
-  content whenever you want a fresh variant.
+  content whenever you want a fresh variant. Like Tune my queries, it is confirm-gated:
+  the panel shows an approximate token count and dollar cost (no engagement needed) and
+  only calls the model once you confirm.
 - **Queries refresh themselves when their inputs change** — generation consumes the full
   profile (skills, preferences, country, summary) and v4 tracks a content hash of those
   inputs. When you save an edited profile, or a gap-fill chat turn completes your

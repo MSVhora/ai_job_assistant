@@ -47,6 +47,7 @@ from app.services.query_builder import (
     PROMPT_VERSION,
     GeneratedQueries,
     compute_queries_input_hash,
+    expected_completion_tokens,
     options_block,
     parse_stored,
     strip_undeclared_options,
@@ -55,8 +56,6 @@ from app.services.query_builder import (
 logger = logging.getLogger(__name__)
 
 TUNE_TEMPERATURE = 0.2
-_TUNE_COMPLETION_TOKENS_PER_SOURCE = 120
-_TUNE_COMPLETION_TOKENS_BASE = 40
 _BUCKET_LABELS = {"positive": "clicked or saved", "negative": "dismissed", "weak": "never opened"}
 
 _TUNE_SYSTEM = (
@@ -240,8 +239,7 @@ async def estimate_tuning_cost(session: AsyncSession, profile_id: uuid.UUID) -> 
         plan.prompt,
         schema=GeneratedQueries,
         system=_TUNE_SYSTEM,
-        expected_completion_tokens=_TUNE_COMPLETION_TOKENS_PER_SOURCE * len(plan.names)
-        + _TUNE_COMPLETION_TOKENS_BASE,
+        expected_completion_tokens=expected_completion_tokens(len(plan.names)),
     )
 
 

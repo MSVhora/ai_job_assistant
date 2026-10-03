@@ -88,6 +88,19 @@ async def regenerate_search_queries(
     )
 
 
+@router.post("/profiles/{profile_id}/search-queries/estimate", response_model=CostEstimateResponse)
+async def estimate_regenerate_search_queries(
+    profile_id: uuid.UUID,
+    session: Annotated[AsyncSession, Depends(get_db)],
+    payload: SearchQueryGenerateRequest | None = None,
+) -> CostEstimateResponse:
+    return CostEstimateResponse.from_estimate(
+        await query_builder.estimate_regeneration_cost(
+            session, profile_id, payload.sources if payload else None
+        )
+    )
+
+
 @router.post("/profiles/{profile_id}/tune-queries", response_model=SearchQueriesResponse)
 async def tune_search_queries(
     profile_id: uuid.UUID,

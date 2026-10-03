@@ -7,23 +7,37 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CostEstimate } from "@/lib/api";
 
-import { TuneConfirm } from "./TuneConfirm";
+import { QueryCostConfirm } from "./QueryCostConfirm";
 
 let respond: (profileId: string) => Promise<CostEstimate> = () => Promise.reject(new Error("unset"));
-const requestedProfiles: string[] = [];
+const requested: string[] = [];
 
 vi.mock("@/lib/api", () => ({
   estimateTuneQueries: (profileId: string) => {
-    requestedProfiles.push(profileId);
+    requested.push(`tune:${profileId}`);
+    return respond(profileId);
+  },
+  estimateRegenerateQueries: (profileId: string) => {
+    requested.push(`regenerate:${profileId}`);
     return respond(profileId);
   },
 }));
 
-function renderConfirm(onConfirm = vi.fn(), onCancel = vi.fn()) {
+function renderConfirm(
+  kind: "tune" | "regenerate" = "tune",
+  onConfirm = vi.fn(),
+  onCancel = vi.fn(),
+) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={client}>
-      <TuneConfirm profileId="p-1" onConfirm={onConfirm} onCancel={onCancel} pending={false} />
+      <QueryCostConfirm
+        kind={kind}
+        profileId="p-1"
+        onConfirm={onConfirm}
+        onCancel={onCancel}
+        pending={false}
+      />
     </QueryClientProvider>,
   );
   return { onConfirm, onCancel };
@@ -39,18 +53,18 @@ const estimate = (overrides: Partial<CostEstimate>): CostEstimate => ({
 });
 
 beforeEach(() => {
-  requestedProfiles.length = 0;
+  requested.length = 0;
 });
 afterEach(cleanup);
 
-describe("TuneConfirm", () => {
+describe("QueryCostConfirm", () => {
   it("shows the estimated tokens and dollars before the user confirms", async () => {
     respond = () => Promise.resolve(estimate({}));
     renderConfirm();
 
     expect(screen.getByText("Estimating cost…")).toBeInTheDocument();
     expect(await screen.findByText(/≈ 2,000 tokens, ≈ \$0\.0016/)).toBeInTheDocument();
-    expect(requestedProfiles).toEqual(["p-1"]);
+    expect(requested).toEqual(["tune:p-1"]);
   });
 
   it("says so when the model's price is unknown", async () => {
@@ -66,16 +80,26 @@ describe("TuneConfirm", () => {
 
   it("reports an estimate failure without blocking the choice", async () => {
     respond = () => Promise.reject(new Error("no signals yet"));
-    const { onConfirm } = renderConfirm();
+    const { onConfirm } = renderConfirm("tune");
 
     expect(await screen.findByRole("alert")).toHaveTextContent("no signals yet");
     await userEvent.click(screen.getByRole("button", { name: "Tune my queries" }));
     expect(onConfirm).toHaveBeenCalledOnce();
   });
 
+  it("prices first-time generation with the regenerate estimate", async () => {
+    respond = () => Promise.resolve(estimate({}));
+    const { onConfirm } = renderConfirm("regenerate");
+
+    expect(await screen.findByText(/≈ 2,000 tokens, ≈ \$0\.0016/)).toBeInTheDocument();
+    expect(requested).toEqual(["regenerate:p-1"]);
+    await userEvent.click(screen.getByRole("button", { name: "Regenerate" }));
+    expect(onConfirm).toHaveBeenCalledOnce();
+  });
+
   it("cancels", async () => {
     respond = () => Promise.resolve(estimate({}));
-    const { onCancel } = renderConfirm();
+    const { onCancel } = renderConfirm("tune");
 
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onCancel).toHaveBeenCalledOnce();

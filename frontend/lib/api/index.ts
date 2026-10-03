@@ -264,6 +264,13 @@ export async function estimateTuneQueries(profileId: string): Promise<CostEstima
   );
 }
 
+export async function estimateRegenerateQueries(profileId: string): Promise<CostEstimate> {
+  return apiFetch<CostEstimate>(
+    `/api/profiles/${encodeURIComponent(profileId)}/search-queries/estimate`,
+    { method: "POST", body: JSON.stringify({}) },
+  );
+}
+
 export async function tuneSearchQueries(profileId: string): Promise<SearchQueriesResponse> {
   return apiFetch<SearchQueriesResponse>(
     `/api/profiles/${encodeURIComponent(profileId)}/tune-queries`,

@@ -1,5 +1,6 @@
 import os
 import shutil
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -47,6 +48,14 @@ async def clean_tables(migrated_database: None) -> None:
             )
         )
     await engine.dispose()
+
+
+@pytest.fixture(autouse=True)
+def fresh_settings() -> Iterator[None]:
+    from app.core.config import get_settings
+
+    yield
+    get_settings.cache_clear()
 
 
 @pytest.fixture(autouse=True)

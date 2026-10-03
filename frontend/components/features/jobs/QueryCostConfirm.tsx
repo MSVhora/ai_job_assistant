@@ -1,6 +1,6 @@
 "use client";
 
-import { useTuneEstimate } from "@/hooks/use-job-search";
+import { useRegenerateEstimate, useTuneEstimate } from "@/hooks/use-job-search";
 import type { CostEstimate } from "@/lib/api";
 import { formatUsd } from "@/lib/format-cost";
 
@@ -17,25 +17,49 @@ function EstimateLine({ estimate }: { estimate: CostEstimate }) {
   );
 }
 
-export function TuneConfirm({
+const COPY = {
+  tune: {
+    description: (
+      <>
+        Tuning reads your opened, saved and dismissed matches and rewrites the query specs for
+        every source with <strong>one LLM call</strong> — your API key pays. Your currently
+        stored specs are shown below and are replaced.
+      </>
+    ),
+    confirmLabel: "Tune my queries",
+  },
+  regenerate: {
+    description: (
+      <>
+        Regenerating asks the model for fresh query specs for every enabled source with{" "}
+        <strong>one LLM call</strong> — your API key pays. Your currently stored specs are
+        replaced.
+      </>
+    ),
+    confirmLabel: "Regenerate",
+  },
+} as const;
+
+export function QueryCostConfirm({
+  kind,
   profileId,
   onConfirm,
   onCancel,
   pending,
 }: {
+  kind: "tune" | "regenerate";
   profileId: string;
   onConfirm: () => void;
   onCancel: () => void;
   pending: boolean;
 }) {
-  const estimate = useTuneEstimate(profileId, true);
+  const tuneEstimate = useTuneEstimate(profileId, kind === "tune");
+  const regenerateEstimate = useRegenerateEstimate(profileId, kind === "regenerate");
+  const estimate = kind === "tune" ? tuneEstimate : regenerateEstimate;
+  const copy = COPY[kind];
   return (
     <div className="mb-2 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2.5">
-      <p className="text-xs text-gray-700">
-        Tuning reads your opened, saved and dismissed matches and rewrites the query specs for
-        every source with <strong>one LLM call</strong> — your API key pays. Your currently
-        stored specs are shown below and are replaced.
-      </p>
+      <p className="text-xs text-gray-700">{copy.description}</p>
       {estimate.isPending && (
         <p className="mt-1.5 text-xs text-gray-500" aria-live="polite">
           Estimating cost…
@@ -56,7 +80,7 @@ export function TuneConfirm({
           disabled={pending}
           className="rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-600 px-3 py-1 text-xs font-semibold text-white shadow-md shadow-violet-200 hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Tune my queries
+          {copy.confirmLabel}
         </button>
         <button
           type="button"

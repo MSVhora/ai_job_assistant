@@ -84,7 +84,7 @@ async def test_updated_at_trigger_and_set_null_migrations_round_trip(
         assert await _updated_at_triggers() == 0
 
         await _alembic("upgrade", "head")
-        assert await _updated_at_triggers() == 9
+        assert await _updated_at_triggers() == 11
         assert await _canonical_fk_delete_action() == "n"
     finally:
         await _alembic("upgrade", "head")
@@ -98,7 +98,7 @@ async def test_evidence_core_migration_round_trip(migrated_database: None) -> No
 
         await _alembic("upgrade", "head")
         assert await _evidence_objects() == (6, 4, 1)
-        assert await _updated_at_triggers() == 9
+        assert await _updated_at_triggers() == 11
     finally:
         await _alembic("upgrade", "head")
 
@@ -116,6 +116,35 @@ async def test_llm_output_cache_migration_round_trip(migrated_database: None) ->
 
         await _alembic("upgrade", "head")
         assert await cache_table_exists()
+    finally:
+        await _alembic("upgrade", "head")
+
+
+async def test_achievements_migration_round_trip(migrated_database: None) -> None:
+    async def achievement_objects() -> tuple[int, int, int]:
+        async with session_factory() as session:
+            row = (
+                await session.execute(
+                    text(
+                        "SELECT"
+                        " (SELECT count(*) FROM pg_tables WHERE tablename LIKE 'achievement%'),"
+                        " (SELECT count(*) FROM pg_type WHERE typname IN ('achievement_status',"
+                        " 'achievement_origin', 'achievement_revision_source')),"
+                        " (SELECT count(*) FROM pg_indexes"
+                        " WHERE indexname = 'uq_achievement_extraction_active_run')"
+                    )
+                )
+            ).one()
+        return (row[0], row[1], row[2])
+
+    try:
+        await _alembic("downgrade", "0024")
+        assert await achievement_objects() == (0, 0, 0)
+        assert await _updated_at_triggers() == 9
+
+        await _alembic("upgrade", "head")
+        assert await achievement_objects() == (4, 3, 1)
+        assert await _updated_at_triggers() == 11
     finally:
         await _alembic("upgrade", "head")
 

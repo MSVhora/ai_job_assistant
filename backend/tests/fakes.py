@@ -262,3 +262,83 @@ def install_evidence_source(monkeypatch: Any, source: ScriptedEvidenceSource) ->
     from app.adapters.evidence_sources import registry
 
     monkeypatch.setitem(registry._FACTORIES, source.name, lambda: source)
+
+
+async def seed_evidence_chunk(
+    *,
+    bodies: list[str],
+    text: str | None = None,
+    project_key: str = "ada/engine",
+    private: bool = False,
+    candidate_id: "uuid.UUID | None" = None,
+    when: Any = None,
+    scope_employer: dict[str, Any] | None = None,
+) -> tuple["uuid.UUID", "uuid.UUID", list["uuid.UUID"]]:
+    """Seed one candidate-owned chunk with one commit item per body; returns the ids."""
+    from datetime import UTC, datetime
+
+    from app.core.db import session_factory
+    from app.models import (
+        Candidate,
+        EvidenceChunk,
+        EvidenceChunkItem,
+        EvidenceItem,
+        EvidenceKind,
+        EvidenceScope,
+        EvidenceSourceAccount,
+    )
+
+    stamp = when or datetime(2024, 6, 1, tzinfo=UTC)
+    chunk_text = text if text is not None else "\n".join(bodies)
+    async with session_factory() as session:
+        if candidate_id is None:
+            candidate = Candidate()
+            session.add(candidate)
+            await session.flush()
+            candidate_id = candidate.id
+        scope_id = None
+        if scope_employer is not None:
+            account = EvidenceSourceAccount(candidate_id=candidate_id, kind="github")
+            session.add(account)
+            await session.flush()
+            scope = EvidenceScope(
+                source_id=account.id, ref=project_key, enabled=True, employer_ref=scope_employer
+            )
+            session.add(scope)
+            await session.flush()
+            scope_id = scope.id
+        chunk = EvidenceChunk(
+            candidate_id=candidate_id,
+            kind="commit_cluster",
+            project_key=project_key,
+            title=f"{project_key}: {len(bodies)} commits",
+            text=chunk_text,
+            token_count=len(chunk_text) // 4,
+            content_hash=hashlib.sha256(chunk_text.encode()).hexdigest(),
+            chunker_version="chunker_v1",
+            contains_private=private,
+            time_start=stamp,
+            time_end=stamp,
+        )
+        session.add(chunk)
+        await session.flush()
+        item_ids: list[uuid.UUID] = []
+        for index, body in enumerate(bodies):
+            item = EvidenceItem(
+                candidate_id=candidate_id,
+                scope_id=scope_id,
+                kind=EvidenceKind.commit,
+                external_id=f"{index:02d}-{hashlib.sha256(f'{chunk.id}:{index}'.encode()).hexdigest()}",
+                project_key=project_key,
+                title=body[:60],
+                body=body,
+                occurred_at=stamp,
+                is_private=private,
+                content_hash=hashlib.sha256(body.encode()).hexdigest(),
+            )
+            session.add(item)
+            await session.flush()
+            session.add(EvidenceChunkItem(chunk_id=chunk.id, item_id=item.id))
+            item_ids.append(item.id)
+        await session.commit()
+        return candidate_id, chunk.id, item_ids

@@ -1,7 +1,7 @@
 # Issue #52 — STAR achievement extraction: models, extraction service, confirm-gated runs (Week 2)
 
-**Status:** Proposed — for owner review
-**Tracks:** GitHub issue #52 (milestone `v6`, branch `v6/44-achievement-extraction-star`)
+**Status:** In progress — branch `v6/52-achievement-extraction-star`
+**Tracks:** GitHub issue #52 (milestone `v6`, branch `v6/52-achievement-extraction-star`)
 **Plan of record:** [v6-implementation-plan.md](v6-implementation-plan.md) §5, §8 (cost), §9 (migration `0025`)
 **Depends on:** #49 (task routing, cache, meter), #51 (chunks)
 **Blocks:** #53 (review), #55, #58
@@ -65,7 +65,7 @@ Tables `achievement`, `achievement_evidence` (unique `(achievement_id, item_id)`
 - **Config:** every new `Settings` field appears in `.env.example` (the settings↔env guard test fails otherwise); no `os.getenv`/`os.environ` and no provider SDK imports outside their one module.
 - **API:** new routes keep `response_model` (binary downloads declare their media type instead), use only the CORS-allowed methods (`GET`, `POST`, `PATCH`, `DELETE`, `OPTIONS` — **never PUT**) and headers (`Content-Type`, `Accept`), raise `DomainError` subclasses (checked by `tests/core/test_error_contract.py`), and bound every list with the shared `pagination()` dependency and `X-Total-Count`.
 - **Privacy:** no resume/evidence text, prompts, tokens or keys in logs (extend `tests/routers/test_logging_privacy.py` for the new flows); LLM calls log `cost_usd=`; outbound HTTP has an explicit timeout.
-- **Schema (v5 #43 conventions):** every table with `updated_at` gets `create_updated_at_trigger(table)` / `drop_updated_at_trigger(table)` from `app.core.migration_helpers`; every FK is indexed and declares its ON DELETE (CASCADE owned children, RESTRICT identity/audit, SET NULL provenance); constraints and indexes are named (`uq_`/`ix_`/`fk_`/`ck_`); bounded scalars get a `CHECK`; `alembic check` is clean and the schema audit (`tests/db/test_schema_standards.py`) reports nothing; downgrade works. Revision numbers continue from `0022`.
+- **Schema (v5 #43 conventions):** every table with `updated_at` gets `create_updated_at_trigger(table)` / `drop_updated_at_trigger(table)` from `app.core.migration_helpers`; every FK is indexed and declares its ON DELETE (CASCADE owned children, RESTRICT identity/audit, SET NULL provenance); constraints and indexes are named (`uq_`/`ix_`/`fk_`/`ck_`); bounded scalars get a `CHECK`; `alembic check` is clean and the schema audit (`tests/db/test_schema_standards.py`) reports nothing; downgrade works. Revision numbers continue from `0024` (this issue adds `0025`).
 
 ### Gates / docs
 
@@ -83,3 +83,14 @@ the backend gate (`ruff check . && ruff format --check . && pyright && pytest --
 ## Out of scope
 
 Approve/edit/merge UI (#53), LLM-based merge proposals (v7), resume/agent use, cross-achievement summarization.
+
+## Implementation notes (deviations from the plan above)
+
+- **Stateless confirm gate:** there is no estimates table. `estimate_id` is a SHA-256 over the chunks to process (`id`, `content_hash`, `extracted_hash`), the prompt version and the routed extract model; `POST /extract` recomputes it and answers 409 on a mismatch.
+- **Evidence labels:** chunk text carries no per-item ids, so the prompt adds a labelled item list (`E1: [commit] title (date)`, redacted) and the model cites labels. Metric numbers, metric quotes and result quotes are validated against the **chunk text the model saw** (redacted), not the original item bodies.
+- **`extracted_hash`** stores `digest(content_hash, ACHIEVEMENT_PROMPT_VERSION)`, so a content change or a prompt bump re-extracts. A chunk that already has drafts at the current prompt version is skipped without a call; drafts from an older prompt version are archived (revision `status_change`) when the new extraction succeeds. Approved rows are never touched.
+- **Schema:** the run table reuses the `sync_status` enum (three new enums only: `achievement_status`, `achievement_origin`, `achievement_revision_source`; the Python member for `split` is `split_` because `split` shadows `str.split`, with `values_callable` keeping the DB label `split`). Added `review_flags` JSONB; metric `verified` is `evidence | user | needs_confirmation`.
+- **Stale reconciliation** (only after a run with no failed chunk): drafts whose source chunk hash no longer exists are archived, approved ones get `evidence_stale_at`.
+- **Estimate accuracy:** prompt tokens are priced from the real prompts (checked within ±25 % of metered tokens in tests); completion tokens are a conservative per-chunk ceiling (450), so the estimate is an upper bound. Embedding cost assumes 200 tokens per pending chunk.
+- **Employer:** a repo scope's own `employer_ref` wins (`source: scope`); otherwise the best date-overlap experience across the candidate's profiles (`source: suggested`). Resume, note and link chunks get none.
+- **Tests:** `clean_tables` now also truncates `llm_output_cache` (content-addressed rows otherwise leak between tests). No live LLM is exercised; quality is judged in #60.

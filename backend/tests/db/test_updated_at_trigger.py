@@ -11,6 +11,8 @@ from app.core.db import session_factory
 pytestmark = pytest.mark.usefixtures("clean_tables")
 
 TABLES_WITH_UPDATED_AT = [
+    "achievement",
+    "achievement_extraction_run",
     "candidate",
     "evidence_chunk",
     "evidence_item",

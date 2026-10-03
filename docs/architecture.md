@@ -38,7 +38,7 @@ flowchart TB
 Non-negotiable layering rules (enforced by the
 [coding standards](instructions/)):
 
-- `routers/` — HTTP only: parse, call a service, return a response model (evidence: `routers/evidence.py` → `services/evidence_sync.py`, `evidence_chunks.py`, `evidence_notes.py`, `evidence_items.py`; pure stages in `services/evidence_pipeline/`: `noise`, `chunking`, `dedupe`, `resume_ingest`)
+- `routers/` — HTTP only: parse, call a service, return a response model (evidence: `routers/evidence.py` → `services/evidence_sync.py`, `evidence_chunks.py`, `evidence_notes.py`, `evidence_items.py`, `achievement_extraction.py`, `achievements.py`; pure stages in `services/evidence_pipeline/`: `noise`, `chunking`, `dedupe`, `resume_ingest`)
 - `services/` — business logic; raise domain errors
 - `models/` — SQLAlchemy 2.0 ORM; the schema source of truth
 - `adapters/llm.py` — the **only** place that talks to an LLM provider; it prices calls
@@ -175,6 +175,40 @@ sequenceDiagram
 ```
 
 ![evidence-sync-sequence diagram](./assets/evidence-sync-sequence.svg)
+
+## Achievement extraction (sequence)
+
+See [guide 04](guide/04-evidence-and-resume.md). Extraction is confirm-gated: the estimate is
+computed from the real chunk prompts, and `POST /api/evidence/extract` must quote the estimate's
+id, which changes when the evidence, the prompt version or the routed model changes.
+
+<!-- diagram: achievement-extraction-sequence -->
+```mermaid
+sequenceDiagram
+    participant B as Browser
+    participant A as FastAPI
+    participant G as LLM (LiteLLM, extract task)
+    participant D as Postgres
+
+    B->>A: POST /api/evidence/extract/estimate
+    A->>D: chunks whose extracted_hash differs, plus llm_output_cache hits
+    A-->>B: estimate_id, chunk counts, tokens, cost (or unavailable), private share
+    B->>A: POST /api/evidence/extract (confirmed_estimate_id)
+    A->>D: sweep stale runs, active-run check, insert run (partial unique index)
+    A-->>B: 202 run_id
+    loop each pending chunk
+        A->>D: cache lookup (task, model, prompt version, redacted chunk)
+        A->>G: chunk text + labelled evidence list (only on a cache miss)
+        G-->>A: 0-3 achievements (schema-validated, one repair at most)
+        A->>A: validators - evidence labels, verbatim numbers, result quote, placeholders
+        A->>D: draft achievements, evidence links, ai_extraction revision, chunk.extracted_hash
+        A->>G: embed the drafts (failure keeps the draft without a vector)
+    end
+    A->>D: archive drafts of vanished chunks, flag approved ones evidence_stale_at
+    B->>A: GET /api/evidence/extract/runs/{id}, GET /api/achievements?status=draft
+```
+
+![achievement-extraction-sequence diagram](./assets/achievement-extraction-sequence.svg)
 
 Search runs start **only** from an explicit `POST /api/jobs/search` — never automatically —
 and are tracked in `job_search` (status + per-source `{source, status, count, warning}`
@@ -344,6 +378,11 @@ erDiagram
     evidence_scope |o--o{ evidence_item : "ingested from"
     evidence_chunk ||--o{ evidence_chunk_item : "built from"
     evidence_item ||--o{ evidence_chunk_item : "in chunks"
+    candidate ||--o{ achievement : "owns"
+    achievement ||--o{ achievement_evidence : "cites"
+    evidence_item ||--o{ achievement_evidence : "cited by"
+    achievement ||--o{ achievement_revision : "audit trail"
+    candidate ||--o{ achievement_extraction_run : "extraction runs"
 
     candidate {
         uuid id PK
@@ -544,6 +583,61 @@ erDiagram
     evidence_chunk_item {
         uuid chunk_id PK "FK CASCADE"
         uuid item_id PK "FK CASCADE"
+    }
+
+    achievement {
+        uuid id PK
+        uuid candidate_id FK "RESTRICT"
+        text status "draft | approved | rejected | archived (only approved is used downstream)"
+        text origin "ai_extracted | user_created | merged"
+        text title
+        text situation
+        text task
+        text action
+        text result "null unless the evidence states an outcome"
+        jsonb metrics "text, source_quote, evidence_ids, verified: evidence | user | needs_confirmation"
+        jsonb skills "canonicalized tags"
+        text impact_type
+        smallint difficulty "CHECK 1-5"
+        text project_key
+        jsonb employer_ref "scope or suggested"
+        date time_start
+        date time_end
+        vector embedding "vector(768), nullable, no ANN index"
+        text source_chunk_hash "chunk the draft came from"
+        jsonb review_flags
+        boolean derived_from_private
+        timestamptz evidence_stale_at
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    achievement_evidence {
+        uuid id PK
+        uuid achievement_id FK "CASCADE"
+        uuid item_id FK "RESTRICT, unique with achievement"
+        text role "primary | supporting"
+        text quote
+    }
+
+    achievement_revision {
+        uuid id PK
+        uuid achievement_id FK "RESTRICT"
+        text source "ai_extraction | manual_edit | merge | split | metric_confirmation | status_change"
+        jsonb diff
+        timestamptz created_at
+    }
+
+    achievement_extraction_run {
+        uuid id PK
+        uuid candidate_id FK "RESTRICT, one pending/running run per candidate (partial unique index)"
+        text status "pending | running | paused | succeeded | failed"
+        jsonb estimate "the confirmed estimate"
+        jsonb progress
+        jsonb usage "tokens and cost"
+        text error
+        timestamptz created_at
+        timestamptz updated_at
     }
 
     llm_output_cache {

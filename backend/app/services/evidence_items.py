@@ -76,6 +76,10 @@ async def list_items(
     return [item_response(row) for row in rows]
 
 
+async def get_item(session: AsyncSession, item_id: uuid.UUID) -> ItemResponse:
+    return item_response(await owned_item(session, item_id))
+
+
 async def set_item_status(
     session: AsyncSession, item_id: uuid.UUID, status: EvidenceItemStatus
 ) -> tuple[ItemResponse, uuid.UUID]:

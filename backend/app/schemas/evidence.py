@@ -119,6 +119,7 @@ class EvidenceStatusResponse(BaseModel):
     last_synced_at: datetime | None
     scopes_total: int
     scopes_enabled: int
+    scopes_unmapped: int = 0
     latest_sync: SyncRunResponse | None
 
 
@@ -134,6 +135,14 @@ class ScopeResponse(BaseModel):
     sync_state: str
     last_synced_at: datetime | None
     employer_ref: dict[str, object] | None
+    suggested_employer: dict[str, object] | None = None
+
+
+class EmployerOption(BaseModel):
+    kind: Literal["experience", "personal"]
+    label: str
+    company: str | None = None
+    start_date: str | None = None
 
 
 class ScopeUpdateItem(BaseModel):

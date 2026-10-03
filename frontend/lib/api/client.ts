@@ -136,3 +136,21 @@ export async function apiFetchWithTotal<T>(
   const total = Number(response.headers.get("X-Total-Count"));
   return { items, total: Number.isFinite(total) ? total : 0 };
 }
+
+export async function apiFetchVoid(path: string, init?: ApiFetchInit): Promise<void> {
+  const { timeoutMs = DEFAULT_TIMEOUT_MS, ...requestInit } = init ?? {};
+  let response: Response;
+  const headers = new Headers(requestInit.headers);
+  const signal = requestInit.signal ?? AbortSignal.timeout(timeoutMs);
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, { ...requestInit, headers, signal });
+  } catch (cause) {
+    if (cause instanceof Error && cause.name === "TimeoutError") {
+      throw new ApiError(0, "The request timed out — try again.");
+    }
+    throw new ApiError(0, `network error: ${cause instanceof Error ? cause.message : "unknown"}`);
+  }
+  if (!response.ok) {
+    await fail(response, path);
+  }
+}

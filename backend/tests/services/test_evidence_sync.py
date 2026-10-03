@@ -505,3 +505,37 @@ async def test_a_run_where_every_scope_fails_builds_no_chunks(
     run_id = await sync()
 
     assert "chunks" not in (await load_run(run_id)).progress
+
+
+async def test_a_sync_that_changes_linked_evidence_flags_approved_achievements_for_re_review(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from fakes import seed_achievement
+
+    from app.models import Achievement
+
+    await seed_scopes("ada/engine")
+    original = item("issue", "ada/engine#1")
+    install_evidence_source(
+        monkeypatch, ScriptedEvidenceSource({"ada/engine": [page([original], "done")]})
+    )
+    await sync()
+    stored = (await load_items())["ada/engine#1"]
+    approved = await seed_achievement(
+        stored.candidate_id, item_ids=[stored.id], status="approved", project_key="ada/engine"
+    )
+
+    install_evidence_source(
+        monkeypatch, ScriptedEvidenceSource({"ada/engine": [page([original], "done")]})
+    )
+    unchanged_run = await sync()
+    changed = original.model_copy(update={"body": "Reworded after the maintainers asked"})
+    install_evidence_source(
+        monkeypatch, ScriptedEvidenceSource({"ada/engine": [page([changed], "done")]})
+    )
+    changed_run = await sync()
+
+    assert (await load_run(unchanged_run)).progress["stale_flagged"] == 0
+    assert (await load_run(changed_run)).progress["stale_flagged"] == 1
+    async with session_factory() as session:
+        assert (await session.get_one(Achievement, approved)).evidence_stale_at is not None

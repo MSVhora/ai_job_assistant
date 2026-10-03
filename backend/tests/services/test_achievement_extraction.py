@@ -32,12 +32,8 @@ from app.models import (
     SyncStatus,
 )
 from app.services import achievement_extraction
-from app.services.achievement_extraction import (
-    estimate,
-    run_extraction,
-    start_extraction,
-    suggest_employer,
-)
+from app.services.achievement_extraction import estimate, run_extraction, start_extraction
+from app.services.employer_mapping import Experience, suggest_employer
 
 pytestmark = pytest.mark.usefixtures("clean_tables")
 
@@ -486,9 +482,7 @@ async def test_a_scope_employer_overrides_the_suggestion(monkeypatch: pytest.Mon
 
 
 def test_suggest_employer_skips_non_repository_chunks_and_non_overlapping_ranges() -> None:
-    experience = achievement_extraction._Experience(
-        "Acme", "Jan 2024", date(2024, 1, 1), date(2024, 12, 31)
-    )
+    experience = Experience("Acme", "Jan 2024", date(2024, 1, 1), date(2024, 12, 31))
     during = date(2024, 5, 1)
     after = date(2026, 1, 1)
 

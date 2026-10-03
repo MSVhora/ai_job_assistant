@@ -43,6 +43,7 @@ export {
   DuplicateRunError,
   ExtractionFailedError,
   apiFetch,
+  apiFetchVoid,
   apiFetchWithTotal,
 } from "./client";
 
@@ -280,3 +281,6 @@ export async function tuneSearchQueries(profileId: string): Promise<SearchQuerie
     { method: "POST" },
   );
 }
+
+export * from "./achievements";
+export * from "./evidence";

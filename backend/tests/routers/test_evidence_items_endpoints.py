@@ -263,3 +263,30 @@ async def test_note_text_never_reaches_the_logs(
     await client.get("/api/evidence/chunks/summary")
 
     assert MARKER not in "\n".join(record.getMessage() for record in caplog.records)
+
+
+async def test_a_single_item_can_be_fetched_and_foreign_or_unknown_ids_are_404(
+    client: AsyncClient,
+) -> None:
+    (item_id,) = await seed_items(("kept", "a", "ada/open", False))
+    async with session_factory() as session:
+        stranger = Candidate()
+        session.add(stranger)
+        await session.flush()
+        foreign = EvidenceItem(
+            candidate_id=stranger.id,
+            kind=EvidenceKind.note,
+            external_id="theirs",
+            body="not yours",
+            content_hash="t",
+        )
+        session.add(foreign)
+        await session.commit()
+        foreign_id = foreign.id
+
+    ok = await client.get(f"/api/evidence/items/{item_id}")
+
+    assert ok.status_code == 200
+    assert (ok.json()["id"], ok.json()["external_id"]) == (str(item_id), "a")
+    assert (await client.get(f"/api/evidence/items/{foreign_id}")).status_code == 404
+    assert (await client.get(f"/api/evidence/items/{uuid.uuid4()}")).status_code == 404

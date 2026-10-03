@@ -9,6 +9,7 @@ from app.deps import get_db, pagination
 from app.models import EvidenceItemStatus, EvidenceKind
 from app.schemas.evidence import (
     ChunkSummaryResponse,
+    EmployerOption,
     EvidenceStatusResponse,
     ItemResponse,
     ItemUpdate,
@@ -39,6 +40,13 @@ async def github_status(
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> EvidenceStatusResponse:
     return await evidence_sync.get_status(session)
+
+
+@router.get("/employers", response_model=list[EmployerOption])
+async def list_employers(
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> list[EmployerOption]:
+    return await evidence_sync.employer_options(session)
 
 
 @router.get("/github/scopes", response_model=list[ScopeResponse])
@@ -177,6 +185,14 @@ async def list_items(
 ) -> list[ItemResponse]:
     response.headers[TOTAL_COUNT_HEADER] = str(await evidence_items.count_items(session, filters))
     return await evidence_items.list_items(session, filters, page)
+
+
+@router.get("/items/{item_id}", response_model=ItemResponse)
+async def get_item(
+    item_id: uuid.UUID,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> ItemResponse:
+    return await evidence_items.get_item(session, item_id)
 
 
 @router.patch("/items/{item_id}", response_model=ItemResponse)

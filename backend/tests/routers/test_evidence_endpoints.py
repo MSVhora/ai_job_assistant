@@ -131,7 +131,7 @@ async def test_public_scopes_enable_without_disclosure_and_update_settings(
                     "ref": "ada/engine",
                     "enabled": True,
                     "content_level": "metadata_only",
-                    "employer_ref": {"company": "Analytical Ltd", "start_date": "2024-01"},
+                    "employer_ref": {"kind": "personal"},
                 }
             ]
         },
@@ -141,7 +141,7 @@ async def test_public_scopes_enable_without_disclosure_and_update_settings(
     updated = response.json()[0]
     assert updated["enabled"] is True
     assert updated["content_level"] == "metadata_only"
-    assert updated["employer_ref"]["company"] == "Analytical Ltd"
+    assert updated["employer_ref"] == {"kind": "personal", "source": "user"}
 
 
 async def test_updating_an_unlisted_scope_is_a_404(

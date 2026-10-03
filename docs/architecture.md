@@ -210,6 +210,19 @@ sequenceDiagram
 
 ![achievement-extraction-sequence diagram](./assets/achievement-extraction-sequence.svg)
 
+### Review, audit trail and the approval gate
+
+`services/achievement_review.py` and `achievement_merge.py` are the only writers of an achievement
+after extraction. `services/achievement_rules.py` holds the pure parts: the state table
+(`draft → approved | rejected`, `approved → draft | archived`, `rejected → draft`), the approval
+gate (at least one evidence link and no `needs_confirmation` metric), the stricter bulk-approval
+gate (also no private-derived, flagged or stale rows) and the field-level diff. Every mutation writes
+exactly one `achievement_revision` row (`manual_edit`, `status_change`, `metric_confirmation`,
+`merge`, `split`), so the history is complete without whole-row snapshots. "Evidence changed" is
+detected without a snapshot column: an approved achievement is flagged when a linked item's
+`updated_at` is later than its latest revision, and the unchanged-item upsert in the sync keeps that
+signal precise; re-review (`acknowledge`) writes a revision, which resets the baseline.
+
 Search runs start **only** from an explicit `POST /api/jobs/search` — never automatically —
 and are tracked in `job_search` (status + per-source `{source, status, count, warning}`
 outcomes, queryable via `GET /api/jobs/searches/{id}`). A failing source is a run warning,

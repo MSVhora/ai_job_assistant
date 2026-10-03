@@ -434,6 +434,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/evidence/employers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Employers */
+        get: operations["list_employers_api_evidence_employers_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/evidence/github/scopes": {
         parameters: {
             query?: never;
@@ -597,7 +614,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** Get Item */
+        get: operations["get_item_api_evidence_items__item_id__get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -692,6 +710,279 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/achievements/merge-proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Merge Proposals */
+        get: operations["merge_proposals_api_achievements_merge_proposals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/achievements/merge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Merge Achievements */
+        post: operations["merge_achievements_api_achievements_merge_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/achievements/bulk-approve/eligible": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bulk Approve Eligible */
+        get: operations["bulk_approve_eligible_api_achievements_bulk_approve_eligible_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/achievements/bulk-approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bulk Approve */
+        post: operations["bulk_approve_api_achievements_bulk_approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/achievements/{achievement_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Achievement */
+        get: operations["get_achievement_api_achievements__achievement_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Edit Achievement */
+        patch: operations["edit_achievement_api_achievements__achievement_id__patch"];
+        trace?: never;
+    };
+    "/api/achievements/{achievement_id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve Achievement */
+        post: operations["approve_achievement_api_achievements__achievement_id__approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/achievements/{achievement_id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reject Achievement */
+        post: operations["reject_achievement_api_achievements__achievement_id__reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/achievements/{achievement_id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive Achievement */
+        post: operations["archive_achievement_api_achievements__achievement_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/achievements/{achievement_id}/unapprove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Unapprove Achievement */
+        post: operations["unapprove_achievement_api_achievements__achievement_id__unapprove_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/achievements/{achievement_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Restore Achievement */
+        post: operations["restore_achievement_api_achievements__achievement_id__restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/achievements/{achievement_id}/acknowledge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Acknowledge Achievement */
+        post: operations["acknowledge_achievement_api_achievements__achievement_id__acknowledge_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/achievements/{achievement_id}/confirm-metric": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Confirm Metric */
+        post: operations["confirm_metric_api_achievements__achievement_id__confirm_metric_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/achievements/{achievement_id}/split": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Split Achievement */
+        post: operations["split_achievement_api_achievements__achievement_id__split_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/achievements/{achievement_id}/evidence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Link Evidence */
+        post: operations["link_evidence_api_achievements__achievement_id__evidence_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/achievements/{achievement_id}/evidence/{item_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Unlink Evidence */
+        delete: operations["unlink_evidence_api_achievements__achievement_id__evidence__item_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/achievements/{achievement_id}/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Revisions */
+        get: operations["list_revisions_api_achievements__achievement_id__revisions_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -766,6 +1057,35 @@ export interface components {
          * @enum {string}
          */
         AchievementStatus: "draft" | "approved" | "rejected" | "archived";
+        /** AchievementUpdate */
+        AchievementUpdate: {
+            /** Title */
+            title?: string | null;
+            /** Situation */
+            situation?: string | null;
+            /** Task */
+            task?: string | null;
+            /** Action */
+            action?: string | null;
+            /** Result */
+            result?: string | null;
+            /** Skills */
+            skills?: string[] | null;
+            /** Impact Type */
+            impact_type?: ("performance" | "reliability" | "revenue" | "cost" | "quality" | "velocity" | "scale" | "security" | "ux" | "leadership" | "other") | null;
+            /** Difficulty */
+            difficulty?: number | null;
+            /** Project Key */
+            project_key?: string | null;
+            /** Employer Ref */
+            employer_ref?: {
+                [key: string]: unknown;
+            } | null;
+            /** Time Start */
+            time_start?: string | null;
+            /** Time End */
+            time_end?: string | null;
+        };
         /** AwardItem */
         AwardItem: {
             /** Title */
@@ -782,6 +1102,47 @@ export interface components {
         Body_upload_resume_api_resumes_post: {
             /** File */
             file: string;
+        };
+        /** BulkApproveRequest */
+        BulkApproveRequest: {
+            /** Ids */
+            ids: string[];
+        };
+        /** BulkApproveResponse */
+        BulkApproveResponse: {
+            /** Approved */
+            approved: string[];
+            /** Skipped */
+            skipped: components["schemas"]["BulkSkipped"][];
+        };
+        /** BulkEligibleItem */
+        BulkEligibleItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Title */
+            title: string;
+            /** Evidence Count */
+            evidence_count: number;
+        };
+        /** BulkEligibleResponse */
+        BulkEligibleResponse: {
+            /** Count */
+            count: number;
+            /** Items */
+            items: components["schemas"]["BulkEligibleItem"][];
+        };
+        /** BulkSkipped */
+        BulkSkipped: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Reasons */
+            reasons: string[];
         };
         /** CertificationItem */
         CertificationItem: {
@@ -810,6 +1171,18 @@ export interface components {
             by_kind: {
                 [key: string]: number;
             };
+        };
+        /** ConfirmMetricRequest */
+        ConfirmMetricRequest: {
+            /** Index */
+            index: number;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "as_written" | "edit";
+            /** Text */
+            text?: string | null;
         };
         /** ContactInfo */
         ContactInfo: {
@@ -888,6 +1261,20 @@ export interface components {
             /** End Date */
             end_date?: string | null;
         };
+        /** EmployerOption */
+        EmployerOption: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "experience" | "personal";
+            /** Label */
+            label: string;
+            /** Company */
+            company?: string | null;
+            /** Start Date */
+            start_date?: string | null;
+        };
         /**
          * EvidenceItemStatus
          * @enum {string}
@@ -898,6 +1285,22 @@ export interface components {
          * @enum {string}
          */
         EvidenceKind: "commit" | "pull_request" | "review_comment" | "issue" | "readme" | "repo_summary" | "note" | "link" | "resume_line";
+        /** EvidenceLinkCreate */
+        EvidenceLinkCreate: {
+            /**
+             * Item Id
+             * Format: uuid
+             */
+            item_id: string;
+            /**
+             * Role
+             * @default supporting
+             * @enum {string}
+             */
+            role: "primary" | "supporting";
+            /** Quote */
+            quote?: string | null;
+        };
         /** EvidenceLinkResponse */
         EvidenceLinkResponse: {
             /**
@@ -924,6 +1327,11 @@ export interface components {
             scopes_total: number;
             /** Scopes Enabled */
             scopes_enabled: number;
+            /**
+             * Scopes Unmapped
+             * @default 0
+             */
+            scopes_unmapped: number;
             latest_sync: components["schemas"]["SyncRunResponse"] | null;
         };
         /** ExperienceItem */
@@ -1477,6 +1885,42 @@ export interface components {
             /** Warning */
             warning?: string | null;
         };
+        /** MergeProposalResponse */
+        MergeProposalResponse: {
+            /**
+             * First Id
+             * Format: uuid
+             */
+            first_id: string;
+            /** First Title */
+            first_title: string;
+            /**
+             * Second Id
+             * Format: uuid
+             */
+            second_id: string;
+            /** Second Title */
+            second_title: string;
+            /** Project Key */
+            project_key: string | null;
+            /** Similarity */
+            similarity: number;
+        };
+        /** MergeRequest */
+        MergeRequest: {
+            /** Ids */
+            ids: string[];
+            /** Title */
+            title?: string | null;
+            /** Situation */
+            situation?: string | null;
+            /** Task */
+            task?: string | null;
+            /** Action */
+            action?: string | null;
+            /** Result */
+            result?: string | null;
+        };
         /** NoteCreate */
         NoteCreate: {
             /** Title */
@@ -1693,6 +2137,25 @@ export interface components {
             /** Parse Version */
             parse_version: string;
         };
+        /** RevisionResponse */
+        RevisionResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Source */
+            source: string;
+            /** Diff */
+            diff: {
+                [key: string]: unknown;
+            };
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
         /** RevisionSummary */
         RevisionSummary: {
             /**
@@ -1734,6 +2197,10 @@ export interface components {
             last_synced_at: string | null;
             /** Employer Ref */
             employer_ref: {
+                [key: string]: unknown;
+            } | null;
+            /** Suggested Employer */
+            suggested_employer?: {
                 [key: string]: unknown;
             } | null;
         };
@@ -1910,6 +2377,13 @@ export interface components {
             options?: {
                 [key: string]: string | number | boolean | string[];
             };
+        };
+        /** SplitRequest */
+        SplitRequest: {
+            /** Evidence Item Ids */
+            evidence_item_ids: string[];
+            /** Title */
+            title?: string | null;
         };
         /**
          * StoredPreferences
@@ -3002,6 +3476,26 @@ export interface operations {
             };
         };
     };
+    list_employers_api_evidence_employers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmployerOption"][];
+                };
+            };
+        };
+    };
     list_github_scopes_api_evidence_github_scopes_get: {
         parameters: {
             query?: never;
@@ -3382,6 +3876,37 @@ export interface operations {
             };
         };
     };
+    get_item_api_evidence_items__item_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ItemResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     update_item_api_evidence_items__item_id__patch: {
         parameters: {
             query?: never;
@@ -3525,6 +4050,10 @@ export interface operations {
         parameters: {
             query?: {
                 status?: components["schemas"]["AchievementStatus"];
+                project_key?: string | null;
+                private?: boolean | null;
+                stale?: boolean | null;
+                sort?: "rank" | "recent";
                 limit?: number;
                 offset?: number;
             };
@@ -3541,6 +4070,535 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AchievementResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    merge_proposals_api_achievements_merge_proposals_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MergeProposalResponse"][];
+                };
+            };
+        };
+    };
+    merge_achievements_api_achievements_merge_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MergeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AchievementResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bulk_approve_eligible_api_achievements_bulk_approve_eligible_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkEligibleResponse"];
+                };
+            };
+        };
+    };
+    bulk_approve_api_achievements_bulk_approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkApproveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkApproveResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_achievement_api_achievements__achievement_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                achievement_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AchievementResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_achievement_api_achievements__achievement_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                achievement_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AchievementUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AchievementResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_achievement_api_achievements__achievement_id__approve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                achievement_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AchievementResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    reject_achievement_api_achievements__achievement_id__reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                achievement_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AchievementResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_achievement_api_achievements__achievement_id__archive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                achievement_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AchievementResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unapprove_achievement_api_achievements__achievement_id__unapprove_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                achievement_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AchievementResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_achievement_api_achievements__achievement_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                achievement_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AchievementResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    acknowledge_achievement_api_achievements__achievement_id__acknowledge_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                achievement_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AchievementResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    confirm_metric_api_achievements__achievement_id__confirm_metric_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                achievement_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfirmMetricRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AchievementResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    split_achievement_api_achievements__achievement_id__split_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                achievement_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SplitRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AchievementResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    link_evidence_api_achievements__achievement_id__evidence_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                achievement_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EvidenceLinkCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AchievementResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unlink_evidence_api_achievements__achievement_id__evidence__item_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                achievement_id: string;
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AchievementResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_revisions_api_achievements__achievement_id__revisions_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                achievement_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevisionResponse"][];
                 };
             };
             /** @description Validation Error */

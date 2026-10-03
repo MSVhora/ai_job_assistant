@@ -217,9 +217,7 @@ export async function getMatchRebuildStatus(profileId: string): Promise<MatchReb
 export async function listMatches(params: MatchListParams): Promise<MatchResponse[]> {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined && value !== null && value !== "") {
-      query.set(key, String(value));
-    }
+    query.set(key, String(value));
   }
   return apiFetch<MatchResponse[]>(`/api/matches?${query.toString()}`);
 }

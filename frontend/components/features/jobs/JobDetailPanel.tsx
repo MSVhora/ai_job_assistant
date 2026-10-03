@@ -238,7 +238,7 @@ export function JobDetailPanel({
         )}
       </div>
 
-      {posting?.url && match !== null && (
+      {posting?.url && (
         <div className="border-t border-gray-100 p-4">
           <a
             href={applyMatchUrl(match.id)}

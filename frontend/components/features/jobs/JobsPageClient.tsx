@@ -54,8 +54,7 @@ export function JobsPageClient() {
   const sources = useSources();
   const profiles = useProfiles();
   const profilesList = profiles.data ?? [];
-  const fallbackProfileId =
-    urlProfileId === null ? (profilesList[0]?.profile_id ?? null) : urlProfileId;
+  const fallbackProfileId = urlProfileId ?? profilesList[0]?.profile_id ?? null;
   const activeProfileId = fallbackProfileId;
   const selectedRunStatus = useJobSearchStatus(selectedSearchId, activeProfileId);
   const setup = useSetupCheck();
@@ -102,7 +101,7 @@ export function JobsPageClient() {
     );
   }
 
-  if (sources.isError || sources.data === undefined) {
+  if (sources.isError) {
     return (
       <Card title="Job sources">
         <p className="text-sm text-red-700">Could not load the job sources from the backend.</p>

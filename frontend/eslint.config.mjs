@@ -21,8 +21,25 @@ const eslintConfig = defineConfig([
     },
     rules: {
       ...jsxA11y.flatConfigs.strict.rules,
+      // Numbers in template literals are safe and read better than String(n).
+      "@typescript-eslint/restrict-template-expressions": ["error", { allowNumber: true }],
+      // `||` on strings is deliberate: an empty string must fall back too.
+      "@typescript-eslint/prefer-nullish-coalescing": [
+        "error",
+        { ignorePrimitives: { string: true } },
+      ],
+    },
+  },
+  {
+    files: ["app/**/*.tsx", "components/**/*.tsx"],
+    rules: {
       "max-lines": ["warn", { max: 200, skipBlankLines: true, skipComments: true }],
     },
+  },
+  {
+    // apiFetch<T> / apiFetchWithTotal<T> are unchecked response casts by design.
+    files: ["lib/api/client.ts"],
+    rules: { "@typescript-eslint/no-unnecessary-type-parameters": "off" },
   },
   {
     files: ["**/*.test.{ts,tsx}"],
@@ -32,6 +49,11 @@ const eslintConfig = defineConfig([
       ...vitest.configs.recommended.rules,
       "max-lines": "off",
     },
+  },
+  {
+    // The Radix dialog portals an unlabeled <form>; no role or label can reach it.
+    files: ["components/features/jobs/SearchStepperModal.test.tsx"],
+    rules: { "testing-library/no-node-access": "off" },
   },
   prettier,
   globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts", "lib/api/schema.d.ts"]),

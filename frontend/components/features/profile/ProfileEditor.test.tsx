@@ -2,8 +2,8 @@
 
 import type { ReactElement } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 
 import type { ProfileResponse } from "@/lib/api";
 
@@ -60,8 +60,6 @@ function profileFixture(missingFields: string[]): ProfileResponse {
     missing_fields: missingFields,
   } as unknown as ProfileResponse;
 }
-
-afterEach(cleanup);
 
 describe("EditorBody gap-fill visibility", () => {
   it("hides the chat when the profile has no missing fields", () => {

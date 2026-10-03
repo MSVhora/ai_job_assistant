@@ -237,7 +237,7 @@ export function ReviewSummary({
   const advanced = (source.filters ?? [])
     .map((decl) => ({
       label: decl.label,
-      display: optionDisplay((query.options ?? {})[decl.key], decl.type),
+      display: optionDisplay(query.options?.[decl.key], decl.type),
     }))
     .filter((entry): entry is { label: string; display: string } => entry.display !== null);
 

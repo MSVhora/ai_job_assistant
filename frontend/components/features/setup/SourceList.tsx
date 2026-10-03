@@ -35,7 +35,7 @@ export function SourceList() {
     );
   }
 
-  if (isError || data === undefined) {
+  if (isError) {
     return (
       <section className="rounded-3xl border border-violet-100 bg-white/80 p-6 shadow-xl shadow-violet-100/60 backdrop-blur">
         <h2 className="text-base font-bold tracking-tight text-gray-900">Job sources</h2>

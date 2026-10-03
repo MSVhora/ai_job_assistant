@@ -68,7 +68,7 @@ export function SetupChecklist() {
     );
   }
 
-  if (isError || data === undefined) {
+  if (isError) {
     return (
       <section className="rounded-3xl border border-violet-100 bg-white/80 p-6 shadow-xl shadow-violet-100/60 backdrop-blur">
         <p className="text-sm text-red-700">

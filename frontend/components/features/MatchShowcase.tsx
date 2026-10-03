@@ -29,6 +29,7 @@ export function MatchShowcase() {
 
   return (
     <div
+      role="presentation"
       className="relative mx-auto mt-16 max-w-4xl"
       onMouseEnter={() => {
         paused.current = true;

@@ -50,7 +50,7 @@ function formatValidationDetail(detail: unknown[]): string {
     const location = Array.isArray(entry.loc)
       ? entry.loc.filter((part) => part !== "body").join(".")
       : "";
-    const message = String(entry.msg ?? "invalid value");
+    const message = typeof entry.msg === "string" ? entry.msg : "invalid value";
     parts.push(location === "" ? message : `${location}: ${message}`);
   }
   if (parts.length === 0) return STATUS_FALLBACK_MESSAGES[422] ?? "The request was invalid.";

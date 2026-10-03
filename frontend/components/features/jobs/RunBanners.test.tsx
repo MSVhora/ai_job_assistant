@@ -1,12 +1,10 @@
 "use client";
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { RunBanners } from "./RunBanners";
-
-afterEach(cleanup);
 
 vi.mock("./RunBanner", () => ({
   RunBanner: ({ searchId, onDismiss }: { searchId: string; onDismiss: () => void }) => (
@@ -18,7 +16,7 @@ vi.mock("./RunBanner", () => ({
 
 describe("RunBanners", () => {
   it("renders one banner per active run", () => {
-    render(<RunBanners searchIds={["run-1", "run-2"]} profileId="p-1" onDismiss={() => {}} />);
+    render(<RunBanners searchIds={["run-1", "run-2"]} profileId="p-1" onDismiss={vi.fn()} />);
     expect(screen.getByText("dismiss-run-1")).toBeInTheDocument();
     expect(screen.getByText("dismiss-run-2")).toBeInTheDocument();
   });
@@ -33,7 +31,7 @@ describe("RunBanners", () => {
   });
 
   it("renders nothing when no runs are active", () => {
-    render(<RunBanners searchIds={[]} profileId="p-1" onDismiss={() => {}} />);
+    render(<RunBanners searchIds={[]} profileId="p-1" onDismiss={vi.fn()} />);
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 });

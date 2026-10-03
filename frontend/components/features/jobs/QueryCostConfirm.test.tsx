@@ -1,9 +1,9 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CostEstimate } from "@/lib/api";
 
@@ -56,7 +56,6 @@ const estimate = (overrides: Partial<CostEstimate>): CostEstimate => ({
 beforeEach(() => {
   requested.length = 0;
 });
-afterEach(cleanup);
 
 describe("QueryCostConfirm", () => {
   it("shows the estimated tokens and dollars before the user confirms", async () => {

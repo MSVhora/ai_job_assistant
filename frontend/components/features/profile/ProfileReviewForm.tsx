@@ -75,7 +75,13 @@ export function ProfileReviewForm({
   });
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-5" noValidate>
+    <form
+      onSubmit={(event) => {
+        void submit(event);
+      }}
+      className="flex flex-col gap-5"
+      noValidate
+    >
       <SectionCard
         title="Contact"
         description="How employers can reach you"

@@ -42,7 +42,7 @@ export function RebuildBanner({ profileId }: { profileId: string | null }) {
   const runId = data?.id ?? null;
   const staleCount = data?.stale_count ?? 0;
   const active = isRebuildActive(data?.status);
-  const needsAttention = runId !== null && data !== undefined && data.status === "failed";
+  const needsAttention = runId !== null && data?.status === "failed";
 
   useEffect(() => {
     if (data?.status === "succeeded" && profileId !== null) {

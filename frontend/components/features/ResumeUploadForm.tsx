@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, type DragEvent, type FormEvent } from "react";
+import { useEffect, useRef, useState, type DragEvent, type SubmitEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { useExtractResume, useUploadAndExtract } from "@/hooks/use-upload-and-extract";
@@ -101,7 +101,7 @@ export function ResumeUploadForm() {
     };
   }, [showProgress]);
 
-  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const onSubmit = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (file === null) return;
     setProgress(0);

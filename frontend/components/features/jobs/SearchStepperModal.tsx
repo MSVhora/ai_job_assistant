@@ -23,7 +23,7 @@ import {
 const STEP_LABELS = ["Profile", "Source", "Details", "Review"] as const;
 const LAST_STEP = 4;
 
-const STEP_FIELDS: (keyof SearchFormValues | string)[][] = [
+const STEP_FIELDS: string[][] = [
   [],
   ["source"],
   [
@@ -214,7 +214,7 @@ export function SearchStepperModal({
   // Submissions only come from the review step's button in principle, but
   // implicit submit events (Enter in any input at any step) land on the form
   // too. They advance the wizard instead of ever starting a run early.
-  const onFormSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+  const onFormSubmit = (event: React.SubmitEvent<HTMLFormElement>) => {
     // A submit must come from an explicit press on the review step AFTER it
     // rendered: the tail end of the pointer gesture that advanced the wizard
     // (pointer-up landing on the submit button that mounts in the Next

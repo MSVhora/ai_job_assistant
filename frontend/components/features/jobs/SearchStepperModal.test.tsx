@@ -1,13 +1,19 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ProfileResponse, SourceInfo } from "@/lib/api";
 
 import { SearchStepperModal } from "./SearchStepperModal";
+
+function requireForm(): HTMLFormElement {
+  const form = document.querySelector("form");
+  if (form === null) throw new Error("no form rendered");
+  return form;
+}
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -93,7 +99,7 @@ function mount(open = true) {
         profilesError={false}
         profilesList={[{ profile_id: "p-1", name: "Backend track" } as never]}
         activeProfileId="p-1"
-        onSelectProfile={() => {}}
+        onSelectProfile={vi.fn()}
         sources={[source]}
         onSearchStarted={onSearchStarted}
       />
@@ -108,7 +114,6 @@ async function goThrough(user: ReturnType<typeof userEvent.setup>) {
 }
 
 afterEach(() => {
-  cleanup();
   vi.clearAllMocks();
 });
 
@@ -166,7 +171,7 @@ describe("SearchStepperModal", () => {
     // Implicit submissions (Enter in a field, browser defaults) land on the
     // form at any step (Radix portals it to document.body) — they must be
     // inert until the review step.
-    fireEvent.submit(document.querySelector("form")!);
+    fireEvent.submit(requireForm());
     await sleep(0);
     expect(startMutation).not.toHaveBeenCalled();
     expect(screen.getByRole("region", { name: /Review of the search/ })).toBeInTheDocument();
@@ -179,7 +184,7 @@ describe("SearchStepperModal", () => {
     await user.click(screen.getByRole("button", { name: "Next" }));
     expect(screen.getByRole("region", { name: /Review of the search/ })).toBeInTheDocument();
 
-    fireEvent.submit(document.querySelector("form")!);
+    fireEvent.submit(requireForm());
     await sleep(0);
     expect(startMutation).not.toHaveBeenCalled();
 

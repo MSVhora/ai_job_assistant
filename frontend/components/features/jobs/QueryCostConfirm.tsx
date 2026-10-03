@@ -9,7 +9,7 @@ function EstimateLine({ estimate }: { estimate: CostEstimate }) {
   return (
     <p className="mt-1.5 text-xs text-gray-700" aria-live="polite">
       Estimated cost: ≈ {tokens.toLocaleString()} tokens
-      {estimate.usd !== null && estimate.usd !== undefined
+      {estimate.usd !== null
         ? `, ≈ ${formatUsd(estimate.usd)}`
         : ` — ${estimate.message ?? "cost unavailable for this model"}`}
       . Approximate; up to double if the model has to repair its answer.

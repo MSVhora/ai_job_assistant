@@ -7,7 +7,7 @@ from docx import Document
 from app.core.errors import TextExtractionError, UnsupportedFileTypeError
 from app.services.text_extraction import extract_docx, extract_pdf, sniff_file_type
 
-FIXTURES = Path(__file__).parent / "fixtures"
+FIXTURES = Path(__file__).resolve().parents[1] / "fixtures"
 
 
 def build_docx(paragraphs: list[str], table_cells: list[list[str]] | None = None) -> bytes:

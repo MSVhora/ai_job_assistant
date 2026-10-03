@@ -14,7 +14,7 @@ from app.models import Resume
 pytestmark = pytest.mark.usefixtures("clean_tables")
 
 DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-FIXTURES = Path(__file__).parent / "fixtures"
+FIXTURES = Path(__file__).resolve().parents[1] / "fixtures"
 
 
 @pytest.fixture

@@ -3,7 +3,7 @@ from pathlib import Path
 
 from app.core.config import Settings
 
-ENV_EXAMPLE = Path(__file__).resolve().parents[2] / ".env.example"
+ENV_EXAMPLE = Path(__file__).resolve().parents[3] / ".env.example"
 NON_SETTINGS_KEYS = {
     "POSTGRES_USER",
     "POSTGRES_PASSWORD",

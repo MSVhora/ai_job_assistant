@@ -1,6 +1,6 @@
 # Issue #42 — Mirror `app/` in `backend/tests/`
 
-**Status:** Proposed — for owner review
+**Status:** Implemented — see notes below
 **Tracks:** GitHub issue #42 (milestone `v5`, branch `v5/42-backend-test-layout`)
 **Plan of record:** [v5 plan](v5-hardening-plan.md) · standards: [testing.md](../../instructions/testing.md), [backend-fastapi.md](../../instructions/backend-fastapi.md)
 **Depends on:** #40 (so its new test moves with the rest) · **Blocks:** #43, #41 (smaller, readable diffs), all v6 tests
@@ -60,3 +60,9 @@ The standard says tests mirror the application layout. Today `backend/tests/` is
 ## Out of scope
 
 Rewriting or deduplicating tests, adding coverage (#41), changing fixtures.
+
+## Implementation notes
+
+- 463 tests collected before and after, identical node ids apart from the folder prefix; `test_link_labeling` went to `services/` (it exercises `profile_extraction`).
+- Path fixes: `FIXTURES` in three test modules, `backend_dir` in `test_migrations.py`, `ENV_EXAMPLE` in `test_env_example.py`.
+- **Deviation (one test edit):** the new order exposed a latent isolation bug. `test_search_status_requires_profile_id` used the real Adzuna source and passed only because the developer's `.env` has Adzuna keys and it ran before a test that leaves empty keys in the cached settings. It now patches the registry with a fake source like its neighbours. The leaking test was not identified.

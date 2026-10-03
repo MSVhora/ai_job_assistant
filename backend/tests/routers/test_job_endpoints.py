@@ -437,8 +437,11 @@ async def test_search_normalizes_country(
     assert source.queries[0].country == "de"
 
 
-async def test_search_status_requires_profile_id(client: AsyncClient) -> None:
+async def test_search_status_requires_profile_id(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     profile_id = await seed_profile_light("Owner")
+    monkeypatch.setattr(registry, "all_sources", lambda: (FakeJobSource("adzuna", postings=[]),))
     start = (
         await client.post(
             "/api/jobs/search",

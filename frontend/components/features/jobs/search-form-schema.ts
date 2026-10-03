@@ -4,17 +4,17 @@ import type { JobSearchRequest, SourceFilterDecl, SourceInfo, StructuredProfile 
 
 export type OptionValues = Record<string, string | boolean>;
 
-export type QueryFieldValues = {
+export interface QueryFieldValues {
   title: string;
   skills_all: string;
   skills: string;
   exclude: string;
   options: OptionValues;
-};
+}
 
 export type PostedWithinValue = "any" | "1" | "7" | "30";
 
-export type SearchFormValues = {
+export interface SearchFormValues {
   query: QueryFieldValues;
   source: string;
   location: string;
@@ -23,7 +23,7 @@ export type SearchFormValues = {
   maxSalary: string;
   posted_within: PostedWithinValue;
   results_wanted: number;
-};
+}
 
 export const POSTED_WITHIN_OPTIONS: { value: PostedWithinValue; label: string }[] = [
   { value: "any", label: "Any time" },
@@ -234,7 +234,7 @@ export function toSearchRequest(
   if (values.source === "" || source === null) {
     missing.push("source");
   }
-  const fields = values.query ?? emptyQueryFields();
+  const fields = values.query;
   const title = fields.title.trim();
   const skillsAll = splitList(fields.skills_all);
   const skills = splitList(fields.skills);

@@ -19,7 +19,9 @@ export function Reveal({ children, className }: { children: ReactNode; className
       { threshold: 0.15 },
     );
     observer.observe(el);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+    };
   }, []);
 
   return (

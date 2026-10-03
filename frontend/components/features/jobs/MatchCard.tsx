@@ -129,7 +129,9 @@ export function MatchCard({
             type="button"
             aria-expanded={open}
             aria-controls={detailsId}
-            onClick={() => setOpen((value) => !value)}
+            onClick={() => {
+              setOpen((value) => !value);
+            }}
             className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-semibold text-violet-700 transition-colors hover:bg-violet-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
           >
             <SparkleIcon />
@@ -178,7 +180,9 @@ export function MatchCard({
           <span className="flex items-center gap-1.5">
             <button
               type="button"
-              onClick={() => sendSignal(saved ? "unsave" : "save")}
+              onClick={() => {
+                sendSignal(saved ? "unsave" : "save");
+              }}
               aria-pressed={saved}
               disabled={signal.isPending}
               aria-label={saved ? `Remove ${posting.title} from saved` : `Save ${posting.title}`}
@@ -192,7 +196,9 @@ export function MatchCard({
             </button>
             <button
               type="button"
-              onClick={() => sendSignal(dismissed ? "undismiss" : "dismiss")}
+              onClick={() => {
+                sendSignal(dismissed ? "undismiss" : "dismiss");
+              }}
               disabled={signal.isPending}
               aria-label={
                 dismissed ? `Restore ${posting.title} to the list` : `Dismiss ${posting.title}`

@@ -155,7 +155,9 @@ function ResumeRow({ resume }: { resume: ResumeSummaryResponse }) {
             variant="secondary"
             className="rounded-full px-3 py-1 text-xs"
             disabled={extract.isPending}
-            onClick={() => extract.mutate(resume.resume_id)}
+            onClick={() => {
+              extract.mutate(resume.resume_id);
+            }}
           >
             {extract.isPending ? "Extracting…" : "Extract profile"}
           </Button>

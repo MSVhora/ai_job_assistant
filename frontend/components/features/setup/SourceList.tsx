@@ -85,7 +85,9 @@ export function SourceList() {
                 <button
                   type="button"
                   disabled={!source.is_configured}
-                  onClick={() => setDisclosureFor(source.name)}
+                  onClick={() => {
+                    setDisclosureFor(source.name);
+                  }}
                   className="rounded-full bg-gradient-to-r from-violet-600 to-purple-600 px-4 py-2 text-sm font-semibold text-white shadow-md shadow-violet-300 transition hover:-translate-y-0.5 hover:shadow-lg hover:shadow-violet-400/50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
                 >
                   Enable…
@@ -108,9 +110,18 @@ export function SourceList() {
         sourceName={disclosureFor}
         pending={enable.isPending}
         onConfirm={(name) => {
-          enable.mutate({ name, acknowledged: true }, { onSettled: () => setDisclosureFor(null) });
+          enable.mutate(
+            { name, acknowledged: true },
+            {
+              onSettled: () => {
+                setDisclosureFor(null);
+              },
+            },
+          );
         }}
-        onClose={() => setDisclosureFor(null)}
+        onClose={() => {
+          setDisclosureFor(null);
+        }}
       />
     </>
   );
@@ -167,7 +178,9 @@ function DisclosureDialog({
         <input
           type="checkbox"
           checked={acknowledged}
-          onChange={(event) => setAcknowledged(event.target.checked)}
+          onChange={(event) => {
+            setAcknowledged(event.target.checked);
+          }}
           className="mt-0.5 h-4 w-4 rounded border-gray-300 accent-violet-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
         />
         I have read and acknowledge the disclosure above.

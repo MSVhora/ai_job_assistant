@@ -44,7 +44,9 @@ export function ProfileSelector({
       <Select
         id={id}
         value={activeProfileId ?? ""}
-        onChange={(event) => onSelect(event.target.value)}
+        onChange={(event) => {
+          onSelect(event.target.value);
+        }}
       >
         {profiles.map((profile) => (
           <option key={profile.profile_id} value={profile.profile_id}>

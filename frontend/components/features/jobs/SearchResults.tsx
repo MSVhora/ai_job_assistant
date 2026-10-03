@@ -52,7 +52,7 @@ export function SearchResults({
     );
   }
 
-  const list = postings.data ?? [];
+  const list = postings.data;
   if (list.length === 0) {
     if (status === "failed") {
       return (

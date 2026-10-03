@@ -106,11 +106,11 @@ export function SearchStepperModal({
   // Reset the wizard whenever it opens: adjust state during render when the
   // `open` prop flips (the render-phase adjustment pattern).
   const [wasOpen, setWasOpen] = useState(open);
-  if (open === true && wasOpen === false) {
+  if (open && !wasOpen) {
     setWasOpen(true);
     setStep(1);
     setSourceName("");
-  } else if (open === false && wasOpen === true) {
+  } else if (!open && wasOpen) {
     setWasOpen(false);
   }
 
@@ -146,11 +146,11 @@ export function SearchStepperModal({
       location: preferences?.target_location || structured.contact.location || "",
       country: structured.contact.country || "",
       minSalary:
-        preferences?.salary_min !== undefined && preferences?.salary_min !== null
+        preferences?.salary_min !== undefined && preferences.salary_min !== null
           ? String(preferences.salary_min)
           : "",
       maxSalary:
-        preferences?.salary_max !== undefined && preferences?.salary_max !== null
+        preferences?.salary_max !== undefined && preferences.salary_max !== null
           ? String(preferences.salary_max)
           : "",
       posted_within: "any" as const,
@@ -205,7 +205,9 @@ export function SearchStepperModal({
     }
     form.clearErrors("root");
     start.mutate(payload, {
-      onSuccess: (data) => onSearchStarted(data.search_id),
+      onSuccess: (data) => {
+        onSearchStarted(data.search_id);
+      },
     });
   });
 
@@ -346,7 +348,7 @@ export function SearchStepperModal({
           )}
           {start.isError && duplicateRunError === null && (
             <p role="alert" className="text-xs text-red-600">
-              {start.error?.message}
+              {start.error.message}
             </p>
           )}
         </form>

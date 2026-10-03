@@ -37,7 +37,26 @@ function profileFixture(missingFields: string[]): ProfileResponse {
   return {
     profile_id: "p-1",
     name: "Main",
-    structured_profile: { contact: { full_name: "Jane Doe" }, skills: ["SQL"] },
+    structured_profile: {
+      contact: {
+        full_name: "Jane Doe",
+        email: null,
+        phone: null,
+        location: null,
+        country: null,
+        links: [],
+      },
+      headline: null,
+      summary: null,
+      skills: ["SQL"],
+      experience: [],
+      projects: [],
+      education: [],
+      certifications: [],
+      awards: [],
+      extra_sections: [],
+      preferences: null,
+    },
     missing_fields: missingFields,
   } as unknown as ProfileResponse;
 }

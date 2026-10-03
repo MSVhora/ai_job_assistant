@@ -47,7 +47,13 @@ export function EducationSection() {
       defaultOpen={fields.length > 0}
       hasError={errors !== undefined}
       action={
-        <Button variant="secondary" className={addBtn} onClick={() => append(emptyEducation)}>
+        <Button
+          variant="secondary"
+          className={addBtn}
+          onClick={() => {
+            append(emptyEducation);
+          }}
+        >
           + Add education
         </Button>
       }
@@ -56,7 +62,13 @@ export function EducationSection() {
         <EmptyState
           message="No education entries yet — add your degrees, bootcamps or courses."
           action={
-            <Button variant="secondary" className={addBtn} onClick={() => append(emptyEducation)}>
+            <Button
+              variant="secondary"
+              className={addBtn}
+              onClick={() => {
+                append(emptyEducation);
+              }}
+            >
               + Add education
             </Button>
           }
@@ -68,7 +80,9 @@ export function EducationSection() {
               key={field.id}
               index={index}
               count={fields.length}
-              onRemove={() => remove(index)}
+              onRemove={() => {
+                remove(index);
+              }}
               onMove={move}
               title={fields.length > 1 ? `Education ${index + 1}` : undefined}
               subtitle={
@@ -128,7 +142,13 @@ export function CertificationsSection() {
       defaultOpen={fields.length > 0}
       hasError={errors !== undefined}
       action={
-        <Button variant="secondary" className={addBtn} onClick={() => append(emptyCertification)}>
+        <Button
+          variant="secondary"
+          className={addBtn}
+          onClick={() => {
+            append(emptyCertification);
+          }}
+        >
           + Add certification
         </Button>
       }
@@ -140,7 +160,9 @@ export function CertificationsSection() {
             <Button
               variant="secondary"
               className={addBtn}
-              onClick={() => append(emptyCertification)}
+              onClick={() => {
+                append(emptyCertification);
+              }}
             >
               + Add certification
             </Button>
@@ -153,7 +175,9 @@ export function CertificationsSection() {
               key={field.id}
               index={index}
               count={fields.length}
-              onRemove={() => remove(index)}
+              onRemove={() => {
+                remove(index);
+              }}
               onMove={move}
               title={field.name || (fields.length > 1 ? `Certification ${index + 1}` : undefined)}
               subtitle={field.issuer || undefined}
@@ -197,7 +221,13 @@ export function AwardsSection() {
       defaultOpen={fields.length > 0}
       hasError={errors !== undefined}
       action={
-        <Button variant="secondary" className={addBtn} onClick={() => append(emptyAward)}>
+        <Button
+          variant="secondary"
+          className={addBtn}
+          onClick={() => {
+            append(emptyAward);
+          }}
+        >
           + Add award
         </Button>
       }
@@ -206,7 +236,13 @@ export function AwardsSection() {
         <EmptyState
           message="No awards yet — add hackathon wins, scholarships or employee-of-the-month style recognitions."
           action={
-            <Button variant="secondary" className={addBtn} onClick={() => append(emptyAward)}>
+            <Button
+              variant="secondary"
+              className={addBtn}
+              onClick={() => {
+                append(emptyAward);
+              }}
+            >
               + Add award
             </Button>
           }
@@ -218,7 +254,9 @@ export function AwardsSection() {
               key={field.id}
               index={index}
               count={fields.length}
-              onRemove={() => remove(index)}
+              onRemove={() => {
+                remove(index);
+              }}
               onMove={move}
               title={field.title || (fields.length > 1 ? `Award ${index + 1}` : undefined)}
               subtitle={field.issuer || undefined}
@@ -258,7 +296,13 @@ export function ExtraSectionsSection() {
       defaultOpen={fields.length > 0}
       hasError={errors !== undefined}
       action={
-        <Button variant="secondary" className={addBtn} onClick={() => append(emptyExtraSection)}>
+        <Button
+          variant="secondary"
+          className={addBtn}
+          onClick={() => {
+            append(emptyExtraSection);
+          }}
+        >
           + Add section
         </Button>
       }
@@ -270,7 +314,9 @@ export function ExtraSectionsSection() {
             <Button
               variant="secondary"
               className={addBtn}
-              onClick={() => append(emptyExtraSection)}
+              onClick={() => {
+                append(emptyExtraSection);
+              }}
             >
               + Add section
             </Button>
@@ -283,7 +329,9 @@ export function ExtraSectionsSection() {
               key={field.id}
               index={index}
               count={fields.length}
-              onRemove={() => remove(index)}
+              onRemove={() => {
+                remove(index);
+              }}
               onMove={move}
               title={field.title || (fields.length > 1 ? `Section ${index + 1}` : undefined)}
             >

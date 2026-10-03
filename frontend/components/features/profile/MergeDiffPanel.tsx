@@ -129,7 +129,9 @@ export function MergeDiffPanel({
             <Button
               variant="secondary"
               className="rounded-full px-4 py-1.5 text-xs"
-              onClick={() => setTakenDraft(new Set(differing))}
+              onClick={() => {
+                setTakenDraft(new Set(differing));
+              }}
               disabled={isSaving}
             >
               Use all draft values
@@ -137,7 +139,9 @@ export function MergeDiffPanel({
             <Button
               variant="secondary"
               className="rounded-full px-4 py-1.5 text-xs"
-              onClick={() => setTakenDraft(new Set())}
+              onClick={() => {
+                setTakenDraft(new Set());
+              }}
               disabled={isSaving}
             >
               Keep all current values
@@ -162,7 +166,9 @@ export function MergeDiffPanel({
                       variant={takenDraft.has(key) ? "secondary" : "primary"}
                       className="rounded-full px-3 py-1 text-xs"
                       aria-pressed={!takenDraft.has(key)}
-                      onClick={() => toggle(key)}
+                      onClick={() => {
+                        toggle(key);
+                      }}
                       disabled={isSaving}
                     >
                       Keep current
@@ -171,7 +177,9 @@ export function MergeDiffPanel({
                       variant={takenDraft.has(key) ? "primary" : "secondary"}
                       className="rounded-full px-3 py-1 text-xs"
                       aria-pressed={takenDraft.has(key)}
-                      onClick={() => toggle(key)}
+                      onClick={() => {
+                        toggle(key);
+                      }}
                       disabled={isSaving}
                     >
                       Use draft

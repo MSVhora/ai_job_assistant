@@ -134,7 +134,7 @@ export function ProfileMock() {
         {rows.map((row, i) => (
           <li
             key={row.field}
-            className={`feature-row flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 ${`feature-d${i + 1}`}`}
+            className={`feature-row flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 feature-d${i + 1}`}
           >
             <span className="text-xs font-medium text-gray-500">{row.field}</span>
             <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-900">

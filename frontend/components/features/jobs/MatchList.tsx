@@ -10,11 +10,11 @@ import type { MatchResponse } from "@/lib/api";
 
 const MATCH_PAGE_SIZE = 20;
 
-export type MatchSelection = {
+export interface MatchSelection {
   match: MatchResponse | null;
   toggle: (match: MatchResponse) => void;
   clear: () => void;
-};
+}
 
 function hasFiltersActive(filters: MatchFilterValues): boolean {
   return hasActiveFilters(filters);
@@ -174,7 +174,9 @@ export function MatchList({
           <button
             key={value}
             type="button"
-            onClick={() => changeStatus(value)}
+            onClick={() => {
+              changeStatus(value);
+            }}
             aria-pressed={status === value}
             className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 ${
               status === value
@@ -225,7 +227,9 @@ export function MatchList({
                   rank={page * MATCH_PAGE_SIZE + index + 1}
                   profileId={profileId}
                   selected={selection.match?.id === match.id}
-                  onOpenDetails={() => selection.toggle(match)}
+                  onOpenDetails={() => {
+                    selection.toggle(match);
+                  }}
                 />
               ))}
             </ul>
@@ -244,7 +248,9 @@ export function MatchList({
         >
           <button
             type="button"
-            onClick={() => changePage(page - 1)}
+            onClick={() => {
+              changePage(page - 1);
+            }}
             disabled={page === 0}
             className="inline-flex items-center gap-1 rounded-full border border-gray-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:border-violet-300 hover:text-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 disabled:cursor-not-allowed disabled:opacity-40"
           >
@@ -256,7 +262,9 @@ export function MatchList({
           </span>
           <button
             type="button"
-            onClick={() => changePage(page + 1)}
+            onClick={() => {
+              changePage(page + 1);
+            }}
             disabled={page >= pageCount - 1}
             className="inline-flex items-center gap-1 rounded-full border border-gray-300 bg-white px-3.5 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:border-violet-300 hover:text-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 disabled:cursor-not-allowed disabled:opacity-40"
           >

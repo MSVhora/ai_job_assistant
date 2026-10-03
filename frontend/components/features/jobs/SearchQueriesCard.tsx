@@ -43,12 +43,23 @@ export function SearchQueriesCard({
 
   const regenerateQueries = () => {
     if (profileId === null || regenerate.isPending) return;
-    regenerate.mutate({ profileId }, { onSettled: () => setConfirming(null) });
+    regenerate.mutate(
+      { profileId },
+      {
+        onSettled: () => {
+          setConfirming(null);
+        },
+      },
+    );
   };
 
   const startTune = () => {
     if (profileId === null || tune.isPending) return;
-    tune.mutate(profileId, { onSettled: () => setConfirming(null) });
+    tune.mutate(profileId, {
+      onSettled: () => {
+        setConfirming(null);
+      },
+    });
   };
 
   return (
@@ -79,7 +90,9 @@ export function SearchQueriesCard({
             </span>
             <button
               type="button"
-              onClick={() => setConfirming("regenerate")}
+              onClick={() => {
+                setConfirming("regenerate");
+              }}
               disabled={busier}
               className="rounded-full border border-violet-300 bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700 hover:bg-violet-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 disabled:cursor-not-allowed disabled:opacity-50"
             >
@@ -87,7 +100,9 @@ export function SearchQueriesCard({
             </button>
             <button
               type="button"
-              onClick={() => setConfirming("tune")}
+              onClick={() => {
+                setConfirming("tune");
+              }}
               disabled={busier}
               className="rounded-full border border-gray-300 bg-white px-3 py-1 text-xs font-semibold text-gray-700 hover:border-violet-300 hover:text-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 disabled:cursor-not-allowed disabled:opacity-50"
             >
@@ -101,7 +116,9 @@ export function SearchQueriesCard({
           kind={confirming}
           profileId={profileId}
           onConfirm={confirming === "tune" ? startTune : regenerateQueries}
-          onCancel={() => setConfirming(null)}
+          onCancel={() => {
+            setConfirming(null);
+          }}
           pending={busier}
         />
       )}

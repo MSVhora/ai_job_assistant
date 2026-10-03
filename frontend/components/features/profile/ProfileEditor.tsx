@@ -72,7 +72,7 @@ export function EditorBody({ profile }: { profile: ProfileResponse }) {
       next.contact.location = values.contact.location;
     }
     if (touched.has("contact.country")) {
-      next.contact.country = values.contact.country ?? "";
+      next.contact.country = values.contact.country;
     }
     if (touched.has("preferences.target_location")) {
       next.preferences.target_location = values.preferences.target_location;
@@ -115,7 +115,9 @@ export function EditorBody({ profile }: { profile: ProfileResponse }) {
               <Input
                 id="rename-profile"
                 value={nameInput}
-                onChange={(event) => setNameInput(event.target.value)}
+                onChange={(event) => {
+                  setNameInput(event.target.value);
+                }}
               />
             </Field>
           </div>
@@ -134,7 +136,7 @@ export function EditorBody({ profile }: { profile: ProfileResponse }) {
           <div className="flex gap-2">
             <Button
               disabled={renameProfile.isPending || nameInput.trim() === ""}
-              onClick={() =>
+              onClick={() => {
                 renameProfile.mutate(
                   { profileId: profile.profile_id, payload: { name: nameInput.trim() } },
                   {
@@ -142,12 +144,17 @@ export function EditorBody({ profile }: { profile: ProfileResponse }) {
                       setRenaming(false);
                     },
                   },
-                )
-              }
+                );
+              }}
             >
               {renameProfile.isPending ? "Saving…" : "Save name"}
             </Button>
-            <Button variant="secondary" onClick={() => setRenaming(false)}>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setRenaming(false);
+              }}
+            >
               Cancel
             </Button>
           </div>
@@ -174,12 +181,12 @@ export function EditorBody({ profile }: { profile: ProfileResponse }) {
           isSaving={updateProfile.isPending}
           saveError={updateProfile.error?.message ?? null}
           savedRevisionSource={updateProfile.data?.last_revision?.source ?? null}
-          onSave={(structuredProfile) =>
+          onSave={(structuredProfile) => {
             updateProfile.mutate({
               profileId: profile.profile_id,
               payload: { structured_profile: structuredProfile },
-            })
-          }
+            });
+          }}
         />
       </FormProvider>
       <Link

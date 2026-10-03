@@ -256,7 +256,7 @@ function BarsPreview() {
   );
 }
 
-type GetStartedOption = {
+interface GetStartedOption {
   eyebrow: string;
   title: string;
   description: string;
@@ -265,7 +265,7 @@ type GetStartedOption = {
   href?: string;
   popular?: boolean;
   disabled?: boolean;
-};
+}
 
 const OPTIONS: GetStartedOption[] = [
   {

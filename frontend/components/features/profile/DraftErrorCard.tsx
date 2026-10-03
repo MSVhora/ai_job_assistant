@@ -29,7 +29,9 @@ export function DraftErrorCard({
         )}
         <Button
           disabled={extract.isPending}
-          onClick={() => extract.mutate(resumeId, { onSuccess: onResolved })}
+          onClick={() => {
+            extract.mutate(resumeId, { onSuccess: onResolved });
+          }}
         >
           {extract.isPending ? "Extracting…" : "Extract profile"}
         </Button>

@@ -126,7 +126,9 @@ export function ProfileReviewForm({
             <Button
               variant="secondary"
               className="rounded-full border-dashed px-4 py-1.5 text-xs font-semibold text-violet-700 hover:border-violet-400 hover:bg-violet-50"
-              onClick={() => append(emptyLink)}
+              onClick={() => {
+                append(emptyLink);
+              }}
             >
               + Add link
             </Button>
@@ -159,7 +161,9 @@ export function ProfileReviewForm({
                 <Button
                   variant="danger"
                   className="mt-7 rounded-full px-2.5 py-1.5 text-xs"
-                  onClick={() => remove(index)}
+                  onClick={() => {
+                    remove(index);
+                  }}
                   aria-label={`Remove link ${index + 1}`}
                 >
                   ✕

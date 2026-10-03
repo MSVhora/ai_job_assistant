@@ -120,7 +120,7 @@ export function ResumeUploadForm() {
   const onDrop = (event: DragEvent<HTMLButtonElement>) => {
     event.preventDefault();
     setDragging(false);
-    acceptFile(event.dataTransfer.files?.[0]);
+    acceptFile(event.dataTransfer.files[0]);
   };
 
   const formatSize = (bytes: number) =>
@@ -137,7 +137,9 @@ export function ResumeUploadForm() {
           event.preventDefault();
           setDragging(true);
         }}
-        onDragLeave={() => setDragging(false)}
+        onDragLeave={() => {
+          setDragging(false);
+        }}
         onDrop={onDrop}
         disabled={pending}
         aria-label="Choose a resume file (PDF or DOCX) to upload"
@@ -182,7 +184,9 @@ export function ResumeUploadForm() {
             variant="secondary"
             className="px-2 py-1 text-xs"
             disabled={pending}
-            onClick={() => setFile(null)}
+            onClick={() => {
+              setFile(null);
+            }}
           >
             Remove
           </Button>
@@ -211,7 +215,7 @@ export function ResumeUploadForm() {
           className="flex flex-col gap-2 rounded-2xl border border-violet-100 bg-white p-4 shadow-sm"
         >
           <div className="flex items-center justify-between text-sm">
-            <span className="font-semibold text-gray-900">{currentStage?.label}…</span>
+            <span className="font-semibold text-gray-900">{currentStage.label}…</span>
             <span className="font-semibold text-violet-700">{progress}%</span>
           </div>
           <div

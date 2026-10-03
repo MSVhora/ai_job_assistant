@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { useSetupCheck } from "@/hooks/use-setup";
 import { CheckCircleIcon, ExternalLinkIcon, KeyIcon } from "./icons";
 
-type ProviderStep = {
+interface ProviderStep {
   name: string;
   description: string;
   guideHref: string;
@@ -16,7 +16,7 @@ type ProviderStep = {
     adzuna_configured: boolean;
     apify_configured: boolean;
   }) => boolean;
-};
+}
 
 const STEPS: ProviderStep[] = [
   {

@@ -61,8 +61,12 @@ export function JobsPageClient() {
   const setup = useSetupCheck();
   const selection: MatchSelection = {
     match: selectedMatch,
-    toggle: (match) => setSelectedMatch((current) => (current?.id === match.id ? null : match)),
-    clear: () => setSelectedMatch(null),
+    toggle: (match) => {
+      setSelectedMatch((current) => (current?.id === match.id ? null : match));
+    },
+    clear: () => {
+      setSelectedMatch(null);
+    },
   };
   const changeFilters = (next: MatchFilterValues) => {
     setFilters(next);
@@ -73,7 +77,7 @@ export function JobsPageClient() {
     setDismissedIds([]);
     setSelectedSearchId(null);
     setSelectedMatch(null);
-    void router.replace(`/jobs?profile=${profileId}`);
+    router.replace(`/jobs?profile=${profileId}`);
   };
 
   // Persisted runs: banners for still-active runs are derived from the
@@ -169,7 +173,11 @@ export function JobsPageClient() {
         </div>
         <div className="flex shrink-0 flex-col gap-2 border-t border-gray-100 p-3">
           <RebuildBanner profileId={activeProfileId} />
-          <StartSearchButton onClick={() => setSearchOpen(true)} />
+          <StartSearchButton
+            onClick={() => {
+              setSearchOpen(true);
+            }}
+          />
         </div>
       </aside>
 

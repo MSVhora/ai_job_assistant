@@ -78,7 +78,9 @@ export function SourceStep({
             className="accent-violet-600"
             disabled={!source.is_configured}
             checked={selectedSourceId === source.name}
-            onChange={() => onSelect(source.name)}
+            onChange={() => {
+              onSelect(source.name);
+            }}
             aria-label={`Search ${source.name}`}
           />
           <span>{source.name}</span>
@@ -188,7 +190,9 @@ function SourceFiltersAccordion({ decls }: { decls: SourceFilterDecl[] }) {
     <Accordion
       id="details-advanced-filters"
       open={open}
-      onToggle={() => setOpen((previous) => !previous)}
+      onToggle={() => {
+        setOpen((previous) => !previous);
+      }}
       trigger={
         <span className="text-sm font-semibold text-gray-900">
           More filters for this source (optional)
@@ -207,7 +211,10 @@ function optionDisplay(value: string | boolean | undefined, type: string): strin
   return String(value);
 }
 
-type ReviewRow = { label: string; value: string };
+interface ReviewRow {
+  label: string;
+  value: string;
+}
 
 export function ReviewSummary({
   source,
@@ -220,13 +227,13 @@ export function ReviewSummary({
 }) {
   const { control } = useFormContext<SearchFormValues>();
   const values = useWatch({ control });
-  const query = values?.query ?? {};
+  const query = values.query ?? {};
   const title = query.title?.trim();
   const skillsAll = query.skills_all?.trim();
   const skills = query.skills?.trim();
   const exclude = source.supports_exclusions ? (query.exclude?.trim() ?? "") : null;
   const postedWithin =
-    POSTED_WITHIN_OPTIONS.find((option) => option.value === values?.posted_within)?.label ?? "—";
+    POSTED_WITHIN_OPTIONS.find((option) => option.value === values.posted_within)?.label ?? "—";
   const advanced = (source.filters ?? [])
     .map((decl) => ({
       label: decl.label,
@@ -249,28 +256,28 @@ export function ReviewSummary({
     },
     {
       label: "Location",
-      value: (values?.location ?? "").trim() === "" ? "—" : (values?.location ?? "").trim(),
+      value: (values.location ?? "").trim() === "" ? "—" : (values.location ?? "").trim(),
     },
     {
       label: "Country",
-      value: (values?.country ?? "").trim() === "" ? "—" : (values?.country ?? "").trim(),
+      value: (values.country ?? "").trim() === "" ? "—" : (values.country ?? "").trim(),
     },
     { label: "Posted within", value: postedWithin },
     {
       label: "Min. salary",
       value:
-        (values?.minSalary ?? "").trim() === ""
+        (values.minSalary ?? "").trim() === ""
           ? "—"
           : `${values.minSalary}${currency !== null ? ` ${currency}` : ""}`,
     },
     {
       label: "Max. salary",
       value:
-        (values?.maxSalary ?? "").trim() === ""
+        (values.maxSalary ?? "").trim() === ""
           ? "—"
           : `${values.maxSalary}${currency !== null ? ` ${currency}` : ""}`,
     },
-    { label: "Results wanted", value: String(values?.results_wanted ?? "—") },
+    { label: "Results wanted", value: String(values.results_wanted ?? "—") },
     {
       label: "Advanced filters",
       value:

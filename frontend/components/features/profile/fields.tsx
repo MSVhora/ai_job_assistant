@@ -175,7 +175,9 @@ export function SectionCard({
       <div className="flex flex-wrap items-center gap-2 border-b border-gray-100 bg-gray-50/60 px-5 py-4 sm:px-6">
         <button
           type="button"
-          onClick={() => setOpen((current) => !current)}
+          onClick={() => {
+            setOpen((current) => !current);
+          }}
           aria-expanded={open}
           className="flex min-w-0 flex-1 items-center gap-3 rounded-xl text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
         >
@@ -247,7 +249,9 @@ export function ItemCard({
           <Button
             variant="secondary"
             className="rounded-full px-2.5 py-1 text-xs"
-            onClick={() => onMove(index, index - 1)}
+            onClick={() => {
+              onMove(index, index - 1);
+            }}
             disabled={index === 0}
             aria-label="Move up"
           >
@@ -256,7 +260,9 @@ export function ItemCard({
           <Button
             variant="secondary"
             className="rounded-full px-2.5 py-1 text-xs"
-            onClick={() => onMove(index, index + 1)}
+            onClick={() => {
+              onMove(index, index + 1);
+            }}
             disabled={index === count - 1}
             aria-label="Move down"
           >
@@ -318,7 +324,9 @@ export function StringListField({
           <Button
             variant="secondary"
             className="rounded-full px-2.5 py-1.5 text-xs"
-            onClick={() => move(index, index - 1)}
+            onClick={() => {
+              move(index, index - 1);
+            }}
             disabled={index === 0}
             aria-label={`Move ${label} ${index + 1} up`}
           >
@@ -327,7 +335,9 @@ export function StringListField({
           <Button
             variant="secondary"
             className="rounded-full px-2.5 py-1.5 text-xs"
-            onClick={() => move(index, index + 1)}
+            onClick={() => {
+              move(index, index + 1);
+            }}
             disabled={index === fields.length - 1}
             aria-label={`Move ${label} ${index + 1} down`}
           >
@@ -336,7 +346,9 @@ export function StringListField({
           <Button
             variant="danger"
             className="rounded-full px-2.5 py-1.5 text-xs"
-            onClick={() => remove(index)}
+            onClick={() => {
+              remove(index);
+            }}
             aria-label={`Remove ${label} ${index + 1}`}
           >
             ✕
@@ -347,7 +359,9 @@ export function StringListField({
         <Button
           variant="secondary"
           className="rounded-full border-dashed px-4 py-1.5 text-xs font-semibold text-violet-700 hover:border-violet-400 hover:bg-violet-50"
-          onClick={() => append("" as never)}
+          onClick={() => {
+            append("" as never);
+          }}
         >
           + {addLabel}
         </Button>

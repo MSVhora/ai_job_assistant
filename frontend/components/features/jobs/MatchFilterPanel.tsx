@@ -79,7 +79,9 @@ export function MatchFilterPanel({
         <Input
           id="filter-location"
           value={filters.location ?? ""}
-          onChange={(event) => onChange({ ...filters, location: event.target.value || undefined })}
+          onChange={(event) => {
+            onChange({ ...filters, location: event.target.value || undefined });
+          }}
           placeholder="Bangalore"
         />
       </div>
@@ -88,40 +90,42 @@ export function MatchFilterPanel({
         label="Workplace"
         value={filters.remote_type ?? ""}
         options={REMOTE_OPTIONS}
-        onChange={(value) =>
+        onChange={(value) => {
           onChange({
             ...filters,
             remote_type: (value || undefined) as MatchFilterValues["remote_type"],
-          })
-        }
+          });
+        }}
       />
       <SelectField
         id="filter-job-type"
         label="Job type"
         value={filters.job_type ?? ""}
         options={JOB_TYPE_OPTIONS}
-        onChange={(value) =>
+        onChange={(value) => {
           onChange({
             ...filters,
             job_type: (value || undefined) as MatchFilterValues["job_type"],
-          })
-        }
+          });
+        }}
       />
       <SelectField
         id="filter-recency"
         label="Posted"
         value={filters.posted_within_days !== undefined ? String(filters.posted_within_days) : ""}
         options={RECENCY_OPTIONS}
-        onChange={(value) =>
-          onChange({ ...filters, posted_within_days: value ? Number(value) : undefined })
-        }
+        onChange={(value) => {
+          onChange({ ...filters, posted_within_days: value ? Number(value) : undefined });
+        }}
       />
       <SelectField
         id="filter-sort"
         label="Sort by"
         value={filters.sort ?? "final_score"}
         options={SORT_OPTIONS}
-        onChange={(value) => onChange({ ...filters, sort: value as MatchFilterValues["sort"] })}
+        onChange={(value) => {
+          onChange({ ...filters, sort: value as MatchFilterValues["sort"] });
+        }}
       />
       <div className="border-t border-gray-100 pt-3">
         <PrioritySlider
@@ -133,7 +137,9 @@ export function MatchFilterPanel({
       {active > 0 && (
         <button
           type="button"
-          onClick={() => onChange({ ...DEFAULT_MATCH_FILTERS, location: undefined })}
+          onClick={() => {
+            onChange({ ...DEFAULT_MATCH_FILTERS, location: undefined });
+          }}
           className="w-fit rounded-full border border-violet-300 bg-white px-4 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
         >
           Clear filters ({active})
@@ -164,7 +170,9 @@ function SelectField({
       <select
         id={id}
         value={value}
-        onChange={(event) => onChange(event.target.value)}
+        onChange={(event) => {
+          onChange(event.target.value);
+        }}
         className={selectStyles}
       >
         {options.map((option) => (

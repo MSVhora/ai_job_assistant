@@ -179,7 +179,7 @@ export function HowItWorksSection() {
                   </span>
                   <h3 className="mt-4 text-lg font-bold">{step.title}</h3>
                   <p className="mt-1.5 text-sm leading-relaxed text-gray-600">{step.description}</p>
-                  {step.ai === true && (
+                  {step.ai && (
                     <p className="mt-3 inline-flex items-center gap-1 rounded-full bg-violet-50 px-2.5 py-1 text-[10px] font-bold tracking-wider text-violet-700 uppercase">
                       <svg
                         viewBox="0 0 20 20"

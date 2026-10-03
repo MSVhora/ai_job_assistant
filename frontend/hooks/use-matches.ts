@@ -1,6 +1,6 @@
 "use client";
 
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, skipToken, useQuery } from "@tanstack/react-query";
 
 import { listMatchesPage, type MatchListParams } from "@/lib/api";
 
@@ -30,8 +30,8 @@ export function useMatches(
 ) {
   return useQuery({
     queryKey: ["matches", profileId, params],
-    queryFn: () => listMatchesPage({ profile_id: profileId as string, ...params }),
-    enabled: profileId !== null,
+    queryFn:
+      profileId !== null ? () => listMatchesPage({ profile_id: profileId, ...params }) : skipToken,
     placeholderData: keepPreviousData,
   });
 }

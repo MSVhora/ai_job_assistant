@@ -144,16 +144,22 @@ function ProfileRow({
                 variant="danger"
                 className="rounded-full px-3 py-1 text-xs"
                 disabled={deleteProfile.isPending}
-                onClick={() =>
-                  deleteProfile.mutate(profileId, { onSuccess: () => setConfirming(false) })
-                }
+                onClick={() => {
+                  deleteProfile.mutate(profileId, {
+                    onSuccess: () => {
+                      setConfirming(false);
+                    },
+                  });
+                }}
               >
                 {deleteProfile.isPending ? "Deleting…" : "Confirm delete"}
               </Button>
               <Button
                 variant="secondary"
                 className="rounded-full px-3 py-1 text-xs"
-                onClick={() => setConfirming(false)}
+                onClick={() => {
+                  setConfirming(false);
+                }}
               >
                 Cancel
               </Button>
@@ -162,7 +168,9 @@ function ProfileRow({
             <Button
               variant="secondary"
               className="rounded-full px-3 py-1 text-xs"
-              onClick={() => setConfirming(true)}
+              onClick={() => {
+                setConfirming(true);
+              }}
             >
               Delete
             </Button>

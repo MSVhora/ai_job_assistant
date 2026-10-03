@@ -166,7 +166,7 @@ describe("SearchStepperModal", () => {
     // Implicit submissions (Enter in a field, browser defaults) land on the
     // form at any step (Radix portals it to document.body) — they must be
     // inert until the review step.
-    fireEvent.submit(document.querySelector("form") as HTMLFormElement);
+    fireEvent.submit(document.querySelector("form")!);
     await sleep(0);
     expect(startMutation).not.toHaveBeenCalled();
     expect(screen.getByRole("region", { name: /Review of the search/ })).toBeInTheDocument();
@@ -179,7 +179,7 @@ describe("SearchStepperModal", () => {
     await user.click(screen.getByRole("button", { name: "Next" }));
     expect(screen.getByRole("region", { name: /Review of the search/ })).toBeInTheDocument();
 
-    fireEvent.submit(document.querySelector("form") as HTMLFormElement);
+    fireEvent.submit(document.querySelector("form")!);
     await sleep(0);
     expect(startMutation).not.toHaveBeenCalled();
 

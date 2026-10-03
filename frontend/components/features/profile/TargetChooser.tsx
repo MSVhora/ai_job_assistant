@@ -125,7 +125,9 @@ export function TargetChooser({
 
       <div className="mt-6 flex flex-wrap items-center gap-3 border-t border-gray-100 pt-5">
         <Button
-          onClick={() => setCreatingNew(true)}
+          onClick={() => {
+            setCreatingNew(true);
+          }}
           className="rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-5 py-2.5 font-semibold shadow-lg shadow-violet-200 hover:from-violet-700 hover:to-fuchsia-700"
         >
           <span className="inline-flex items-center gap-2">

@@ -38,7 +38,7 @@ export function FirstReview({ draft }: { draft: DraftProfileResponse }) {
       },
       {
         onSuccess: (created) => {
-          void router.replace(`/profile?profile=${created.profile_id}`);
+          router.replace(`/profile?profile=${created.profile_id}`);
         },
       },
     );
@@ -62,7 +62,9 @@ export function FirstReview({ draft }: { draft: DraftProfileResponse }) {
             <Input
               id="profile-name"
               value={name}
-              onChange={(event) => setName(event.target.value)}
+              onChange={(event) => {
+                setName(event.target.value);
+              }}
               placeholder="Senior Android Developer"
               aria-invalid={nameError ? true : undefined}
             />

@@ -52,7 +52,13 @@ export function ExperienceSection() {
       defaultOpen={fields.length > 0}
       hasError={errors !== undefined}
       action={
-        <Button variant="secondary" className={addBtn} onClick={() => append(emptyExperience)}>
+        <Button
+          variant="secondary"
+          className={addBtn}
+          onClick={() => {
+            append(emptyExperience);
+          }}
+        >
           + Add role
         </Button>
       }
@@ -61,7 +67,13 @@ export function ExperienceSection() {
         <EmptyState
           message="No roles yet — add your work experience, internships and freelance work."
           action={
-            <Button variant="secondary" className={addBtn} onClick={() => append(emptyExperience)}>
+            <Button
+              variant="secondary"
+              className={addBtn}
+              onClick={() => {
+                append(emptyExperience);
+              }}
+            >
               + Add role
             </Button>
           }
@@ -73,7 +85,9 @@ export function ExperienceSection() {
               key={field.id}
               index={index}
               count={fields.length}
-              onRemove={() => remove(index)}
+              onRemove={() => {
+                remove(index);
+              }}
               onMove={move}
               title={
                 field.title || field.company
@@ -157,7 +171,13 @@ export function ProjectsSection() {
       defaultOpen={fields.length > 0}
       hasError={errors !== undefined}
       action={
-        <Button variant="secondary" className={addBtn} onClick={() => append(emptyProject)}>
+        <Button
+          variant="secondary"
+          className={addBtn}
+          onClick={() => {
+            append(emptyProject);
+          }}
+        >
           + Add project
         </Button>
       }
@@ -166,7 +186,13 @@ export function ProjectsSection() {
         <EmptyState
           message="No projects yet — add personal, open-source or academic projects."
           action={
-            <Button variant="secondary" className={addBtn} onClick={() => append(emptyProject)}>
+            <Button
+              variant="secondary"
+              className={addBtn}
+              onClick={() => {
+                append(emptyProject);
+              }}
+            >
               + Add project
             </Button>
           }
@@ -178,7 +204,9 @@ export function ProjectsSection() {
               key={field.id}
               index={index}
               count={fields.length}
-              onRemove={() => remove(index)}
+              onRemove={() => {
+                remove(index);
+              }}
               onMove={move}
               title={field.name || (fields.length > 1 ? `Project ${index + 1}` : undefined)}
               subtitle={field.role || undefined}

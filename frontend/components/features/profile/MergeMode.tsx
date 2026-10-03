@@ -62,7 +62,7 @@ export function MergeMode({ profileId, resumeId }: { profileId: string; resumeId
         isSaving={updateProfile.isPending}
         saveError={updateProfile.error?.message ?? null}
         savedRevisionSource={updateProfile.data?.last_revision?.source ?? null}
-        onSave={(merged) =>
+        onSave={(merged) => {
           updateProfile.mutate(
             {
               profileId,
@@ -70,12 +70,14 @@ export function MergeMode({ profileId, resumeId }: { profileId: string; resumeId
             },
             {
               onSuccess: () => {
-                void router.replace(`/profile?profile=${profileId}`);
+                router.replace(`/profile?profile=${profileId}`);
               },
             },
-          )
-        }
-        onDiscard={() => void router.replace(`/profile?profile=${profileId}`)}
+          );
+        }}
+        onDiscard={() => {
+          router.replace(`/profile?profile=${profileId}`);
+        }}
       />
       <Link
         href="/profile"

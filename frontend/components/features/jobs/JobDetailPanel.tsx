@@ -1,6 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
+import { skipToken, useQuery } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 
 import { Badge } from "@/components/ui/badge";
@@ -69,8 +69,7 @@ export function JobDetailPanel({
   const matchId = match?.job_posting.id ?? null;
   const detail = useQuery({
     queryKey: ["job-posting", matchId],
-    queryFn: () => getJobPosting(matchId as string),
-    enabled: matchId !== null,
+    queryFn: matchId !== null ? () => getJobPosting(matchId) : skipToken,
     staleTime: 60_000,
   });
   const openSignal = useOpenMatchSignal();
@@ -220,16 +219,16 @@ export function JobDetailPanel({
                 AI match breakdown
               </h4>
               <div className="flex flex-col gap-1.5">
-                <ScoreRow label="Final score" value={scorePercent(match?.final_score ?? 0)} />
-                <ScoreRow label="Similarity" value={scorePercent(match?.vector_score ?? 0)} />
-                {match?.role_fit != null && (
+                <ScoreRow label="Final score" value={scorePercent(match.final_score)} />
+                <ScoreRow label="Similarity" value={scorePercent(match.vector_score ?? 0)} />
+                {match.role_fit != null && (
                   <ScoreRow label="Role fit" value={`${match.role_fit}/10`} />
                 )}
-                {match?.company_fit != null && (
+                {match.company_fit != null && (
                   <ScoreRow label="Company fit" value={`${match.company_fit}/10`} />
                 )}
               </div>
-              {match?.rationale && (
+              {match.rationale && (
                 <p className="mt-3 rounded-xl border border-violet-100 bg-white px-3 py-2.5 text-sm leading-relaxed text-gray-700">
                   {match.rationale}
                 </p>

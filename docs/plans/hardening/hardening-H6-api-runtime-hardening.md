@@ -15,7 +15,7 @@ Make the runtime rules in the standards true and keep them true with tests: expl
 |---|---|
 | CORS explicit methods/headers | `main.py`: `allow_methods=["*"]`, `allow_headers=["*"]`, `allow_credentials=True` with configured origins |
 | Timeouts on every outbound call | Connectors (`adzuna.py`, `apify.py`) set `httpx.AsyncClient(timeout=_TIMEOUT_S)`; **LLM and embedding calls in `adapters/llm.py` pass no timeout** to LiteLLM |
-| List endpoints bounded | `GET /api/matches` has `limit` (1–200) and `offset` + `X-Total-Count`; `GET /api/jobs/searches` is capped by a hard-coded `.limit(20)` in `ingestion.list_profile_searches` (not configurable); `GET /api/profiles`, `GET /api/resumes` and (to be confirmed) `GET /api/jobs/searches/{id}/postings` have no limit |
+| List endpoints bounded | `GET /api/matches` has `limit` (1–200) and `offset` + `X-Total-Count`; `GET /api/jobs/searches` is capped by a hard-coded `.limit(20)` in `ingestion.list_profile_searches` (not configurable); `GET /api/profiles`, `GET /api/resumes` and `GET /api/jobs/searches/{id}/postings` have no limit |
 | No resume text/keys/prompts in logs; config only via `Settings` | Quick scan found none (no `os.getenv`/`os.environ` in `app/`; warning logs carry exception text and ids) — make it a test |
 | One error contract | Domain errors use `{"detail", ...}` via `core/errors.py`; consistency across all routers not asserted |
 

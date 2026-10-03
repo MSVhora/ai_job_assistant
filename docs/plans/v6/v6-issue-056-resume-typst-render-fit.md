@@ -30,12 +30,29 @@ Decide **what is included** for the user's chosen page count (1, 2, 3 or 4) by m
 4. Confirm font licences (OFL, e.g. Source Sans 3 / Libertinus); pin the compiler version.
 5. Note whether the pinned Typst version emits tagged PDF. If any check fails, switch to the fallback (WeasyPrint behind `PageMeter`) **before** writing the fit and report back.
 
+## Spike results (2026-10-03)
+
+Run in a scratch venv (Python 3.12) and in `python:3.12-slim` (aarch64) with `typst` 0.15.0 and `pdfplumber`; nothing in the repo was changed.
+
+| Check | Result |
+|---|---|
+| Wheel on `python:3.12-slim` | Installs and compiles with no system packages (aarch64 tested). PyPI ships abi3 manylinux wheels for x86_64 and aarch64 (≈ 35 MB), so amd64 should work too but was **not** run here. |
+| Data as data | `sys_inputs={"data": json.dumps(...)}` with `json(bytes(sys.inputs.data))` in the template works. Names/bullets containing `# * $ @` backtick `\` quotes and `#raw("x")` rendered literally in the extracted text; nothing executed. **Decision: one JSON string via `sys_inputs`, no temp files.** |
+| Page counting | `pdfplumber` counts pages correctly (1 page for a short sample, 3 for 60 × 40-word bullets). |
+| Determinism | Two compiles of the same input are byte-identical. |
+| Fonts | The compiler embeds Libertinus Serif, New Computer Modern and DejaVu Sans Mono (all OFL); with `ignore_system_fonts=True` the PDF used only Libertinus Serif. **Proposed change: use the embedded Libertinus Serif and ship no font files** (nothing to license or copy; still independent of host fonts). Revisit only if the owner wants a sans face. |
+| Tagged PDF | The output contains `/StructTreeRoot` and `/MarkInfo`. Extraction order and heading detection on the real template are still asserted in `test_resume_ats.py`. |
+| Speed | A reused `typst.Compiler` measured < 1 ms per compile on a trivial document (comemo caching); a real resume will be slower, so the `RESUME_FIT_MAX_COMPILES` bound stays. Re-measure on the real template. |
+| Fallback | Not needed; WeasyPrint stays only as the documented fallback. |
+
+Still to do before merge: pin the exact version in `pyproject.toml`/`uv.lock`, `pip-audit`, and one amd64 image build.
+
 ## Locked decisions
 
 | Decision | Choice | Rationale |
 |---|---|---|
 | Renderer | `typst` PyPI package, version **pinned exactly** | ADR-3 |
-| Fonts | Bundled in `backend/app/resources/fonts/`, passed explicitly; never host fonts | Determinism |
+| Fonts | The compiler's embedded Libertinus Serif with `ignore_system_fonts=True` (spike); never host fonts | Determinism, no font files to ship |
 | Templates | One Typst source, two variants (`classic`, `compact`) via parameters | Plan §2.1 |
 | Targets | `page_target ∈ {1,2,3,4}`; `RESUME_MAX_PAGES` (default 4) caps it | Owner decision: user chooses length |
 | Objective | Maximize total priority of included bullets subject to `pages ≤ page_target`; **no fill thresholds** | Owner: priority is the crux, not fullness |
@@ -64,7 +81,7 @@ Single column; standard headings (Experience, Education, Skills, Projects); real
 
 ### Backend (`backend/app/`)
 
-- `resources/typst/resume.typ` (+ per-variant parameters), `resources/fonts/*`.
+- `resources/typst/resume.typ` (+ per-variant parameters).
 - `services/resume_render/{typst_template.py,page_meter.py,fit.py}`: content → Typst data (passed to the template as **data**, never concatenated into markup), compile, measure, fit search, `RenderResult(pdf_bytes | None, layout)`.
 - `services/resume_builder.py` integration point: `fit_document(document)` called after generation, after edits/add/remove, and before render.
 - `routers/resume_documents.py`: `POST /api/resume-documents/{id}/fit`, `POST …/render` (binary download: declares `response_class=Response` and `responses={200: {"content": {"application/pdf": {}}}}`; update `backend-fastapi.md`, whose `response_model` exceptions currently list only redirect/204 routes; `application/pdf`, 422 `CannotFit` with details), `GET …/layout`. Contact info comes from `content.basics`; nothing private-marked is rendered into the file.

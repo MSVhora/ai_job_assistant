@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Resume design mockups — v6 (synthetic data)</title>
+<style>
+  :root { --bg:#eef0f3; --ink:#111; --muted:#555; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); font-family: -apple-system, "Segoe UI", Arial, sans-serif; color:var(--ink); }
+  header.top { padding:16px 24px; background:#fff; border-bottom:1px solid #d8dbe0; }
+  header.top h1 { margin:0 0 4px; font-size:18px; }
+  header.top p { margin:0; font-size:13px; color:var(--muted); max-width:900px; line-height:1.45; }
+  nav { display:flex; gap:8px; padding:12px 24px; flex-wrap:wrap; }
+  nav button { border:1px solid #c9cdd4; background:#fff; padding:7px 14px; border-radius:8px; cursor:pointer; font-size:13px; }
+  nav button.on { background:#111; color:#fff; border-color:#111; }
+  .stage { padding:8px 24px 40px; display:flex; flex-wrap:wrap; gap:28px; justify-content:center; }
+  .wrap { display:none; } .wrap.show { display:block; }
+  .cap { font-size:12px; color:var(--muted); margin:0 0 8px; max-width:210mm; line-height:1.4; }
+  .page { width:210mm; min-height:297mm; background:#fff; box-shadow:0 2px 14px rgba(0,0,0,.18); position:relative; }
+  .page::after { content:"A4 page boundary"; position:absolute; left:0; right:0; top:297mm; border-top:1px dashed #e0653a; font-size:9px; color:#e0653a; padding-top:2px; text-align:right; }
+  ul { margin:0; padding:0; list-style:none; } li { position:relative; }
+  a { color:inherit; text-decoration:none; }
+
+  /* ---------- A · Classic ---------- */
+  .a { padding:16mm 17mm; font-family: Georgia, "Libertinus Serif", "Times New Roman", serif; font-size:10.5pt; line-height:1.28; }
+  .a .name { text-align:center; font-size:21pt; letter-spacing:.5px; margin:0; font-weight:700; }
+  .a .title { text-align:center; margin:2px 0 0; font-style:italic; }
+  .a .contact { text-align:center; margin:4px 0 8px; font-size:9.5pt; }
+  .a h2 { font-size:10.5pt; letter-spacing:1.4px; text-transform:uppercase; margin:9px 0 4px; padding-bottom:1px; border-bottom:1px solid #111; }
+  .a .row { display:flex; justify-content:space-between; gap:12px; margin-top:5px; }
+  .a .row b { font-weight:700; } .a .row i { font-style:italic; } .a .dates { white-space:nowrap; }
+  .a li { padding-left:12px; margin:1.6px 0; } .a li::before { content:"•"; position:absolute; left:2px; }
+  .a .skills p { margin:1.5px 0; } .a .skills b { font-weight:700; }
+
+  /* ---------- B · Modern ---------- */
+  .b { padding:15mm 16mm; font-family: "Source Sans 3", "Helvetica Neue", Arial, sans-serif; font-size:10pt; line-height:1.32; }
+  .b .name { font-size:24pt; margin:0; font-weight:700; color:#0f4c5c; letter-spacing:-.3px; }
+  .b .title { margin:0 0 2px; font-size:11.5pt; color:#333; }
+  .b .contact { font-size:9.5pt; color:#333; margin:0 0 6px; }
+  .b h2 { font-size:9.5pt; letter-spacing:1.6px; text-transform:uppercase; color:#0f4c5c; margin:11px 0 4px; border-bottom:1.5px solid #0f4c5c; padding-bottom:2px; font-weight:700; }
+  .b .row { display:flex; justify-content:space-between; gap:12px; margin-top:6px; }
+  .b .row b { font-weight:700; } .b .row span.sub { color:#333; } .b .dates { white-space:nowrap; color:#333; }
+  .b li { padding-left:12px; margin:1.8px 0; } .b li::before { content:"•"; position:absolute; left:2px; color:#0f4c5c; }
+  .b .skills p { margin:1.5px 0; } .b .skills b { color:#0f4c5c; }
+
+  /* ---------- C · Compact ---------- */
+  .c { padding:11mm 13mm; font-family: "Source Sans 3", "Helvetica Neue", Arial, sans-serif; font-size:9.5pt; line-height:1.24; }
+  .c .head { display:flex; justify-content:space-between; align-items:baseline; gap:12px; border-bottom:1px solid #111; padding-bottom:3px; }
+  .c .name { font-size:17pt; margin:0; font-weight:700; }
+  .c .contact { font-size:8.8pt; text-align:right; line-height:1.3; }
+  .c .title { margin:2px 0 3px; font-size:10pt; font-weight:600; }
+  .c h2 { font-size:9pt; letter-spacing:1.2px; text-transform:uppercase; margin:7px 0 2px; font-weight:700; }
+  .c .row { display:flex; justify-content:space-between; gap:10px; margin-top:4px; }
+  .c .row b { font-weight:700; } .c .dates { white-space:nowrap; }
+  .c li { padding-left:10px; margin:1px 0; } .c li::before { content:"•"; position:absolute; left:1px; }
+  .c .skills p { margin:1px 0; } .c .skills b { font-weight:700; }
+
+  @media print { body { background:#fff; } header.top, nav, .cap { display:none; } .stage { padding:0; } .page { box-shadow:none; } .page::after { display:none; } .wrap { display:none !important; } .wrap.show { display:block !important; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>Resume design mockups — three ATS-safe options</h1>
+  <p>Synthetic persona and numbers, rendered as HTML so you can compare looks. All three are single column, real text, standard headings, no images or tables — the same rules the Typst template (#56) must meet. Use the buttons to switch; the dashed orange line marks the end of an A4 page. Print to PDF from the browser to see the page-fit behaviour.</p>
+</header>
+<nav id="tabs">
+  <button data-t="a" class="on">A · Classic (serif, centred)</button>
+  <button data-t="b">B · Modern (sans, one accent)</button>
+  <button data-t="c">C · Compact (dense, 9.5 pt)</button>
+  <button data-t="all">Compare all</button>
+</nav>
+<div class="stage" id="stage">
+
+<!-- ================= A ================= -->
+<div class="wrap show" data-w="a">
+  <p class="cap"><b>A · Classic.</b> Traditional serif, centred name, ruled section headings, dates right-aligned. Safest for conservative employers. 10.5 pt, 17 mm margins.</p>
+  <div class="page a">
+    <h1 class="name">Ada Chen</h1>
+    <p class="title">Senior Software Engineer — Payments &amp; Platform</p>
+    <p class="contact">Berlin, Germany · ada.chen@example.com · +49 30 0000 0000 · github.com/ada-example · linkedin.com/in/ada-example</p>
+
+    <h2>Summary</h2>
+    <p>Backend engineer with 9 years of experience building payment and data platforms in Python and Go; leads small teams and owns reliability work from design to on-call.</p>
+
+    <h2>Skills</h2>
+    <div class="skills">
+      <p><b>Languages:</b> Python, Go, SQL, TypeScript</p>
+      <p><b>Platforms:</b> PostgreSQL, Kafka, Kubernetes, AWS, Terraform</p>
+      <p><b>Practices:</b> Distributed systems, observability, CI/CD, code review, mentoring</p>
+    </div>
+
+    <h2>Experience</h2>
+    <div class="row"><span><b>Senior Software Engineer</b>, Acme Payments — Berlin</span><span class="dates">Mar 2021 – Present</span></div>
+    <ul>
+      <li>Reduced p95 checkout latency from 480 ms to 190 ms by moving fraud scoring to an asynchronous Kafka pipeline.</li>
+      <li>Led a four-person team that migrated the ledger from a monolith to three services with zero downtime.</li>
+      <li>Introduced contract tests across 12 services, cutting integration incidents release over release.</li>
+      <li>Built the on-call runbook and alert routing now used by all payment teams.</li>
+    </ul>
+    <div class="row"><span><b>Software Engineer</b>, Northwind Labs — Remote</span><span class="dates">Jun 2018 – Feb 2021</span></div>
+    <ul>
+      <li>Designed the batch reconciliation service processing 2 M transactions per night in PostgreSQL.</li>
+      <li>Replaced hand-rolled retries with an idempotency-key library adopted by five teams.</li>
+      <li>Mentored three junior engineers through their first production releases.</li>
+    </ul>
+
+    <h2>Projects</h2>
+    <div class="row"><span><b>pgqueue-lite</b> — open-source job queue on PostgreSQL</span><span class="dates">2022 – Present</span></div>
+    <ul>
+      <li>Implemented <i>SKIP LOCKED</i> job leasing with retry backoff; 340 GitHub stars.</li>
+      <li>Wrote the benchmark suite and published results comparing it with Redis-backed queues.</li>
+    </ul>
+
+    <h2>Education</h2>
+    <div class="row"><span><b>B.Sc. Computer Science</b>, Technical University of Munich</span><span class="dates">2014 – 2018</span></div>
+  </div>
+</div>
+
+<!-- ================= B ================= -->
+<div class="wrap" data-w="b">
+  <p class="cap"><b>B · Modern.</b> Sans-serif, left-aligned name with a single teal accent used only for the name, headings and bullets (prints fine in greyscale). 10 pt, 16 mm margins.</p>
+  <div class="page b">
+    <h1 class="name">Ada Chen</h1>
+    <p class="title">Senior Software Engineer — Payments &amp; Platform</p>
+    <p class="contact">Berlin, Germany · ada.chen@example.com · +49 30 0000 0000 · github.com/ada-example · linkedin.com/in/ada-example</p>
+
+    <h2>Summary</h2>
+    <p>Backend engineer with 9 years of experience building payment and data platforms in Python and Go; leads small teams and owns reliability work from design to on-call.</p>
+
+    <h2>Skills</h2>
+    <div class="skills">
+      <p><b>Languages</b> · Python, Go, SQL, TypeScript</p>
+      <p><b>Platforms</b> · PostgreSQL, Kafka, Kubernetes, AWS, Terraform</p>
+      <p><b>Practices</b> · Distributed systems, observability, CI/CD, code review, mentoring</p>
+    </div>
+
+    <h2>Experience</h2>
+    <div class="row"><span><b>Senior Software Engineer</b> <span class="sub">· Acme Payments, Berlin</span></span><span class="dates">Mar 2021 – Present</span></div>
+    <ul>
+      <li>Reduced p95 checkout latency from 480 ms to 190 ms by moving fraud scoring to an asynchronous Kafka pipeline.</li>
+      <li>Led a four-person team that migrated the ledger from a monolith to three services with zero downtime.</li>
+      <li>Introduced contract tests across 12 services, cutting integration incidents release over release.</li>
+      <li>Built the on-call runbook and alert routing now used by all payment teams.</li>
+    </ul>
+    <div class="row"><span><b>Software Engineer</b> <span class="sub">· Northwind Labs, Remote</span></span><span class="dates">Jun 2018 – Feb 2021</span></div>
+    <ul>
+      <li>Designed the batch reconciliation service processing 2 M transactions per night in PostgreSQL.</li>
+      <li>Replaced hand-rolled retries with an idempotency-key library adopted by five teams.</li>
+      <li>Mentored three junior engineers through their first production releases.</li>
+    </ul>
+
+    <h2>Projects</h2>
+    <div class="row"><span><b>pgqueue-lite</b> <span class="sub">· open-source job queue on PostgreSQL</span></span><span class="dates">2022 – Present</span></div>
+    <ul>
+      <li>Implemented SKIP LOCKED job leasing with retry backoff; 340 GitHub stars.</li>
+      <li>Wrote the benchmark suite and published results comparing it with Redis-backed queues.</li>
+    </ul>
+
+    <h2>Education</h2>
+    <div class="row"><span><b>B.Sc. Computer Science</b> <span class="sub">· Technical University of Munich</span></span><span class="dates">2014 – 2018</span></div>
+  </div>
+</div>
+
+<!-- ================= C ================= -->
+<div class="wrap" data-w="c">
+  <p class="cap"><b>C · Compact.</b> What the fit loop falls back to when content is tight: 9.5 pt, 13 mm margins, name and contact on one line, tighter spacing. Same content as A and B with room left over for ~6 more bullets.</p>
+  <div class="page c">
+    <div class="head"><h1 class="name">Ada Chen</h1><div class="contact">Berlin, Germany · ada.chen@example.com · +49 30 0000 0000<br>github.com/ada-example · linkedin.com/in/ada-example</div></div>
+    <p class="title">Senior Software Engineer — Payments &amp; Platform</p>
+    <p>Backend engineer with 9 years of experience building payment and data platforms in Python and Go; leads small teams and owns reliability work from design to on-call.</p>
+
+    <h2>Skills</h2>
+    <div class="skills">
+      <p><b>Languages:</b> Python, Go, SQL, TypeScript &nbsp;·&nbsp; <b>Platforms:</b> PostgreSQL, Kafka, Kubernetes, AWS, Terraform</p>
+      <p><b>Practices:</b> Distributed systems, observability, CI/CD, code review, mentoring</p>
+    </div>
+
+    <h2>Experience</h2>
+    <div class="row"><span><b>Senior Software Engineer</b>, Acme Payments — Berlin</span><span class="dates">Mar 2021 – Present</span></div>
+    <ul>
+      <li>Reduced p95 checkout latency from 480 ms to 190 ms by moving fraud scoring to an asynchronous Kafka pipeline.</li>
+      <li>Led a four-person team that migrated the ledger from a monolith to three services with zero downtime.</li>
+      <li>Introduced contract tests across 12 services, cutting integration incidents release over release.</li>
+      <li>Built the on-call runbook and alert routing now used by all payment teams.</li>
+    </ul>
+    <div class="row"><span><b>Software Engineer</b>, Northwind Labs — Remote</span><span class="dates">Jun 2018 – Feb 2021</span></div>
+    <ul>
+      <li>Designed the batch reconciliation service processing 2 M transactions per night in PostgreSQL.</li>
+      <li>Replaced hand-rolled retries with an idempotency-key library adopted by five teams.</li>
+      <li>Mentored three junior engineers through their first production releases.</li>
+    </ul>
+
+    <h2>Projects</h2>
+    <div class="row"><span><b>pgqueue-lite</b> — open-source job queue on PostgreSQL</span><span class="dates">2022 – Present</span></div>
+    <ul>
+      <li>Implemented SKIP LOCKED job leasing with retry backoff; 340 GitHub stars.</li>
+      <li>Wrote the benchmark suite and published results comparing it with Redis-backed queues.</li>
+    </ul>
+
+    <h2>Education</h2>
+    <div class="row"><span><b>B.Sc. Computer Science</b>, Technical University of Munich</span><span class="dates">2014 – 2018</span></div>
+  </div>
+</div>
+
+</div>
+<script>
+  const wraps=[...document.querySelectorAll('.wrap')], btns=[...document.querySelectorAll('#tabs button')];
+  btns.forEach(b=>b.addEventListener('click',()=>{
+    btns.forEach(x=>x.classList.toggle('on',x===b));
+    wraps.forEach(w=>w.classList.toggle('show', b.dataset.t==='all' || w.dataset.w===b.dataset.t));
+    document.getElementById('stage').style.zoom = b.dataset.t==='all' ? '0.5' : '1';
+  }));
+</script>
+</body>
+</html>

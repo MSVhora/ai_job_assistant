@@ -400,3 +400,33 @@ async def seed_achievement(
             )
         await session.commit()
         return achievement.id
+
+
+def golden_profile() -> StructuredProfile:
+    """The scrubbed 'Ada' profile with one deliberate instance of every conflict kind."""
+    import json
+    from pathlib import Path
+
+    path = Path(__file__).parent / "eval" / "golden" / "profile.json"
+    return StructuredProfile.model_validate(json.loads(path.read_text()))
+
+
+def transient_achievement(**fields: Any) -> Any:
+    """An in-memory approved achievement for pure (no database) reconciliation tests."""
+    import uuid
+    from datetime import date
+
+    from app.models import Achievement, AchievementStatus
+
+    defaults: dict[str, Any] = {
+        "id": uuid.uuid4(),
+        "title": "Faster nightly import",
+        "status": AchievementStatus.approved,
+        "metrics": [],
+        "skills": [],
+        "employer_ref": None,
+        "project_key": None,
+        "time_start": date(2021, 6, 1),
+        "time_end": None,
+    }
+    return Achievement(**{**defaults, **fields})

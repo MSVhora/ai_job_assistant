@@ -1,8 +1,10 @@
 import asyncio
 import re
 import sys
+import uuid
 from pathlib import Path
 
+import pytest
 from alembic.config import Config
 from sqlalchemy import text
 
@@ -84,7 +86,7 @@ async def test_updated_at_trigger_and_set_null_migrations_round_trip(
         assert await _updated_at_triggers() == 0
 
         await _alembic("upgrade", "head")
-        assert await _updated_at_triggers() == 11
+        assert await _updated_at_triggers() == 12
         assert await _canonical_fk_delete_action() == "n"
     finally:
         await _alembic("upgrade", "head")
@@ -98,7 +100,7 @@ async def test_evidence_core_migration_round_trip(migrated_database: None) -> No
 
         await _alembic("upgrade", "head")
         assert await _evidence_objects() == (6, 4, 1)
-        assert await _updated_at_triggers() == 11
+        assert await _updated_at_triggers() == 12
     finally:
         await _alembic("upgrade", "head")
 
@@ -144,8 +146,67 @@ async def test_achievements_migration_round_trip(migrated_database: None) -> Non
 
         await _alembic("upgrade", "head")
         assert await achievement_objects() == (4, 3, 1)
-        assert await _updated_at_triggers() == 11
+        assert await _updated_at_triggers() == 12
     finally:
+        await _alembic("upgrade", "head")
+
+
+async def test_resume_document_migration_round_trip_and_checks(migrated_database: None) -> None:
+    from fakes import seed_profile_light
+    from sqlalchemy.exc import IntegrityError
+
+    async def resume_objects() -> tuple[int, int]:
+        async with session_factory() as session:
+            row = (
+                await session.execute(
+                    text(
+                        "SELECT"
+                        " (SELECT count(*) FROM pg_tables WHERE tablename LIKE 'resume_document%'),"
+                        " (SELECT count(*) FROM pg_type WHERE typname = 'resume_document_status')"
+                    )
+                )
+            ).one()
+        return (row[0], row[1])
+
+    async def insert(profile_id: uuid.UUID, page_target: int, jd_weight: float) -> None:
+        async with session_factory() as session:
+            await session.execute(
+                text(
+                    "INSERT INTO resume_document (candidate_id, profile_id, title, page_target,"
+                    " jd_weight) SELECT candidate_id, id, 't', :pages, :weight FROM profile"
+                    " WHERE id = :profile_id"
+                ),
+                {"pages": page_target, "weight": jd_weight, "profile_id": profile_id},
+            )
+            await session.commit()
+
+    try:
+        await _alembic("downgrade", "0025")
+        assert await resume_objects() == (0, 0)
+        assert await _updated_at_triggers() == 11
+
+        await _alembic("upgrade", "head")
+        assert await resume_objects() == (2, 1)
+        assert await _updated_at_triggers() == 12
+
+        profile_id = await seed_profile_light()
+        await insert(profile_id, 1, 0)
+        await insert(profile_id, 4, 0.5)
+        for pages, weight in ((0, 0), (5, 0), (1, 0.6), (1, -0.1)):
+            with pytest.raises(IntegrityError):
+                await insert(profile_id, pages, weight)
+        async with session_factory() as session:
+            defaults = (
+                await session.execute(
+                    text("SELECT comments, conflicts, status::text, version FROM resume_document")
+                )
+            ).first()
+        assert defaults is not None
+        assert (defaults[0], defaults[1], defaults[2], defaults[3]) == ([], [], "draft", 1)
+    finally:
+        async with session_factory() as session:
+            await session.execute(text("TRUNCATE profile, candidate, resume_document CASCADE"))
+            await session.commit()
         await _alembic("upgrade", "head")
 
 

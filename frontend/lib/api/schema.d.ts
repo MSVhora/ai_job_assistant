@@ -983,6 +983,111 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/resume-documents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Resume Documents */
+        get: operations["list_resume_documents_api_resume_documents_get"];
+        put?: never;
+        /** Create Resume Document */
+        post: operations["create_resume_document_api_resume_documents_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/resume-documents/{document_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Resume Document */
+        get: operations["get_resume_document_api_resume_documents__document_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Resume Document */
+        delete: operations["delete_resume_document_api_resume_documents__document_id__delete"];
+        options?: never;
+        head?: never;
+        /** Update Resume Document */
+        patch: operations["update_resume_document_api_resume_documents__document_id__patch"];
+        trace?: never;
+    };
+    "/api/resume-documents/{document_id}/resync-identity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resync Resume Identity */
+        post: operations["resync_resume_identity_api_resume_documents__document_id__resync_identity_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/resume-documents/{document_id}/conflicts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Resume Conflicts */
+        get: operations["get_resume_conflicts_api_resume_documents__document_id__conflicts_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/resume-documents/{document_id}/conflicts/{key}/resolve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Resolve Resume Conflict */
+        post: operations["resolve_resume_conflict_api_resume_documents__document_id__conflicts__key__resolve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/resume-documents/{document_id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export Resume Document */
+        get: operations["export_resume_document_api_resume_documents__document_id__export_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1086,6 +1191,15 @@ export interface components {
             /** Time End */
             time_end?: string | null;
         };
+        /** AwardEntry */
+        AwardEntry: {
+            /** Title */
+            title: string;
+            /** Issuer */
+            issuer?: string | null;
+            /** Issued Date */
+            issued_date?: string | null;
+        };
         /** AwardItem */
         AwardItem: {
             /** Title */
@@ -1097,6 +1211,31 @@ export interface components {
              * @description verbatim as written on the resume
              */
             issued_date?: string | null;
+        };
+        /** Basics */
+        Basics: {
+            /** Full Name */
+            full_name: string;
+            /**
+             * Label
+             * @description the profile headline
+             */
+            label?: string | null;
+            /** Summary */
+            summary?: string | null;
+            /** Email */
+            email?: string | null;
+            /** Phone */
+            phone?: string | null;
+            /** Location */
+            location?: string | null;
+            /** Country */
+            country?: string | null;
+            /**
+             * Links
+             * @default []
+             */
+            links: components["schemas"]["SourceLink"][];
         };
         /** Body_upload_resume_api_resumes_post */
         Body_upload_resume_api_resumes_post: {
@@ -1144,6 +1283,54 @@ export interface components {
             /** Reasons */
             reasons: string[];
         };
+        /** Bullet */
+        Bullet: {
+            /** Text */
+            text: string;
+            /** Achievement Id */
+            achievement_id?: string | null;
+            /**
+             * Evidence Ids
+             * @default []
+             */
+            evidence_ids: string[];
+            /**
+             * Metric Ids
+             * @default []
+             */
+            metric_ids: string[];
+            /**
+             * From Private
+             * @default false
+             */
+            from_private: boolean;
+            /**
+             * Score
+             * @default 0
+             */
+            score: number;
+            /**
+             * Origin
+             * @default generated
+             * @enum {string}
+             */
+            origin: "generated" | "profile_verbatim" | "user_edited";
+            /**
+             * Check
+             * @default passed
+             * @enum {string}
+             */
+            check: "passed" | "needs_review" | "failed";
+        };
+        /** CertificateEntry */
+        CertificateEntry: {
+            /** Name */
+            name: string;
+            /** Issuer */
+            issuer?: string | null;
+            /** Issued Date */
+            issued_date?: string | null;
+        };
         /** CertificationItem */
         CertificationItem: {
             /** Name */
@@ -1183,6 +1370,46 @@ export interface components {
             mode: "as_written" | "edit";
             /** Text */
             text?: string | null;
+        };
+        /** Conflict */
+        Conflict: {
+            /** Key */
+            key: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "date_outside_employment" | "employer_not_in_profile" | "identity_mismatch" | "skill_missing_in_profile" | "skill_without_evidence" | "metric_contradiction" | "overlapping_roles";
+            /**
+             * Severity
+             * @enum {string}
+             */
+            severity: "info" | "warning" | "error";
+            /** Message */
+            message: string;
+            /**
+             * Refs
+             * @default {}
+             */
+            refs: {
+                [key: string]: string;
+            };
+            /**
+             * Suggested Actions
+             * @default []
+             */
+            suggested_actions: ("edit_profile" | "keep_as_is")[];
+        };
+        /** ConflictsResponse */
+        ConflictsResponse: {
+            /** Open */
+            open: components["schemas"]["Conflict"][];
+            /** Resolved */
+            resolved: components["schemas"]["Conflict"][];
+            /** Github Checked */
+            github_checked: boolean;
+            /** Note */
+            note?: string | null;
         };
         /** ContactInfo */
         ContactInfo: {
@@ -1247,6 +1474,19 @@ export interface components {
              */
             parsed_at: string;
             search_queries?: components["schemas"]["StoredSearchQueries"] | null;
+        };
+        /** EducationEntry */
+        EducationEntry: {
+            /** Institution */
+            institution?: string | null;
+            /** Degree */
+            degree?: string | null;
+            /** Field */
+            field?: string | null;
+            /** Start Date */
+            start_date?: string | null;
+            /** End Date */
+            end_date?: string | null;
         };
         /** EducationItem */
         EducationItem: {
@@ -1362,6 +1602,13 @@ export interface components {
              * @default []
              */
             bullets: string[];
+        };
+        /** ExtraEntry */
+        ExtraEntry: {
+            /** Title */
+            title: string;
+            /** Entries */
+            entries: string[];
         };
         /** ExtraSection */
         ExtraSection: {
@@ -1756,6 +2003,37 @@ export interface components {
          * @enum {string}
          */
         JobType: "full_time" | "part_time" | "contract" | "internship" | "temporary";
+        /** Layout */
+        Layout: {
+            /** Pages */
+            pages?: number | null;
+            /** Preset */
+            preset?: string | null;
+            /** Font Pt */
+            font_pt?: number | null;
+            /** Margin In */
+            margin_in?: number | null;
+            /**
+             * Included Ids
+             * @default []
+             */
+            included_ids: string[];
+            /**
+             * Not Included
+             * @default []
+             */
+            not_included: components["schemas"]["NotIncluded"][];
+            /**
+             * Steps
+             * @default []
+             */
+            steps: string[];
+            /**
+             * Short On Evidence
+             * @default false
+             */
+            short_on_evidence: boolean;
+        };
         /** LinkCreate */
         LinkCreate: {
             /**
@@ -1921,6 +2199,21 @@ export interface components {
             /** Result */
             result?: string | null;
         };
+        /** NotIncluded */
+        NotIncluded: {
+            /** Id */
+            id: string;
+            /**
+             * Priority
+             * @default 0
+             */
+            priority: number;
+            /**
+             * Reason
+             * @enum {string}
+             */
+            reason: "did_not_fit" | "needs_review" | "overlap_omitted" | "not_written";
+        };
         /** NoteCreate */
         NoteCreate: {
             /** Title */
@@ -2025,6 +2318,31 @@ export interface components {
              */
             source_resume_id?: string | null;
         };
+        /** ProjectEntry */
+        ProjectEntry: {
+            /** Name */
+            name: string;
+            /** Role */
+            role?: string | null;
+            /** Url */
+            url?: string | null;
+            /** Start Date */
+            start_date?: string | null;
+            /** End Date */
+            end_date?: string | null;
+            /** Description */
+            description?: string | null;
+            /**
+             * Technologies
+             * @default []
+             */
+            technologies: string[];
+            /**
+             * Highlights
+             * @default []
+             */
+            highlights: components["schemas"]["Bullet"][];
+        };
         /** ProjectItem */
         ProjectItem: {
             /** Name */
@@ -2061,6 +2379,165 @@ export interface components {
          * @enum {string}
          */
         RemoteType: "remote" | "hybrid" | "on_site";
+        /** ResolveConflictRequest */
+        ResolveConflictRequest: {
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "keep_as_is" | "reopen";
+        };
+        /**
+         * ResumeContent
+         * @description JSON Resume-shaped sections whose highlights are provenance-carrying `Bullet`s.
+         *
+         *     Field names follow `StructuredProfile` so the mapping is lossless; the JSON Resume
+         *     field names (`name`, `position`, `highlights` as strings, ...) are produced by export.
+         */
+        ResumeContent: {
+            basics: components["schemas"]["Basics"];
+            /**
+             * Skills
+             * @default []
+             */
+            skills: string[];
+            /**
+             * Work
+             * @default []
+             */
+            work: components["schemas"]["WorkEntry"][];
+            /**
+             * Education
+             * @default []
+             */
+            education: components["schemas"]["EducationEntry"][];
+            /**
+             * Projects
+             * @default []
+             */
+            projects: components["schemas"]["ProjectEntry"][];
+            /**
+             * Awards
+             * @default []
+             */
+            awards: components["schemas"]["AwardEntry"][];
+            /**
+             * Certificates
+             * @default []
+             */
+            certificates: components["schemas"]["CertificateEntry"][];
+            /**
+             * Extra Sections
+             * @default []
+             */
+            extra_sections: components["schemas"]["ExtraEntry"][];
+        };
+        /** ResumeDocumentCreate */
+        ResumeDocumentCreate: {
+            /**
+             * Profile Id
+             * Format: uuid
+             */
+            profile_id: string;
+            /** Title */
+            title?: string | null;
+            /**
+             * Page Target
+             * @default 1
+             */
+            page_target: number;
+            /** Match Id */
+            match_id?: string | null;
+        };
+        /** ResumeDocumentResponse */
+        ResumeDocumentResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Profile Id
+             * Format: uuid
+             */
+            profile_id: string;
+            /** Match Id */
+            match_id: string | null;
+            /** Title */
+            title: string;
+            /** Page Target */
+            page_target: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "draft" | "final";
+            /** Version */
+            version: number;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Jd Weight */
+            jd_weight: number;
+            /** Template */
+            template: string;
+            content: components["schemas"]["ResumeContent"];
+            layout: components["schemas"]["Layout"];
+            /** Comments */
+            comments: {
+                [key: string]: unknown;
+            }[];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** ResumeDocumentSummary */
+        ResumeDocumentSummary: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Profile Id
+             * Format: uuid
+             */
+            profile_id: string;
+            /** Match Id */
+            match_id: string | null;
+            /** Title */
+            title: string;
+            /** Page Target */
+            page_target: number;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "draft" | "final";
+            /** Version */
+            version: number;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** ResumeDocumentUpdate */
+        ResumeDocumentUpdate: {
+            /** Title */
+            title?: string | null;
+            /** Page Target */
+            page_target?: number | null;
+            /** Template */
+            template?: string | null;
+            /** Status */
+            status?: ("draft" | "final") | null;
+            content?: components["schemas"]["ResumeContent"] | null;
+        };
         /** ResumeIngestRequest */
         ResumeIngestRequest: {
             /**
@@ -2530,6 +3007,29 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /** WorkEntry */
+        WorkEntry: {
+            /** Company */
+            company?: string | null;
+            /** Title */
+            title?: string | null;
+            /** Location */
+            location?: string | null;
+            /** Start Date */
+            start_date?: string | null;
+            /** End Date */
+            end_date?: string | null;
+            /**
+             * Is Current
+             * @default false
+             */
+            is_current: boolean;
+            /**
+             * Highlights
+             * @default []
+             */
+            highlights: components["schemas"]["Bullet"][];
         };
     };
     responses: never;
@@ -4599,6 +5099,300 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RevisionResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_resume_documents_api_resume_documents_get: {
+        parameters: {
+            query?: {
+                profile_id?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumeDocumentSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_resume_document_api_resume_documents_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResumeDocumentCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumeDocumentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_resume_document_api_resume_documents__document_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumeDocumentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_resume_document_api_resume_documents__document_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_resume_document_api_resume_documents__document_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResumeDocumentUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumeDocumentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resync_resume_identity_api_resume_documents__document_id__resync_identity_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumeDocumentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_resume_conflicts_api_resume_documents__document_id__conflicts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConflictsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resolve_resume_conflict_api_resume_documents__document_id__conflicts__key__resolve_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResolveConflictRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConflictsResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    export_resume_document_api_resume_documents__document_id__export_get: {
+        parameters: {
+            query?: {
+                format?: "text" | "markdown" | "json_resume";
+            };
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Clean export: no private marks, badges or provenance. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain; charset=utf-8": unknown;
+                    "text/markdown; charset=utf-8": unknown;
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

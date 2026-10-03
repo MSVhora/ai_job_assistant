@@ -1,0 +1,92 @@
+{
+  "contact": {
+    "full_name": "Ada Lovelace",
+    "email": "ada@example.com",
+    "phone": "+44 20 7946 0000",
+    "location": "London, UK",
+    "country": "gb",
+    "links": [
+      {"label": "GitHub", "url": "https://github.com/ada"},
+      {"label": null, "url": "https://ada.example.com"}
+    ]
+  },
+  "headline": "Staff Engineer, data platforms",
+  "summary": "Builds reliable ingestion and analytics systems.",
+  "skills": ["Python", "SQL", "Terraform", "Rust"],
+  "experience": [
+    {
+      "company": "Engine Co",
+      "title": "Senior Engineer",
+      "location": "London",
+      "start_date": "Jan 2020",
+      "end_date": "Dec 2022",
+      "is_current": false,
+      "bullets": ["Cut p95 latency by 60% across the ingest service", "Led the platform team"]
+    },
+    {
+      "company": "Analytical Ltd",
+      "title": "Consultant",
+      "location": "Remote",
+      "start_date": "Oct 2022",
+      "end_date": "Jun 2023",
+      "is_current": false,
+      "bullets": ["Advised on warehouse design"]
+    },
+    {
+      "company": "Babbage Systems",
+      "title": "Engineer",
+      "location": "Cambridge",
+      "start_date": "Jul 2023",
+      "end_date": null,
+      "is_current": true,
+      "bullets": ["Owns the nightly import pipeline"]
+    },
+    {
+      "company": "Undated Labs",
+      "title": "Intern",
+      "location": null,
+      "start_date": null,
+      "end_date": null,
+      "is_current": false,
+      "bullets": []
+    }
+  ],
+  "projects": [
+    {
+      "name": "engine",
+      "role": "Maintainer",
+      "url": "https://github.com/ada/engine",
+      "start_date": "2021",
+      "end_date": "2022",
+      "description": "Open-source analytical engine.",
+      "bullets": ["Reduced cold-start time by 20%"],
+      "technologies": ["Rust", "Python"]
+    }
+  ],
+  "education": [
+    {
+      "institution": "University of London",
+      "degree": "BSc",
+      "field": "Mathematics",
+      "start_date": "2014",
+      "end_date": "2017"
+    }
+  ],
+  "certifications": [
+    {"name": "Certified Kubernetes Application Developer", "issuer": "CNCF", "issued_date": "2021"}
+  ],
+  "awards": [
+    {"title": "Engineering Excellence", "issuer": "Engine Co", "issued_date": "2022"}
+  ],
+  "extra_sections": [
+    {"title": "Languages", "entries": ["English", "French"]}
+  ],
+  "preferences": {
+    "target_title": "Staff Engineer",
+    "target_location": "London",
+    "remote_preference": "hybrid",
+    "seniority": "staff",
+    "seniority_source": "user"
+  },
+  "years_of_experience": 6
+}

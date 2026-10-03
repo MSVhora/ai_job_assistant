@@ -108,6 +108,26 @@ async def test_identify_returns_login_node_id_and_token_scopes() -> None:
     assert fake.requests[0].headers["authorization"] == f"Bearer {TOKEN}"
 
 
+async def test_identify_carries_the_public_name_location_and_email() -> None:
+    identity = await source_for(FakeGitHub()).identify()
+
+    assert (identity.name, identity.location) == ("Augusta Byron", "London, England")
+    assert identity.emails == ["ada@example.com"]
+
+
+async def test_identify_leaves_name_and_location_empty_when_the_profile_hides_them() -> None:
+    fake = FakeGitHub()
+    fake.override = lambda request: (
+        httpx.Response(200, json={"login": "ada", "name": None})
+        if request.url.path == "/user"
+        else None
+    )
+
+    identity = await source_for(fake).identify()
+
+    assert (identity.name, identity.location, identity.emails) == (None, None, [])
+
+
 async def test_identify_is_cached_for_the_run() -> None:
     fake = FakeGitHub()
     source = source_for(fake)

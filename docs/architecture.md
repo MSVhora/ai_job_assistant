@@ -223,6 +223,21 @@ detected without a snapshot column: an approved achievement is flagged when a li
 `updated_at` is later than its latest revision, and the unchanged-item upsert in the sync keeps that
 signal precise; re-review (`acknowledge`) writes a revision, which resets the baseline.
 
+### Resume documents and reconciliation
+
+A `resume_document` is structured data, never a rendered file: `ResumeContent` (JSON Resume-shaped
+sections whose highlights are provenance-carrying `Bullet`s) plus layout, comments and the
+kept-as-is conflict resolutions. `services/resume_mapping.py` maps a profile into it and back
+losslessly (the server-managed `preferences` and `years_of_experience` are excluded and supplied by
+the caller) and `services/resume_export.py` produces the clean text, Markdown and JSON Resume
+outputs from the same content. `services/resume_reconcile.py` holds pure detectors over the profile,
+the *approved* achievements and an optional GitHub identity; it only reports, so the profile is never
+modified (resolving means editing the profile through the existing PATCH, or recording
+"keep as is" on the document under a stable conflict key). GitHub name, location and public email
+are fetched on demand for the identity check and never stored; without a token or on failure that
+detector is skipped and the response says so. Saving content snapshots a
+`resume_document_revision` and keeps the newest 20.
+
 Search runs start **only** from an explicit `POST /api/jobs/search` — never automatically —
 and are tracked in `job_search` (status + per-source `{source, status, count, warning}`
 outcomes, queryable via `GET /api/jobs/searches/{id}`). A failing source is a run warning,
@@ -364,7 +379,7 @@ never a run failure. With no salary floor set the connector also sends
 Source of truth: `backend/app/models/` + Alembic migrations. See
 [plan §4](plans/v1/v1-implementation-plan.md#4-data-model) for the data model narrative.
 
-`updated_at` on `candidate`, `profile`, `job_search`, `match` and `match_rebuild` is maintained by a
+`updated_at` on `candidate`, `profile`, `job_search`, `match`, `match_rebuild` and (since `0026`) `resume_document` is maintained by a
 `set_updated_at()` database trigger (migration `0021`), so bulk `UPDATE`s bump it too; an update that
 changes nothing leaves it alone, and one that sets it explicitly keeps that value. New tables with the
 column add the trigger through `app/core/migration_helpers.py`. `job_posting.canonical_id` is
@@ -396,6 +411,10 @@ erDiagram
     evidence_item ||--o{ achievement_evidence : "cited by"
     achievement ||--o{ achievement_revision : "audit trail"
     candidate ||--o{ achievement_extraction_run : "extraction runs"
+    candidate ||--o{ resume_document : "owns"
+    profile ||--o{ resume_document : "tailored from (CASCADE)"
+    match |o--o{ resume_document : "job description from (SET NULL)"
+    resume_document ||--o{ resume_document_revision : "snapshots (newest 20)"
 
     candidate {
         uuid id PK
@@ -651,6 +670,36 @@ erDiagram
         text error
         timestamptz created_at
         timestamptz updated_at
+    }
+
+    resume_document {
+        uuid id PK
+        uuid candidate_id FK "RESTRICT"
+        uuid profile_id FK "CASCADE, the profile the identity is copied from"
+        uuid match_id FK "SET NULL, nullable"
+        varchar title
+        smallint page_target "CHECK 1 to 4"
+        real jd_weight "CHECK 0 to 0.5"
+        varchar template
+        text job_description
+        varchar jd_hash
+        jsonb content "ResumeContent with per-bullet provenance"
+        jsonb layout "fit result (#56)"
+        jsonb conflicts "kept-as-is resolutions, keyed by conflict key"
+        jsonb comments
+        text status "draft | final"
+        integer version
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    resume_document_revision {
+        uuid id PK
+        uuid document_id FK "CASCADE"
+        integer version
+        jsonb content
+        varchar source "create | manual_edit"
+        timestamptz created_at
     }
 
     llm_output_cache {

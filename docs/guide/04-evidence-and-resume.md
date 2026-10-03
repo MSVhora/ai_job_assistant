@@ -192,6 +192,29 @@ header (or open `/evidence`).
   history. Tick two or more cards to **Merge**, or use the *possible duplicates* list, which only
   suggests and never merges by itself.
 
+## Reconciliation
+
+Before a resume is written, the builder compares your profile with your **approved** achievements
+and lists where they disagree. It only reports: nothing is changed on its own, and the profile stays
+exactly as you saved it. Each conflict has a stable key, so a decision survives re-runs.
+
+| Conflict | Meaning |
+|---|---|
+| Date outside employment | An achievement is dated outside the time you were at its mapped employer (compared by month; a year-only end date covers the whole year). |
+| Employer not in profile | An achievement is mapped to a company your profile no longer lists. Unconfirmed *Suggested* mappings are ignored. |
+| Identity mismatch | Your GitHub name, location or public email differs from your profile contact. This reads GitHub on demand and stores nothing; without a token, or if GitHub cannot be reached, the check is skipped and the page says so. |
+| Skill missing in profile | Your evidence shows a skill your profile does not list. |
+| Skill without evidence | A profile skill has no approved evidence yet (informational; it stays on the resume). Hidden until you have approved achievements. |
+| Metric contradiction | A profile bullet states a different figure than a confirmed metric on the same project or employer (same unit, shared topic words; only confirmed metrics count). |
+| Overlapping roles | Two roles overlap by at least `RESUME_OVERLAP_MIN_DAYS` (default 60; informational). Unparsable dates never raise a conflict. |
+
+To resolve one, either edit your profile (the normal profile edit, which writes a revision) or mark
+it **keep as is** on the document; the profile is not touched. A kept conflict can be reopened.
+
+Resume documents keep a snapshot of the content on every save (the newest 20) and can be exported
+as plain text, Markdown or JSON Resume. Exports are clean: no private-repo marks, badges or
+provenance, and the contact details come from the document's basics, copied from the profile.
+
 ## Not yet verified against live GitHub
 
 The connector was built from GitHub's documented REST/GraphQL contracts and tested with synthetic

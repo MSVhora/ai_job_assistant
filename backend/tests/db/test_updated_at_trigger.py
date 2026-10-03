@@ -22,6 +22,7 @@ TABLES_WITH_UPDATED_AT = [
     "match",
     "match_rebuild",
     "profile",
+    "resume_document",
 ]
 
 

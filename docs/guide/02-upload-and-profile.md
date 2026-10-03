@@ -10,7 +10,7 @@ multi-profile tracks with the resume list
 follow-up, extraction also drafts **per-source search queries** from the profile (a second
 small LLM call; a failure there never fails the extraction, and [Regenerate on the jobs
 page](03-job-discovery-and-matching.md) refills them anytime). This guide describes the
-finished v1 profile pipeline.
+profile pipeline (v1, extended through v4 with derived seniority and hash-cached queries).
 
 ## The idea
 
@@ -124,7 +124,7 @@ Nothing in the flow dead-ends — every failure has an explicit recovery path:
   backend becomes visible on its own; other views keep retry affordances and a global toast
   surfaces mutation failures from anywhere
 
-## Step-by-step (once the pipeline is live)
+## Step-by-step
 
 1. **Upload** *(live)* — pick a standard single-column PDF or DOCX (up to 10 MB).
    Multi-column or image-only resumes parse poorly or fail with a clear message. The AI

@@ -2,8 +2,9 @@
 
 How AI Job Assistant fits together — components, data flows, and the database schema.
 For day-to-day usage see the [user guide](guide/README.md); for scope see the
-[v3 implementation plan](plans/v3/v3-implementation-plan.md) (earlier:
-[v1](plans/v1/v1-implementation-plan.md), [v2](plans/v2/v2-implementation-plan.md)).
+[v4 search-relevance plan](plans/v4/v4-search-relevance-plan.md) (earlier:
+[v1](plans/v1/v1-implementation-plan.md), [v2](plans/v2/v2-implementation-plan.md),
+[v3](plans/v3/v3-implementation-plan.md)).
 
 ## System overview (flow diagram)
 
@@ -115,13 +116,16 @@ sequenceDiagram
     A->>G: embed descriptions
     A->>D: upsert postings + embeddings + search_posting rows (append-only)
     A->>D: cross-source dedupe pass — trigram+company+country grouping → canonical_id, merge rules (issue #38)
-    A->>D: hard filters + cosine → top N
-    A->>G: re-rank top N + rationale
+    A->>D: hard filters + hybrid signals (cosine, skill overlap, recency, salary fit) → ranked candidates (issue #37)
+    A->>G: re-rank top N by hybrid score + rationale
     A->>D: store matches
     B->>A: GET /api/jobs/searches (profile_id) -> recent runs
     B->>A: GET /api/jobs/searches/{id}?profile_id= → run status + warnings (404 unless owned)
     B->>A: GET /api/jobs/searches/{id}/postings?profile_id= → unranked run results (404 unless owned)
     B->>A: GET /api/matches → ranked + "why this matches"
+    B->>A: POST /api/matches/{id}/signals · GET /api/matches/{id}/apply → engagement signals (issue #39)
+    B->>A: POST /api/profiles/{id}/tune-queries → confirm-gated LLM rewrite of stored query specs (issue #39)
+    B->>A: POST · GET /api/profiles/{id}/rebuild-matches → scoped corpus rebuild run (issue #25)
 ```
 
 ![search-matching-sequence diagram](./assets/search-matching-sequence.svg)
@@ -262,7 +266,7 @@ pages), capped by `max_adzuna_calls_per_run` (default 4) with a stop-and-log,
 never a run failure. With no salary floor set the connector also sends
 `salary_include_unknown=1`.
 
-## Database schema (v1, ER diagram)
+## Database schema (ER diagram)
 
 Source of truth: `backend/app/models/` + Alembic migrations. See
 [plan §4](plans/v1/v1-implementation-plan.md#4-data-model) for the data model narrative.
@@ -292,6 +296,7 @@ erDiagram
         text name "track name, e.g. Senior Android Developer"
         jsonb structured_profile "contact, headline, skills, experience, projects, education, certifications, extra sections, embedded preferences"
         jsonb search_queries "per-source query specs + generation stamp; Regenerate overwrites"
+        text queries_input_hash "SHA-256 of the query-generation inputs (issue #31); stored specs regenerate only when it changes"
         jsonb preferences "dashboard view preference {priority: 0-1} — role-fit vs company-fit weighting at match read time (issue #11); distinct from resume-derived prefs inside structured_profile"
         uuid source_resume_id FK "resume whose draft seeded this profile (provenance)"
         vector embedding "pgvector, dim 768 (gemini-embedding-001, truncated via dimensions param); refreshed on every content save/gap-fill"
@@ -326,6 +331,7 @@ erDiagram
     job_search {
         uuid id PK
         uuid profile_id FK "owning profile — searches are profile-scoped (v3 #24); cascade on profile delete"
+        text source "the one source this run targets (issue #36); partial unique index (profile_id, source) while pending/running"
         text status "pending | running | succeeded | partial | failed"
         jsonb query "validated search request (issue #7)"
         jsonb results "per-source {source, status, count, warning?}"

@@ -1,12 +1,11 @@
 # 3 — Job Discovery & Matching
 
-**Status: live** — the search UI (profile selector, per-source queries, filters, live run
-banner), Adzuna + the LinkedIn Apify actor, LLM-generated per-source queries with
-Regenerate, de-duplication, embeddings, the hard-filter + cosine ranking query, ranked
-matches with the LLM re-rank and "why this matches" rationale, the `GET /api/matches`
-dashboard, and the priority-weight slider (role fit ↔ company fit, issue #11) all work
-today (issues #7–#11 and the search-queries follow-up). The `MATCH_WEIGHT_*` values in
-`.env` are the server defaults; the slider overrides them per profile at read time.
+**Status: live** — everything below works today (issues #7–#11, the search-queries follow-up,
+v3 #24–#30 and v4 #31–#39): the Start-search wizard, profile-grounded per-source queries,
+Adzuna and the LinkedIn Apify actor, de-duplication within and across sources, embeddings,
+hybrid scoring with an LLM re-rank and "why this matches" rationale, the priority slider,
+engagement signals and Tune my queries. The `MATCH_WEIGHT_*` values in `.env` are the server
+defaults; the slider overrides the role/company split per profile at read time.
 
 ## The idea
 
@@ -90,29 +89,24 @@ Lower or clear the field if a source comes back empty.
 <!-- diagram: job-discovery-flow -->
 ```mermaid
 flowchart LR
-    P["Saved profile"] --> Q["Search query + filters"]
-    Q --> C1["Adzuna<br/>(official API)"]
-    Q --> C2["LinkedIn actor<br/>(Apify scraper)"]
+    P["Saved profile<br/>(skills, preferences, country)"] --> Q["Per-source query specs<br/>+ filters resolved from the profile"]
+    Q --> C1["Adzuna<br/>(official API, multi-pass)"]
+    Q --> C2["LinkedIn actor<br/>(Apify scraper, NL brief)"]
     C1 --> N["Normalize + de-duplicate<br/>(source, external_id)"]
     C2 --> N
     N --> E["Embed job descriptions<br/>(your embedding provider)"]
-    E --> F["Hard filters:<br/>location / remote / salary / type"]
-    F --> V["Vector similarity ranking<br/>(pgvector cosine)"]
-    V --> R["LLM re-ranks top N<br/>+ writes rationale"]
+    E --> X["Cross-source canonical grouping<br/>(country + company + title similarity)"]
+    X --> F["Freshness + hard filters:<br/>location / remote / salary / type"]
+    F --> H["Hybrid score in SQL:<br/>vector · skill overlap · recency · salary fit"]
+    H --> R["LLM re-ranks top N by hybrid score<br/>+ writes rationale"]
     R --> M["Ranked matches with<br/>why-this-matches"]
+    M --> S["Save / dismiss / apply signals<br/>→ Tune my queries"]
+    S -.-> Q
 ```
 
 ![job-discovery-flow diagram](../assets/job-discovery-flow.svg)
 
 A failing source never breaks the search — it is skipped with a warning surfaced in the UI.
-
-Today (issues #7–#10 + the search-queries follow-up): the `/jobs` page starts a background run
-from per-source, editable queries, `GET /api/jobs/searches/{id}` reports its status with
-per-source results/warnings while a live banner polls it, the run's postings are listed
-(unranked) under the banner once it finishes, and postings are de-duplicated per
-`(source, external_id)` — a re-search refreshes the stored postings instead of duplicating
-them. Ranked matches with the "why this matches" rationale are shown below the banner and
-refresh after every run.
 
 ## Searches belong to a profile (live since v3 #24)
 
@@ -371,38 +365,8 @@ re-finds one of them — there is no one-time backfill.
 
 ## What happens on a search (behind the scenes)
 
-<!-- diagram: search-sequence -->
-```mermaid
-sequenceDiagram
-    actor U as User
-    participant B as Browser
-    participant A as FastAPI
-    participant I as Ingestion run<br/>(background)
-    participant C as Job source connectors
-    participant G as Gemini (via LiteLLM)
-    participant D as Postgres + pgvector
-
-    U->>B: click Start search
-    U->>B: wizard: profile, then one source, then details, then filters
-    B->>A: POST /api/jobs/search (one source per run)
-    A->>D: a run for this profile + source already active? → 409 (wizard shows the active run)
-    A->>I: start background run
-    A-->>B: run accepted (search happens async)
-    I->>C: query each enabled source
-    C-->>I: raw postings (failed source = skipped + warned)
-    I->>I: normalize + de-duplicate
-    I->>G: embed job descriptions
-    I->>D: store postings + embeddings
-    I->>D: group cross-source duplicates<br/>under the canonical posting (#38)
-    I->>D: hard filters + hybrid signals (cosine, skill overlap,<br/>recency, salary fit) → ranked candidates
-    I->>G: re-rank top N by hybrid score, generate rationale
-    I->>D: store matches
-    U->>B: open dashboard
-    B->>A: GET /api/matches
-    A-->>B: ranked matches + rationale
-```
-
-![search-sequence diagram](../assets/search-sequence.svg)
+The full step-by-step sequence (connectors, embeddings, canonical grouping, hybrid scoring, re-rank)
+is in the [architecture document](../architecture.md#search--matching-sequence).
 
 Searches run in the background — you can navigate away; results appear when the run
 finishes.

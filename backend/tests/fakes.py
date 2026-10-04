@@ -235,10 +235,12 @@ class ScriptedEvidenceSource:
         *,
         configured: bool = True,
         scopes: list[Any] | None = None,
+        permissions: list[str] | None = None,
     ) -> None:
         self.scripts = scripts or {}
         self.configured = configured
         self.scopes = scopes or []
+        self.permissions = permissions or []
         self.seen: list[Any] = []
 
     def is_configured(self) -> bool:
@@ -247,7 +249,7 @@ class ScriptedEvidenceSource:
     async def identify(self) -> Any:
         from app.schemas.evidence import SourceIdentity
 
-        return SourceIdentity(login="ada")
+        return SourceIdentity(login="ada", permissions=self.permissions)
 
     async def list_scopes(self) -> list[Any]:
         return self.scopes

@@ -1,0 +1,32 @@
+{
+  "data": {
+    "viewer": {
+      "contributionsCollection": {
+        "commitContributionsByRepository": [
+          {
+            "repository": {
+              "nameWithOwner": "ada/engine",
+              "isPrivate": false
+            }
+          },
+          {
+            "repository": {
+              "nameWithOwner": "ada/ancient",
+              "isPrivate": false
+            }
+          }
+        ],
+        "pullRequestContributionsByRepository": [],
+        "pullRequestReviewContributionsByRepository": [
+          {
+            "repository": {
+              "nameWithOwner": "outsider/lib",
+              "isPrivate": false
+            }
+          }
+        ],
+        "issueContributionsByRepository": []
+      }
+    }
+  }
+}

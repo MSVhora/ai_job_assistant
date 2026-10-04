@@ -23,6 +23,7 @@ from app.schemas.evidence import (
     SyncRequest,
     SyncRunResponse,
     SyncStartResponse,
+    TokenCheckResponse,
 )
 from app.services import (
     evidence_chunks,
@@ -47,6 +48,11 @@ async def list_employers(
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> list[EmployerOption]:
     return await evidence_sync.employer_options(session)
+
+
+@router.get("/github/token", response_model=TokenCheckResponse)
+async def github_token() -> TokenCheckResponse:
+    return await evidence_sync.check_token()
 
 
 @router.get("/github/scopes", response_model=list[ScopeResponse])

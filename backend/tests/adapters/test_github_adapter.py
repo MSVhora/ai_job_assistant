@@ -6,6 +6,7 @@ from typing import Any
 import httpx
 import pytest
 
+from app.adapters.evidence_sources import github as github_module
 from app.adapters.evidence_sources.base import (
     EvidenceSourceConfigError,
     EvidenceSourceError,
@@ -65,6 +66,15 @@ class FakeGitHub:
         body = json.loads(request.content)
         self.graphql_bodies.append(body)
         query: str = body["query"]
+        if "contributionYears" in query:
+            return httpx.Response(
+                200, json=golden("graphql_contribution_years.json"), headers=self.headers
+            )
+        if "commitContributionsByRepository" in query:
+            year = body["variables"]["from"][:4]
+            return httpx.Response(
+                200, json=golden(f"graphql_contributions_{year}.json"), headers=self.headers
+            )
         if "history(" in query:
             index = 0 if body["variables"]["after"] is None else 1
             return httpx.Response(200, json=golden(self.commit_pages[index]), headers=self.headers)
@@ -79,6 +89,7 @@ class FakeGitHub:
 
 @pytest.fixture(autouse=True)
 def _fast_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    github_module._CONTRIBUTED_CACHE.clear()
     settings = get_settings()
     monkeypatch.setattr(settings, "github_token", TOKEN)
     monkeypatch.setattr(settings, "llm_retry_attempts", 2)
@@ -138,18 +149,103 @@ async def test_identify_is_cached_for_the_run() -> None:
     assert len(fake.requests) == 1
 
 
-async def test_list_scopes_flags_private_and_fork_and_stops_at_the_lookback_floor() -> None:
+async def test_list_scopes_flags_private_fork_and_marks_old_repos_outside_the_lookback() -> None:
     scopes = await source_for(FakeGitHub()).list_scopes()
 
-    assert [scope.ref for scope in scopes] == [
+    by_ref = {scope.ref: scope for scope in scopes}
+    assert list(by_ref) == [
+        "ada/engine",
+        "ada/secret-notes",
+        "babbage/difference",
+        "ada/ancient",
+        "booth/private-app",
+        "outsider/lib",
+    ]
+    assert by_ref["ada/secret-notes"].is_private is True
+    assert by_ref["babbage/difference"].is_fork is True
+    assert by_ref["ada/engine"].description == "Analytical engine emulator"
+
+
+async def test_list_scopes_marks_contributed_repos_and_adds_ones_the_token_does_not_list() -> None:
+    scopes = {scope.ref: scope for scope in await source_for(FakeGitHub()).list_scopes()}
+
+    assert {ref for ref, scope in scopes.items() if scope.contributed} == {
+        "ada/engine",
+        "ada/ancient",
+        "booth/private-app",
+        "outsider/lib",
+    }
+    assert scopes["booth/private-app"].is_private is True
+    assert scopes["outsider/lib"].is_private is False
+    assert scopes["outsider/lib"].pushed_at is None
+
+
+async def test_a_contributed_repo_is_never_outside_the_lookback_but_others_are() -> None:
+    scopes = {scope.ref: scope for scope in await source_for(FakeGitHub()).list_scopes()}
+
+    assert scopes["ada/ancient"].contributed is True
+    assert scopes["ada/ancient"].outside_lookback is False
+    assert scopes["ada/engine"].outside_lookback is False
+
+
+async def test_an_old_repo_without_contributions_is_flagged_outside_the_lookback() -> None:
+    fake = FakeGitHub()
+    fake.override = lambda request: (
+        httpx.Response(200, json=golden("graphql_contribution_years.json") | {"data": {}})
+        if request.method == "POST" and b"contributionYears" in request.content
+        else None
+    )
+
+    scopes = {scope.ref: scope for scope in await source_for(fake).list_scopes()}
+
+    assert scopes["ada/ancient"].outside_lookback is True
+    assert not any(scope.contributed for scope in scopes.values())
+
+
+async def test_the_contribution_history_is_cached_between_listings() -> None:
+    fake = FakeGitHub()
+
+    await source_for(fake).list_scopes()
+    graphql_calls = len(fake.graphql_bodies)
+    await source_for(fake).list_scopes()
+
+    assert graphql_calls == 3
+    assert len(fake.graphql_bodies) == graphql_calls
+
+
+async def test_a_failing_contribution_query_degrades_to_the_plain_repository_list() -> None:
+    fake = FakeGitHub()
+    fake.override = lambda request: (
+        httpx.Response(200, json={"errors": [{"type": "RATE_LIMITED", "message": "slow down"}]})
+        if request.method == "POST" and request.url.path == "/graphql"
+        else None
+    )
+
+    scopes = await source_for(fake).list_scopes()
+
+    assert [scope.ref for scope in scopes][:3] == [
         "ada/engine",
         "ada/secret-notes",
         "babbage/difference",
     ]
-    by_ref = {scope.ref: scope for scope in scopes}
-    assert by_ref["ada/secret-notes"].is_private is True
-    assert by_ref["babbage/difference"].is_fork is True
-    assert by_ref["ada/engine"].description == "Analytical engine emulator"
+    assert not any(scope.contributed for scope in scopes)
+
+
+async def test_partial_contribution_results_are_kept_when_an_organization_blocks_access() -> None:
+    fake = FakeGitHub()
+
+    def partial(request: httpx.Request) -> httpx.Response | None:
+        if request.method == "POST" and b"commitContributionsByRepository" in request.content:
+            payload = golden("graphql_contributions_2026.json")
+            payload["errors"] = [{"type": "FORBIDDEN", "message": "SAML enforcement"}]
+            return httpx.Response(200, json=payload)
+        return None
+
+    fake.override = partial
+
+    scopes = {scope.ref: scope for scope in await source_for(fake).list_scopes()}
+
+    assert scopes["booth/private-app"].contributed is True
 
 
 async def test_sync_scope_yields_every_evidence_kind_with_normalized_fields() -> None:

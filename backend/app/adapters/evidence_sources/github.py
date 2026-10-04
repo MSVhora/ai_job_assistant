@@ -1,5 +1,6 @@
 import logging
 import re
+import time
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -49,6 +50,26 @@ HTTP_CLIENT_ERROR = 400
 JSON_ACCEPT = "application/vnd.github+json"
 RAW_ACCEPT = "application/vnd.github.raw+json"
 REF_RE = re.compile(r"^[\w.-]+/[\w.-]+$")
+CONTRIBUTED_TTL_S = 300.0
+CONTRIBUTION_FIELDS = (
+    "commitContributionsByRepository",
+    "pullRequestContributionsByRepository",
+    "pullRequestReviewContributionsByRepository",
+    "issueContributionsByRepository",
+)
+CONTRIBUTION_YEARS_QUERY = "{ viewer { contributionsCollection { contributionYears } } }"
+CONTRIBUTIONS_QUERY = (
+    "query($from: DateTime!, $to: DateTime!) { viewer { "
+    "contributionsCollection(from: $from, to: $to) { "
+    + " ".join(
+        f"{name}(maxRepositories: 100) {{ repository {{ nameWithOwner isPrivate }} }}"
+        for name in CONTRIBUTION_FIELDS
+    )
+    + " } } }"
+)
+# Contribution history per (login, token scopes): the repository list is read on every page
+# load and a source instance lives for one request, so the ~13 GraphQL calls are cached briefly.
+_CONTRIBUTED_CACHE: dict[str, tuple[float, dict[str, bool]]] = {}
 
 COMMITS_QUERY = """
 query($owner: String!, $name: String!, $author: ID!, $since: GitTimestamp, $after: String) {
@@ -182,6 +203,32 @@ def _obj(value: object) -> dict[str, object]:
 
 def _arr(value: object) -> list[object]:
     return json_array(value) or []
+
+
+def _scope_candidate(repo: dict[str, object], floor: datetime) -> ScopeCandidate | None:
+    full_name = _str(repo.get("full_name"))
+    if full_name is None or not REF_RE.fullmatch(full_name):
+        return None
+    pushed = parse_datetime(repo.get("pushed_at"))
+    return ScopeCandidate(
+        ref=full_name,
+        is_private=repo.get("private") is True,
+        is_fork=repo.get("fork") is True,
+        description=_str(repo.get("description")),
+        pushed_at=pushed,
+        outside_lookback=pushed is not None and pushed < floor,
+    )
+
+
+def _contribution_refs(collection: dict[str, object]) -> dict[str, bool]:
+    refs: dict[str, bool] = {}
+    for name in CONTRIBUTION_FIELDS:
+        for entry in _arr(collection.get(name)):
+            repo = _obj(_obj(entry).get("repository"))
+            ref = _str(repo.get("nameWithOwner"))
+            if ref is not None and REF_RE.fullmatch(ref):
+                refs[ref] = repo.get("isPrivate") is True
+    return refs
 
 
 def _login(node: dict[str, object]) -> str | None:
@@ -383,7 +430,9 @@ class GitHubSource:
         options = _Options(params=params, accept=accept, etag=etag, allow_not_found=allow_not_found)
         return await self._send("GET", path, self._rest_rate, options)
 
-    async def _graphql(self, query: str, variables: dict[str, object]) -> dict[str, object]:
+    async def _graphql(
+        self, query: str, variables: dict[str, object], *, tolerate_errors: bool = False
+    ) -> dict[str, object]:
         options = _Options(json_body={"query": query, "variables": variables})
         response = await self._send("POST", "/graphql", self._graphql_rate, options)
         body = _json_object(response)
@@ -396,7 +445,7 @@ class GitHubSource:
             raise EvidenceSourcePausedError(
                 reason, self._graphql_rate.reset_at or datetime.now(UTC) + FALLBACK_RESUME
             )
-        if errors:
+        if errors and not tolerate_errors:
             msg = "GitHub GraphQL query failed (repository missing or not accessible)"
             raise EvidenceSourceError(msg)
         return _obj(body.get("data"))
@@ -422,8 +471,13 @@ class GitHubSource:
         return self._identity
 
     async def list_scopes(self) -> list[ScopeCandidate]:
+        """Every repository the token can read, plus the ones you contributed to.
+
+        Repositories pushed before the lookback floor stay in the list, flagged
+        `outside_lookback`, so the caller can tell "too old to offer" from "no longer visible".
+        """
         floor = self._floor()
-        candidates: list[ScopeCandidate] = []
+        listed: dict[str, ScopeCandidate] = {}
         for page in range(1, MAX_REPO_PAGES + 1):
             response = await self._rest(
                 "/user/repos",
@@ -436,27 +490,53 @@ class GitHubSource:
                 },
             )
             rows = _arr(_json_value(response))
-            reached_floor = False
             for row in rows:
-                repo = _obj(row)
-                pushed = parse_datetime(repo.get("pushed_at"))
-                full_name = _str(repo.get("full_name"))
-                if pushed is not None and pushed < floor:
-                    reached_floor = True
-                    break
-                if full_name is not None and REF_RE.fullmatch(full_name):
-                    candidates.append(
-                        ScopeCandidate(
-                            ref=full_name,
-                            is_private=repo.get("private") is True,
-                            is_fork=repo.get("fork") is True,
-                            description=_str(repo.get("description")),
-                            pushed_at=pushed,
-                        )
-                    )
-            if reached_floor or len(rows) < REPOS_PER_PAGE:
+                candidate = _scope_candidate(_obj(row), floor)
+                if candidate is not None:
+                    listed[candidate.ref] = candidate
+            if len(rows) < REPOS_PER_PAGE:
                 break
-        return candidates
+        identity = await self.identify()
+        for ref, private in (await self._contributed(identity)).items():
+            known = listed.get(ref)
+            if known is None:
+                listed[ref] = ScopeCandidate(ref=ref, is_private=private, contributed=True)
+            else:
+                known.contributed = True
+                known.outside_lookback = False
+        return list(listed.values())
+
+    async def _contributed(self, identity: SourceIdentity) -> dict[str, bool]:
+        """Repository -> private, for every year you have contributions; never fails the list."""
+        key = f"{identity.login}|{','.join(sorted(identity.permissions))}"
+        cached = _CONTRIBUTED_CACHE.get(key)
+        if cached is not None and time.monotonic() - cached[0] < CONTRIBUTED_TTL_S:
+            return dict(cached[1])
+        try:
+            refs = await self._fetch_contributed()
+        except EvidenceSourceError as exc:
+            logger.warning("evidence.contributed failed error_type=%s", type(exc).__name__)
+            return {}
+        _CONTRIBUTED_CACHE[key] = (time.monotonic(), refs)
+        return dict(refs)
+
+    async def _fetch_contributed(self) -> dict[str, bool]:
+        data = await self._graphql(CONTRIBUTION_YEARS_QUERY, {}, tolerate_errors=True)
+        collection = _obj(_obj(data.get("viewer")).get("contributionsCollection"))
+        years = [
+            year for year in _arr(collection.get("contributionYears")) if isinstance(year, int)
+        ]
+        refs: dict[str, bool] = {}
+        for year in years:
+            window = await self._graphql(
+                CONTRIBUTIONS_QUERY,
+                {"from": f"{year}-01-01T00:00:00Z", "to": f"{year}-12-31T23:59:59Z"},
+                tolerate_errors=True,
+            )
+            refs.update(
+                _contribution_refs(_obj(_obj(window.get("viewer")).get("contributionsCollection")))
+            )
+        return refs
 
     def _page(self, items: list[EvidenceItemData], cursor: GitHubCursor) -> SyncPage:
         used = self._used - self._reported

@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   getEvidenceStatus,
+  getTokenCheck,
   listEmployers,
   listGithubScopes,
   listSyncs,
@@ -13,6 +14,7 @@ import {
   type SyncMode,
 } from "@/lib/api";
 import { isActiveStatus } from "@/lib/evidence-progress";
+import { SCOPE_UPDATE_BATCH, chunk } from "@/lib/scope-draft";
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -29,6 +31,15 @@ export function useGithubScopes(enabled: boolean) {
   });
 }
 
+export function useTokenCheck(enabled: boolean) {
+  return useQuery({
+    queryKey: ["evidence-token"],
+    queryFn: getTokenCheck,
+    enabled,
+    staleTime: 60_000,
+  });
+}
+
 export function useEmployers() {
   return useQuery({ queryKey: ["evidence-employers"], queryFn: listEmployers });
 }
@@ -36,8 +47,17 @@ export function useEmployers() {
 export function useUpdateScopes() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ scopes, acknowledged }: { scopes: ScopeUpdateItem[]; acknowledged: boolean }) =>
-      updateGithubScopes(scopes, acknowledged),
+    mutationFn: async ({
+      scopes,
+      acknowledged,
+    }: {
+      scopes: ScopeUpdateItem[];
+      acknowledged: boolean;
+    }) => {
+      for (const batch of chunk(scopes, SCOPE_UPDATE_BATCH)) {
+        await updateGithubScopes(batch, acknowledged);
+      }
+    },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["evidence-scopes"] });
       void queryClient.invalidateQueries({ queryKey: ["evidence-status"] });

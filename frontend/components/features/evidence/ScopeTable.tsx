@@ -1,36 +1,58 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 
 import { Card } from "@/components/ui/card";
 import { useEmployers, useGithubScopes, useUpdateScopes } from "@/hooks/use-evidence-sync";
-import type { EvidenceScope, EvidenceStatus, ScopeUpdateItem } from "@/lib/api";
+import type { EvidenceStatus } from "@/lib/api";
+import {
+  changeCount,
+  filterScopes,
+  newlyEnabledPrivate,
+  selectScopes,
+  selectedCount,
+  toUpdates,
+  withPatch,
+  type ScopeDraft,
+} from "@/lib/scope-draft";
 
 import { DisclosureModal } from "./DisclosureModal";
 import { ScopeRow } from "./ScopeRow";
+import { ScopeSaveBar } from "./ScopeSaveBar";
+import { ScopeToolbar } from "./ScopeToolbar";
 
 export function ScopeTable({ status }: { status: EvidenceStatus }) {
   const scopes = useGithubScopes(status.configured);
   const employers = useEmployers();
   const update = useUpdateScopes();
-  const [pendingPrivate, setPendingPrivate] = useState<string | null>(null);
+  const [draft, setDraft] = useState<ScopeDraft>({});
+  const [query, setQuery] = useState("");
+  const [confirming, setConfirming] = useState<string[]>([]);
 
-  const apply = (item: ScopeUpdateItem, acknowledged = false) => {
-    update.mutate({ scopes: [item], acknowledged });
+  const all = scopes.data ?? [];
+  const shown = filterScopes(all, query);
+
+  const save = (acknowledged: boolean) => {
+    update.mutate(
+      { scopes: toUpdates(draft), acknowledged },
+      {
+        onSuccess: () => {
+          setDraft({});
+          setConfirming([]);
+          toast.success("Repository selection saved");
+        },
+      },
+    );
   };
 
-  const toggle = (scope: EvidenceScope, enabled: boolean) => {
-    if (enabled && scope.is_private) {
-      setPendingPrivate(scope.ref);
+  const onSave = () => {
+    const privateRepos = newlyEnabledPrivate(draft, all);
+    if (privateRepos.length > 0) {
+      setConfirming(privateRepos);
       return;
     }
-    apply({ ref: scope.ref, enabled });
-  };
-
-  const confirmPrivate = () => {
-    if (pendingPrivate === null) return;
-    apply({ ref: pendingPrivate, enabled: true }, true);
-    setPendingPrivate(null);
+    save(false);
   };
 
   return (
@@ -58,37 +80,72 @@ export function ScopeTable({ status }: { status: EvidenceStatus }) {
           </button>
         </div>
       )}
-      {scopes.isSuccess && scopes.data.length === 0 && (
+      {scopes.isSuccess && all.length === 0 && (
         <p className="text-sm text-gray-600">No repositories found for this token.</p>
       )}
-      {scopes.isSuccess && scopes.data.length > 0 && (
+      {scopes.isSuccess && all.length > 0 && (
         <>
-          <p className="mb-3 text-xs text-gray-500">
-            New repositories start disabled. A refresh never enables anything on its own.
+          <p className="mb-3 text-xs text-gray-600">
+            Choose the repositories evidence is collected from. Only the ones you select are synced
+            and used to build your achievements and resumes — nothing is read from the rest. Your
+            choices take effect when you press <strong>Save changes</strong>. New repositories start
+            unselected, and a refresh never selects anything on its own.
           </p>
+          <ScopeToolbar
+            total={all.length}
+            shown={shown.length}
+            selected={selectedCount(all, draft)}
+            query={query}
+            disabled={update.isPending}
+            onQuery={setQuery}
+            onSelectShown={() => {
+              setDraft((current) => selectScopes(current, shown, true));
+            }}
+            onClearShown={() => {
+              setDraft((current) => selectScopes(current, shown, false));
+            }}
+          />
+          {shown.length === 0 && (
+            <p className="text-sm text-gray-600">No repository matches “{query}”.</p>
+          )}
           <ul className="flex flex-col gap-2" aria-label="Repositories">
-            {scopes.data.map((scope) => (
+            {shown.map((scope) => (
               <ScopeRow
                 key={scope.ref}
                 scope={scope}
+                patch={draft[scope.ref]}
                 employers={employers.data ?? []}
                 disabled={update.isPending}
-                onChange={(item) => {
-                  apply(item);
+                onChange={(patch) => {
+                  setDraft((current) => withPatch(current, scope, patch));
                 }}
-                onToggle={toggle}
               />
             ))}
           </ul>
+          {update.isError && (
+            <p role="alert" className="mt-3 text-sm text-red-700">
+              Could not save: {update.error.message}
+            </p>
+          )}
+          <ScopeSaveBar
+            changes={changeCount(draft)}
+            pending={update.isPending}
+            onSave={onSave}
+            onDiscard={() => {
+              setDraft({});
+            }}
+          />
         </>
       )}
       <DisclosureModal
-        repo={pendingPrivate}
+        repos={confirming}
         firstTime={status.acknowledged_at === null}
         pending={update.isPending}
-        onConfirm={confirmPrivate}
+        onConfirm={() => {
+          save(true);
+        }}
         onCancel={() => {
-          setPendingPrivate(null);
+          setConfirming([]);
         }}
       />
     </Card>

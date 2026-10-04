@@ -32,9 +32,11 @@ export function ConnectStatus({ status }: { status: EvidenceStatus }) {
         </p>
       ) : (
         <p className="text-sm text-gray-700">
-          Add a fine-grained, read-only token as <code className="font-mono">GITHUB_TOKEN</code> in{" "}
-          <code className="font-mono">backend/.env</code> and restart the API. Notes and resume
-          entries below work without GitHub. See{" "}
+          Add a read-only token (fine-grained, or classic for organization repositories you
+          collaborate on) as <code className="font-mono">GITHUB_TOKEN</code> in the project&apos;s{" "}
+          <code className="font-mono">.env</code>, then run{" "}
+          <code className="font-mono">docker compose up -d --force-recreate api</code>. Notes and
+          resume entries below work without GitHub. See{" "}
           <Link href="/setup" className="font-semibold text-violet-700 underline">
             Setup
           </Link>{" "}

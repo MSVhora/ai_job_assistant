@@ -10,11 +10,22 @@ later features build on. Nothing here changes jobs, matches or your profile.
 
 ## Connect GitHub
 
-1. Create a **fine-grained, read-only personal access token** on GitHub. Grant *Metadata*,
-   *Contents (read)*, *Pull requests (read)* and *Issues (read)*, and select only the repositories
-   you want to use.
-2. Put it in `backend/.env` as `GITHUB_TOKEN=` and restart the API. The token never goes to the
-   database, the frontend or the logs; rotate it by editing `.env`.
+1. Create a read-only personal access token on GitHub. Which kind depends on where your work is:
+   - **Fine-grained token** — best for your own repositories. Grant *Metadata*, *Contents (read)*,
+     *Pull requests (read)* and *Issues (read)*, and select only the repositories you want to use.
+     A fine-grained token has a single **resource owner** (your account *or* one organization) and
+     only sees that owner's repositories, so it cannot cover both your own and an organization's.
+     An organization may need to allow fine-grained tokens and approve yours.
+   - **Classic token** — use this when most of your work is in repositories you collaborate on
+     inside one or more organizations. Tick the `repo` scope (and `read:org` if an organization
+     hides its membership). It lists everything you can access in one go, but it is broader than
+     the app needs (GitHub offers no read-only repository scope for classic tokens; the app only
+     ever reads). If the organization enforces SAML single sign-on, open the token on GitHub and
+     choose *Configure SSO → Authorize* for that organization, or its repositories stay hidden.
+2. Put it in the **root `.env`** (next to `docker-compose.yml`) as `GITHUB_TOKEN=`; use
+   `backend/.env` only if you run the API without Docker. Then recreate the API container with
+   `docker compose up -d --force-recreate api` — a plain restart does not re-read `.env`. The token
+   never goes to the database, the frontend or the logs; rotate it by editing `.env`.
 3. `POST /api/setup/check` reports `github_token_configured`; `GET /api/evidence/github/status`
    shows the connected login and the latest sync.
 
@@ -23,9 +34,18 @@ Only commit messages, pull request / issue / review text, README text, language 
 
 ## Choose repositories (scopes)
 
+Enabling a repository means **evidence is collected from it**: only the repositories you select
+are synced and used to build achievements and resumes, and nothing is read from the rest. On the
+Evidence page, tick the repositories you want (the filter box narrows the list, and **Select all**
+and **Clear selection** act on the repositories currently shown), then press **Save changes** —
+nothing is saved until you do, and **Discard** throws your edits away. If the selection switches on
+private repositories, Save shows the disclosure once for all of them. Content level and employer
+mapping are part of the same draft.
+
 `GET /api/evidence/github/scopes` lists the repositories your token can see (pushed within
-`EVIDENCE_LOOKBACK_YEARS`) and stores any new ones **disabled**. Enable the ones you want with
-`PATCH /api/evidence/github/scopes`:
+`EVIDENCE_LOOKBACK_YEARS`) and stores any new ones **disabled**. The page saves your selection with
+one `PATCH /api/evidence/github/scopes` (up to 200 repositories per request; larger selections are
+sent in batches):
 
 - Forks are listed but, like every new repository, start disabled.
 - **Private repositories** need `acknowledged_disclosure: true` the first time: their text is later

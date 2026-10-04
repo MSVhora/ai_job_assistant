@@ -225,7 +225,7 @@ signal precise; re-review (`acknowledge`) writes a revision, which resets the ba
 
 ### Resume documents and reconciliation
 
-A `resume_document` is structured data, never a rendered file: `ResumeContent` (JSON Resume-shaped
+A `resume_document` is structured data, never a stored file (a PDF is rendered on request): `ResumeContent` (JSON Resume-shaped
 sections whose highlights are provenance-carrying `Bullet`s) plus layout, comments and the
 kept-as-is conflict resolutions. `services/resume_mapping.py` maps a profile into it and back
 losslessly (the server-managed `preferences` and `years_of_experience` are excluded and supplied by
@@ -254,8 +254,14 @@ a `judge` call checks entailment; a failing bullet is rewritten once, then flagg
 `resume_comments` regenerates only commented blocks with the comment as a subordinate instruction;
 `resume_bullets` re-checks user edits by code and records overrides. Everything the run produced
 besides the content (pool, omitted roles, gaps, warnings, usage) is stored in
-`resume_document.generation`. The layout returned for now lists what is unusable (`needs_review`,
-`not_written`, `overlap_omitted`); the page fit that fills `layout` properly is #56.
+`resume_document.generation`. After every content change `persist` runs the page fit
+(`resume_render/fit.py`) in a worker thread: it orders the passing bullets (pinned, role anchors,
+then priority), binary-searches the longest prefix that fits the page target under three
+typography presets by compiling the Typst template (`resources/typst/resume.typ`, content passed as
+one JSON string) in memory and counting pages with `pdfplumber`, and stores the winning preset and
+the included / not-included lists in `resume_document.layout`. If nothing fits, content is kept and
+the layout is empty with a warning. `POST …/fit` re-fits on demand (layout only) and `POST …/render`
+fits again and returns the PDF, which is never stored.
 
 Search runs start **only** from an explicit `POST /api/jobs/search` — never automatically —
 and are tracked in `job_search` (status + per-source `{source, status, count, warning}`
@@ -703,7 +709,7 @@ erDiagram
         text job_description
         varchar jd_hash
         jsonb content "ResumeContent with per-bullet provenance"
-        jsonb layout "fit result (#56)"
+        jsonb layout "page-fit result: pages, preset, included and not-included bullets"
         jsonb conflicts "kept-as-is resolutions, keyed by conflict key"
         jsonb comments "open | applied | rejected, with reasons"
         jsonb generation "ranked pool, omitted roles, gaps, JD analysis, warnings, usage"

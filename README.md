@@ -21,6 +21,11 @@ node scripts/render-diagrams.mjs   # needs @mermaid-js/mermaid-cli
 
 FastAPI (Python 3.12) · Next.js (TypeScript) · Postgres + pgvector · LiteLLM (Gemini Flash default) · Docker Compose
 
+Resume PDFs are rendered with the `typst` package, pinned exactly in `backend/pyproject.toml` (a prebuilt wheel, no system libraries) and
+set in Libertinus Serif, which ships inside the compiler under the SIL Open Font License; system fonts are ignored so a page count never
+depends on the host. Changing the pinned version can change pagination: run the resume tests after any bump and rebuild the backend image
+(`docker compose build api`) to pick it up.
+
 ## Quickstart
 
 ```bash

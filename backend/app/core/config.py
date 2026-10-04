@@ -112,6 +112,8 @@ class Settings(BaseSettings):
     resume_weight_recency: Annotated[float, Field(ge=0, le=1)] = 0.20
     resume_candidate_oversample: Annotated[float, Field(ge=1, le=3)] = 1.3
     resume_max_pages: Annotated[int, Field(ge=1, le=4)] = 4
+    # v6 #56: upper bound on Typst compiles one page-fit run may spend (3 presets x ~7 each).
+    resume_fit_max_compiles: Annotated[int, Field(ge=3, le=200)] = 30
     evidence_bot_logins: list[str] = [
         "dependabot",
         "renovate",

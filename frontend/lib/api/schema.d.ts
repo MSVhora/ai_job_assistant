@@ -1088,6 +1088,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/resume-documents/{document_id}/layout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Resume Layout */
+        get: operations["get_resume_layout_api_resume_documents__document_id__layout_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/resume-documents/{document_id}/fit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Fit Resume Document */
+        post: operations["fit_resume_document_api_resume_documents__document_id__fit_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/resume-documents/{document_id}/render": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Render Resume Document */
+        post: operations["render_resume_document_api_resume_documents__document_id__render_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/resume-documents/{document_id}/regenerate": {
         parameters: {
             query?: never;
@@ -2836,8 +2887,9 @@ export interface components {
             /**
              * Template
              * @default classic
+             * @enum {string}
              */
-            template: string;
+            template: "classic" | "compact";
             /** Job Description */
             job_description?: string | null;
             /**
@@ -2935,7 +2987,7 @@ export interface components {
             /** Page Target */
             page_target?: number | null;
             /** Template */
-            template?: string | null;
+            template?: ("classic" | "compact") | null;
             /** Status */
             status?: ("draft" | "final") | null;
             content?: components["schemas"]["ResumeContent"] | null;
@@ -5800,6 +5852,99 @@ export interface operations {
                     "text/plain; charset=utf-8": unknown;
                     "text/markdown; charset=utf-8": unknown;
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_resume_layout_api_resume_documents__document_id__layout_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Layout"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    fit_resume_document_api_resume_documents__document_id__fit_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumeDocumentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    render_resume_document_api_resume_documents__document_id__render_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The fitted resume. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": unknown;
                 };
             };
             /** @description Validation Error */

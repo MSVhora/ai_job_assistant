@@ -216,6 +216,19 @@ class InvalidCommentTargetError(DomainError):
     default_detail = "the comment must target a section or bullet of this document"
 
 
+class CannotFitError(DomainError):
+    status_code = 422
+    default_detail = (
+        "this resume cannot fit the chosen page count at the smallest type size; "
+        "choose more pages or shorten the contact, education or skills sections"
+    )
+
+
+class ResumeRenderError(DomainError):
+    status_code = 500
+    default_detail = "the resume could not be rendered"
+
+
 class InvalidEmployerError(DomainError):
     status_code = 400
     default_detail = "employer must be one of your profile's experience entries or personal"

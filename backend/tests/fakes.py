@@ -17,6 +17,14 @@ from app.adapters.job_sources.base import (
     SourceFilterDecl,
 )
 from app.schemas.profile import StructuredProfile
+from app.schemas.resume_document import (
+    Basics,
+    Bullet,
+    BulletCheck,
+    EducationEntry,
+    ResumeContent,
+    WorkEntry,
+)
 from app.services import profile_derivation
 
 if TYPE_CHECKING:
@@ -686,3 +694,51 @@ class FakeResumeLLM:
             for key, text in claims
         ]
         return {"verdicts": verdicts}
+
+
+def synthetic_resume(
+    roles: int,
+    per_role: int,
+    *,
+    seed: int = 0,
+    words: int = 8,
+    checks: dict[str, BulletCheck] | None = None,
+    pinned: set[str] | None = None,
+) -> ResumeContent:
+    """A resume with `roles` jobs of `per_role` written bullets with distinct random scores.
+
+    Bullet ids are `r{role}b{index}`; `checks` overrides a bullet's check, `pinned` pins ids.
+    """
+    rng = random.Random(seed)
+    scores = rng.sample(range(1, 10_000), roles * per_role)
+    work: list[WorkEntry] = []
+    for role in range(roles):
+        bullets = [
+            Bullet(
+                id=f"r{role}b{index}",
+                text=" ".join(
+                    f"w{rng.randint(0, 999)}" for _ in range(rng.randint(words // 2 + 1, words))
+                )
+                + f" r{role}b{index}",
+                score=scores[role * per_role + index] / 10_000,
+                check=(checks or {}).get(f"r{role}b{index}", "passed"),
+                pinned=f"r{role}b{index}" in (pinned or set()),
+            )
+            for index in range(per_role)
+        ]
+        work.append(
+            WorkEntry(
+                id=f"role{role}",
+                company=f"Company {role}",
+                title="Engineer",
+                start_date=f"{2010 + role}-01",
+                end_date=f"{2011 + role}-01",
+                highlights=bullets,
+            )
+        )
+    return ResumeContent(
+        basics=Basics(full_name="Ada Lovelace", email="ada@example.com", phone="555 0100"),
+        skills=[f"Skill{n}" for n in range(6)],
+        work=work,
+        education=[EducationEntry(institution="Analytical College", degree="BSc", field="Maths")],
+    )

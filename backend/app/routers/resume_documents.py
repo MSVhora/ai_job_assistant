@@ -12,6 +12,7 @@ from app.schemas.resume_document import (
     CommentCreate,
     CommentUpdate,
     ConflictsResponse,
+    Layout,
     RegenerateRequest,
     ResolveConflictRequest,
     ResumeContent,
@@ -26,6 +27,7 @@ from app.services import (
     resume_comments,
     resume_documents,
     resume_export,
+    resume_rendering,
 )
 
 router = APIRouter(prefix="/api", tags=["resume-documents"])
@@ -138,6 +140,36 @@ async def export_resume_document(
     else:
         body = resume_export.to_plain_text(content)
     return Response(content=body, media_type=EXPORT_MEDIA_TYPES[export_format])
+
+
+@router.get("/resume-documents/{document_id}/layout", response_model=Layout)
+async def get_resume_layout(
+    document_id: uuid.UUID, session: Annotated[AsyncSession, Depends(get_db)]
+) -> Layout:
+    return await resume_rendering.get_layout(session, document_id)
+
+
+@router.post("/resume-documents/{document_id}/fit", response_model=ResumeDocumentResponse)
+async def fit_resume_document(
+    document_id: uuid.UUID, session: Annotated[AsyncSession, Depends(get_db)]
+) -> ResumeDocumentResponse:
+    return await resume_rendering.refit_document(session, document_id)
+
+
+@router.post(
+    "/resume-documents/{document_id}/render",
+    response_class=Response,
+    responses={200: {"description": "The fitted resume.", "content": {"application/pdf": {}}}},
+)
+async def render_resume_document(
+    document_id: uuid.UUID, session: Annotated[AsyncSession, Depends(get_db)]
+) -> Response:
+    pdf, filename = await resume_rendering.render_document(session, document_id)
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.post("/resume-documents/{document_id}/regenerate", response_model=ResumeDocumentResponse)

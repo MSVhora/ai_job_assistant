@@ -4,7 +4,7 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.pagination import TOTAL_COUNT_HEADER, Pagination
+from app.core.pagination import SEARCHES_PAGE, TOTAL_COUNT_HEADER, Pagination
 from app.deps import get_db, pagination
 from app.models import AchievementStatus
 from app.schemas.achievement import (
@@ -45,6 +45,16 @@ async def start_extraction(
     return await achievement_extraction.start_extraction(
         session, background_tasks, payload.confirmed_estimate_id
     )
+
+
+@router.get("/evidence/extract/runs", response_model=list[ExtractionRunResponse])
+async def list_extraction_runs(
+    response: Response,
+    session: Annotated[AsyncSession, Depends(get_db)],
+    page: Annotated[Pagination, Depends(pagination(SEARCHES_PAGE.limit))],
+) -> list[ExtractionRunResponse]:
+    response.headers[TOTAL_COUNT_HEADER] = str(await achievement_extraction.count_runs(session))
+    return await achievement_extraction.list_runs(session, page)
 
 
 @router.get("/evidence/extract/runs/{run_id}", response_model=ExtractionRunResponse)

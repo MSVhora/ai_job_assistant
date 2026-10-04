@@ -155,6 +155,49 @@ async def test_unknown_runs_are_404(client: AsyncClient) -> None:
     assert response.status_code == 404
 
 
+async def test_listing_extraction_runs_is_empty_before_any_run(client: AsyncClient) -> None:
+    response = await client.get("/api/evidence/extract/runs")
+
+    assert response.status_code == 200
+    assert response.json() == []
+    assert response.headers["x-total-count"] == "0"
+
+
+async def test_extraction_runs_are_listed_newest_first_with_a_bounded_page(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    provider(monkeypatch)
+    candidate_id, *_ = await seed_evidence_chunk(bodies=BODIES)
+    first_estimate = (await client.post("/api/evidence/extract/estimate")).json()
+    first = await client.post(
+        "/api/evidence/extract", json={"confirmed_estimate_id": first_estimate["estimate_id"]}
+    )
+    await seed_evidence_chunk(
+        bodies=["Added contract tests for the importer"],
+        project_key="ada/second",
+        candidate_id=candidate_id,
+    )
+    second_estimate = (await client.post("/api/evidence/extract/estimate")).json()
+    second = await client.post(
+        "/api/evidence/extract", json={"confirmed_estimate_id": second_estimate["estimate_id"]}
+    )
+
+    listed = await client.get("/api/evidence/extract/runs")
+    newest_only = await client.get("/api/evidence/extract/runs", params={"limit": 1})
+
+    assert [run["id"] for run in listed.json()] == [
+        second.json()["run_id"],
+        first.json()["run_id"],
+    ]
+    assert listed.headers["x-total-count"] == "2"
+    assert [run["id"] for run in newest_only.json()] == [second.json()["run_id"]]
+    assert newest_only.headers["x-total-count"] == "2"
+    assert {"status", "progress", "usage", "estimate"} <= set(listed.json()[0])
+    assert (
+        await client.get("/api/evidence/extract/runs", params={"limit": 5000})
+    ).status_code == 422
+
+
 async def test_a_failed_run_reports_its_error_without_provider_details(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:

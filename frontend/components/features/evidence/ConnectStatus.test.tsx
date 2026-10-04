@@ -50,6 +50,15 @@ describe("ConnectStatus token check", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
+  it("shows no warning before the list was ever refreshed (no stored check yet)", async () => {
+    vi.mocked(getTokenCheck).mockResolvedValue(null);
+    renderWithClient(<ConnectStatus status={status({ scopes_refreshed_at: null })} />);
+
+    await screen.findByText("Token configured");
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
   it("does not check a token that is not configured", () => {
     renderWithClient(<ConnectStatus status={status({ configured: false })} />);
 

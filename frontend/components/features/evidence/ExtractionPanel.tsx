@@ -6,8 +6,13 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useChunkSummary } from "@/hooks/use-evidence-sources";
-import { useEstimateExtraction, useStartExtraction } from "@/hooks/use-extraction";
+import {
+  useEstimateExtraction,
+  useLatestExtraction,
+  useStartExtraction,
+} from "@/hooks/use-extraction";
 import type { ExtractionEstimate } from "@/lib/api";
+import { activeRunIdFrom, isActiveStatus } from "@/lib/evidence-progress";
 
 import { ExtractionBanner } from "./ExtractionBanner";
 import { ExtractionEstimateModal } from "./ExtractionEstimateModal";
@@ -18,6 +23,12 @@ export function ExtractionPanel() {
   const start = useStartExtraction();
   const [shown, setShown] = useState<ExtractionEstimate | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
+  const latest = useLatestExtraction();
+  const running =
+    latest.data !== undefined && latest.data !== null && isActiveStatus(latest.data.status)
+      ? latest.data.id
+      : null;
+  const shownRunId = runId ?? running;
 
   const chunks = summary.data;
   return (
@@ -53,7 +64,7 @@ export function ExtractionPanel() {
         Extraction turns chunks into draft achievements with your LLM. You see an estimate first;
         drafts are never used until you approve them.
       </p>
-      {runId !== null && <ExtractionBanner runId={runId} />}
+      {shownRunId !== null && <ExtractionBanner runId={shownRunId} />}
       <ExtractionEstimateModal
         estimate={shown}
         pending={start.isPending}
@@ -66,8 +77,10 @@ export function ExtractionPanel() {
               setRunId(response.run_id);
               setShown(null);
             },
-            onError: () => {
+            onError: (error) => {
               setShown(null);
+              const active = activeRunIdFrom(error);
+              if (active !== null) setRunId(active);
             },
           });
         }}

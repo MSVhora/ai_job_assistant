@@ -9,6 +9,7 @@ export function status(overrides: Partial<EvidenceStatus> = {}): EvidenceStatus 
     scopes_total: 2,
     scopes_enabled: 1,
     scopes_unmapped: 0,
+    scopes_refreshed_at: "2026-10-02T09:00:00Z",
     latest_sync: null,
     ...overrides,
   };

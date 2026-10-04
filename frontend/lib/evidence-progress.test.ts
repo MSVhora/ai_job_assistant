@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import type { ExtractionRun, SyncRun } from "@/lib/api";
+import { ApiError, type ExtractionRun, type SyncRun } from "@/lib/api";
 
 import {
+  activeRunIdFrom,
   employerKey,
   employerLabel,
   formatResumeAt,
@@ -121,5 +122,21 @@ describe("helpers", () => {
     expect(formatResumeAt(null)).toBeNull();
     expect(formatResumeAt(new Date("nope"))).toBeNull();
     expect(formatResumeAt(new Date("2026-10-03T12:30:00Z"))).toMatch(/\d/);
+  });
+});
+
+describe("activeRunIdFrom", () => {
+  it("reads the running extraction from a 409", () => {
+    const refused = new ApiError(409, "already active", { active_run_id: "run-9" });
+
+    expect(activeRunIdFrom(refused)).toBe("run-9");
+  });
+
+  it("ignores other statuses, missing ids and other errors", () => {
+    expect(activeRunIdFrom(new ApiError(400, "no", { active_run_id: "run-9" }))).toBeNull();
+    expect(activeRunIdFrom(new ApiError(409, "no", { detail: "x" }))).toBeNull();
+    expect(activeRunIdFrom(new ApiError(409, "no", { active_run_id: 5 }))).toBeNull();
+    expect(activeRunIdFrom(new ApiError(409, "no"))).toBeNull();
+    expect(activeRunIdFrom(new Error("boom"))).toBeNull();
   });
 });

@@ -101,7 +101,7 @@ async def test_a_valid_mapping_is_stored_and_applied_to_the_repos_achievements(
     client: AsyncClient,
 ) -> None:
     await seed_profile_light()
-    await client.get("/api/evidence/github/scopes")
+    await client.post("/api/evidence/github/scopes/refresh")
     async with session_factory() as session:
         candidate_id = (
             await session.execute(text("SELECT id FROM candidate LIMIT 1"))
@@ -132,7 +132,7 @@ async def test_a_mapping_outside_the_profiles_experience_is_rejected(
     client: AsyncClient, employer: dict[str, str]
 ) -> None:
     await seed_profile_light()
-    await client.get("/api/evidence/github/scopes")
+    await client.post("/api/evidence/github/scopes/refresh")
 
     response = await patch_scope(client, "ada/engine", employer)
 
@@ -143,7 +143,7 @@ async def test_a_mapping_outside_the_profiles_experience_is_rejected(
 
 
 async def test_personal_mapping_needs_no_profile(client: AsyncClient) -> None:
-    await client.get("/api/evidence/github/scopes")
+    await client.post("/api/evidence/github/scopes/refresh")
 
     response = await patch_scope(client, "ada/side", {"kind": "personal"})
 
@@ -152,7 +152,7 @@ async def test_personal_mapping_needs_no_profile(client: AsyncClient) -> None:
 
 async def test_a_repo_active_during_exactly_one_job_gets_a_suggestion(client: AsyncClient) -> None:
     await seed_profile_light()
-    await client.get("/api/evidence/github/scopes")
+    await client.post("/api/evidence/github/scopes/refresh")
     await add_items(
         "ada/engine", datetime(2022, 1, 1, tzinfo=UTC), datetime(2022, 6, 1, tzinfo=UTC)
     )
@@ -167,7 +167,7 @@ async def test_a_repo_active_during_exactly_one_job_gets_a_suggestion(client: As
 
 async def test_a_confirmed_repo_no_longer_gets_a_suggestion(client: AsyncClient) -> None:
     await seed_profile_light()
-    await client.get("/api/evidence/github/scopes")
+    await client.post("/api/evidence/github/scopes/refresh")
     await add_items(
         "ada/engine", datetime(2022, 1, 1, tzinfo=UTC), datetime(2022, 6, 1, tzinfo=UTC)
     )
@@ -180,7 +180,7 @@ async def test_a_confirmed_repo_no_longer_gets_a_suggestion(client: AsyncClient)
 
 async def test_status_counts_synced_enabled_repos_without_a_mapping(client: AsyncClient) -> None:
     await seed_profile_light()
-    await client.get("/api/evidence/github/scopes")
+    await client.post("/api/evidence/github/scopes/refresh")
     await client.patch(
         "/api/evidence/github/scopes",
         json={

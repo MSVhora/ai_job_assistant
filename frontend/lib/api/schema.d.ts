@@ -486,6 +486,23 @@ export interface paths {
         patch: operations["update_github_scopes_api_evidence_github_scopes_patch"];
         trace?: never;
     };
+    "/api/evidence/github/scopes/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Refresh Github Scopes */
+        post: operations["refresh_github_scopes_api_evidence_github_scopes_refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/evidence/github/sync": {
         parameters: {
             query?: never;
@@ -687,6 +704,23 @@ export interface paths {
         put?: never;
         /** Start Extraction */
         post: operations["start_extraction_api_evidence_extract_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/evidence/extract/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Extraction Runs */
+        get: operations["list_extraction_runs_api_evidence_extract_runs_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1828,6 +1862,8 @@ export interface components {
              * @default 0
              */
             scopes_unmapped: number;
+            /** Scopes Refreshed At */
+            scopes_refreshed_at?: string | null;
             latest_sync: components["schemas"]["SyncRunResponse"] | null;
         };
         /** ExperienceItem */
@@ -4514,7 +4550,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["TokenCheckResponse"];
+                    "application/json": components["schemas"]["TokenCheckResponse"] | null;
                 };
             };
         };
@@ -4568,6 +4604,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_github_scopes_api_evidence_github_scopes_refresh_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScopeResponse"][];
                 };
             };
         };
@@ -5025,6 +5081,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ExtractionStartResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_extraction_runs_api_evidence_extract_runs_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtractionRunResponse"][];
                 };
             };
             /** @description Validation Error */

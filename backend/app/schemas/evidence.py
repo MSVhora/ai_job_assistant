@@ -125,6 +125,7 @@ class EvidenceStatusResponse(BaseModel):
     scopes_total: int
     scopes_enabled: int
     scopes_unmapped: int = 0
+    scopes_refreshed_at: datetime | None = None
     latest_sync: SyncRunResponse | None
 
 

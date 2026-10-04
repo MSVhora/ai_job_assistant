@@ -75,6 +75,10 @@ class EvidenceSourceAccount(Base):
     )
     acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_synced_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    scopes_refreshed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    token_scopes: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -90,6 +94,12 @@ class EvidenceScope(Base):
     )
     ref: Mapped[str] = mapped_column(String(255))
     is_private: Mapped[bool] = mapped_column(default=False, server_default=sql_text("false"))
+    is_fork: Mapped[bool] = mapped_column(default=False, server_default=sql_text("false"))
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    pushed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    contributed: Mapped[bool] = mapped_column(default=False, server_default=sql_text("false"))
+    visible: Mapped[bool] = mapped_column(default=True, server_default=sql_text("true"))
+    new_since_refresh: Mapped[bool] = mapped_column(default=False, server_default=sql_text("false"))
     enabled: Mapped[bool] = mapped_column(default=False, server_default=sql_text("false"))
     content_level: Mapped[ContentLevel] = mapped_column(
         Enum(ContentLevel, name="evidence_content_level", native_enum=True),

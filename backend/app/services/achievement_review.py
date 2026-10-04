@@ -21,6 +21,8 @@ from app.models import (
     AchievementRevisionSource,
     AchievementStatus,
     EvidenceItem,
+    EvidenceScope,
+    EvidenceSourceAccount,
 )
 from app.schemas.achievement import (
     AchievementResponse,
@@ -51,6 +53,14 @@ from app.services.skill_canon import canonicalize
 logger = logging.getLogger(__name__)
 
 __all__ = ["EDITABLE_FIELDS", "owned_achievement"]
+
+
+SCOPE_SOURCE = "scope"
+USER_SOURCE = "user"
+
+
+def _set_by_user(employer_ref: dict[str, object] | None) -> bool:
+    return employer_ref is not None and employer_ref.get("source") == USER_SOURCE
 
 
 async def owned_achievement(session: AsyncSession, achievement_id: uuid.UUID) -> Achievement:
@@ -150,6 +160,25 @@ async def _facts(session: AsyncSession, achievement: Achievement) -> Facts:
     )
 
 
+async def _repository_employer(
+    session: AsyncSession, candidate_id: uuid.UUID, project_key: str | None
+) -> dict[str, object] | None:
+    """The employer of the achievement's repository, or None: what clearing an override means."""
+    if not project_key:
+        return None
+    mapped = (
+        await session.execute(
+            select(EvidenceScope.employer_ref)
+            .join(EvidenceSourceAccount, EvidenceSourceAccount.id == EvidenceScope.source_id)
+            .where(
+                EvidenceSourceAccount.candidate_id == candidate_id,
+                EvidenceScope.ref == project_key,
+            )
+        )
+    ).scalar_one_or_none()
+    return {**mapped, "source": SCOPE_SOURCE} if mapped else None
+
+
 async def edit(
     session: AsyncSession, achievement_id: uuid.UUID, payload: AchievementUpdate
 ) -> AchievementResponse:
@@ -159,11 +188,19 @@ async def edit(
     if "skills" in data:
         data["skills"] = canonicalize(data["skills"] or [])
     if "employer_ref" in data:
-        facts = await load_profile_facts(session, achievement.candidate_id)
-        try:
-            data["employer_ref"] = normalize_employer_ref(data["employer_ref"], facts.experiences)
-        except ValueError as exc:
-            raise InvalidAchievementInputError(str(exc)) from exc
+        if data["employer_ref"] is None:
+            repository = data.get("project_key", achievement.project_key)
+            data["employer_ref"] = await _repository_employer(
+                session, achievement.candidate_id, repository
+            )
+        else:
+            facts = await load_profile_facts(session, achievement.candidate_id)
+            try:
+                data["employer_ref"] = normalize_employer_ref(
+                    data["employer_ref"], facts.experiences
+                )
+            except ValueError as exc:
+                raise InvalidAchievementInputError(str(exc)) from exc
     for name, value in data.items():
         setattr(achievement, name, value)
     start, end = achievement.time_start, achievement.time_end
@@ -426,8 +463,9 @@ async def apply_scope_employer(
     project_key: str,
     employer_ref: dict[str, object] | None,
 ) -> int:
-    """A confirmed repo mapping applies to all of that repo's existing achievements."""
-    stored = {**employer_ref, "source": "scope"} if employer_ref else None
+    """A confirmed repo mapping applies to that repo's existing achievements, except the ones
+    whose employer the user chose individually: that choice outranks the repository default."""
+    stored = {**employer_ref, "source": SCOPE_SOURCE} if employer_ref else None
     rows = (
         (
             await session.execute(
@@ -443,7 +481,7 @@ async def apply_scope_employer(
     )
     changed = 0
     for row in rows:
-        if row.employer_ref == stored:
+        if row.employer_ref == stored or _set_by_user(row.employer_ref):
             continue
         add_revision(
             session,

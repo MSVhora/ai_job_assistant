@@ -4,6 +4,8 @@ import type { Achievement } from "@/lib/api";
 
 import {
   approvalBlockers,
+  employerSource,
+  repositoryUrl,
   flagLabel,
   formatRevisionDiff,
   isStale,
@@ -105,5 +107,22 @@ describe("small helpers", () => {
       'title: "A" → "B"',
       "bulk: true",
     ]);
+  });
+});
+
+describe("repositoryUrl and employerSource", () => {
+  it("links only owner/repo project keys", () => {
+    expect(repositoryUrl("ada/engine")).toBe("https://github.com/ada/engine");
+    expect(repositoryUrl("resume:Acme Corp")).toBeNull();
+    expect(repositoryUrl("a b/c")).toBeNull();
+    expect(repositoryUrl(null)).toBeNull();
+  });
+
+  it("reads who set an employer", () => {
+    expect(employerSource({ company: "A", source: "user" })).toBe("user");
+    expect(employerSource({ company: "A", source: "scope" })).toBe("scope");
+    expect(employerSource({ company: "A", source: "suggested" })).toBe("suggested");
+    expect(employerSource({ company: "A" })).toBeNull();
+    expect(employerSource(null)).toBeNull();
   });
 });

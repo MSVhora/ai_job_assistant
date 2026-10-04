@@ -11,12 +11,14 @@ import { AchievementList } from "./AchievementList";
 import { BulkApproveModal } from "./BulkApproveModal";
 import { MergeDialog, type MergeCandidate } from "./MergeDialog";
 import { MergeProposals } from "./MergeProposals";
+import { RepositoryFilter } from "./RepositoryFilter";
 import { ReviewTabs } from "./ReviewTabs";
 import { TAB_HINTS, type ReviewTab } from "./review-tabs";
 
 export function ReviewPageClient() {
   const [tab, setTab] = useState<ReviewTab>("draft");
   const [privateOnly, setPrivateOnly] = useState(false);
+  const [repository, setRepository] = useState("");
   const [offset, setOffset] = useState(0);
   const [selected, setSelected] = useState<ReadonlyMap<string, string>>(new Map());
   const [openId, setOpenId] = useState<string | null>(null);
@@ -80,10 +82,19 @@ export function ReviewPageClient() {
           </Button>
         )}
       </div>
+      <RepositoryFilter
+        value={repository}
+        onChange={(next) => {
+          setRepository(next);
+          setOffset(0);
+          setSelected(new Map());
+        }}
+      />
       {tab === "draft" && <MergeProposals onMerge={setMergePair} />}
       <AchievementList
         tab={tab}
         privateOnly={privateOnly}
+        repository={repository}
         offset={offset}
         selected={selected}
         onSelect={toggle}

@@ -3,6 +3,7 @@
 import { Badge } from "@/components/ui/badge";
 import { Select } from "@/components/ui/select";
 import type { EmployerOption, EvidenceScope } from "@/lib/api";
+import { optionKey, optionRef } from "@/lib/employer-options";
 import { employerKey, employerLabel } from "@/lib/evidence-progress";
 import { viewOf, type ScopePatch } from "@/lib/scope-draft";
 
@@ -10,18 +11,6 @@ const CONTENT_LEVELS = [
   { value: "messages_and_prs", label: "Messages and PRs" },
   { value: "metadata_only", label: "Metadata only" },
 ] as const;
-
-function optionKey(option: EmployerOption): string {
-  return option.kind === "personal"
-    ? "personal"
-    : `${option.company ?? ""}|${option.start_date ?? ""}`;
-}
-
-function optionRef(option: EmployerOption): Record<string, unknown> {
-  return option.kind === "personal"
-    ? { kind: "personal" }
-    : { company: option.company, start_date: option.start_date };
-}
 
 export function ScopeRow({
   scope,

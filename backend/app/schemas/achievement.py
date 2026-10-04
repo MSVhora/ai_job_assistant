@@ -128,6 +128,8 @@ class AchievementUpdate(BaseModel):
     impact_type: ImpactType | None = None
     difficulty: int | None = Field(default=None, ge=1, le=5)
     project_key: str | None = Field(default=None, max_length=255)
+    # An employer you choose here outranks the repository's mapping; null clears the choice so
+    # the achievement follows its repository's employer again.
     employer_ref: dict[str, object] | None = None
     time_start: date | None = None
     time_end: date | None = None

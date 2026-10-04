@@ -86,3 +86,28 @@ export function formatRevisionDiff(diff: Record<string, unknown>): string[] {
     return `${field}: ${JSON.stringify(change)}`;
   });
 }
+
+const GITHUB_REPO = /^[\w.-]+\/[\w.-]+$/;
+
+/** Link to the source repository when the project key is an `owner/repo`, else null. */
+export function repositoryUrl(projectKey: string | null | undefined): string | null {
+  return projectKey !== null && projectKey !== undefined && GITHUB_REPO.test(projectKey)
+    ? `https://github.com/${projectKey}`
+    : null;
+}
+
+export type EmployerSource = "user" | "scope" | "suggested";
+
+/** Who set the achievement's employer: you, its repository's mapping, or the app's suggestion. */
+export function employerSource(
+  ref: Record<string, unknown> | null | undefined,
+): EmployerSource | null {
+  const source = ref?.source;
+  return source === "user" || source === "scope" || source === "suggested" ? source : null;
+}
+
+export const EMPLOYER_SOURCE_NOTES: Record<EmployerSource, string> = {
+  user: "set by you",
+  scope: "from the repository",
+  suggested: "suggested",
+};

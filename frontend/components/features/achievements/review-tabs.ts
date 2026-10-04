@@ -22,6 +22,7 @@ export function paramsForTab(
   tab: ReviewTab,
   privateOnly: boolean,
   offset: number,
+  repository = "",
 ): AchievementListParams {
   const base: AchievementListParams = {
     status: tab === "attention" ? "approved" : tab,
@@ -29,6 +30,7 @@ export function paramsForTab(
     offset,
     ...(tab === "attention" ? { stale: true } : {}),
     ...(privateOnly ? { private: true } : {}),
+    ...(repository === "" ? {} : { project_key: repository }),
   };
   return base;
 }

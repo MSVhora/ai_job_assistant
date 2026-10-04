@@ -5,6 +5,7 @@ import { useAchievement } from "@/hooks/use-achievements";
 
 import { ActionBar } from "./ActionBar";
 import { AchievementBadges } from "./AchievementBadges";
+import { EmployerEditor } from "./EmployerEditor";
 import { EvidencePanel } from "./EvidencePanel";
 import { MetricsList } from "./MetricsList";
 import { RevisionHistory } from "./RevisionHistory";
@@ -60,6 +61,12 @@ export function AchievementDrawer({
           </Section>
           <Section title="Tags">
             <TagsEditor
+              key={`${achievement.id}-${achievement.updated_at}`}
+              achievement={achievement}
+            />
+          </Section>
+          <Section title="Employer">
+            <EmployerEditor
               key={`${achievement.id}-${achievement.updated_at}`}
               achievement={achievement}
             />

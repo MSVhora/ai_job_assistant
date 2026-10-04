@@ -10,6 +10,8 @@ import {
   getBulkEligible,
   getEvidenceItem,
   listAchievementsPage,
+  listEmployers,
+  listGithubScopes,
   listMergeProposals,
   listRevisions,
   mergeAchievements,
@@ -17,6 +19,7 @@ import {
 } from "@/lib/api";
 
 import { renderWithClient } from "../test-utils";
+import { scope } from "../evidence/fixtures";
 import { achievement, item, PENDING_METRIC } from "./fixtures";
 import { ReviewPageClient } from "./ReviewPageClient";
 
@@ -26,6 +29,8 @@ vi.mock("@/lib/api", async (importOriginal) => ({
   getAchievement: vi.fn(),
   getBulkEligible: vi.fn(),
   getEvidenceItem: vi.fn(),
+  listEmployers: vi.fn(),
+  listGithubScopes: vi.fn(),
   listAchievementsPage: vi.fn(),
   listMergeProposals: vi.fn(),
   listRevisions: vi.fn(),
@@ -45,6 +50,8 @@ describe("ReviewPageClient", () => {
       getBulkEligible,
       getEvidenceItem,
       listAchievementsPage,
+      listEmployers,
+      listGithubScopes,
       listMergeProposals,
       listRevisions,
       mergeAchievements,
@@ -54,6 +61,8 @@ describe("ReviewPageClient", () => {
     }
     vi.mocked(listAchievementsPage).mockImplementation(() => page());
     vi.mocked(listMergeProposals).mockResolvedValue([]);
+    vi.mocked(listEmployers).mockResolvedValue([]);
+    vi.mocked(listGithubScopes).mockResolvedValue([]);
     vi.mocked(listRevisions).mockResolvedValue([]);
     vi.mocked(getEvidenceItem).mockResolvedValue(item());
     vi.mocked(runAchievementAction).mockResolvedValue(achievement({ status: "approved" }));
@@ -78,9 +87,34 @@ describe("ReviewPageClient", () => {
     expect(screen.getByText("Private repo")).toBeInTheDocument();
     expect(screen.getByText("Evidence updated — re-review")).toBeInTheDocument();
     expect(screen.getByText("1 to confirm")).toBeInTheDocument();
-    expect(screen.getByText("Acme Corp (Mar 2021)")).toBeInTheDocument();
+    expect(screen.getByText(/Employer: Acme Corp \(Mar 2021\)/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Repository ada/engine" })).toHaveAttribute(
+      "href",
+      "https://github.com/ada/engine",
+    );
     expect(screen.getByText("1 evidence item")).toBeInTheDocument();
     expect(listAchievementsPage).toHaveBeenCalledWith({ status: "draft", limit: 20, offset: 0 });
+  });
+
+  it("filters the list to one repository", async () => {
+    vi.mocked(listGithubScopes).mockResolvedValue([scope({ ref: "ada/engine", enabled: true })]);
+    const user = userEvent.setup();
+    renderWithClient(<ReviewPageClient />);
+    await screen.findByRole("button", { name: "Faster nightly import" });
+
+    await user.selectOptions(
+      await screen.findByRole("combobox", { name: "Repository" }),
+      "ada/engine",
+    );
+
+    await waitFor(() => {
+      expect(listAchievementsPage).toHaveBeenLastCalledWith({
+        status: "draft",
+        limit: 20,
+        offset: 0,
+        project_key: "ada/engine",
+      });
+    });
   });
 
   it("will not approve a draft that has unconfirmed metrics or no evidence", async () => {

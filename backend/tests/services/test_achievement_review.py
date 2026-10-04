@@ -431,6 +431,76 @@ async def test_a_confirmed_repo_employer_is_applied_to_its_existing_achievements
     assert revision.diff == {"employer_ref": [None, {"kind": "personal", "source": "scope"}]}
 
 
+async def set_employer(achievement_id: uuid.UUID, employer: dict[str, Any] | None) -> None:
+    async with session_factory() as session:
+        (await session.get_one(Achievement, achievement_id)).employer_ref = employer
+        await session.commit()
+
+
+async def test_a_repo_employer_never_overwrites_one_the_user_chose_for_an_achievement() -> None:
+    candidate_id, _, items = await seed_evidence_chunk(bodies=BODIES)
+    chosen = await seed_achievement(candidate_id, item_ids=items[:1], title="Mine")
+    following = await seed_achievement(candidate_id, item_ids=items[1:2], title="Follows")
+    personal = {"kind": "personal", "source": "user"}
+    await set_employer(chosen, personal)
+    employer = {"company": "Acme Corp", "start_date": "Mar 2021", "source": "user"}
+
+    changed = await call(review.apply_scope_employer, candidate_id, "ada/engine", employer)
+
+    assert changed == 1
+    assert (await load(chosen)).employer_ref == personal
+    assert (await load(following)).employer_ref == {
+        "company": "Acme Corp",
+        "start_date": "Mar 2021",
+        "source": "scope",
+    }
+    assert await revisions(chosen) == []
+
+
+async def test_a_suggested_employer_is_still_replaced_by_the_repo_mapping() -> None:
+    candidate_id, _, items = await seed_evidence_chunk(bodies=BODIES)
+    suggested = await seed_achievement(candidate_id, item_ids=items[:1])
+    await set_employer(
+        suggested, {"company": "Old Co", "start_date": "2019", "source": "suggested"}
+    )
+
+    await call(
+        review.apply_scope_employer,
+        candidate_id,
+        "ada/engine",
+        {"kind": "personal", "source": "user"},
+    )
+
+    assert (await load(suggested)).employer_ref == {"kind": "personal", "source": "scope"}
+
+
+async def test_clearing_an_achievements_employer_follows_its_repository_again() -> None:
+    candidate_id, _, items = await seed_evidence_chunk(
+        bodies=BODIES, scope_employer={"company": "Acme Corp", "start_date": "Mar 2021"}
+    )
+    achievement_id = await seed_achievement(candidate_id, item_ids=items[:1])
+    await set_employer(achievement_id, {"kind": "personal", "source": "user"})
+
+    await call(review.edit, achievement_id, AchievementUpdate(employer_ref=None))
+
+    assert (await load(achievement_id)).employer_ref == {
+        "company": "Acme Corp",
+        "start_date": "Mar 2021",
+        "source": "scope",
+    }
+    (revision,) = await revisions(achievement_id)
+    assert "employer_ref" in revision.diff
+
+
+async def test_clearing_the_employer_of_an_unmapped_repository_leaves_it_unset() -> None:
+    _, achievement_id, _ = await seeded()
+    await set_employer(achievement_id, {"kind": "personal", "source": "user"})
+
+    await call(review.edit, achievement_id, AchievementUpdate(employer_ref=None))
+
+    assert (await load(achievement_id)).employer_ref is None
+
+
 async def test_revisions_are_listed_newest_first_with_a_total() -> None:
     _, achievement_id, _ = await seeded()
     await call(review.edit, achievement_id, AchievementUpdate(title="Second title"))

@@ -1,20 +1,24 @@
 "use client";
 
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   addProfileExperience,
   estimateEmployerMergeSuggestions,
   listEmployers,
+  listOwners,
   mergeEmployers,
+  setOwnerEmployer,
   suggestEmployerMerges,
   unmergeEmployer,
   type EmployerMergeRequest,
   type EmployerOption,
+  type OwnerSummary,
   type ExperienceCreate,
 } from "@/lib/api";
 
 const EMPLOYERS_KEY = ["evidence-employers"];
+const OWNERS_KEY = ["evidence-owners"];
 
 function useRefreshAfterEmployerChange() {
   const queryClient = useQueryClient();
@@ -75,4 +79,28 @@ export function useEstimateMergeSuggestions() {
 
 export function useSuggestMerges() {
   return useMutation({ mutationFn: suggestEmployerMerges });
+}
+
+export function useOwners(enabled: boolean) {
+  return useQuery({ queryKey: OWNERS_KEY, queryFn: listOwners, enabled });
+}
+
+export function useSetOwnerEmployer() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      owner,
+      employerRef,
+    }: {
+      owner: string;
+      employerRef: Record<string, unknown> | null;
+    }) => setOwnerEmployer(owner, employerRef),
+    onSuccess: async (owners: OwnerSummary[]) => {
+      queryClient.setQueryData(OWNERS_KEY, owners);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["evidence-scopes"] }),
+        queryClient.invalidateQueries({ queryKey: ["achievements"] }),
+      ]);
+    },
+  });
 }

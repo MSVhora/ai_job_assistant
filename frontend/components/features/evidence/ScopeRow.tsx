@@ -55,6 +55,7 @@ export function ScopeRow({
             {scope.is_fork && <Badge>Fork</Badge>}
             {scope.is_new && <Badge variant="ai">New</Badge>}
             {scope.sync_state === "failed" && <Badge variant="danger">Last sync failed</Badge>}
+            {view.employer_ref?.source === "org" && <Badge>Employer from organization</Badge>}
             {patch !== undefined && <Badge variant="ai">Unsaved</Badge>}
           </div>
           {!scope.visible && (

@@ -19,6 +19,8 @@ from app.schemas.evidence import (
     LinkCreate,
     NoteCreate,
     NoteUpdate,
+    OwnerEmployerUpdate,
+    OwnerSummary,
     ResumeIngestRequest,
     ResumeIngestResponse,
     ScopeResponse,
@@ -34,6 +36,7 @@ from app.services import (
     evidence_chunks,
     evidence_items,
     evidence_notes,
+    evidence_organizations,
     evidence_sync,
 )
 from app.services.evidence_pipeline import resume_ingest
@@ -98,6 +101,22 @@ async def list_github_scopes(
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> list[ScopeResponse]:
     return await evidence_sync.list_scopes(session)
+
+
+@router.get("/github/organizations", response_model=list[OwnerSummary])
+async def list_github_organizations(
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> list[OwnerSummary]:
+    return await evidence_organizations.list_owners(session)
+
+
+@router.patch("/github/organizations/{owner}", response_model=list[OwnerSummary])
+async def set_github_organization_employer(
+    owner: str,
+    payload: OwnerEmployerUpdate,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> list[OwnerSummary]:
+    return await evidence_organizations.set_owner_employer(session, owner, payload.employer_ref)
 
 
 @router.post("/github/scopes/refresh", response_model=list[ScopeResponse])

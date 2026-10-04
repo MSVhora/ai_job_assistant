@@ -154,6 +154,11 @@ class EvidenceScopeNotFoundError(DomainError):
     default_detail = "repository not found - list the repositories first"
 
 
+class EvidenceOwnerNotFoundError(DomainError):
+    status_code = 404
+    default_detail = "no repository of this owner is listed - list the repositories first"
+
+
 class SyncRunNotFoundError(DomainError):
     status_code = 404
     default_detail = "evidence sync run not found"

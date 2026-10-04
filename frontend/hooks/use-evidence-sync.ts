@@ -49,6 +49,7 @@ export function useRefreshScopes() {
       queryClient.setQueryData(["evidence-scopes"], scopes);
       void queryClient.invalidateQueries({ queryKey: ["evidence-status"] });
       void queryClient.invalidateQueries({ queryKey: ["evidence-token"] });
+      void queryClient.invalidateQueries({ queryKey: ["evidence-owners"] });
     },
   });
 }
@@ -73,6 +74,7 @@ export function useUpdateScopes() {
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["evidence-scopes"] });
+      void queryClient.invalidateQueries({ queryKey: ["evidence-owners"] });
       void queryClient.invalidateQueries({ queryKey: ["evidence-status"] });
       void queryClient.invalidateQueries({ queryKey: ["achievements"] });
     },

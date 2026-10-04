@@ -578,6 +578,7 @@ erDiagram
         timestamptz last_synced_at
         timestamptz scopes_refreshed_at "when the repository list was last read from GitHub"
         jsonb token_scopes "classic token scopes at that refresh"
+        jsonb owner_employers "GitHub owner to employer: repositories without their own mapping inherit it"
         timestamptz created_at
     }
 

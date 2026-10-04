@@ -197,6 +197,21 @@ class ScopeUpdateItem(BaseModel):
     employer_ref: dict[str, object] | None = None
 
 
+class OwnerSummary(BaseModel):
+    """A GitHub owner (organization or the user's own account) and the employer it maps to."""
+
+    owner: str
+    repos: int
+    selected: int
+    explicit: int
+    employer: dict[str, object] | None
+    personal_account: bool
+
+
+class OwnerEmployerUpdate(BaseModel):
+    employer_ref: dict[str, object] | None = None
+
+
 class ScopeUpdateRequest(BaseModel):
     scopes: list[ScopeUpdateItem] = Field(min_length=1, max_length=200)
     acknowledged_disclosure: bool = False

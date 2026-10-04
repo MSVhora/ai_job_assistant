@@ -79,6 +79,9 @@ class EvidenceSourceAccount(Base):
         DateTime(timezone=True), nullable=True
     )
     token_scopes: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    # {"owners": {"<owner, lowercase>": <employer reference>}}: the employer every repository of
+    # that owner gets unless it was mapped on its own.
+    owner_employers: Mapped[dict[str, object] | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 

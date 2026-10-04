@@ -571,6 +571,40 @@ export interface paths {
         patch: operations["update_github_scopes_api_evidence_github_scopes_patch"];
         trace?: never;
     };
+    "/api/evidence/github/organizations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Github Organizations */
+        get: operations["list_github_organizations_api_evidence_github_organizations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/evidence/github/organizations/{owner}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Set Github Organization Employer */
+        patch: operations["set_github_organization_employer_api_evidence_github_organizations__owner__patch"];
+        trace?: never;
+    };
     "/api/evidence/github/scopes/refresh": {
         parameters: {
             query?: never;
@@ -2817,6 +2851,33 @@ export interface components {
             position: number;
             entry: components["schemas"]["WorkEntry"];
         };
+        /** OwnerEmployerUpdate */
+        OwnerEmployerUpdate: {
+            /** Employer Ref */
+            employer_ref?: {
+                [key: string]: unknown;
+            } | null;
+        };
+        /**
+         * OwnerSummary
+         * @description A GitHub owner (organization or the user's own account) and the employer it maps to.
+         */
+        OwnerSummary: {
+            /** Owner */
+            owner: string;
+            /** Repos */
+            repos: number;
+            /** Selected */
+            selected: number;
+            /** Explicit */
+            explicit: number;
+            /** Employer */
+            employer: {
+                [key: string]: unknown;
+            } | null;
+            /** Personal Account */
+            personal_account: boolean;
+        };
         /** PoolEntry */
         PoolEntry: {
             /**
@@ -4889,6 +4950,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ScopeResponse"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_github_organizations_api_evidence_github_organizations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerSummary"][];
+                };
+            };
+        };
+    };
+    set_github_organization_employer_api_evidence_github_organizations__owner__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                owner: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OwnerEmployerUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OwnerSummary"][];
                 };
             };
             /** @description Validation Error */

@@ -8,6 +8,7 @@ export type EvidenceStatus = Schemas["EvidenceStatusResponse"];
 export type EvidenceScope = Schemas["ScopeResponse"];
 export type ScopeUpdateItem = Schemas["ScopeUpdateItem"];
 export type EmployerOption = Schemas["EmployerOption"];
+export type OwnerSummary = Schemas["OwnerSummary"];
 export type EmployerMergeSuggestion = Schemas["EmployerMergeSuggestion"];
 export type EmployerMergeSuggestions = Schemas["EmployerMergeSuggestionsResponse"];
 export type EmployerMergeRequest = Schemas["EmployerMergeRequest"];
@@ -86,6 +87,20 @@ export async function suggestEmployerMerges(): Promise<EmployerMergeSuggestions>
 
 export async function listEmployers(): Promise<EmployerOption[]> {
   return apiFetch<EmployerOption[]>(`${BASE}/employers`);
+}
+
+export async function listOwners(): Promise<OwnerSummary[]> {
+  return apiFetch<OwnerSummary[]>(`${BASE}/github/organizations`);
+}
+
+export async function setOwnerEmployer(
+  owner: string,
+  employerRef: Record<string, unknown> | null,
+): Promise<OwnerSummary[]> {
+  return apiFetch<OwnerSummary[]>(`${BASE}/github/organizations/${encodeURIComponent(owner)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ employer_ref: employerRef }),
+  });
 }
 
 export async function startGithubSync(mode: SyncMode): Promise<SyncStart> {

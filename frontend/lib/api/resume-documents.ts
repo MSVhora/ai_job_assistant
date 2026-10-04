@@ -33,10 +33,13 @@ function path(id: string, suffix = ""): string {
   return `${BASE}/${encodeURIComponent(id)}${suffix}`;
 }
 
-function send<T>(url: string, method: string, body?: unknown): Promise<T> {
+const MODEL_CALL_TIMEOUT_MS = 180_000;
+
+function send<T>(url: string, method: string, body?: unknown, timeoutMs?: number): Promise<T> {
   return apiFetch<T>(url, {
     method,
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    ...(timeoutMs === undefined ? {} : { timeoutMs }),
   });
 }
 
@@ -58,7 +61,7 @@ export function listResumeDocuments(
 }
 
 export function createResumeDocument(payload: ResumeDocumentCreate): Promise<ResumeDocument> {
-  return send<ResumeDocument>(BASE, "POST", payload);
+  return send<ResumeDocument>(BASE, "POST", payload, MODEL_CALL_TIMEOUT_MS);
 }
 
 export function getResumeDocument(id: string): Promise<ResumeDocument> {
@@ -85,6 +88,7 @@ export function regenerateResumeDocument(id: string, blockId?: string): Promise<
     path(id, "/regenerate"),
     "POST",
     blockId === undefined ? undefined : { block_id: blockId },
+    MODEL_CALL_TIMEOUT_MS,
   );
 }
 
@@ -123,11 +127,18 @@ export function includeRoleAnyway(id: string, blockId: string): Promise<ResumeDo
   return send<ResumeDocument>(
     path(id, `/roles/${encodeURIComponent(blockId)}/include-anyway`),
     "POST",
+    undefined,
+    MODEL_CALL_TIMEOUT_MS,
   );
 }
 
 export function writeAchievementBullet(id: string, achievementId: string): Promise<ResumeDocument> {
-  return send<ResumeDocument>(path(id, `/write/${encodeURIComponent(achievementId)}`), "POST");
+  return send<ResumeDocument>(
+    path(id, `/write/${encodeURIComponent(achievementId)}`),
+    "POST",
+    undefined,
+    MODEL_CALL_TIMEOUT_MS,
+  );
 }
 
 export function addResumeComment(id: string, payload: CommentCreate): Promise<ResumeDocument> {
@@ -139,7 +150,12 @@ export function deleteResumeComment(id: string, commentId: string): Promise<Resu
 }
 
 export function applyResumeComments(id: string): Promise<ResumeDocument> {
-  return send<ResumeDocument>(path(id, "/apply-comments"), "POST");
+  return send<ResumeDocument>(
+    path(id, "/apply-comments"),
+    "POST",
+    undefined,
+    MODEL_CALL_TIMEOUT_MS,
+  );
 }
 
 export function getResumeConflicts(id: string): Promise<ResumeConflicts> {

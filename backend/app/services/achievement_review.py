@@ -196,9 +196,7 @@ async def edit(
         else:
             facts = await load_profile_facts(session, achievement.candidate_id)
             try:
-                data["employer_ref"] = normalize_employer_ref(
-                    data["employer_ref"], facts.experiences
-                )
+                data["employer_ref"] = normalize_employer_ref(data["employer_ref"], facts.groups)
             except ValueError as exc:
                 raise InvalidAchievementInputError(str(exc)) from exc
     for name, value in data.items():

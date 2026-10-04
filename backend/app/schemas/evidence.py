@@ -155,10 +155,17 @@ class TokenCheckResponse(BaseModel):
 
 
 class EmployerOption(BaseModel):
+    """One employer: all of a company's experience entries together, or personal work."""
+
     kind: Literal["experience", "personal"]
     label: str
     company: str | None = None
     start_date: str | None = None
+    key: str = "personal"
+    entries: int = 0
+    span: str | None = None
+    aliases: list[str] = Field(default_factory=list)
+    merged_from: list[str] = Field(default_factory=list)
 
 
 class ScopeUpdateItem(BaseModel):

@@ -33,7 +33,7 @@ from app.models import (
 )
 from app.services import achievement_extraction
 from app.services.achievement_extraction import estimate, run_extraction, start_extraction
-from app.services.employer_mapping import Experience, suggest_employer
+from app.services.employer_mapping import Experience, group_experiences, suggest_employer
 
 pytestmark = pytest.mark.usefixtures("clean_tables")
 
@@ -460,7 +460,7 @@ async def test_employer_comes_from_the_scope_else_from_date_overlap(
     (draft,) = await drafts()
     assert draft.employer_ref == {
         "company": "Acme Corp",
-        "start_date": "Jan 2024",
+        "start_date": None,
         "source": "suggested",
     }
 
@@ -482,15 +482,17 @@ async def test_a_scope_employer_overrides_the_suggestion(monkeypatch: pytest.Mon
 
 
 def test_suggest_employer_skips_non_repository_chunks_and_non_overlapping_ranges() -> None:
-    experience = Experience("Acme", "Jan 2024", date(2024, 1, 1), date(2024, 12, 31))
+    groups = group_experiences(
+        [Experience("Acme", "Jan 2024", date(2024, 1, 1), date(2024, 12, 31))]
+    )
     during = date(2024, 5, 1)
     after = date(2026, 1, 1)
 
-    assert suggest_employer("ada/engine", during, during, [experience])["company"] == "Acme"  # type: ignore[index]
-    assert suggest_employer("resume:Acme", during, during, [experience]) is None
-    assert suggest_employer("note:ideas", during, during, [experience]) is None
-    assert suggest_employer("ada/engine", after, after, [experience]) is None
-    assert suggest_employer("ada/engine", None, None, [experience]) is None
+    assert suggest_employer("ada/engine", during, during, groups)["company"] == "Acme"  # type: ignore[index]
+    assert suggest_employer("resume:Acme", during, during, groups) is None
+    assert suggest_employer("note:ideas", during, during, groups) is None
+    assert suggest_employer("ada/engine", after, after, groups) is None
+    assert suggest_employer("ada/engine", None, None, groups) is None
 
 
 def test_fake_vector_dimension_matches_the_pinned_embedding_size() -> None:

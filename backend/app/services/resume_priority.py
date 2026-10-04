@@ -1,12 +1,13 @@
 import math
 import uuid
-from collections.abc import Iterable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, replace
 from datetime import date
 
 from app.core.config import Settings
 from app.models import Achievement
 from app.schemas.resume_document import TailoringStrength, WorkEntry
+from app.services.company_names import normalize_company
 from app.services.profile_derivation import resolve_date
 from app.services.resume_terms import canon
 
@@ -204,13 +205,21 @@ class Omission:
 
 
 def resolve_overlaps(
-    roles: Sequence[RoleSpan], min_days: int, forced: frozenset[str] = frozenset()
+    roles: Sequence[RoleSpan],
+    min_days: int,
+    forced: frozenset[str] = frozenset(),
+    company_key: Callable[[str | None], str] = normalize_company,
 ) -> tuple[list[RoleSpan], list[Omission]]:
     """Keep the higher-priority role of any overlapping pair (tie: the more recent).
 
     Roles in `forced` ("include anyway") are always kept and neither block nor are blocked by
-    other roles. Unparsable dates never overlap. Results keep the input order.
+    other roles. Unparsable dates never overlap. Roles at the same employer never block each
+    other (concurrent stints at one company are not a conflict). Results keep the input order.
     """
+
+    def same_employer(first: RoleSpan, second: RoleSpan) -> bool:
+        key = company_key(first.company)
+        return key != "" and key == company_key(second.company)
 
     def order(role: RoleSpan) -> tuple[float, int, str]:
         anchor = role.end or role.start
@@ -219,7 +228,14 @@ def resolve_overlaps(
     blockers: list[RoleSpan] = []
     omitted: list[Omission] = []
     for role in sorted((item for item in roles if item.block_id not in forced), key=order):
-        blocker = next((item for item in blockers if overlap_days(role, item) >= min_days), None)
+        blocker = next(
+            (
+                item
+                for item in blockers
+                if overlap_days(role, item) >= min_days and not same_employer(role, item)
+            ),
+            None,
+        )
         if blocker is None:
             blockers.append(role)
         else:

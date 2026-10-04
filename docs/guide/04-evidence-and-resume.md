@@ -17,8 +17,10 @@ later features build on. Nothing here changes jobs, matches or your profile.
      only sees that owner's repositories, so it cannot cover both your own and an organization's.
      An organization may need to allow fine-grained tokens and approve yours.
    - **Classic token** — use this when most of your work is in repositories you collaborate on
-     inside one or more organizations. Tick the `repo` scope (and `read:org` if an organization
-     hides its membership). It lists everything you can access in one go, but it is broader than
+     inside one or more organizations. Tick the top-level **`repo`** checkbox, "Full control of
+     private repositories" (ticking only its sub-boxes, such as `public_repo`, does not grant private
+     access: private repositories then silently disappear), and `read:org` if an organization
+     hides its membership. It lists everything you can access in one go, but it is broader than
      the app needs (GitHub offers no read-only repository scope for classic tokens; the app only
      ever reads). If the organization enforces SAML single sign-on, open the token on GitHub and
      choose *Configure SSO → Authorize* for that organization, or its repositories stay hidden.

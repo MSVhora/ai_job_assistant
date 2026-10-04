@@ -6,7 +6,6 @@ from typing import Any
 import httpx
 import pytest
 
-from app.adapters.evidence_sources import github as github_module
 from app.adapters.evidence_sources.base import (
     EvidenceSourceConfigError,
     EvidenceSourceError,
@@ -89,7 +88,6 @@ class FakeGitHub:
 
 @pytest.fixture(autouse=True)
 def _fast_settings(monkeypatch: pytest.MonkeyPatch) -> None:
-    github_module._CONTRIBUTED_CACHE.clear()
     settings = get_settings()
     monkeypatch.setattr(settings, "github_token", TOKEN)
     monkeypatch.setattr(settings, "llm_retry_attempts", 2)
@@ -200,17 +198,6 @@ async def test_an_old_repo_without_contributions_is_flagged_outside_the_lookback
 
     assert scopes["ada/ancient"].outside_lookback is True
     assert not any(scope.contributed for scope in scopes.values())
-
-
-async def test_the_contribution_history_is_cached_between_listings() -> None:
-    fake = FakeGitHub()
-
-    await source_for(fake).list_scopes()
-    graphql_calls = len(fake.graphql_bodies)
-    await source_for(fake).list_scopes()
-
-    assert graphql_calls == 3
-    assert len(fake.graphql_bodies) == graphql_calls
 
 
 async def test_a_failing_contribution_query_degrades_to_the_plain_repository_list() -> None:

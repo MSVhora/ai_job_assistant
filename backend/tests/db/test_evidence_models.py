@@ -267,3 +267,20 @@ async def test_updated_at_trigger_exists_on_every_evidence_table_with_the_column
         f"trg_{table}_set_updated_at"
         for table in ("evidence_chunk", "evidence_item", "evidence_scope", "evidence_sync_run")
     ]
+
+
+async def test_scope_listing_cache_columns_have_safe_defaults() -> None:
+    candidate_id = await _candidate_id()
+    source_id = await _source(candidate_id)
+    async with session_factory() as session:
+        session.add(EvidenceScope(source_id=source_id, ref="ada/engine"))
+        await session.commit()
+
+    async with session_factory() as session:
+        scope = (await session.execute(select(EvidenceScope))).scalars().one()
+        account = (await session.execute(select(EvidenceSourceAccount))).scalars().one()
+
+    assert (scope.is_fork, scope.contributed, scope.new_since_refresh) == (False, False, False)
+    assert scope.visible is True
+    assert (scope.description, scope.pushed_at) == (None, None)
+    assert (account.scopes_refreshed_at, account.token_scopes) == (None, None)

@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Literal, cast
 
 from fastapi import BackgroundTasks
-from sqlalchemy import Select, func, select, update
+from sqlalchemy import Select, func, select, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -74,6 +74,8 @@ logger = logging.getLogger(__name__)
 
 SyncMode = Literal["incremental", "full"]
 SOURCE_KIND = "github"
+# One refresh at a time: two tabs must not race the (source_id, ref) unique index.
+SCOPE_REFRESH_LOCK_KEY = 5_150_028
 ACTIVE_STATUSES = (SyncStatus.pending, SyncStatus.running)
 ABANDONED_ERROR = "run abandoned - in-flight lock released"
 STORAGE_WARNING = "could not store evidence"
@@ -143,28 +145,24 @@ def _run_response(run: EvidenceSyncRun) -> SyncRunResponse:
 
 
 def _scope_response(
-    scope: EvidenceScope,
-    live: ScopeCandidate | None,
-    *,
-    is_new: bool,
-    suggested: dict[str, object] | None = None,
+    scope: EvidenceScope, *, suggested: dict[str, object] | None = None
 ) -> ScopeResponse:
-    """`visible` is false for a stored scope the provider no longer lists (lost access, deleted)."""
+    """A stored scope as the page sees it; `visible` is false once a refresh no longer lists it."""
     return ScopeResponse(
         ref=scope.ref,
         is_private=scope.is_private,
-        is_fork=live.is_fork if live else False,
-        description=live.description if live else None,
-        pushed_at=live.pushed_at if live else None,
+        is_fork=scope.is_fork,
+        description=scope.description,
+        pushed_at=scope.pushed_at,
         enabled=scope.enabled,
-        is_new=is_new,
+        is_new=scope.new_since_refresh,
         content_level=scope.content_level,
         sync_state=scope.sync_state.value,
         last_synced_at=scope.last_synced_at,
         employer_ref=scope.employer_ref,
         suggested_employer=suggested,
-        contributed=live.contributed if live else False,
-        visible=live is not None,
+        contributed=scope.contributed,
+        visible=scope.visible,
     )
 
 
@@ -192,6 +190,7 @@ async def get_status(session: AsyncSession) -> EvidenceStatusResponse:
             scopes_total=0,
             scopes_enabled=0,
             scopes_unmapped=0,
+            scopes_refreshed_at=None,
             latest_sync=None,
         )
     scopes = await _stored_scopes(session, account.id)
@@ -209,6 +208,7 @@ async def get_status(session: AsyncSession) -> EvidenceStatusResponse:
         acknowledged_at=account.acknowledged_at,
         last_synced_at=account.last_synced_at,
         scopes_total=len(scopes),
+        scopes_refreshed_at=account.scopes_refreshed_at,
         scopes_enabled=sum(1 for scope in scopes.values() if scope.enabled),
         scopes_unmapped=sum(
             1
@@ -252,29 +252,29 @@ async def _suggestions(
     return suggestions
 
 
-async def check_token() -> TokenCheckResponse:
-    """What the configured token can do, so a missing `repo` scope is reported, not silent.
+async def check_token(session: AsyncSession) -> TokenCheckResponse | None:
+    """What the token could do at the last refresh; null until a refresh has happened.
 
-    Classic tokens report their scopes; fine-grained tokens report none, so their private
-    access is unknown here and shows up as missing repositories instead.
+    Stored, not asked of GitHub on every page load. Classic tokens report their scopes;
+    fine-grained tokens report none, so for them a missing private repository is the symptom.
     """
-    source = _require_source()
-    try:
-        identity = await source.identify()
-    except EvidenceSourceError as exc:
-        logger.warning("evidence.token failed error_type=%s", type(exc).__name__)
-        raise EvidenceSourceUnavailableError(str(exc)) from exc
-    scopes = sorted(identity.permissions)
+    candidate_id = await _candidate_id(session)
+    account = None
+    if candidate_id is not None:
+        account = (await session.execute(_select_account(candidate_id))).scalar_one_or_none()
+    if account is None or account.scopes_refreshed_at is None or account.account_login is None:
+        return None
+    scopes = sorted(account.token_scopes or [])
     classic = bool(scopes)
     private_access = ("repo" in scopes) if classic else None
     warnings: list[str] = []
     if private_access is False:
         warnings.append(
             "This classic token lacks the top-level `repo` scope, so private repositories are "
-            "hidden. Edit the token on GitHub and tick `repo`, then reload this page."
+            "hidden. Edit the token on GitHub and tick `repo`, then refresh the repository list."
         )
     return TokenCheckResponse(
-        login=identity.login,
+        login=account.account_login,
         token_type="classic" if classic else "fine_grained_or_app",
         scopes=scopes,
         private_access=private_access,
@@ -282,10 +282,57 @@ async def check_token() -> TokenCheckResponse:
     )
 
 
+def _list_order(scope: EvidenceScope) -> tuple[bool, bool, float, str]:
+    """Still listed first, then most recently pushed; contributed-only repos (no push date) last."""
+    pushed = scope.pushed_at
+    return (not scope.visible, pushed is None, -pushed.timestamp() if pushed else 0.0, scope.ref)
+
+
 async def list_scopes(session: AsyncSession) -> list[ScopeResponse]:
+    """The stored repository list; never calls GitHub (see `refresh_scopes`)."""
+    candidate = await get_or_create_candidate(session)
+    account = await _get_or_create_account(session, candidate.id)
+    scopes = sorted((await _stored_scopes(session, account.id)).values(), key=_list_order)
+    suggestions = await _suggestions(session, candidate.id, scopes)
+    return [_scope_response(scope, suggested=suggestions.get(scope.id)) for scope in scopes]
+
+
+def _apply_listing(
+    session: AsyncSession,
+    account: EvidenceSourceAccount,
+    stored: dict[str, EvidenceScope],
+    live: list[ScopeCandidate],
+) -> None:
+    """Store what the provider listed. Nothing is ever enabled here; new repos start disabled."""
+    for scope in stored.values():
+        scope.visible = False
+        scope.new_since_refresh = False
+    for candidate in live:
+        scope = stored.get(candidate.ref)
+        if scope is None:
+            if candidate.outside_lookback:
+                continue
+            scope = EvidenceScope(
+                source_id=account.id, ref=candidate.ref, enabled=False, new_since_refresh=True
+            )
+            session.add(scope)
+            stored[candidate.ref] = scope
+        scope.is_private = candidate.is_private
+        scope.is_fork = candidate.is_fork
+        scope.description = candidate.description
+        scope.pushed_at = candidate.pushed_at
+        scope.contributed = candidate.contributed
+        scope.visible = True
+
+
+async def refresh_scopes(session: AsyncSession) -> list[ScopeResponse]:
+    """Ask GitHub for the repository list and store it. User-triggered, about ten seconds."""
     source = _require_source()
     candidate = await get_or_create_candidate(session)
     account = await _get_or_create_account(session, candidate.id)
+    await session.execute(
+        text("SELECT pg_advisory_xact_lock(:key)"), {"key": SCOPE_REFRESH_LOCK_KEY}
+    )
     try:
         identity = await source.identify()
         live = await source.list_scopes()
@@ -293,41 +340,12 @@ async def list_scopes(session: AsyncSession) -> list[ScopeResponse]:
         logger.warning("evidence.scopes failed error_type=%s", type(exc).__name__)
         raise EvidenceSourceUnavailableError(str(exc)) from exc
     account.account_login = identity.login
-    stored = await _stored_scopes(session, account.id)
-    new_refs: set[str] = set()
-    matched: list[tuple[EvidenceScope, ScopeCandidate]] = []
-    for candidate_scope in live:
-        scope = stored.pop(candidate_scope.ref, None)
-        if scope is None:
-            if candidate_scope.outside_lookback:
-                continue
-            scope = EvidenceScope(
-                source_id=account.id,
-                ref=candidate_scope.ref,
-                is_private=candidate_scope.is_private,
-                enabled=False,
-            )
-            session.add(scope)
-            new_refs.add(candidate_scope.ref)
-        scope.is_private = candidate_scope.is_private
-        matched.append((scope, candidate_scope))
+    account.token_scopes = sorted(identity.permissions)
+    account.scopes_refreshed_at = datetime.now(UTC)
+    _apply_listing(session, account, await _stored_scopes(session, account.id), live)
     await session.flush()
-    everything = [scope for scope, _ in matched] + list(stored.values())
-    suggestions = await _suggestions(session, candidate.id, everything)
-    responses = [
-        _scope_response(
-            scope,
-            candidate_scope,
-            is_new=scope.ref in new_refs,
-            suggested=suggestions.get(scope.id),
-        )
-        for scope, candidate_scope in matched
-    ]
-    responses.extend(
-        _scope_response(scope, None, is_new=False, suggested=suggestions.get(scope.id))
-        for scope in stored.values()
-    )
-    return responses
+    logger.info("evidence.scopes refreshed listed=%d", len(live))
+    return await list_scopes(session)
 
 
 async def update_scopes(session: AsyncSession, payload: ScopeUpdateRequest) -> list[ScopeResponse]:
@@ -360,7 +378,7 @@ async def update_scopes(session: AsyncSession, payload: ScopeUpdateRequest) -> l
         if item.ref in employers:
             scope.employer_ref = employers[item.ref]
             await apply_scope_employer(session, candidate.id, scope.ref, employers[item.ref])
-        updated.append(_scope_response(scope, None, is_new=False))
+        updated.append(_scope_response(scope))
     await session.flush()
     return updated
 

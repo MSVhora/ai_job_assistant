@@ -50,9 +50,11 @@ async def list_employers(
     return await evidence_sync.employer_options(session)
 
 
-@router.get("/github/token", response_model=TokenCheckResponse)
-async def github_token() -> TokenCheckResponse:
-    return await evidence_sync.check_token()
+@router.get("/github/token", response_model=TokenCheckResponse | None)
+async def github_token(
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> TokenCheckResponse | None:
+    return await evidence_sync.check_token(session)
 
 
 @router.get("/github/scopes", response_model=list[ScopeResponse])
@@ -60,6 +62,13 @@ async def list_github_scopes(
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> list[ScopeResponse]:
     return await evidence_sync.list_scopes(session)
+
+
+@router.post("/github/scopes/refresh", response_model=list[ScopeResponse])
+async def refresh_github_scopes(
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> list[ScopeResponse]:
+    return await evidence_sync.refresh_scopes(session)
 
 
 @router.patch("/github/scopes", response_model=list[ScopeResponse])

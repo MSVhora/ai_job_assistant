@@ -1,6 +1,5 @@
 import logging
 import re
-import time
 from collections.abc import AsyncIterator, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -50,7 +49,6 @@ HTTP_CLIENT_ERROR = 400
 JSON_ACCEPT = "application/vnd.github+json"
 RAW_ACCEPT = "application/vnd.github.raw+json"
 REF_RE = re.compile(r"^[\w.-]+/[\w.-]+$")
-CONTRIBUTED_TTL_S = 300.0
 CONTRIBUTION_FIELDS = (
     "commitContributionsByRepository",
     "pullRequestContributionsByRepository",
@@ -67,9 +65,6 @@ CONTRIBUTIONS_QUERY = (
     )
     + " } } }"
 )
-# Contribution history per (login, token scopes): the repository list is read on every page
-# load and a source instance lives for one request, so the ~13 GraphQL calls are cached briefly.
-_CONTRIBUTED_CACHE: dict[str, tuple[float, dict[str, bool]]] = {}
 
 COMMITS_QUERY = """
 query($owner: String!, $name: String!, $author: ID!, $since: GitTimestamp, $after: String) {
@@ -496,8 +491,7 @@ class GitHubSource:
                     listed[candidate.ref] = candidate
             if len(rows) < REPOS_PER_PAGE:
                 break
-        identity = await self.identify()
-        for ref, private in (await self._contributed(identity)).items():
+        for ref, private in (await self._contributed()).items():
             known = listed.get(ref)
             if known is None:
                 listed[ref] = ScopeCandidate(ref=ref, is_private=private, contributed=True)
@@ -506,19 +500,13 @@ class GitHubSource:
                 known.outside_lookback = False
         return list(listed.values())
 
-    async def _contributed(self, identity: SourceIdentity) -> dict[str, bool]:
+    async def _contributed(self) -> dict[str, bool]:
         """Repository -> private, for every year you have contributions; never fails the list."""
-        key = f"{identity.login}|{','.join(sorted(identity.permissions))}"
-        cached = _CONTRIBUTED_CACHE.get(key)
-        if cached is not None and time.monotonic() - cached[0] < CONTRIBUTED_TTL_S:
-            return dict(cached[1])
         try:
-            refs = await self._fetch_contributed()
+            return await self._fetch_contributed()
         except EvidenceSourceError as exc:
             logger.warning("evidence.contributed failed error_type=%s", type(exc).__name__)
             return {}
-        _CONTRIBUTED_CACHE[key] = (time.monotonic(), refs)
-        return dict(refs)
 
     async def _fetch_contributed(self) -> dict[str, bool]:
         data = await self._graphql(CONTRIBUTION_YEARS_QUERY, {}, tolerate_errors=True)

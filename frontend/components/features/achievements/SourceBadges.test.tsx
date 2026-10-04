@@ -19,7 +19,7 @@ describe("SourceBadges", () => {
       "href",
       "https://github.com/ada/engine",
     );
-    expect(screen.getByText("Employer: Acme Corp (Mar 2021) · from the repository")).toBeVisible();
+    expect(screen.getByText("Employer: Acme Corp · from the repository")).toBeVisible();
   });
 
   it("says when you set the employer yourself, including for personal work", () => {
@@ -41,7 +41,7 @@ describe("SourceBadges", () => {
       />,
     );
 
-    expect(screen.getByText("Employer: Old Co (2019) · suggested")).toBeVisible();
+    expect(screen.getByText("Employer: Old Co · suggested")).toBeVisible();
   });
 
   it("says the employer is not set and still shows the repository", () => {

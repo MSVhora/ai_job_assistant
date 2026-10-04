@@ -13,7 +13,7 @@ import {
 } from "@/lib/api";
 
 import { renderWithClient } from "../test-utils";
-import { scope, status } from "./fixtures";
+import { employerOption, PERSONAL_OPTION, scope, status } from "./fixtures";
 import { ScopeTable } from "./ScopeTable";
 
 vi.mock("@/lib/api", async (importOriginal) => ({
@@ -25,15 +25,7 @@ vi.mock("@/lib/api", async (importOriginal) => ({
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-const EMPLOYERS = [
-  {
-    kind: "experience" as const,
-    label: "Acme Corp (Mar 2021)",
-    company: "Acme Corp",
-    start_date: "Mar 2021",
-  },
-  { kind: "personal" as const, label: "Personal / open source", company: null, start_date: null },
-];
+const EMPLOYERS = [employerOption("Acme Corp", { label: "Acme Corp (Mar 2021)" }), PERSONAL_OPTION];
 
 const include = (ref: string) => ({ name: `Include ${ref}` });
 
@@ -576,9 +568,7 @@ describe("ScopeTable", () => {
     const user = userEvent.setup();
     renderWithClient(<ScopeTable status={status()} />);
 
-    await user.click(
-      await screen.findByRole("button", { name: /Suggested: Acme Corp \(Mar 2021\)/ }),
-    );
+    await user.click(await screen.findByRole("button", { name: /Suggested: Acme Corp — use/ }));
     await user.click(screen.getByRole("button", { name: "Save changes" }));
 
     await waitFor(() => {

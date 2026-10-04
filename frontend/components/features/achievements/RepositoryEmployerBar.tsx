@@ -3,20 +3,20 @@
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { EmployerSelect } from "@/components/features/employers/EmployerSelect";
 import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/select";
 import { useEmployers, useUpdateScopes } from "@/hooks/use-evidence-sync";
 import type { EvidenceScope } from "@/lib/api";
-import { findOption, optionKey, optionRef } from "@/lib/employer-options";
-import { employerKey } from "@/lib/evidence-progress";
+import { findOption, keyForRef, optionRef } from "@/lib/employer-options";
 
 /** Maps a repository to an employer; every achievement from it follows, except your own choices. */
 export function RepositoryEmployerBar({ scope }: { scope: EvidenceScope }) {
   const employers = useEmployers();
   const update = useUpdateScopes();
-  const saved = employerKey(scope.employer_ref);
-  const [value, setValue] = useState(saved);
   const options = employers.data ?? [];
+  const saved = keyForRef(options, scope.employer_ref);
+  const [chosen, setChosen] = useState<string | null>(null);
+  const value = chosen ?? saved;
 
   const apply = () => {
     const chosen = findOption(options, value);
@@ -39,22 +39,15 @@ export function RepositoryEmployerBar({ scope }: { scope: EvidenceScope }) {
         <label htmlFor="repository-employer" className="text-sm font-semibold text-gray-800">
           Employer for {scope.ref}
         </label>
-        <Select
+        <EmployerSelect
           id="repository-employer"
           value={value}
+          options={options}
+          noneLabel="Not mapped (treated as a project)"
           disabled={employers.isPending || update.isPending}
           className="w-64"
-          onChange={(event) => {
-            setValue(event.target.value);
-          }}
-        >
-          <option value="">Not mapped (treated as a project)</option>
-          {options.map((option) => (
-            <option key={optionKey(option)} value={optionKey(option)}>
-              {option.label}
-            </option>
-          ))}
-        </Select>
+          onChange={setChosen}
+        />
         <Button disabled={update.isPending || value === saved} onClick={apply}>
           {update.isPending ? "Applying…" : "Apply to this repository"}
         </Button>

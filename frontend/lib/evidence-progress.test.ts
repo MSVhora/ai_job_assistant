@@ -109,11 +109,11 @@ describe("helpers", () => {
   });
 
   it("labels and keys employer references", () => {
-    expect(employerLabel({ company: "Acme", start_date: "Mar 2021" })).toBe("Acme (Mar 2021)");
+    expect(employerLabel({ company: "Acme", start_date: "Mar 2021" })).toBe("Acme");
     expect(employerLabel({ company: "Acme" })).toBe("Acme");
     expect(employerLabel({ kind: "personal" })).toBe("Personal / open source");
     expect(employerLabel(null)).toBeNull();
-    expect(employerKey({ company: "Acme", start_date: "Mar 2021" })).toBe("Acme|Mar 2021");
+    expect(employerKey({ company: "Acme", start_date: "Mar 2021" })).toBe("Acme");
     expect(employerKey({ kind: "personal" })).toBe("personal");
     expect(employerKey(null)).toBe("");
   });

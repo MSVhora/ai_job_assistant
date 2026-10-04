@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { listEmployers, listGithubScopes, updateGithubScopes } from "@/lib/api";
 
 import { renderWithClient } from "../test-utils";
-import { scope } from "../evidence/fixtures";
+import { employerOption, PERSONAL_OPTION, scope } from "../evidence/fixtures";
 import { RepositoryFilter } from "./RepositoryFilter";
 
 vi.mock("@/lib/api", async (importOriginal) => ({
@@ -16,15 +16,7 @@ vi.mock("@/lib/api", async (importOriginal) => ({
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-const EMPLOYERS = [
-  {
-    kind: "experience" as const,
-    label: "Acme Corp (Mar 2021)",
-    company: "Acme Corp",
-    start_date: "Mar 2021",
-  },
-  { kind: "personal" as const, label: "Personal / open source", company: null, start_date: null },
-];
+const EMPLOYERS = [employerOption("Acme Corp", { label: "Acme Corp (Mar 2021)" }), PERSONAL_OPTION];
 
 describe("RepositoryFilter", () => {
   beforeEach(() => {
@@ -73,7 +65,7 @@ describe("RepositoryFilter", () => {
 
     await waitFor(() => {
       expect(updateGithubScopes).toHaveBeenCalledWith(
-        [{ ref: "ada/engine", employer_ref: { company: "Acme Corp", start_date: "Mar 2021" } }],
+        [{ ref: "ada/engine", employer_ref: { company: "Acme Corp" } }],
         false,
       );
     });

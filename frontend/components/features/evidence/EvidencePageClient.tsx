@@ -2,6 +2,8 @@
 
 import { useEvidenceStatus } from "@/hooks/use-evidence-sync";
 
+import { EmployersPanel } from "@/components/features/employers/EmployersPanel";
+
 import { ConnectStatus } from "./ConnectStatus";
 import { ExtractionPanel } from "./ExtractionPanel";
 import { NotesPanel } from "./NotesPanel";
@@ -35,6 +37,7 @@ export function EvidencePageClient() {
     <div className="flex flex-col gap-5">
       <ConnectStatus status={status.data} />
       <ScopeTable status={status.data} />
+      <EmployersPanel />
       <SyncPanel status={status.data} />
       <NotesPanel />
       <ExtractionPanel />

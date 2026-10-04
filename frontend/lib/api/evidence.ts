@@ -2,11 +2,15 @@ import { apiFetch, apiFetchVoid, apiFetchWithTotal } from "./client";
 import type { components } from "./schema";
 
 type Schemas = components["schemas"];
+type Estimate = Schemas["CostEstimateResponse"];
 
 export type EvidenceStatus = Schemas["EvidenceStatusResponse"];
 export type EvidenceScope = Schemas["ScopeResponse"];
 export type ScopeUpdateItem = Schemas["ScopeUpdateItem"];
 export type EmployerOption = Schemas["EmployerOption"];
+export type EmployerMergeSuggestion = Schemas["EmployerMergeSuggestion"];
+export type EmployerMergeSuggestions = Schemas["EmployerMergeSuggestionsResponse"];
+export type EmployerMergeRequest = Schemas["EmployerMergeRequest"];
 export type TokenCheck = Schemas["TokenCheckResponse"];
 export type SyncRun = Schemas["SyncRunResponse"];
 export type SyncStart = Schemas["SyncStartResponse"];
@@ -49,6 +53,32 @@ export async function getTokenCheck(): Promise<TokenCheck | null> {
 /** Asks GitHub for the repository list and stores it; takes several seconds. */
 export async function refreshGithubScopes(): Promise<EvidenceScope[]> {
   return apiFetch<EvidenceScope[]>(`${BASE}/github/scopes/refresh`, {
+    method: "POST",
+    timeoutMs: 120_000,
+  });
+}
+
+export async function mergeEmployers(payload: EmployerMergeRequest): Promise<EmployerOption[]> {
+  return apiFetch<EmployerOption[]>(`${BASE}/employers/merges`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function unmergeEmployer(key: string): Promise<EmployerOption[]> {
+  return apiFetch<EmployerOption[]>(`${BASE}/employers/merges/${encodeURIComponent(key)}`, {
+    method: "DELETE",
+  });
+}
+
+export async function estimateEmployerMergeSuggestions(): Promise<Estimate> {
+  return apiFetch<Estimate>(`${BASE}/employers/merge-suggestions/estimate`, {
+    method: "POST",
+  });
+}
+
+export async function suggestEmployerMerges(): Promise<EmployerMergeSuggestions> {
+  return apiFetch<EmployerMergeSuggestions>(`${BASE}/employers/merge-suggestions`, {
     method: "POST",
     timeoutMs: 120_000,
   });

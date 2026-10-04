@@ -445,6 +445,7 @@ erDiagram
 
     candidate {
         uuid id PK
+        jsonb employer_merges "confirmed company merges: groups of names that are one employer"
         timestamptz created_at
         timestamptz updated_at
     }

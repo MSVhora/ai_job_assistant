@@ -1166,7 +1166,8 @@ export interface paths {
         get?: never;
         put?: never;
         post?: never;
-        delete?: never;
+        /** Remove Resume Bullet */
+        delete: operations["remove_resume_bullet_api_resume_documents__document_id__bullets__bullet_id__delete"];
         options?: never;
         head?: never;
         /** Update Resume Bullet */
@@ -5972,6 +5973,38 @@ export interface operations {
                 "application/json": components["schemas"]["RegenerateRequest"] | null;
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumeDocumentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_resume_bullet_api_resume_documents__document_id__bullets__bullet_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                document_id: string;
+                bullet_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {

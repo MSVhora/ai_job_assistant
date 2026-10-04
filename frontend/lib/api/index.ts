@@ -284,3 +284,4 @@ export async function tuneSearchQueries(profileId: string): Promise<SearchQuerie
 
 export * from "./achievements";
 export * from "./evidence";
+export * from "./resume-documents";

@@ -194,6 +194,17 @@ async def update_resume_bullet(
     return await resume_bullets.update_bullet(session, document_id, bullet_id, payload)
 
 
+@router.delete(
+    "/resume-documents/{document_id}/bullets/{bullet_id}", response_model=ResumeDocumentResponse
+)
+async def remove_resume_bullet(
+    document_id: uuid.UUID,
+    bullet_id: str,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> ResumeDocumentResponse:
+    return await resume_bullets.remove_bullet(session, document_id, bullet_id)
+
+
 @router.post(
     "/resume-documents/{document_id}/bullets/{bullet_id}/approve-anyway",
     response_model=ResumeDocumentResponse,

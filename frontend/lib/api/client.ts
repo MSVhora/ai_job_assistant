@@ -154,3 +154,29 @@ export async function apiFetchVoid(path: string, init?: ApiFetchInit): Promise<v
     await fail(response, path);
   }
 }
+
+async function sendRaw(path: string, init: ApiFetchInit | undefined): Promise<Response> {
+  const { timeoutMs = DEFAULT_TIMEOUT_MS, ...requestInit } = init ?? {};
+  const signal = requestInit.signal ?? AbortSignal.timeout(timeoutMs);
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, { ...requestInit, signal });
+  } catch (cause) {
+    if (cause instanceof Error && cause.name === "TimeoutError") {
+      throw new ApiError(0, "The request timed out — try again.");
+    }
+    throw new ApiError(0, `network error: ${cause instanceof Error ? cause.message : "unknown"}`);
+  }
+  if (!response.ok) {
+    await fail(response, path);
+  }
+  return response;
+}
+
+export async function apiFetchText(path: string, init?: ApiFetchInit): Promise<string> {
+  return (await sendRaw(path, init)).text();
+}
+
+export async function apiFetchBlob(path: string, init?: ApiFetchInit): Promise<Blob> {
+  return (await sendRaw(path, init)).blob();
+}

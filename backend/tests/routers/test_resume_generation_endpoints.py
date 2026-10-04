@@ -157,6 +157,31 @@ async def test_bullet_edit_pin_and_approve_anyway(
     assert (again.status_code, missing.status_code, extra.status_code) == (400, 404, 422)
 
 
+async def test_removing_a_bullet_returns_its_achievement_to_the_unwritten_pool(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    document, _, _ = await generate(client, monkeypatch)
+    bullet = acme(document)["highlights"][0]
+    url = f"{BASE}/{document['id']}/bullets/{bullet['id']}"
+
+    removed = await client.delete(url)
+    again = await client.delete(url)
+
+    body = removed.json()
+    assert removed.status_code == 200
+    assert bullet["id"] not in {b["id"] for b in acme(body)["highlights"]}
+    assert bullet["id"] not in body["layout"]["included_ids"]
+    achievement_id = bullet["achievement_id"]
+    pooled = next(i for i in body["generation"]["pool"] if i["achievement_id"] == achievement_id)
+    assert pooled["written"] is False
+    assert any(
+        item["id"] == bullet["achievement_id"] and item["reason"] == "not_written"
+        for item in body["layout"]["not_included"]
+    )
+    assert again.status_code == 404
+    assert (await client.delete(f"{BASE}/{uuid.uuid4()}/bullets/x")).status_code == 404
+
+
 async def test_include_anyway_and_write_on_demand(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:

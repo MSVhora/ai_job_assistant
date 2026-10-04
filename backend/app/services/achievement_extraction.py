@@ -8,7 +8,7 @@ from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, cast
 
 from fastapi import BackgroundTasks
-from sqlalchemy import Select, select, update
+from sqlalchemy import Select, func, select, update
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,6 +33,7 @@ from app.core.errors import (
     LLMNotConfiguredError,
     NothingToExtractError,
 )
+from app.core.pagination import DEFAULT_PAGE, Pagination
 from app.models import (
     Achievement,
     AchievementEvidence,
@@ -674,11 +675,7 @@ async def _finish(run_id: uuid.UUID, candidate_id: uuid.UUID, counters: _Counter
         return status
 
 
-async def get_run(session: AsyncSession, run_id: uuid.UUID) -> ExtractionRunResponse:
-    candidate_id = await candidate_id_or_none(session)
-    run = await session.get(AchievementExtractionRun, run_id)
-    if run is None or candidate_id is None or run.candidate_id != candidate_id:
-        raise ExtractionRunNotFoundError
+def _run_response(run: AchievementExtractionRun) -> ExtractionRunResponse:
     return ExtractionRunResponse(
         id=run.id,
         status=run.status.value,
@@ -689,3 +686,42 @@ async def get_run(session: AsyncSession, run_id: uuid.UUID) -> ExtractionRunResp
         created_at=run.created_at,
         updated_at=run.updated_at,
     )
+
+
+async def get_run(session: AsyncSession, run_id: uuid.UUID) -> ExtractionRunResponse:
+    candidate_id = await candidate_id_or_none(session)
+    run = await session.get(AchievementExtractionRun, run_id)
+    if run is None or candidate_id is None or run.candidate_id != candidate_id:
+        raise ExtractionRunNotFoundError
+    return _run_response(run)
+
+
+async def count_runs(session: AsyncSession) -> int:
+    candidate_id = await candidate_id_or_none(session)
+    if candidate_id is None:
+        return 0
+    query = select(func.count()).where(AchievementExtractionRun.candidate_id == candidate_id)
+    return (await session.execute(query)).scalar_one()
+
+
+async def list_runs(
+    session: AsyncSession, page: Pagination = DEFAULT_PAGE
+) -> list[ExtractionRunResponse]:
+    """Newest first, so the page can pick up a run that is still going after a reload."""
+    candidate_id = await candidate_id_or_none(session)
+    if candidate_id is None:
+        return []
+    rows = (
+        (
+            await session.execute(
+                select(AchievementExtractionRun)
+                .where(AchievementExtractionRun.candidate_id == candidate_id)
+                .order_by(AchievementExtractionRun.created_at.desc())
+                .limit(page.limit)
+                .offset(page.offset)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return [_run_response(run) for run in rows]

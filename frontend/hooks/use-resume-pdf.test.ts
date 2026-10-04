@@ -34,7 +34,7 @@ describe("useResumePdf", () => {
   });
 
   it("requests nothing until generate is called", () => {
-    const { result } = renderHook(() => useResumePdf("d1"));
+    const { result } = renderHook(() => useResumePdf("d1", 3));
 
     expect(result.current.state).toEqual({ status: "idle" });
     expect(generateResumePdf).not.toHaveBeenCalled();
@@ -46,7 +46,7 @@ describe("useResumePdf", () => {
     vi.mocked(generateResumePdf)
       .mockReturnValueOnce(first.promise)
       .mockReturnValueOnce(second.promise);
-    const { result } = renderHook(() => useResumePdf("d1"));
+    const { result } = renderHook(() => useResumePdf("d1", 3));
 
     let firstRun!: Promise<void>;
     let secondRun!: Promise<void>;
@@ -63,12 +63,12 @@ describe("useResumePdf", () => {
       await firstRun;
     });
 
-    expect(result.current.state).toEqual({ status: "ready", url: "blob:pdf-1" });
+    expect(result.current.state).toEqual({ status: "ready", url: "blob:pdf-1", version: 3 });
   });
 
   it("releases the previous blob url when a new PDF replaces it and on unmount", async () => {
     vi.mocked(generateResumePdf).mockResolvedValue(pdf("x"));
-    const { result, unmount } = renderHook(() => useResumePdf("d1"));
+    const { result, unmount } = renderHook(() => useResumePdf("d1", 3));
 
     await act(() => result.current.generate());
     await act(() => result.current.generate());
@@ -80,7 +80,7 @@ describe("useResumePdf", () => {
 
   it("reports the failure message and can be reset", async () => {
     vi.mocked(generateResumePdf).mockRejectedValue(new Error("cannot fit"));
-    const { result } = renderHook(() => useResumePdf("d1"));
+    const { result } = renderHook(() => useResumePdf("d1", 3));
 
     await act(() => result.current.generate());
     expect(result.current.state).toEqual({ status: "error", message: "cannot fit" });

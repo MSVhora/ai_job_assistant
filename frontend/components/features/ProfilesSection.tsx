@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useDeleteProfile, useProfiles } from "@/hooks/use-profiles";
+import { resumeBuilderHref } from "@/lib/resume-view";
 
 function ProfileIcon() {
   return (
@@ -138,6 +139,14 @@ function ProfileRow({
           </p>
         )}
         <div className="flex items-center gap-2">
+          {!confirming && (
+            <Link
+              href={resumeBuilderHref(profileId)}
+              className="rounded-full border border-violet-300 px-3 py-1 text-xs font-semibold text-violet-700 hover:bg-violet-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
+            >
+              Build resume from evidence
+            </Link>
+          )}
           {confirming ? (
             <>
               <Button

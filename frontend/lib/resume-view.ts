@@ -126,3 +126,11 @@ export function commentsFor(
       comment.target.block_id === blockId && (comment.target.bullet_id ?? null) === bulletId,
   );
 }
+
+export function resumeBuilderHref(profileId: string | null, matchId?: string): string {
+  const query = new URLSearchParams();
+  if (profileId !== null) query.set("profile", profileId);
+  if (matchId !== undefined) query.set("match", matchId);
+  const suffix = query.size > 0 ? `?${query.toString()}` : "";
+  return `/resume-builder${suffix}`;
+}

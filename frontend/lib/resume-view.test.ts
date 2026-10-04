@@ -8,6 +8,7 @@ import {
   commentsFor,
   notIncludedRows,
   pageUsageLine,
+  resumeBuilderHref,
 } from "./resume-view";
 
 function bullet(id: string, text: string, extra: Record<string, unknown> = {}) {
@@ -136,5 +137,13 @@ describe("commentsFor", () => {
 
     expect(commentsFor(comments, "w1", null).map((c) => c.id)).toEqual(["c1"]);
     expect(commentsFor(comments, "w1", "b1").map((c) => c.id)).toEqual(["c2"]);
+  });
+});
+
+describe("resumeBuilderHref", () => {
+  it("prefills the profile and match when known", () => {
+    expect(resumeBuilderHref("p1", "m1")).toBe("/resume-builder?profile=p1&match=m1");
+    expect(resumeBuilderHref("p1")).toBe("/resume-builder?profile=p1");
+    expect(resumeBuilderHref(null)).toBe("/resume-builder");
   });
 });

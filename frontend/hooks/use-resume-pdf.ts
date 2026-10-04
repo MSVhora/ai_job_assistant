@@ -7,7 +7,7 @@ import { generateResumePdf } from "@/lib/api";
 export type PdfState =
   | { status: "idle" }
   | { status: "pending" }
-  | { status: "ready"; url: string }
+  | { status: "ready"; url: string; version: number }
   | { status: "error"; message: string };
 
 /**
@@ -15,7 +15,7 @@ export type PdfState =
  * arrive out of order (an older request finishing after a newer one) are discarded, and the
  * previous blob URL is released whenever it is replaced or the component unmounts.
  */
-export function useResumePdf(documentId: string) {
+export function useResumePdf(documentId: string, version: number) {
   const [state, setState] = useState<PdfState>({ status: "idle" });
   const latest = useRef(0);
   const current = useRef<string | null>(null);
@@ -34,7 +34,7 @@ export function useResumePdf(documentId: string) {
       if (requestId !== latest.current) return;
       release();
       current.current = URL.createObjectURL(blob);
-      setState({ status: "ready", url: current.current });
+      setState({ status: "ready", url: current.current, version });
     } catch (error) {
       if (requestId !== latest.current) return;
       setState({
@@ -42,7 +42,7 @@ export function useResumePdf(documentId: string) {
         message: error instanceof Error ? error.message : "The PDF could not be generated.",
       });
     }
-  }, [documentId, release]);
+  }, [documentId, version, release]);
 
   const reset = useCallback(() => {
     latest.current += 1;

@@ -4,6 +4,8 @@ import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { FreshnessBadge } from "@/components/features/jobs/FreshnessBadge";
+import { TailorResumeLink } from "@/components/features/resume/TailorResumeLink";
+
 import { MatchSignalButtons } from "./MatchSignalButtons";
 import { CompanyAvatar, SparkleIcon } from "./match-card-parts";
 import { applyMatchUrl, type MatchResponse } from "@/lib/api";
@@ -147,6 +149,7 @@ export function MatchCard({
             No link available
           </span>
         )}
+        <TailorResumeLink profileId={profileId} matchId={match.id} />
         {profileId !== null && (
           <MatchSignalButtons
             matchId={match.id}

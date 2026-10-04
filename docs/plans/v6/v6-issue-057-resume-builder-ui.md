@@ -1,7 +1,7 @@
 # Issue #57 — Resume builder UI: create → review (copy, comments, private marks) → generate PDF (Week 3)
 
-**Status:** Proposed — for owner review (revised 2026-10-02 after owner decisions)
-**Tracks:** GitHub issue #57 (milestone `v6`, branch `v6/49-resume-builder-ui`)
+**Status:** Implemented (2026-10-04) — see *Implementation notes* for deviations (revised 2026-10-02 after owner decisions)
+**Tracks:** GitHub issue #57 (milestone `v6`, branch `v6/57-resume-builder-ui`)
 **Plan of record:** [v6-implementation-plan.md](v6-implementation-plan.md) §2.5, §6.4, §10.2, §12
 **Depends on:** #53 (nav, evidence UI patterns), #54–#56
 **Blocks:** #61 (acceptance run)
@@ -74,3 +74,16 @@ Frontend + backend gates; guide 04 finalized (screenshots in `docs/assets/`): ch
 ## Out of scope
 
 Rich-text editing, drag-and-drop, side-by-side diff against the original profile, sharing links, cover letters.
+
+## Implementation notes — deviations from the plan above
+
+- **Routes:** `/resume-builder` (create form + list) and `/resume-builder/[id]` (review + PDF). The match and profile entry points prefill the create form through `?profile=` and `?match=`; there is no `/resume-builder/new`.
+- **Length:** the select offers 1, 2, 3 and 4 pages rather than "Multiple pages (3 or 4)", so the choice maps directly to `page_target`.
+- **Loading, error and not-found states live inside the `*PageClient` components**, as in every other screen of this repo (there are no `loading.tsx`/`error.tsx`/`not-found.tsx` files anywhere in `app/`); a missing document renders "This resume was not found." with a link back.
+- **One small backend addition:** `DELETE /api/resume-documents/{id}/bullets/{bullet_id}` removes a bullet and puts its achievement back in the unwritten pool, so **Remove** moves it to Not included (where **Write and add** restores it). **Add** for a bullet that did not fit pins it (`PATCH …/bullets/{id}` with `pinned`), which makes the fit place it first.
+- **Per-bullet and per-block copy** offer plain text and Markdown (built on the client from the included bullets); JSON Resume is offered for the whole document only, from `GET …/export`. All three whole-document formats are the backend's clean export.
+- **Private toggle:** `exclude_private` is a create-time option; the backend cannot change it on an existing document, so the review view shows the private-bullet count and says to create a new resume with the exclusion. No regenerate-without-private button.
+- **Template picker** sits in the review header; changing it patches the template and then re-fits, and applies to the next PDF. No JSON "preview" of the layout beyond the fit summary and its steps.
+- **PDF preview** is an `<iframe>` on a blob URL with a download link; `useResumePdf` discards out-of-order responses, revokes superseded blob URLs and marks a preview out of date when the document version moves on. A `CannotFit` 422 shows the backend message.
+- **Not done:** the "Tailor resume" link is on the match card only, not the job detail panel (it has no profile id); no reorder controls (comments and Pin are the mechanisms).
+- **Verification:** `npm run lint`, `format:check`, `typecheck`, `test` (187 tests) and `build` pass; the backend gate passes with the new route; the screens were exercised in a real browser against a mock API serving the real fit and PDF render. The create flow was not run against a live model.

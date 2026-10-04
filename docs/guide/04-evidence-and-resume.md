@@ -327,6 +327,54 @@ header, links as visible text, and no images, tables or text boxes, so applicant
 read it in order. Two variants exist, `classic` (centered header) and `compact` (left-aligned,
 tighter).
 
+## The resume builder screen
+
+Open **Resume builder** in the header (or **Tailor resume** on a match card, or **Build resume from
+evidence** on a profile). Pick a profile, a length of 1 to 4 pages and a template, and optionally a
+job description — pasted, or taken from one of your matches together with why it matched. When a
+job description is in play a **Tailoring strength** appears (Light, Balanced by default, Strong):
+how much the job description boosts aligned work. Work that does not match is still included by its
+own priority. You can also leave out bullets derived from private repositories. Creating a resume
+writes the content and shows it for review; **no PDF exists yet**.
+
+![Creating a resume](../assets/resume-builder-create.jpg)
+
+### Reading the review view
+
+![Reviewing a resume](../assets/resume-builder-review.jpg)
+
+The review shows what the resume will say as plain, selectable text, in resume order, with only the
+bullets that fit your page target. Each bullet carries chips for its evidence (they open the commit,
+pull request or note), a **Private repo** mark when it came from a private repository, and badges
+for bullets you edited, pinned or approved despite a flag. These marks exist on screen only: copies
+and the PDF contain none of them. Below the review you will find:
+
+- **Not included** — what the fit left out, ranked by priority, with the reason. **Add** pins a
+  bullet and re-fits; **Approve anyway** overrides a `needs review` flag (the flags stay on record);
+  **Write and add** writes an achievement that was ranked but not yet written. **Remove** on a
+  bullet in the review sends it back to this list.
+- **Omitted roles** — an overlapping role dropped in favour of a higher-priority one, with
+  **Include anyway**.
+- **Not supported by your evidence** — what the job description asks for that nothing you approved
+  supports, with **Add a note**.
+- **Checks against your profile** — conflicts by severity, with **Edit in profile** or **Keep as
+  is**.
+
+### Copying
+
+Every bullet has **Copy**, every role or project has **Copy text** and **Copy Markdown**, and the
+header copies the whole resume as plain text, Markdown or JSON Resume. All copies come from the same
+stored content as the PDF.
+
+### Comments and the PDF
+
+Add a comment to a section or a bullet; **Apply** rewrites only the commented sections and only
+where your evidence supports the request. A request your evidence cannot support is shown as
+rejected with the reason and an **Add a note** link. **Generate PDF** is the only step that makes a
+file: it re-fits the current content, shows a preview and offers a download. If you change the
+resume afterwards the preview is marked out of date until you generate it again. Changing the
+template re-fits automatically.
+
 ## Not yet verified against live GitHub
 
 The connector was built from GitHub's documented REST/GraphQL contracts and tested with synthetic

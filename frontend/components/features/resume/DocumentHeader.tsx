@@ -76,9 +76,9 @@ export function DocumentHeader({ document }: { document: ResumeDocument }) {
         <ExportMenu documentId={document.id} />
         {privateCount > 0 && (
           <p className="text-xs text-amber-800">
-            {privateCount} bullet{privateCount === 1 ? "" : "s"} come from private repositories.
-            They are marked on this screen only — copies and the PDF carry no marks. To leave them
-            out, create a new resume with the exclusion turned on.
+            {privateCount === 1 ? "1 bullet comes" : `${String(privateCount)} bullets come`} from
+            private repositories. They are marked on this screen only — copies and the PDF carry no
+            marks. To leave them out, create a new resume with the exclusion turned on.
           </p>
         )}
         {warnings.length > 0 && (

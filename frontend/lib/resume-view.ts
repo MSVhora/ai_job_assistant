@@ -94,7 +94,8 @@ export function pageUsageLine(document: ResumeDocument, available: number): stri
   if (document.layout.short_on_evidence) {
     return `${used} — everything available is included; add evidence to fill more.`;
   }
-  return available > 0 ? `${used} — ${String(available)} more achievements available.` : used;
+  if (available === 0) return used;
+  return `${used} — ${String(available)} more ${available === 1 ? "achievement" : "achievements"} available.`;
 }
 
 function dates(block: ResumeBlock): string {

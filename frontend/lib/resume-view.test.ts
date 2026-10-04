@@ -101,6 +101,10 @@ describe("pageUsageLine", () => {
     expect(pageUsageLine(document(), 2)).toBe("1 of 2 pages — 2 more achievements available.");
   });
 
+  it("uses the singular for one more achievement", () => {
+    expect(pageUsageLine(document(), 1)).toBe("1 of 2 pages — 1 more achievement available.");
+  });
+
   it("says when everything available is already in", () => {
     const short = document({ layout: { ...document().layout, short_on_evidence: true } });
 

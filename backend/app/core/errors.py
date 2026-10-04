@@ -234,6 +234,11 @@ class InvalidEmployerError(DomainError):
     default_detail = "employer must be one of your employers or personal"
 
 
+class DuplicateExperienceError(DomainError):
+    status_code = 409
+    default_detail = "this role is already in the profile"
+
+
 class InvalidEmployerMergeError(DomainError):
     status_code = 400
     default_detail = "a merge needs two or more different companies from your profile"

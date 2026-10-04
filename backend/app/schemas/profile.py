@@ -1,8 +1,16 @@
 import uuid
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 
 from app.schemas.enums import RemotePreference, SeniorityLevel
 from app.schemas.job_search import StoredSearchQueries
@@ -156,6 +164,17 @@ class ProfileUpdate(BaseModel):
         default=None,
         description="resume whose AI draft this save is reviewed from",
     )
+
+
+class ExperienceCreate(BaseModel):
+    """A role added to a profile on its own, for example an employer missing from the resume."""
+
+    company: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+    title: str | None = Field(default=None, max_length=200)
+    location: str | None = Field(default=None, max_length=200)
+    start_date: str | None = Field(default=None, max_length=50)
+    end_date: str | None = Field(default=None, max_length=50)
+    is_current: bool = False
 
 
 class StoredPreferences(BaseModel):

@@ -1,11 +1,10 @@
 import { Badge } from "@/components/ui/badge";
 import type { Achievement } from "@/lib/api";
 import { flagLabel, IMPACT_LABELS, isStale, pendingMetricCount } from "@/lib/achievement-view";
-import { employerLabel } from "@/lib/evidence-progress";
+import { SourceBadges } from "./SourceBadges";
 
 export function AchievementBadges({ achievement }: { achievement: Achievement }) {
   const pending = pendingMetricCount(achievement);
-  const employer = employerLabel(achievement.employer_ref);
   return (
     <div className="flex flex-wrap gap-1.5">
       {achievement.derived_from_private && <Badge variant="warn">Private repo</Badge>}
@@ -15,11 +14,7 @@ export function AchievementBadges({ achievement }: { achievement: Achievement })
         {IMPACT_LABELS[achievement.impact_type] ?? achievement.impact_type}
       </Badge>
       <Badge>Difficulty {achievement.difficulty}/5</Badge>
-      {employer !== null ? (
-        <Badge>{employer}</Badge>
-      ) : (
-        achievement.project_key !== null && <Badge>Project: {achievement.project_key}</Badge>
-      )}
+      <SourceBadges achievement={achievement} />
       {achievement.review_flags
         .filter((flag) => flag !== "metric_needs_confirmation")
         .map((flag) => (

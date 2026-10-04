@@ -9,6 +9,8 @@ import {
   editAchievement,
   getAchievement,
   getEvidenceItem,
+  listEmployers,
+  listGithubScopes,
   listRevisions,
   runAchievementAction,
   splitAchievement,
@@ -26,6 +28,8 @@ vi.mock("@/lib/api", async (importOriginal) => ({
   editAchievement: vi.fn(),
   getAchievement: vi.fn(),
   getEvidenceItem: vi.fn(),
+  listEmployers: vi.fn(),
+  listGithubScopes: vi.fn(),
   listRevisions: vi.fn(),
   runAchievementAction: vi.fn(),
   splitAchievement: vi.fn(),
@@ -50,6 +54,8 @@ describe("AchievementDrawer", () => {
       editAchievement,
       getAchievement,
       getEvidenceItem,
+      listEmployers,
+      listGithubScopes,
       listRevisions,
       runAchievementAction,
       splitAchievement,
@@ -63,6 +69,8 @@ describe("AchievementDrawer", () => {
       Promise.resolve(item({ id, title: id === "i1" ? "Add the loader" : `Source ${id}` })),
     );
     vi.mocked(listRevisions).mockResolvedValue([]);
+    vi.mocked(listEmployers).mockResolvedValue([]);
+    vi.mocked(listGithubScopes).mockResolvedValue([]);
     vi.mocked(editAchievement).mockResolvedValue(achievement());
     vi.mocked(runAchievementAction).mockResolvedValue(achievement());
   });

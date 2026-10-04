@@ -10,6 +10,7 @@ import { PAGE_SIZE, paramsForTab, type ReviewTab } from "./review-tabs";
 export function AchievementList({
   tab,
   privateOnly,
+  repository,
   offset,
   selected,
   onSelect,
@@ -18,13 +19,14 @@ export function AchievementList({
 }: {
   tab: ReviewTab;
   privateOnly: boolean;
+  repository: string;
   offset: number;
   selected: ReadonlyMap<string, string>;
   onSelect: (achievement: Achievement, selected: boolean) => void;
   onOpen: (id: string) => void;
   onPage: (offset: number) => void;
 }) {
-  const list = useAchievements(paramsForTab(tab, privateOnly, offset));
+  const list = useAchievements(paramsForTab(tab, privateOnly, offset, repository));
   const action = useAchievementAction();
 
   if (list.isPending) {

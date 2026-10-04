@@ -204,12 +204,24 @@ always see what was edited, merged or confirmed and when.
 - **Changed evidence.** After a sync, an approved achievement whose linked evidence changed is
   flagged (`evidence_stale_at`, "evidence updated"). It is never altered silently; `POST
   …/acknowledge` clears the flag once you have looked again.
+- **Where it came from.** Every achievement shows its source repository as a link
+  (`owner/repo`, opening it on GitHub) next to a separate **Employer** badge that says who set the
+  employer: *set by you*, *from the repository*, or *suggested* (not yet confirmed). The review page
+  has a **Repository** filter that lists the repositories you selected or synced.
 - **Employer mapping.** Each repository can be mapped once to one of your profile's experience
   entries or to **Personal / open source** (`GET /api/evidence/employers`, then `PATCH
-  /api/evidence/github/scopes` with `employer_ref`). The scope list suggests a match when the repo
-  was active during exactly one job, and the choice applies to all of that repo's achievements.
-  Unmapped repos are not blocking; their achievements are treated as projects, never as employer
-  experience.
+  /api/evidence/github/scopes` with `employer_ref`), either on the Evidence page or on the review
+  page: pick the repository in the filter and use **Apply to this repository** in the bar that
+  appears. The scope list suggests a match when the repo was active during exactly one job, and the
+  choice applies to all of that repo's achievements. Unmapped repos are not blocking; their
+  achievements are treated as projects, never as employer experience.
+- **Employer per achievement.** One repository can hold both work and side projects, so the
+  achievement drawer has an **Employer** control: choose one of your jobs or *Personal / open
+  source*, then **Save employer**. A choice made here outranks the repository's employer and
+  survives later changes to the repository mapping. Choosing **Same as repository** (`PATCH` with
+  `employer_ref: null`) clears it, and the achievement follows its repository again. The employer
+  decides where a bullet lands on a resume: under that company's experience, or under Projects for
+  personal work.
 
 ## The two pages
 

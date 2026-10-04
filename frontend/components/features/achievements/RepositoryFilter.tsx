@@ -1,10 +1,19 @@
 "use client";
 
 import { Select } from "@/components/ui/select";
-import { useGithubScopes } from "@/hooks/use-evidence-sync";
-import { employerKey } from "@/lib/evidence-progress";
+import { useEmployers, useGithubScopes } from "@/hooks/use-evidence-sync";
+import type { EmployerOption, EvidenceScope } from "@/lib/api";
+import { findOptionForRef } from "@/lib/employer-options";
+import { employerKey, employerLabel } from "@/lib/evidence-progress";
 
 import { RepositoryEmployerBar } from "./RepositoryEmployerBar";
+
+/** "owner/repo — Employer": what each repository is attributed to, or that nothing is set. */
+function optionLabel(scope: EvidenceScope, employers: EmployerOption[]): string {
+  const known = findOptionForRef(employers, scope.employer_ref);
+  const employer = known?.company ?? employerLabel(scope.employer_ref);
+  return `${scope.ref} — ${employer ?? "no employer set"}`;
+}
 
 export function RepositoryFilter({
   value,
@@ -14,6 +23,7 @@ export function RepositoryFilter({
   onChange: (repository: string) => void;
 }) {
   const scopes = useGithubScopes(true);
+  const employers = useEmployers();
   const repositories = (scopes.data ?? [])
     .filter((scope) => scope.enabled || scope.last_synced_at !== null)
     .sort((left, right) => left.ref.localeCompare(right.ref));
@@ -29,7 +39,7 @@ export function RepositoryFilter({
         <Select
           id="achievement-repository"
           value={value}
-          className="w-64"
+          className="w-96 max-w-full"
           onChange={(event) => {
             onChange(event.target.value);
           }}
@@ -37,7 +47,7 @@ export function RepositoryFilter({
           <option value="">All repositories</option>
           {repositories.map((scope) => (
             <option key={scope.ref} value={scope.ref}>
-              {scope.ref}
+              {optionLabel(scope, employers.data ?? [])}
             </option>
           ))}
         </Select>

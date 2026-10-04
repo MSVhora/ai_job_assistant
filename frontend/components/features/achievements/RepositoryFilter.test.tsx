@@ -36,17 +36,43 @@ describe("RepositoryFilter", () => {
     renderWithClient(<RepositoryFilter value="" onChange={onChange} />);
 
     const select = await screen.findByRole("combobox", { name: "Repository" });
-    await screen.findByRole("option", { name: "ada/engine" });
-    expect(screen.queryByRole("option", { name: "ada/ignored" })).not.toBeInTheDocument();
+    await screen.findByRole("option", { name: "ada/engine — no employer set" });
+    expect(screen.queryByRole("option", { name: /ada\/ignored/ })).not.toBeInTheDocument();
     await user.selectOptions(select, "ada/side");
 
     expect(onChange).toHaveBeenCalledWith("ada/side");
   });
 
+  it("shows each repository's employer beside its name, and says when none is set", async () => {
+    vi.mocked(listGithubScopes).mockResolvedValue([
+      scope({ ref: "ada/engine", enabled: true }),
+      scope({ ref: "ada/side", enabled: true, employer_ref: { kind: "personal", source: "user" } }),
+      scope({
+        ref: "ada/work",
+        enabled: true,
+        employer_ref: { company: "Samsung Research Institute", start_date: null, source: "scope" },
+      }),
+    ]);
+    vi.mocked(listEmployers).mockResolvedValue([
+      employerOption("Samsung", { aliases: ["Samsung", "Samsung Research Institute"] }),
+      PERSONAL_OPTION,
+    ]);
+    renderWithClient(<RepositoryFilter value="" onChange={vi.fn()} />);
+
+    const options = await screen.findAllByRole("option");
+
+    expect(options.map((option) => option.textContent)).toEqual([
+      "All repositories",
+      "ada/engine — no employer set",
+      "ada/side — Personal / open source",
+      "ada/work — Samsung",
+    ]);
+  });
+
   it("shows no employer bar while all repositories are shown", async () => {
     renderWithClient(<RepositoryFilter value="" onChange={vi.fn()} />);
 
-    await screen.findByRole("option", { name: "ada/engine" });
+    await screen.findByRole("option", { name: "ada/engine — no employer set" });
 
     expect(screen.queryByText(/Employer for/)).not.toBeInTheDocument();
   });

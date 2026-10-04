@@ -207,7 +207,8 @@ always see what was edited, merged or confirmed and when.
 - **Where it came from.** Every achievement shows its source repository as a link
   (`owner/repo`, opening it on GitHub) next to a separate **Employer** badge that says who set the
   employer: *set by you*, *from the repository*, or *suggested* (not yet confirmed). The review page
-  has a **Repository** filter that lists the repositories you selected or synced.
+  has a **Repository** filter that lists the repositories you selected or synced, each followed
+  by its employer (or *no employer set*), so you can see at a glance which ones still need one.
 - **Employers.** An employer is a *company*, not one line of your resume: all experience entries of
   the same company (names compared without case, punctuation or suffixes such as Ltd., Pvt. or
   LLC) are one employer, shown once with its span and role count, for example *Wemsquare

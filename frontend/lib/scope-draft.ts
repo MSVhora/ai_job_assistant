@@ -51,12 +51,15 @@ export function withPatch(draft: ScopeDraft, scope: EvidenceScope, patch: ScopeP
     : { ...draft, [scope.ref]: kept };
 }
 
+/** Select or clear many repositories; one GitHub no longer lists can be cleared but not selected. */
 export function selectScopes(
   draft: ScopeDraft,
   scopes: EvidenceScope[],
   enabled: boolean,
 ): ScopeDraft {
-  return scopes.reduce((next, scope) => withPatch(next, scope, { enabled }), draft);
+  return scopes
+    .filter((scope) => !enabled || scope.visible)
+    .reduce((next, scope) => withPatch(next, scope, { enabled }), draft);
 }
 
 export function toUpdates(draft: ScopeDraft): ScopeUpdateItem[] {
@@ -78,10 +81,21 @@ export function selectedCount(scopes: EvidenceScope[], draft: ScopeDraft): numbe
   return scopes.filter((scope) => viewOf(scope, draft[scope.ref]).enabled).length;
 }
 
-export function filterScopes(scopes: EvidenceScope[], query: string): EvidenceScope[] {
+export function filterScopes(
+  scopes: EvidenceScope[],
+  query: string,
+  onlyContributed = false,
+): EvidenceScope[] {
   const needle = query.trim().toLowerCase();
-  if (needle === "") return scopes;
-  return scopes.filter((scope) => scope.ref.toLowerCase().includes(needle));
+  return scopes.filter(
+    (scope) =>
+      (!onlyContributed || scope.contributed) &&
+      (needle === "" || scope.ref.toLowerCase().includes(needle)),
+  );
+}
+
+export function contributedCount(scopes: EvidenceScope[]): number {
+  return scopes.filter((scope) => scope.contributed && scope.visible).length;
 }
 
 export function chunk<T>(items: T[], size: number): T[][] {

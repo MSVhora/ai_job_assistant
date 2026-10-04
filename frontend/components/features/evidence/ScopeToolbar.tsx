@@ -8,9 +8,13 @@ export function ScopeToolbar({
   selected,
   query,
   disabled,
+  contributed,
+  onlyContributed,
   onQuery,
   onSelectShown,
   onClearShown,
+  onToggleContributed,
+  onSelectContributed,
 }: {
   total: number;
   matching: number;
@@ -20,6 +24,10 @@ export function ScopeToolbar({
   onQuery: (query: string) => void;
   onSelectShown: () => void;
   onClearShown: () => void;
+  contributed: number;
+  onlyContributed: boolean;
+  onToggleContributed: (only: boolean) => void;
+  onSelectContributed: () => void;
 }) {
   const filtered = matching !== total;
   const button =
@@ -55,6 +63,29 @@ export function ScopeToolbar({
       >
         {filtered ? `Clear ${matching} matching` : "Clear selection"}
       </button>
+      {contributed > 0 && (
+        <>
+          <label className="flex cursor-pointer items-center gap-1.5 text-xs text-gray-700">
+            <input
+              type="checkbox"
+              checked={onlyContributed}
+              onChange={(event) => {
+                onToggleContributed(event.target.checked);
+              }}
+              className="h-3.5 w-3.5 rounded border-gray-300 text-violet-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
+            />
+            Only repositories I contributed to ({contributed})
+          </label>
+          <button
+            type="button"
+            className={button}
+            disabled={disabled}
+            onClick={onSelectContributed}
+          >
+            Select my contributions ({contributed})
+          </button>
+        </>
+      )}
       <p aria-live="polite" className="ml-auto text-xs text-gray-600">
         {selected} of {total} selected
       </p>

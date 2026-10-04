@@ -451,6 +451,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/evidence/github/token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Github Token */
+        get: operations["github_token_api_evidence_github_token_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/evidence/github/scopes": {
         parameters: {
             query?: never;
@@ -3134,6 +3151,16 @@ export interface components {
             suggested_employer?: {
                 [key: string]: unknown;
             } | null;
+            /**
+             * Contributed
+             * @default false
+             */
+            contributed: boolean;
+            /**
+             * Visible
+             * @default true
+             */
+            visible: boolean;
         };
         /** ScopeUpdateItem */
         ScopeUpdateItem: {
@@ -3448,6 +3475,22 @@ export interface components {
             sync_id: string;
             /** Status */
             status: string;
+        };
+        /** TokenCheckResponse */
+        TokenCheckResponse: {
+            /** Login */
+            login: string;
+            /**
+             * Token Type
+             * @enum {string}
+             */
+            token_type: "classic" | "fine_grained_or_app";
+            /** Scopes */
+            scopes: string[];
+            /** Private Access */
+            private_access: boolean | null;
+            /** Warnings */
+            warnings: string[];
         };
         /** ValidationError */
         ValidationError: {
@@ -4451,6 +4494,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EmployerOption"][];
+                };
+            };
+        };
+    };
+    github_token_api_evidence_github_token_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenCheckResponse"];
                 };
             };
         };

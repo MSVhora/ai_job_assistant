@@ -5,6 +5,7 @@ import { scope } from "@/components/features/evidence/fixtures";
 import {
   changeCount,
   chunk,
+  contributedCount,
   filterScopes,
   newlyEnabledPrivate,
   paginate,
@@ -133,5 +134,35 @@ describe("paginate", () => {
       to: 0,
       total: 0,
     });
+  });
+});
+
+describe("contributed and invisible repositories", () => {
+  const mine = scope({ ref: "acme/mine", contributed: true });
+  const gone = scope({ ref: "acme/gone", contributed: true, visible: false });
+  const other = scope({ ref: "acme/other" });
+
+  it("filters to contributed repositories and combines that with the text filter", () => {
+    expect(filterScopes([mine, gone, other], "", true).map((s) => s.ref)).toEqual([
+      "acme/mine",
+      "acme/gone",
+    ]);
+    expect(filterScopes([mine, gone, other], "mine", true).map((s) => s.ref)).toEqual([
+      "acme/mine",
+    ]);
+  });
+
+  it("counts only contributed repositories that can still be selected", () => {
+    expect(contributedCount([mine, gone, other])).toBe(1);
+  });
+
+  it("selecting skips an invisible repository, clearing does not", () => {
+    expect(Object.keys(selectScopes({}, [mine, gone, other], true))).toEqual([
+      "acme/mine",
+      "acme/other",
+    ]);
+    const enabledGone = scope({ ref: "acme/gone", visible: false, enabled: true });
+
+    expect(selectScopes({}, [enabledGone], false)).toEqual({ "acme/gone": { enabled: false } });
   });
 });

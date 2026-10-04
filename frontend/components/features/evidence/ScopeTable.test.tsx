@@ -227,6 +227,85 @@ describe("ScopeTable", () => {
     expect(screen.queryByRole("navigation", { name: "Repository pages" })).not.toBeInTheDocument();
   });
 
+  it("marks contributed repositories and ones GitHub no longer lists", async () => {
+    vi.mocked(listGithubScopes).mockResolvedValue([
+      scope({ ref: "acme/api", contributed: true }),
+      scope({ ref: "acme/gone", visible: false }),
+    ]);
+    renderWithClient(<ScopeTable status={status()} />);
+
+    expect(await screen.findByText("Contributed")).toBeInTheDocument();
+    expect(screen.getByText("No longer visible")).toBeInTheDocument();
+    expect(screen.getByText(/GitHub no longer lists this repository/)).toBeInTheDocument();
+  });
+
+  it("cannot newly select a repository that is no longer visible, but can deselect it", async () => {
+    vi.mocked(listGithubScopes).mockResolvedValue([
+      scope({ ref: "acme/gone", visible: false }),
+      scope({ ref: "acme/old", visible: false, enabled: true }),
+    ]);
+    const user = userEvent.setup();
+    renderWithClient(<ScopeTable status={status()} />);
+
+    expect(await screen.findByRole("checkbox", include("acme/gone"))).toBeDisabled();
+    await user.click(screen.getByRole("checkbox", include("acme/old")));
+    expect(screen.getByText("1 unsaved change")).toBeInTheDocument();
+  });
+
+  it("Select all skips repositories that are no longer visible", async () => {
+    vi.mocked(listGithubScopes).mockResolvedValue([
+      scope({ ref: "acme/api" }),
+      scope({ ref: "acme/gone", visible: false }),
+    ]);
+    const user = userEvent.setup();
+    renderWithClient(<ScopeTable status={status()} />);
+
+    await user.click(await screen.findByRole("button", { name: "Select all" }));
+
+    expect(screen.getByText("1 of 2 selected")).toBeInTheDocument();
+  });
+
+  it("filters to contributed repositories and selects only those", async () => {
+    vi.mocked(listGithubScopes).mockResolvedValue([
+      scope({ ref: "acme/api", contributed: true }),
+      scope({ ref: "acme/web" }),
+      scope({ ref: "acme/lib", contributed: true }),
+    ]);
+    const user = userEvent.setup();
+    renderWithClient(<ScopeTable status={status()} />);
+
+    await user.click(
+      await screen.findByRole("checkbox", { name: /Only repositories I contributed to \(2\)/ }),
+    );
+    expect(screen.queryByText("acme/web")).not.toBeInTheDocument();
+    expect(screen.getByText("acme/api")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("checkbox", { name: /Only repositories I contributed to/ }));
+    await user.click(screen.getByRole("button", { name: "Select my contributions (2)" }));
+
+    expect(screen.getByText("2 of 3 selected")).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", include("acme/web"))).not.toBeChecked();
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => {
+      expect(updateGithubScopes).toHaveBeenCalledWith(
+        [
+          { ref: "acme/api", enabled: true },
+          { ref: "acme/lib", enabled: true },
+        ],
+        false,
+      );
+    });
+  });
+
+  it("offers no contributed shortcuts when GitHub reports no contributions", async () => {
+    vi.mocked(listGithubScopes).mockResolvedValue([scope()]);
+    renderWithClient(<ScopeTable status={status()} />);
+
+    await screen.findByText("ada/engine");
+
+    expect(screen.queryByText(/Select my contributions/)).not.toBeInTheDocument();
+  });
+
   it("says when the filter matches nothing", async () => {
     vi.mocked(listGithubScopes).mockResolvedValue([scope()]);
     const user = userEvent.setup();

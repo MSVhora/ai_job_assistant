@@ -7,6 +7,7 @@ export type EvidenceStatus = Schemas["EvidenceStatusResponse"];
 export type EvidenceScope = Schemas["ScopeResponse"];
 export type ScopeUpdateItem = Schemas["ScopeUpdateItem"];
 export type EmployerOption = Schemas["EmployerOption"];
+export type TokenCheck = Schemas["TokenCheckResponse"];
 export type SyncRun = Schemas["SyncRunResponse"];
 export type SyncStart = Schemas["SyncStartResponse"];
 export type SyncMode = Schemas["SyncRequest"]["mode"];
@@ -38,6 +39,10 @@ export async function updateGithubScopes(
     method: "PATCH",
     body: JSON.stringify({ scopes, acknowledged_disclosure: acknowledgedDisclosure }),
   });
+}
+
+export async function getTokenCheck(): Promise<TokenCheck> {
+  return apiFetch<TokenCheck>(`${BASE}/github/token`);
 }
 
 export async function listEmployers(): Promise<EmployerOption[]> {

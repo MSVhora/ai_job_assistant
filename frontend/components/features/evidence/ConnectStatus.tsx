@@ -4,9 +4,11 @@ import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { useTokenCheck } from "@/hooks/use-evidence-sync";
 import type { EvidenceStatus } from "@/lib/api";
 
 export function ConnectStatus({ status }: { status: EvidenceStatus }) {
+  const token = useTokenCheck(status.configured);
   return (
     <Card
       title={<h2 className="text-base font-bold text-gray-900">GitHub connection</h2>}
@@ -43,6 +45,15 @@ export function ConnectStatus({ status }: { status: EvidenceStatus }) {
           for the other keys.
         </p>
       )}
+      {token.data?.warnings.map((warning) => (
+        <p
+          key={warning}
+          role="alert"
+          className="mt-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900"
+        >
+          {warning}
+        </p>
+      ))}
       {status.scopes_unmapped > 0 && (
         <p className="mt-2 text-xs text-amber-800" aria-live="polite">
           {status.scopes_unmapped} synced repositories are not mapped to an employer yet; their

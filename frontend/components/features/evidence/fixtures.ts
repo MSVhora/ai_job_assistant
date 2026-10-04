@@ -28,6 +28,8 @@ export function scope(overrides: Partial<EvidenceScope> = {}): EvidenceScope {
     last_synced_at: null,
     employer_ref: null,
     suggested_employer: null,
+    contributed: false,
+    visible: true,
     ...overrides,
   };
 }

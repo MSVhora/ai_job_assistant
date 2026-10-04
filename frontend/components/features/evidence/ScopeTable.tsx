@@ -8,6 +8,7 @@ import { useEmployers, useGithubScopes, useUpdateScopes } from "@/hooks/use-evid
 import type { EvidenceStatus } from "@/lib/api";
 import {
   changeCount,
+  contributedCount,
   filterScopes,
   newlyEnabledPrivate,
   SCOPE_PAGE_SIZES,
@@ -31,12 +32,13 @@ export function ScopeTable({ status }: { status: EvidenceStatus }) {
   const update = useUpdateScopes();
   const [draft, setDraft] = useState<ScopeDraft>({});
   const [query, setQuery] = useState("");
+  const [onlyContributed, setOnlyContributed] = useState(false);
   const [confirming, setConfirming] = useState<string[]>([]);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState<number>(SCOPE_PAGE_SIZES[0]);
 
   const all = scopes.data ?? [];
-  const matching = filterScopes(all, query);
+  const matching = filterScopes(all, query, onlyContributed);
   const slice = paginate(matching, page, pageSize);
 
   const save = (acknowledged: boolean) => {
@@ -103,6 +105,21 @@ export function ScopeTable({ status }: { status: EvidenceStatus }) {
             selected={selectedCount(all, draft)}
             query={query}
             disabled={update.isPending}
+            contributed={contributedCount(all)}
+            onlyContributed={onlyContributed}
+            onToggleContributed={(only) => {
+              setOnlyContributed(only);
+              setPage(0);
+            }}
+            onSelectContributed={() => {
+              setDraft((current) =>
+                selectScopes(
+                  current,
+                  all.filter((scope) => scope.contributed),
+                  true,
+                ),
+              );
+            }}
             onQuery={(next) => {
               setQuery(next);
               setPage(0);

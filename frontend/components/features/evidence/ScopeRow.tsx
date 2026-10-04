@@ -50,7 +50,7 @@ export function ScopeRow({
           type="checkbox"
           aria-label={`Include ${scope.ref}`}
           checked={view.enabled}
-          disabled={disabled}
+          disabled={disabled || (!scope.visible && !view.enabled)}
           onChange={(event) => {
             onChange({ enabled: event.target.checked });
           }}
@@ -59,12 +59,20 @@ export function ScopeRow({
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-gray-900">{scope.ref}</p>
           <div className="mt-1 flex flex-wrap gap-1.5">
+            {scope.contributed && <Badge variant="success">Contributed</Badge>}
+            {!scope.visible && <Badge variant="warn">No longer visible</Badge>}
             {scope.is_private && <Badge variant="warn">Private repo</Badge>}
             {scope.is_fork && <Badge>Fork</Badge>}
             {scope.is_new && <Badge variant="ai">New</Badge>}
             {scope.sync_state === "failed" && <Badge variant="danger">Last sync failed</Badge>}
             {patch !== undefined && <Badge variant="ai">Unsaved</Badge>}
           </div>
+          {!scope.visible && (
+            <p className="mt-1 text-xs text-amber-800">
+              GitHub no longer lists this repository (access removed or deleted), so it cannot be
+              synced. You can still deselect it.
+            </p>
+          )}
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-2">

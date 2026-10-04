@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
   getEvidenceStatus,
+  getTokenCheck,
   listEmployers,
   listGithubScopes,
   listSyncs,
@@ -25,6 +26,15 @@ export function useGithubScopes(enabled: boolean) {
   return useQuery({
     queryKey: ["evidence-scopes"],
     queryFn: listGithubScopes,
+    enabled,
+    staleTime: 60_000,
+  });
+}
+
+export function useTokenCheck(enabled: boolean) {
+  return useQuery({
+    queryKey: ["evidence-token"],
+    queryFn: getTokenCheck,
     enabled,
     staleTime: 60_000,
   });

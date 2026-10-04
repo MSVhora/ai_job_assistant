@@ -45,10 +45,34 @@ nothing is saved until you do, and **Discard** throws your edits away. If the se
 private repositories, Save shows the disclosure once for all of them. Content level and employer
 mapping are part of the same draft.
 
-`GET /api/evidence/github/scopes` lists the repositories your token can see (pushed within
-`EVIDENCE_LOOKBACK_YEARS`) and stores any new ones **disabled**. The page saves your selection with
-one `PATCH /api/evidence/github/scopes` (up to 200 repositories per request; larger selections are
-sent in batches):
+### What the list contains
+
+The list is everything your token can read, plus the repositories you **contributed to**:
+GitHub's contribution history (commits, pull requests, reviews and issues, for every year you have
+contributions) is merged in. That is how repositories you only worked on through a fork, or can no
+longer browse, still show up for you to pick. The badges tell you what each row is:
+
+- **Contributed** — GitHub's history shows work of yours there. **Only repositories I contributed
+  to** narrows the list to those, and **Select my contributions** ticks them all in one go (that
+  is usually the selection you want in an organization with many repositories you never touched).
+- **Private repo**, **Fork**, **New** — as before.
+- **No longer visible** — you selected it once, but GitHub no longer lists it (access removed, or
+  the repository was deleted or renamed). It cannot be synced and cannot be newly selected; you can
+  still deselect it.
+
+Repositories you did not contribute to are listed only if they were pushed within
+`EVIDENCE_LOOKBACK_YEARS` (default 6, maximum 30); raise it in `.env` to see older ones. A
+repository you contributed to is always listed, whatever its age. The contribution history is
+cached for five minutes and, if GitHub cannot return it (rate limit, SSO block), the list simply
+falls back to the plain repository list without the "Contributed" badges.
+
+If a classic token is missing the top-level `repo` scope, a warning appears under the GitHub
+connection (`GET /api/evidence/github/token` reports the scopes); fine-grained tokens report no
+scopes, so for them a missing private repository is the only symptom.
+
+`GET /api/evidence/github/scopes` returns this list and stores any new repository **disabled**.
+The page saves your selection with one `PATCH /api/evidence/github/scopes` (up to 200 repositories
+per request; larger selections are sent in batches):
 
 - Forks are listed but, like every new repository, start disabled.
 - **Private repositories** need `acknowledged_disclosure: true` the first time: their text is later

@@ -83,3 +83,16 @@ async def approve_anyway(
     bullet.approved_anyway = True
     await persist(ctx, "approve_anyway")
     return resume_documents.to_response(ctx.document)
+
+
+async def remove_bullet(
+    session: AsyncSession, document_id: uuid.UUID, bullet_id: str
+) -> ResumeDocumentResponse:
+    """Take a bullet out of the document; its achievement goes back to the unwritten pool."""
+    ctx, entry, bullet = await _context_with_bullet(session, document_id, bullet_id)
+    entry.highlights = [item for item in entry.highlights if item.id != bullet.id]
+    for pooled in ctx.generation.pool:
+        if bullet.achievement_id is not None and pooled.achievement_id == bullet.achievement_id:
+            pooled.written = False
+    await persist(ctx, "bullet_remove")
+    return resume_documents.to_response(ctx.document)

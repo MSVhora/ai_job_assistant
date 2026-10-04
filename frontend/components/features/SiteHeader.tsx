@@ -82,6 +82,14 @@ export function SiteHeader() {
                 Evidence
               </Link>
             )}
+            {!pathname.startsWith("/resume-builder") && (
+              <Link
+                href="/resume-builder"
+                className="rounded-full px-4 py-2.5 text-sm font-semibold text-violet-700 transition hover:bg-violet-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
+              >
+                Resume builder
+              </Link>
+            )}
             <button
               type="button"
               onClick={() => {

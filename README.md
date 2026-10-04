@@ -55,6 +55,8 @@ A first successful match takes about five minutes (details in the [user guide](d
 4. **Search** — start a run from the `/jobs` wizard: one profile and one source at a time (parallel runs on other sources are fine), with editable details and per-source advanced filters. The run queries the source in the background, de-duplicates and embeds results, and matches only against that profile's own corpus. You can leave the page while it runs. [Search & sources →](docs/guide/03-job-discovery-and-matching.md)
 5. **Read ranked matches** — every posting gets a hybrid score that blends vector similarity with skill overlap, recency, and salary fit; the top N get an LLM re-rank with role-fit/company-fit ratings and a plain-language "why this matches". Save or dismiss matches, and **Tune my queries** rewrites the search specs from that engagement feedback (one manual, confirm-gated LLM call). The priority slider re-weights role fit vs company fit live — per profile, with no extra AI cost. [Search & sources →](docs/guide/03-job-discovery-and-matching.md)
 
+6. **Build a resume from your evidence** — connect GitHub and add notes, approve the achievements extracted from them, then create a 1–4 page resume (optionally tailored to a pasted job description or one of your matches). You review every bullet as text with its evidence and private-repo marks, comment on sections, copy it as plain text, Markdown or JSON Resume, and only then generate a PDF. [Evidence & resume →](docs/guide/04-evidence-and-resume.md)
+
 ## Development
 
 | Where | Command |

@@ -55,7 +55,7 @@ def test_merges_round_trip_through_the_stored_shape() -> None:
         ]
     }
     assert again.key("Alle Labs") == "alle"
-    assert again.keys() == ["samsung", "alle"]
+    assert again.group_keys() == ["samsung", "alle"]
 
 
 @pytest.mark.parametrize(
@@ -63,7 +63,7 @@ def test_merges_round_trip_through_the_stored_shape() -> None:
     [None, "nope", [], {}, {"groups": "x"}, {"groups": [1, None]}, {"groups": [{"members": []}]}],
 )
 def test_a_missing_or_malformed_stored_value_means_no_merges(raw: object) -> None:
-    assert Merges.from_stored(raw).keys() == []
+    assert Merges.from_stored(raw).group_keys() == []
 
 
 def test_a_partly_valid_stored_value_keeps_the_usable_groups() -> None:
@@ -72,4 +72,4 @@ def test_a_partly_valid_stored_value_keeps_the_usable_groups() -> None:
     )
 
     assert merges.key("Samsung RI") == "samsung"
-    assert merges.keys() == ["samsung"]
+    assert merges.group_keys() == ["samsung"]

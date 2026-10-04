@@ -15,7 +15,7 @@ from sqlalchemy import select, text
 from app.core.config import get_settings
 from app.core.db import session_factory
 from app.main import app
-from app.models import Achievement, EvidenceItem, EvidenceKind, EvidenceScope
+from app.models import Achievement, Candidate, EvidenceItem, EvidenceKind, EvidenceScope
 from app.schemas.evidence import ScopeCandidate
 
 pytestmark = pytest.mark.usefixtures("clean_tables")
@@ -135,6 +135,28 @@ async def test_a_mapping_to_an_unknown_employer_is_rejected(client: AsyncClient)
     assert "your employers" in response.json()["detail"]
     scopes = (await client.get("/api/evidence/github/scopes")).json()
     assert {s["ref"]: s["employer_ref"] for s in scopes}["ada/engine"] is None
+
+
+async def test_a_merged_company_is_stored_under_its_canonical_name(client: AsyncClient) -> None:
+    await seed_profile_light()
+    async with session_factory() as session:
+        candidate = (await session.execute(select(Candidate))).scalars().one()
+        candidate.employer_merges = {
+            "groups": [{"canonical": "Acme Group", "members": ["Acme Group", "Acme Corp"]}]
+        }
+        await session.commit()
+    await client.post("/api/evidence/github/scopes/refresh")
+
+    response = await patch_scope(client, "ada/engine", {"company": "Acme Corp"})
+
+    assert response.json()[0]["employer_ref"] == {
+        "company": "Acme Group",
+        "start_date": None,
+        "source": "user",
+    }
+    options = (await client.get("/api/evidence/employers")).json()
+    assert options[0]["company"] == "Acme Group"
+    assert options[0]["merged_from"] == ["Acme Corp"]
 
 
 async def test_personal_mapping_needs_no_profile(client: AsyncClient) -> None:

@@ -25,6 +25,26 @@ def cache_key(task: LLMTask, model: str, prompt_version: str, key_parts: object)
     return hashlib.sha256(canonical.encode()).hexdigest()
 
 
+async def has_cached_output(
+    session: AsyncSession,
+    *,
+    task: LLMTask,
+    prompt_version: str,
+    key_parts: object,
+    schema: type[BaseModel],
+) -> bool:
+    """Whether `cached_parse_structured` would be a hit for these inputs (no side effects)."""
+    key = cache_key(task, model_for(task), prompt_version, key_parts)
+    row = await session.get(LLMOutputCache, key, populate_existing=True)
+    if row is None:
+        return False
+    try:
+        schema.model_validate(row.output)
+    except ValidationError:
+        return False
+    return True
+
+
 async def cached_parse_structured[ModelT: BaseModel](
     session: AsyncSession,
     *,

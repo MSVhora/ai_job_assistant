@@ -744,3 +744,29 @@ def synthetic_resume(
         work=work,
         education=[EducationEntry(institution="Analytical College", degree="BSc", field="Maths")],
     )
+
+
+async def seed_employers(*companies: str) -> None:
+    """A profile whose experience has one entry per given company name."""
+    from sqlalchemy import select
+
+    from app.core.db import session_factory
+    from app.models import Profile
+
+    await seed_profile_light()
+    async with session_factory() as session:
+        profile = (await session.execute(select(Profile))).scalars().first()
+        assert profile is not None
+        data: dict[str, Any] = dict(profile.structured_profile)
+        data["experience"] = [
+            {
+                "company": company,
+                "title": "Engineer",
+                "start_date": f"Jan 20{10 + index}",
+                "end_date": f"Dec 20{10 + index}",
+                "bullets": [],
+            }
+            for index, company in enumerate(companies)
+        ]
+        profile.structured_profile = data
+        await session.commit()

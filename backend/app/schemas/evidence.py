@@ -7,6 +7,9 @@ from pydantic import BaseModel, ConfigDict, Field, HttpUrl, model_validator
 from app.models.evidence import ContentLevel, EvidenceItemStatus, EvidenceKind
 
 __all__ = [
+    "EmployerMergeRequest",
+    "EmployerMergeSuggestion",
+    "EmployerMergeSuggestionsResponse",
     "EvidenceItemData",
     "EvidenceKind",
     "EvidenceStatusResponse",
@@ -166,6 +169,25 @@ class EmployerOption(BaseModel):
     span: str | None = None
     aliases: list[str] = Field(default_factory=list)
     merged_from: list[str] = Field(default_factory=list)
+
+
+class EmployerMergeRequest(BaseModel):
+    """Company names the user confirms are one employer; `canonical` is the name to show."""
+
+    canonical: str = Field(min_length=1, max_length=255)
+    members: list[str] = Field(min_length=1, max_length=20)
+
+
+class EmployerMergeSuggestion(BaseModel):
+    canonical: str
+    members: list[str]
+    reason: str = ""
+
+
+class EmployerMergeSuggestionsResponse(BaseModel):
+    suggestions: list[EmployerMergeSuggestion]
+    cost_usd: float | None
+    cached: bool
 
 
 class ScopeUpdateItem(BaseModel):

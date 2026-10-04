@@ -92,5 +92,5 @@ class Merges:
     def members(self, key: str) -> tuple[str, ...]:
         return self._members.get(key, ())
 
-    def keys(self) -> list[str]:
+    def group_keys(self) -> list[str]:
         return list(self._canonical)

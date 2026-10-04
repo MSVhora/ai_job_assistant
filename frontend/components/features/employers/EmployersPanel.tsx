@@ -10,6 +10,7 @@ import { useUnmergeEmployer } from "@/hooks/use-employers";
 import { useEmployers } from "@/hooks/use-evidence-sync";
 
 import { AddEmployerDialog } from "./AddEmployerDialog";
+import { OrganizationsSection } from "./OrganizationsSection";
 import { MergeChooserModal } from "./MergeChooserModal";
 import { MergeSuggestionsModal } from "./MergeSuggestionsModal";
 
@@ -124,6 +125,7 @@ export function EmployersPanel() {
           </Button>
         </div>
       )}
+      <OrganizationsSection options={employers.data ?? []} />
       <AddEmployerDialog
         open={adding}
         onClose={() => {

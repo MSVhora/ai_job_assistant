@@ -64,6 +64,7 @@ from app.services.employer_mapping import (
     suggest_for_scope,
 )
 from app.services.evidence_chunks import rebuild_chunks_background
+from app.services.evidence_owners import owner_default
 from app.services.evidence_pipeline.dedupe import SQUASH_REASON
 from app.services.evidence_pipeline.noise import classify
 from app.services.resume_service import get_or_create_candidate
@@ -107,7 +108,7 @@ def _select_account(candidate_id: uuid.UUID) -> Select[tuple[EvidenceSourceAccou
     )
 
 
-async def _get_or_create_account(
+async def get_or_create_account(
     session: AsyncSession, candidate_id: uuid.UUID
 ) -> EvidenceSourceAccount:
     account = (await session.execute(_select_account(candidate_id))).scalar_one_or_none()
@@ -167,7 +168,7 @@ def _scope_response(
     )
 
 
-async def _stored_scopes(session: AsyncSession, source_id: uuid.UUID) -> dict[str, EvidenceScope]:
+async def stored_scopes(session: AsyncSession, source_id: uuid.UUID) -> dict[str, EvidenceScope]:
     rows = (
         (await session.execute(select(EvidenceScope).where(EvidenceScope.source_id == source_id)))
         .scalars()
@@ -194,7 +195,7 @@ async def get_status(session: AsyncSession) -> EvidenceStatusResponse:
             scopes_refreshed_at=None,
             latest_sync=None,
         )
-    scopes = await _stored_scopes(session, account.id)
+    scopes = await stored_scopes(session, account.id)
     latest = (
         await session.execute(
             select(EvidenceSyncRun)
@@ -292,8 +293,8 @@ def _list_order(scope: EvidenceScope) -> tuple[bool, bool, float, str]:
 async def list_scopes(session: AsyncSession) -> list[ScopeResponse]:
     """The stored repository list; never calls GitHub (see `refresh_scopes`)."""
     candidate = await get_or_create_candidate(session)
-    account = await _get_or_create_account(session, candidate.id)
-    scopes = sorted((await _stored_scopes(session, account.id)).values(), key=_list_order)
+    account = await get_or_create_account(session, candidate.id)
+    scopes = sorted((await stored_scopes(session, account.id)).values(), key=_list_order)
     suggestions = await _suggestions(session, candidate.id, scopes)
     return [_scope_response(scope, suggested=suggestions.get(scope.id)) for scope in scopes]
 
@@ -314,7 +315,11 @@ def _apply_listing(
             if candidate.outside_lookback:
                 continue
             scope = EvidenceScope(
-                source_id=account.id, ref=candidate.ref, enabled=False, new_since_refresh=True
+                source_id=account.id,
+                ref=candidate.ref,
+                enabled=False,
+                new_since_refresh=True,
+                employer_ref=owner_default(account, candidate.ref),
             )
             session.add(scope)
             stored[candidate.ref] = scope
@@ -330,7 +335,7 @@ async def refresh_scopes(session: AsyncSession) -> list[ScopeResponse]:
     """Ask GitHub for the repository list and store it. User-triggered, about ten seconds."""
     source = _require_source()
     candidate = await get_or_create_candidate(session)
-    account = await _get_or_create_account(session, candidate.id)
+    account = await get_or_create_account(session, candidate.id)
     await session.execute(
         text("SELECT pg_advisory_xact_lock(:key)"), {"key": SCOPE_REFRESH_LOCK_KEY}
     )
@@ -343,7 +348,7 @@ async def refresh_scopes(session: AsyncSession) -> list[ScopeResponse]:
     account.account_login = identity.login
     account.token_scopes = sorted(identity.permissions)
     account.scopes_refreshed_at = datetime.now(UTC)
-    _apply_listing(session, account, await _stored_scopes(session, account.id), live)
+    _apply_listing(session, account, await stored_scopes(session, account.id), live)
     await session.flush()
     logger.info("evidence.scopes refreshed listed=%d", len(live))
     return await list_scopes(session)
@@ -351,8 +356,8 @@ async def refresh_scopes(session: AsyncSession) -> list[ScopeResponse]:
 
 async def update_scopes(session: AsyncSession, payload: ScopeUpdateRequest) -> list[ScopeResponse]:
     candidate = await get_or_create_candidate(session)
-    account = await _get_or_create_account(session, candidate.id)
-    stored = await _stored_scopes(session, account.id)
+    account = await get_or_create_account(session, candidate.id)
+    stored = await stored_scopes(session, account.id)
     missing = [item.ref for item in payload.scopes if item.ref not in stored]
     if missing:
         raise EvidenceScopeNotFoundError
@@ -377,8 +382,8 @@ async def update_scopes(session: AsyncSession, payload: ScopeUpdateRequest) -> l
         if item.content_level is not None:
             scope.content_level = item.content_level
         if item.ref in employers:
-            scope.employer_ref = employers[item.ref]
-            await apply_scope_employer(session, candidate.id, scope.ref, employers[item.ref])
+            scope.employer_ref = employers[item.ref] or owner_default(account, scope.ref)
+            await apply_scope_employer(session, candidate.id, scope.ref, scope.employer_ref)
         updated.append(_scope_response(scope))
     await session.flush()
     return updated
@@ -462,7 +467,7 @@ async def start_sync(
 ) -> SyncStartResponse:
     _require_source()
     candidate = await get_or_create_candidate(session)
-    account = await _get_or_create_account(session, candidate.id)
+    account = await get_or_create_account(session, candidate.id)
     enabled = (
         await session.execute(
             select(func.count())

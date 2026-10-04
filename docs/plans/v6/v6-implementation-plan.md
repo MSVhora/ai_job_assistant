@@ -580,7 +580,7 @@ class AgentMessage(Base):                # agent_message
 | `0024_add_llm_output_cache` | #49 | `llm_output_cache` |
 | `0025_add_achievements` | #52 | `achievement`, `achievement_evidence`, `achievement_revision`, enums |
 | `0026_add_resume_document` | #54 | `resume_document`, `resume_document_revision` |
-| `0030_add_agent_session` | #58 | `agent_session`, `agent_message` (0027: #55 resume generation, 0028: repository-list cache, 0029: employer merges) |
+| `0031_add_agent_session` | #58 | `agent_session`, `agent_message` (0027: #55 resume generation, 0028: repository-list cache, 0029: employer merges, 0030: organization employers) |
 
 All downgrades drop in reverse; `tests/db/test_migrations.py` extended to round-trip each.
 

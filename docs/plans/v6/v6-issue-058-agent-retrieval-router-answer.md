@@ -36,9 +36,9 @@ Answer interview-style questions in the user's voice from **approved** achieveme
 
 ## Scope
 
-### Migration (`0030_add_agent_session.py`)
+### Migration (`0031_add_agent_session.py`)
 
-> Numbering: `0027` was taken by #55 (`resume_document.generation`) and `0028` by the repository-list cache (`evidence_scope` listing columns) and `0029` by the employer merges (`candidate.employer_merges`), so this migration is `0030`.
+> Numbering: `0027` was taken by #55 (`resume_document.generation`) and `0028` by the repository-list cache (`evidence_scope` listing columns), `0029` by the employer merges (`candidate.employer_merges`) and `0030` by the organization employers (`evidence_source.owner_employers`), so this migration is `0031`.
 
 `agent_session` and `agent_message` per plan §9 (FKs indexed; `agent_message(session_id, created_at)` index; role enum). No existing table touched.
 

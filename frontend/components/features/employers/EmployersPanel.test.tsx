@@ -5,6 +5,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   estimateEmployerMergeSuggestions,
   listEmployers,
+  listGithubScopes,
+  listOwners,
   listProfiles,
   mergeEmployers,
   suggestEmployerMerges,
@@ -20,6 +22,8 @@ vi.mock("@/lib/api", async (importOriginal) => ({
   addProfileExperience: vi.fn(),
   estimateEmployerMergeSuggestions: vi.fn(),
   listEmployers: vi.fn(),
+  listGithubScopes: vi.fn(),
+  listOwners: vi.fn(),
   listProfiles: vi.fn(),
   mergeEmployers: vi.fn(),
   suggestEmployerMerges: vi.fn(),
@@ -61,6 +65,8 @@ describe("EmployersPanel", () => {
     }
     vi.mocked(listEmployers).mockResolvedValue([SAMSUNG, SRI, ACME, MERGED, PERSONAL_OPTION]);
     vi.mocked(listProfiles).mockResolvedValue([]);
+    vi.mocked(listOwners).mockResolvedValue([]);
+    vi.mocked(listGithubScopes).mockResolvedValue([]);
     vi.mocked(mergeEmployers).mockResolvedValue([]);
     vi.mocked(unmergeEmployer).mockResolvedValue([]);
   });

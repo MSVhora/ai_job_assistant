@@ -233,6 +233,17 @@ always see what was edited, merged or confirmed and when.
   (`POST /api/evidence/employers/merges`, undone with `DELETE …/merges/{key}`), shown as a
   *Merged:* badge with **Unmerge**, and applied whenever companies are compared; stored employer
   references are never rewritten.
+- **Organizations.** Most work for one employer sits in one GitHub organization, so the
+  **Employers** card has an **Organizations** list: every owner among your repositories with how
+  many are selected. Map an owner to an employer once (`PATCH /api/evidence/github/organizations/{owner}`)
+  and every repository of that owner without a mapping of its own follows it — **including
+  repositories you have not selected**, so ticking one later needs no extra step, and repositories
+  a later refresh finds inherit it too. The preview before **Apply** says how many repositories
+  change and how many keep a mapping you set yourself; those are never overwritten. Clearing the
+  owner only clears what it set. A repository mapped on its own outranks its organization, and
+  clearing that repository's mapping falls back to the organization's. Owner names are compared
+  case-insensitively. Your own account is marked as such: it is usually personal work, but you can
+  map it too. The rows show *Same as organization (…)* where a repository inherits.
 - **Adding an employer that is not on your resume.** **Add an employer** (also the last choice in
   every employer picker) adds the company to a profile as a role — company required; role, dates
   and "I work here now" optional (`POST /api/profiles/{id}/experience`). It is saved like any

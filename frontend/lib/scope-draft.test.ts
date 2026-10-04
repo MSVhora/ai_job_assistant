@@ -7,6 +7,7 @@ import {
   chunk,
   filterScopes,
   newlyEnabledPrivate,
+  paginate,
   selectScopes,
   selectedCount,
   toUpdates,
@@ -97,5 +98,40 @@ describe("filterScopes and chunk", () => {
   it("splits updates into batches the API accepts", () => {
     expect(chunk([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]]);
     expect(chunk([], 200)).toEqual([]);
+  });
+});
+
+describe("paginate", () => {
+  const items = Array.from({ length: 55 }, (_, index) => index + 1);
+
+  it("returns one page with its position in the list", () => {
+    const second = paginate(items, 1, 25);
+
+    expect(second.items).toHaveLength(25);
+    expect(second.items[0]).toBe(26);
+    expect([second.from, second.to, second.total, second.pageCount]).toEqual([26, 50, 55, 3]);
+  });
+
+  it("gives the last page only what is left", () => {
+    const last = paginate(items, 2, 25);
+
+    expect(last.items).toEqual([51, 52, 53, 54, 55]);
+    expect([last.from, last.to]).toEqual([51, 55]);
+  });
+
+  it("clamps a page that no longer exists, for example after filtering", () => {
+    expect(paginate(items.slice(0, 10), 4, 25).page).toBe(0);
+    expect(paginate(items, -3, 25).page).toBe(0);
+  });
+
+  it("handles an empty list", () => {
+    expect(paginate([], 0, 25)).toEqual({
+      items: [],
+      page: 0,
+      pageCount: 1,
+      from: 0,
+      to: 0,
+      total: 0,
+    });
   });
 });

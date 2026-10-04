@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 
 export function ScopeToolbar({
   total,
-  shown,
+  matching,
   selected,
   query,
   disabled,
@@ -13,7 +13,7 @@ export function ScopeToolbar({
   onClearShown,
 }: {
   total: number;
-  shown: number;
+  matching: number;
   selected: number;
   query: string;
   disabled: boolean;
@@ -21,7 +21,7 @@ export function ScopeToolbar({
   onSelectShown: () => void;
   onClearShown: () => void;
 }) {
-  const filtered = shown !== total;
+  const filtered = matching !== total;
   const button =
     "rounded-full border border-violet-300 px-3 py-1 text-xs font-semibold text-violet-700 hover:bg-violet-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 disabled:opacity-50";
   return (
@@ -42,18 +42,18 @@ export function ScopeToolbar({
       <button
         type="button"
         className={button}
-        disabled={disabled || shown === 0}
+        disabled={disabled || matching === 0}
         onClick={onSelectShown}
       >
-        {filtered ? `Select all ${shown} shown` : "Select all"}
+        {filtered ? `Select all ${matching} matching` : "Select all"}
       </button>
       <button
         type="button"
         className={button}
-        disabled={disabled || shown === 0}
+        disabled={disabled || matching === 0}
         onClick={onClearShown}
       >
-        {filtered ? `Clear ${shown} shown` : "Clear selection"}
+        {filtered ? `Clear ${matching} matching` : "Clear selection"}
       </button>
       <p aria-live="polite" className="ml-auto text-xs text-gray-600">
         {selected} of {total} selected

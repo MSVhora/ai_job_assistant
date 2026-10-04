@@ -151,11 +151,80 @@ describe("ScopeTable", () => {
 
     await user.type(await screen.findByRole("searchbox", { name: "Filter repositories" }), "acme");
     expect(screen.queryByText("ada/engine")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Select all 2 shown" }));
+    await user.click(screen.getByRole("button", { name: "Select all 2 matching" }));
 
     expect(screen.getByText("2 of 3 selected")).toBeInTheDocument();
     await user.clear(screen.getByRole("searchbox", { name: "Filter repositories" }));
     expect(screen.getByRole("checkbox", include("ada/engine"))).not.toBeChecked();
+  });
+
+  it("pages a long list, keeps the draft across pages and selects every page with Select all", async () => {
+    vi.mocked(listGithubScopes).mockResolvedValue(
+      Array.from({ length: 60 }, (_, index) =>
+        scope({ ref: `acme/repo-${String(index + 1).padStart(2, "0")}` }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderWithClient(<ScopeTable status={status()} />);
+
+    expect(await screen.findByText("Showing 1–25 of 60")).toBeInTheDocument();
+    expect(screen.getAllByRole("checkbox")).toHaveLength(25);
+    await user.click(screen.getByRole("checkbox", include("acme/repo-01")));
+
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    expect(screen.getByText("Showing 26–50 of 60")).toBeInTheDocument();
+    expect(screen.getByText("Page 2 of 3")).toBeInTheDocument();
+    expect(screen.queryByText("acme/repo-01")).not.toBeInTheDocument();
+    expect(screen.getByText("1 unsaved change")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Select all" }));
+    expect(screen.getByText("60 of 60 selected")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => {
+      expect(updateGithubScopes).toHaveBeenCalledTimes(1);
+    });
+    expect(vi.mocked(updateGithubScopes).mock.calls[0]?.[0]).toHaveLength(60);
+  });
+
+  it("changes the page size and returns to the first page", async () => {
+    vi.mocked(listGithubScopes).mockResolvedValue(
+      Array.from({ length: 60 }, (_, index) =>
+        scope({ ref: `acme/repo-${String(index + 1).padStart(2, "0")}` }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderWithClient(<ScopeTable status={status()} />);
+
+    await user.click(await screen.findByRole("button", { name: "Next" }));
+    await user.selectOptions(screen.getByLabelText("Per page"), "50");
+
+    expect(screen.getByText("Showing 1–50 of 60")).toBeInTheDocument();
+    expect(screen.getAllByRole("checkbox")).toHaveLength(50);
+  });
+
+  it("goes back to the first page when the filter changes", async () => {
+    vi.mocked(listGithubScopes).mockResolvedValue(
+      Array.from({ length: 60 }, (_, index) =>
+        scope({ ref: `acme/repo-${String(index + 1).padStart(2, "0")}` }),
+      ),
+    );
+    const user = userEvent.setup();
+    renderWithClient(<ScopeTable status={status()} />);
+
+    await user.click(await screen.findByRole("button", { name: "Next" }));
+    await user.type(screen.getByRole("searchbox", { name: "Filter repositories" }), "repo-5");
+
+    expect(screen.getByRole("checkbox", include("acme/repo-50"))).toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Repository pages" })).not.toBeInTheDocument();
+  });
+
+  it("shows no pager for a short list", async () => {
+    vi.mocked(listGithubScopes).mockResolvedValue([scope()]);
+    renderWithClient(<ScopeTable status={status()} />);
+
+    await screen.findByText("ada/engine");
+
+    expect(screen.queryByRole("navigation", { name: "Repository pages" })).not.toBeInTheDocument();
   });
 
   it("says when the filter matches nothing", async () => {

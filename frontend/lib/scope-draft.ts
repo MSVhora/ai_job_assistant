@@ -91,3 +91,30 @@ export function chunk<T>(items: T[], size: number): T[][] {
   }
   return groups;
 }
+
+export const SCOPE_PAGE_SIZES = [25, 50, 100] as const;
+
+export interface PageSlice<T> {
+  items: T[];
+  page: number;
+  pageCount: number;
+  from: number;
+  to: number;
+  total: number;
+}
+
+/** One zero-based page of `items`; an out-of-range page is clamped rather than empty. */
+export function paginate<T>(items: T[], page: number, size: number): PageSlice<T> {
+  const total = items.length;
+  const pageCount = Math.max(1, Math.ceil(total / size));
+  const current = Math.min(Math.max(0, page), pageCount - 1);
+  const start = current * size;
+  return {
+    items: items.slice(start, start + size),
+    page: current,
+    pageCount,
+    from: total === 0 ? 0 : start + 1,
+    to: Math.min(start + size, total),
+    total,
+  };
+}

@@ -37,7 +37,8 @@ Only commit messages, pull request / issue / review text, README text, language 
 Enabling a repository means **evidence is collected from it**: only the repositories you select
 are synced and used to build achievements and resumes, and nothing is read from the rest. On the
 Evidence page, tick the repositories you want (the filter box narrows the list, and **Select all**
-and **Clear selection** act on the repositories currently shown), then press **Save changes** —
+and **Clear selection** act on every repository matching the filter, across all pages; the list is
+paged at 25, 50 or 100 per page), then press **Save changes** —
 nothing is saved until you do, and **Discard** throws your edits away. If the selection switches on
 private repositories, Save shows the disclosure once for all of them. Content level and employer
 mapping are part of the same draft.

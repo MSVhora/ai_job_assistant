@@ -10,6 +10,8 @@ import {
   changeCount,
   filterScopes,
   newlyEnabledPrivate,
+  SCOPE_PAGE_SIZES,
+  paginate,
   selectScopes,
   selectedCount,
   toUpdates,
@@ -18,6 +20,7 @@ import {
 } from "@/lib/scope-draft";
 
 import { DisclosureModal } from "./DisclosureModal";
+import { ScopePager } from "./ScopePager";
 import { ScopeRow } from "./ScopeRow";
 import { ScopeSaveBar } from "./ScopeSaveBar";
 import { ScopeToolbar } from "./ScopeToolbar";
@@ -29,9 +32,12 @@ export function ScopeTable({ status }: { status: EvidenceStatus }) {
   const [draft, setDraft] = useState<ScopeDraft>({});
   const [query, setQuery] = useState("");
   const [confirming, setConfirming] = useState<string[]>([]);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState<number>(SCOPE_PAGE_SIZES[0]);
 
   const all = scopes.data ?? [];
-  const shown = filterScopes(all, query);
+  const matching = filterScopes(all, query);
+  const slice = paginate(matching, page, pageSize);
 
   const save = (acknowledged: boolean) => {
     update.mutate(
@@ -93,23 +99,26 @@ export function ScopeTable({ status }: { status: EvidenceStatus }) {
           </p>
           <ScopeToolbar
             total={all.length}
-            shown={shown.length}
+            matching={matching.length}
             selected={selectedCount(all, draft)}
             query={query}
             disabled={update.isPending}
-            onQuery={setQuery}
+            onQuery={(next) => {
+              setQuery(next);
+              setPage(0);
+            }}
             onSelectShown={() => {
-              setDraft((current) => selectScopes(current, shown, true));
+              setDraft((current) => selectScopes(current, matching, true));
             }}
             onClearShown={() => {
-              setDraft((current) => selectScopes(current, shown, false));
+              setDraft((current) => selectScopes(current, matching, false));
             }}
           />
-          {shown.length === 0 && (
+          {matching.length === 0 && (
             <p className="text-sm text-gray-600">No repository matches “{query}”.</p>
           )}
           <ul className="flex flex-col gap-2" aria-label="Repositories">
-            {shown.map((scope) => (
+            {slice.items.map((scope) => (
               <ScopeRow
                 key={scope.ref}
                 scope={scope}
@@ -122,6 +131,15 @@ export function ScopeTable({ status }: { status: EvidenceStatus }) {
               />
             ))}
           </ul>
+          <ScopePager
+            slice={slice}
+            size={pageSize}
+            onPage={setPage}
+            onSize={(size) => {
+              setPageSize(size);
+              setPage(0);
+            }}
+          />
           {update.isError && (
             <p role="alert" className="mt-3 text-sm text-red-700">
               Could not save: {update.error.message}

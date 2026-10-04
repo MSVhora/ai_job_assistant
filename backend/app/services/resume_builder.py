@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import uuid
 from dataclasses import dataclass, field
@@ -10,6 +11,7 @@ from app.adapters.llm import LLMError, usage_meter
 from app.core.config import Settings, get_settings
 from app.core.errors import (
     AchievementNotFoundError,
+    CannotFitError,
     InvalidResumeDocumentError,
     ResumeBlockNotFoundError,
 )
@@ -28,7 +30,6 @@ from app.schemas.resume_document import (
     GenerationUsage,
     JDAnalysis,
     Layout,
-    NotIncluded,
     OmittedRole,
     PoolEntry,
     ResumeContent,
@@ -51,7 +52,6 @@ from app.services.resume_blocks import (
 )
 from app.services.resume_jd import analyze_jd, jd_from_match, jd_hash
 from app.services.resume_priority import (
-    BUDGET_SEEDS,
     Candidate,
     Omission,
     RoleSpan,
@@ -66,6 +66,8 @@ from app.services.resume_priority import (
     select_for_writing,
     tailoring_weight,
 )
+from app.services.resume_render.fit import fit_layout, unfitted_layout
+from app.services.resume_render.page_meter import measure_pages
 from app.services.resume_terms import GapSource, canon, gaps_report, jd_skill_wordings
 from app.services.resume_writer import (
     BlockSpec,
@@ -320,34 +322,6 @@ def _gaps(ctx: Context, placed: list[Candidate]) -> list[GapItem]:
     return gaps_report(ctx.jd, sources)
 
 
-def build_layout(content: ResumeContent, generation: Generation, page_target: int) -> Layout:
-    """Content-only layout: what is usable now and why the rest is not (the page fit is #56)."""
-    included: list[str] = []
-    skipped: list[NotIncluded] = []
-    for entry in blocks(content):
-        for bullet in entry.highlights:
-            if bullet.check == "needs_review":
-                skipped.append(
-                    NotIncluded(id=bullet.id, priority=bullet.score, reason="needs_review")
-                )
-            else:
-                included.append(bullet.id)
-    skipped += [
-        NotIncluded(id=str(item.achievement_id), priority=item.priority, reason="not_written")
-        for item in generation.pool
-        if not item.written
-    ]
-    skipped += [
-        NotIncluded(id=item.block_id, priority=item.priority, reason="overlap_omitted")
-        for item in generation.omitted_roles
-    ]
-    return Layout(
-        included_ids=included,
-        not_included=skipped,
-        short_on_evidence=len(included) < BUDGET_SEEDS[page_target],
-    )
-
-
 def _pool(ordered: list[Candidate], content: ResumeContent) -> list[PoolEntry]:
     written = {
         bullet.achievement_id
@@ -414,14 +388,38 @@ async def load_context(session: AsyncSession, document: ResumeDocument) -> Conte
     )
 
 
-async def persist(ctx: Context, source: str) -> None:
+async def fit_context(ctx: Context, *, strict: bool) -> Layout:
+    """Run the page fit off the event loop; when nothing fits, keep the content and say so.
+
+    `strict` re-raises `CannotFitError` for the explicit fit and render actions.
+    """
+    document = ctx.document
+    target = min(document.page_target, ctx.settings.resume_max_pages)
+    try:
+        return await asyncio.to_thread(
+            fit_layout,
+            ctx.content,
+            ctx.generation,
+            target,
+            document.template,
+            measure_pages,
+            ctx.settings.resume_fit_max_compiles,
+        )
+    except CannotFitError:
+        if strict:
+            raise
+        reason = f"nothing fits {target} page(s) even at the smallest type size"
+        ctx.generation.warnings.append(f"The resume does not fit: {reason}.")
+        return unfitted_layout(ctx.content, ctx.generation, reason)
+
+
+async def persist(ctx: Context, source: str, *, strict: bool = False) -> None:
     """Store content, layout and generation; version and snapshot only when content changed."""
     document = ctx.document
+    layout = await fit_context(ctx, strict=strict)
     ctx.generation.warnings = list(dict.fromkeys(ctx.generation.warnings))
     content = ctx.content.model_dump(mode="json")
-    document.layout = build_layout(ctx.content, ctx.generation, document.page_target).model_dump(
-        mode="json"
-    )
+    document.layout = layout.model_dump(mode="json")
     document.generation = ctx.generation.model_dump(mode="json")
     changed = content != document.content
     if changed:

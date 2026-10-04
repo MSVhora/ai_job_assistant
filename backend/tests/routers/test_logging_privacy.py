@@ -170,7 +170,12 @@ async def test_resume_generation_flow_logs_no_jd_comment_prompt_or_evidence_text
         f"{base}/bullets/{entry['highlights'][0]['id']}", json={"text": f"Shipped {RESUME_MARKER}"}
     )
 
+    fitted = await client.post(f"{base}/fit")
+    rendered = await client.post(f"{base}/render")
+
     assert (created.status_code, applied.status_code, edited.status_code) == (201, 200, 200)
+    assert (fitted.status_code, rendered.status_code) == (200, 200)
+    assert rendered.content.startswith(b"%PDF")
     assert prompts, "the flow must have exercised the LLM wrapper"
     logged = "\n".join(record.getMessage() for record in caplog.records)
     assert "cost_usd=" in logged

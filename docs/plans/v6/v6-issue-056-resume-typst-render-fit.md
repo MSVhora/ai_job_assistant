@@ -1,6 +1,6 @@
 # Issue #56 — Typst rendering and the deterministic priority-first page fit (Week 3)
 
-**Status:** Proposed — for owner review (revised 2026-10-03 against the shipped #55 code; earlier revision 2026-10-02: targets 1–4 pages, priority-first, no fill thresholds, PDF only on explicit request)
+**Status:** Implemented (2026-10-04) — see *Implementation notes* for deviations (revised 2026-10-03 against the shipped #55 code; earlier revision 2026-10-02: targets 1–4 pages, priority-first, no fill thresholds, PDF only on explicit request)
 **Tracks:** GitHub issue #56 (milestone `v6`, branch `v6/56-resume-typst-render-fit`)
 **Plan of record:** [v6-implementation-plan.md](v6-implementation-plan.md) §3.4, §6.3, ADR-3
 **Depends on:** #54 (schema), #55 (ranked pool, written bullets, and the content-only stub layout this issue replaces)
@@ -121,3 +121,18 @@ regenerate `backend/openapi.json` and `frontend/lib/api/schema.d.ts` (`npm run g
 ## Out of scope
 
 More templates, DOCX/HTML export, stored PDFs, custom fonts, cover letters, multi-column layouts.
+
+## Implementation notes — deviations from the plan above
+
+- **Fonts:** the compiler's embedded Libertinus Serif with `ignore_system_fonts=True`; no `resources/fonts/` directory and no font files (owner confirmed serif is fine).
+- **Data passing:** one JSON string in `sys_inputs`, decoded by the template with `json(bytes(sys.inputs.data))`; no temp files.
+- **Eligibility:** `check == "passed"` only. Approving a flagged bullet already sets `check = "passed"`, and `failed` is never set by code, so it is treated like `needs_review`.
+- **Dropping roles (plan step 4) is implicit:** anchors come first in the ordering, so the longest fitting prefix at the floor preset drops the lowest-priority roles whole. `CannotFitError` is raised when the fixed sections (contact, education, skills) overflow, or when not even one bullet fits at the floor preset. When the roomiest preset already fits everything the search stops after one compile.
+- **Template validation:** `ResumeDocumentCreate`/`Update.template` is now `Literal["classic", "compact"]` (422 at the edge); the fit still guards with a 400 `InvalidResumeDocumentError` for older rows.
+- **Generating never loses content to a failed fit:** `persist` catches `CannotFitError`, stores an empty layout (all candidates `did_not_fit`) and adds a `generation.warnings` entry. The explicit `POST …/fit` and `…/render` re-raise it as 422.
+- **`CannotFitError` has no extra body keys** (the explanation is in `detail`), so `test_error_contract.py` needed no change. `ResumeRenderError` (500) wraps compiler failures and never logs compiler text.
+- **`short_on_evidence`** is true when pages < target and nothing is left to add: no `did_not_fit`, `needs_review` or `not_written` entries.
+- **Order in the document:** included roles keep the document's own order (the profile's reverse-chronological order), not a re-sort.
+- **Routes:** `POST …/fit`, `GET …/layout` and `POST …/render` (`Content-Disposition` filename built from an ASCII slug of the name). `render` runs the fit again, persists it, then renders exactly the fitted layout.
+- **Not done here:** an amd64 image build (the wheel exists for manylinux x86_64 but was only exercised on aarch64).
+- **Verification:** backend gate green against the scratch database (1241 tests, 93.4 % coverage; ruff, format and pyright clean), `pre-commit run --all-files` clean, `pip-audit` clean, frontend lint/format/typecheck/test/build pass after regenerating `lib/api/schema.d.ts`, ER diagram re-rendered.

@@ -15,7 +15,7 @@ Applies to everything under `backend/`.
 
 ## Rules
 
-- **Response models everywhere**: every route declares `response_model` (redirect/204 routes are the only exceptions). Never return ORM objects or raw dicts.
+- **Response models everywhere**: every route declares `response_model` (redirect/204 routes and binary or text downloads — the resume `…/export` and `…/render` — are the only exceptions; a download declares its media type through `response_class` and `responses`). Never return ORM objects or raw dicts.
 - **Async all the way**: `async def` routes, SQLAlchemy 2.0 async engine + `asyncpg`. No blocking calls (requests, file IO, time.sleep) inside async routes — use async libs, `asyncio.to_thread`, or `BackgroundTasks`.
 - **DB session via dependency**: one `AsyncSession` per request from `deps.py`; the
   `DbCommitMiddleware` commits on `http.response.start` (a yield-dependency teardown runs

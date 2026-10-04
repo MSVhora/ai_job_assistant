@@ -218,7 +218,7 @@ provenance, and the contact details come from the document's basics, copied from
 ## Writing the resume content
 
 Creating a resume document now also **writes its content** from your approved achievements. It
-returns data only — nothing is rendered to a PDF here. You choose a page target (1 to 4, at most
+returns data only — nothing is rendered to a PDF until you ask (see *Choosing a length* below). You choose a page target (1 to 4, at most
 `RESUME_MAX_PAGES`), optionally a job description (pasted, or taken from one of your matches
 together with its rationale), a tailoring strength and whether to leave out achievements derived
 from private repositories.
@@ -290,6 +290,42 @@ to the more recent one, and the other is listed as omitted with the reason. Role
 weighted sum of its top three achievement priorities plus a small recency term. Projects and open
 source are exempt. **Include anyway** restores an omitted role for this document without removing
 the other one.
+
+## Choosing a length
+
+The page target (1, 2, 3 or 4) is the most pages the resume may take, not a number it has to fill.
+After content is written, edited, added to or removed, a fit step decides **what is included** by
+maximizing the priority of the bullets that fit; a half-empty page is fine when the remaining
+material is weaker or does not exist. Nothing is ever padded, and no model is involved.
+
+### What gets included
+
+Only bullets that passed verification (or that you approved anyway) are candidates. They are taken
+in this order: pinned bullets, then each role's best bullet (so every included role appears before
+any role's second bullet), then the rest by priority. The fit tries three typography presets —
+comfortable (10.5 pt, 0.7 in margins), 10 pt with 0.6 in margins, and a floor of 9.5 pt with 0.5 in
+margins — and finds the longest run of that order that fits the page target at each. It keeps the
+preset that includes the most priority; on a tie the roomier one wins. If a role's best bullet
+does not fit, the lowest-priority roles are left out whole.
+
+The result is the document's **layout**: pages used, preset, what is included and what is not
+(`did_not_fit`, `needs_review`, `not_written` or `overlap_omitted`, each with its priority). It says
+**short on evidence** when everything available is already included and the pages are not full.
+If even one bullet cannot fit at the smallest size — for example a one-page target with a very
+long skills list — fit and render answer 422 asking you to choose more pages or shorten the fixed
+sections; generating content never fails for this reason, it stores an empty layout and a warning.
+
+`POST /api/resume-documents/{id}/fit` re-runs the fit and returns the layout as data; `POST
+…/render` is the explicit **Generate PDF** step: it re-runs the fit on the current content and
+returns `application/pdf`. PDFs are never stored.
+
+### ATS-friendly output
+
+The PDF is a single column of real text: standard headings (Summary, Experience, Education, Skills,
+Projects, Certifications, Awards), a plain bullet glyph, contact details in the body rather than a
+header, links as visible text, and no images, tables or text boxes, so applicant tracking systems
+read it in order. Two variants exist, `classic` (centered header) and `compact` (left-aligned,
+tighter).
 
 ## Not yet verified against live GitHub
 

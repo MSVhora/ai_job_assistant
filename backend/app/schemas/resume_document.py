@@ -23,6 +23,7 @@ ConflictAction = Literal["edit_profile", "keep_as_is"]
 DocumentStatus = Literal["draft", "final"]
 NotIncludedReason = Literal["did_not_fit", "needs_review", "overlap_omitted", "not_written"]
 TailoringStrength = Literal["light", "balanced", "strong"]
+ResumeTemplate = Literal["classic", "compact"]
 CommentSection = Literal["work", "projects"]
 CommentStatus = Literal["open", "applied", "rejected"]
 
@@ -166,7 +167,7 @@ class ResumeDocumentCreate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=200)
     page_target: int = Field(default=1, ge=1, le=4)
     match_id: uuid.UUID | None = None
-    template: str = Field(default="classic", min_length=1, max_length=50)
+    template: ResumeTemplate = "classic"
     job_description: str | None = Field(default=None, min_length=1, max_length=MAX_JD_CHARS)
     tailoring_strength: TailoringStrength = "balanced"
     exclude_private: bool = False
@@ -184,7 +185,7 @@ class ResumeDocumentUpdate(BaseModel):
 
     title: str | None = Field(default=None, min_length=1, max_length=200)
     page_target: int | None = Field(default=None, ge=1, le=4)
-    template: str | None = Field(default=None, min_length=1, max_length=50)
+    template: ResumeTemplate | None = None
     status: DocumentStatus | None = None
     content: ResumeContent | None = None
 

@@ -1,4 +1,4 @@
-import type { EvidenceScope, EvidenceStatus, SyncRun } from "@/lib/api";
+import type { EmployerOption, EvidenceScope, EvidenceStatus, SyncRun } from "@/lib/api";
 
 export function status(overrides: Partial<EvidenceStatus> = {}): EvidenceStatus {
   return {
@@ -50,3 +50,33 @@ export function syncRun(overrides: Partial<SyncRun> = {}): SyncRun {
     ...overrides,
   };
 }
+
+export function employerOption(
+  company: string,
+  overrides: Partial<EmployerOption> = {},
+): EmployerOption {
+  return {
+    kind: "experience",
+    label: `${company} · 2020 – 2022`,
+    company,
+    start_date: null,
+    key: company.toLowerCase(),
+    entries: 1,
+    span: "2020 – 2022",
+    aliases: [company],
+    merged_from: [],
+    ...overrides,
+  };
+}
+
+export const PERSONAL_OPTION: EmployerOption = {
+  kind: "personal",
+  label: "Personal / open source",
+  company: null,
+  start_date: null,
+  key: "personal",
+  entries: 0,
+  span: null,
+  aliases: [],
+  merged_from: [],
+};

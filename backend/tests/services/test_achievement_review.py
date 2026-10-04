@@ -172,7 +172,7 @@ async def test_edit_validates_dates_and_employer() -> None:
             achievement_id,
             AchievementUpdate(time_start=date(2024, 5, 1), time_end=date(2024, 4, 1)),
         )
-    with pytest.raises(InvalidAchievementInputError, match="experience entries"):
+    with pytest.raises(InvalidAchievementInputError, match="your employers"):
         await call(
             review.edit,
             achievement_id,

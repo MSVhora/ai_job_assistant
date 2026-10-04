@@ -247,6 +247,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/profiles/{profile_id}/experience": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add Profile Experience */
+        post: operations["add_profile_experience_api_profiles__profile_id__experience_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/jobs/postings/{posting_id}": {
         parameters: {
             query?: never;
@@ -446,6 +463,74 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/evidence/employers/merge-suggestions/estimate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Estimate Merge Suggestions */
+        post: operations["estimate_merge_suggestions_api_evidence_employers_merge_suggestions_estimate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/evidence/employers/merge-suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Suggest Employer Merges */
+        post: operations["suggest_employer_merges_api_evidence_employers_merge_suggestions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/evidence/employers/merges": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Merge Employers */
+        post: operations["merge_employers_api_evidence_employers_merges_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/evidence/employers/merges/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Unmerge Employer */
+        delete: operations["unmerge_employer_api_evidence_employers_merges__key__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1791,7 +1876,41 @@ export interface components {
             /** End Date */
             end_date?: string | null;
         };
-        /** EmployerOption */
+        /**
+         * EmployerMergeRequest
+         * @description Company names the user confirms are one employer; `canonical` is the name to show.
+         */
+        EmployerMergeRequest: {
+            /** Canonical */
+            canonical: string;
+            /** Members */
+            members: string[];
+        };
+        /** EmployerMergeSuggestion */
+        EmployerMergeSuggestion: {
+            /** Canonical */
+            canonical: string;
+            /** Members */
+            members: string[];
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+        };
+        /** EmployerMergeSuggestionsResponse */
+        EmployerMergeSuggestionsResponse: {
+            /** Suggestions */
+            suggestions: components["schemas"]["EmployerMergeSuggestion"][];
+            /** Cost Usd */
+            cost_usd: number | null;
+            /** Cached */
+            cached: boolean;
+        };
+        /**
+         * EmployerOption
+         * @description One employer: all of a company's experience entries together, or personal work.
+         */
         EmployerOption: {
             /**
              * Kind
@@ -1804,6 +1923,22 @@ export interface components {
             company?: string | null;
             /** Start Date */
             start_date?: string | null;
+            /**
+             * Key
+             * @default personal
+             */
+            key: string;
+            /**
+             * Entries
+             * @default 0
+             */
+            entries: number;
+            /** Span */
+            span?: string | null;
+            /** Aliases */
+            aliases?: string[];
+            /** Merged From */
+            merged_from?: string[];
         };
         /**
          * EvidenceItemStatus
@@ -1865,6 +2000,27 @@ export interface components {
             /** Scopes Refreshed At */
             scopes_refreshed_at?: string | null;
             latest_sync: components["schemas"]["SyncRunResponse"] | null;
+        };
+        /**
+         * ExperienceCreate
+         * @description A role added to a profile on its own, for example an employer missing from the resume.
+         */
+        ExperienceCreate: {
+            /** Company */
+            company: string;
+            /** Title */
+            title?: string | null;
+            /** Location */
+            location?: string | null;
+            /** Start Date */
+            start_date?: string | null;
+            /** End Date */
+            end_date?: string | null;
+            /**
+             * Is Current
+             * @default false
+             */
+            is_current: boolean;
         };
         /** ExperienceItem */
         ExperienceItem: {
@@ -4170,6 +4326,41 @@ export interface operations {
             };
         };
     };
+    add_profile_experience_api_profiles__profile_id__experience_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profile_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExperienceCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProfileResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_job_posting_detail_api_jobs_postings__posting_id__get: {
         parameters: {
             query?: never;
@@ -4531,6 +4722,110 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EmployerOption"][];
+                };
+            };
+        };
+    };
+    estimate_merge_suggestions_api_evidence_employers_merge_suggestions_estimate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CostEstimateResponse"];
+                };
+            };
+        };
+    };
+    suggest_employer_merges_api_evidence_employers_merge_suggestions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmployerMergeSuggestionsResponse"];
+                };
+            };
+        };
+    };
+    merge_employers_api_evidence_employers_merges_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EmployerMergeRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmployerOption"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unmerge_employer_api_evidence_employers_merges__key__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EmployerOption"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

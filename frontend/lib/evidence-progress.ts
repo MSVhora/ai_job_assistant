@@ -130,17 +130,13 @@ export function viewExtraction(run: ExtractionRun): ExtractionView {
 export function employerLabel(ref: Record<string, unknown> | null | undefined): string | null {
   if (ref === null || ref === undefined) return null;
   if (ref.kind === "personal") return "Personal / open source";
-  const company = text(ref.company);
-  if (company === null) return null;
-  const start = text(ref.start_date);
-  return start === null ? company : `${company} (${start})`;
+  return text(ref.company);
 }
 
 export function employerKey(ref: Record<string, unknown> | null | undefined): string {
   if (ref === null || ref === undefined) return "";
   if (ref.kind === "personal") return "personal";
-  const company = text(ref.company);
-  return company === null ? "" : `${company}|${text(ref.start_date) ?? ""}`;
+  return text(ref.company) ?? "";
 }
 
 export function formatResumeAt(date: Date | null): string | null {

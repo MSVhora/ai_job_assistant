@@ -379,9 +379,7 @@ def _build_rows(
     skills = canonicalize(item.skills, context.skills)
     start = item.time_start or (unit.time_start.date() if unit.time_start else None)
     end = item.time_end or (unit.time_end.date() if unit.time_end else None)
-    employer = unit.scope_employer or suggest_employer(
-        unit.project_key, start, end, context.experiences
-    )
+    employer = unit.scope_employer or suggest_employer(unit.project_key, start, end, context.groups)
     metrics = [
         {
             **metric,

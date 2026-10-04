@@ -207,17 +207,42 @@ always see what was edited, merged or confirmed and when.
 - **Where it came from.** Every achievement shows its source repository as a link
   (`owner/repo`, opening it on GitHub) next to a separate **Employer** badge that says who set the
   employer: *set by you*, *from the repository*, or *suggested* (not yet confirmed). The review page
-  has a **Repository** filter that lists the repositories you selected or synced.
-- **Employer mapping.** Each repository can be mapped once to one of your profile's experience
-  entries or to **Personal / open source** (`GET /api/evidence/employers`, then `PATCH
-  /api/evidence/github/scopes` with `employer_ref`), either on the Evidence page or on the review
-  page: pick the repository in the filter and use **Apply to this repository** in the bar that
-  appears. The scope list suggests a match when the repo was active during exactly one job, and the
-  choice applies to all of that repo's achievements. Unmapped repos are not blocking; their
-  achievements are treated as projects, never as employer experience.
+  has a **Repository** filter that lists the repositories you selected or synced, each followed
+  by its employer (or *no employer set*), so you can see at a glance which ones still need one.
+- **Employers.** An employer is a *company*, not one line of your resume: all experience entries of
+  the same company (names compared without case, punctuation or suffixes such as Ltd., Pvt. or
+  LLC) are one employer, shown once with its span and role count, for example *Wemsquare
+  Technologies · Jun 2018 – Nov 2020 · 4 roles* (`GET /api/evidence/employers`). The **Employers**
+  card on the Evidence page lists them.
+- **Employer mapping.** Each repository can be mapped once to one employer or to **Personal / open
+  source** (`PATCH /api/evidence/github/scopes` with `employer_ref`), either on the Evidence page
+  or on the review page: pick the repository in the filter and use **Apply to this repository**
+  in the bar that appears. The scope list suggests an employer when exactly one covers most of the
+  repo's active period (counting all of a company's stints), and the choice applies to all of that
+  repo's achievements. Unmapped repos are not blocking; their achievements are treated as
+  projects, never as employer experience. The stored reference is company-level; when a resume is
+  built the bullet goes under the stint whose dates contain the achievement's dates (the most
+  recent stint otherwise), and references written before this change that name one entry still
+  resolve to that entry.
+- **Merging names.** Names that normalize alike are grouped automatically; names that differ, such
+  as *Samsung* and *Samsung Research Institute*, are not, because that is a judgment. Tick two or
+  more employers and choose **Merge**, or use **Suggest merges**: after an estimate of the cost
+  (nothing is sent until you press **Ask the model**) your LLM is sent only the employer names
+  and proposes groups; every suggestion is checked against your profile, you untick any you
+  disagree with, and nothing changes until you merge. A merge is stored on the candidate
+  (`POST /api/evidence/employers/merges`, undone with `DELETE …/merges/{key}`), shown as a
+  *Merged:* badge with **Unmerge**, and applied whenever companies are compared; stored employer
+  references are never rewritten.
+- **Adding an employer that is not on your resume.** **Add an employer** (also the last choice in
+  every employer picker) adds the company to a profile as a role — company required; role, dates
+  and "I work here now" optional (`POST /api/profiles/{id}/experience`). It is saved like any
+  profile edit, so there is a revision in the profile's history and your job matches are
+  re-scored, and a resume can show it. With several profiles you choose which one; resumes built
+  from a different profile will not have the role and show the usual "employer not in profile"
+  warning. Without dates the employer cannot be matched to when the work happened.
 - **Employer per achievement.** One repository can hold both work and side projects, so the
-  achievement drawer has an **Employer** control: choose one of your jobs or *Personal / open
-  source*, then **Save employer**. A choice made here outranks the repository's employer and
+  achievement drawer has an **Employer** control: choose an employer (or add one) or *Personal /
+  open source*, then **Save employer**. A choice made here outranks the repository's employer and
   survives later changes to the repository mapping. Choosing **Same as repository** (`PATCH` with
   `employer_ref: null`) clears it, and the achievement follows its repository again. The employer
   decides where a bullet lands on a resume: under that company's experience, or under Projects for

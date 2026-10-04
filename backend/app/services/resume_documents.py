@@ -18,6 +18,7 @@ from app.core.pagination import DEFAULT_PAGE, Pagination
 from app.models import (
     Achievement,
     AchievementStatus,
+    Candidate,
     Match,
     Profile,
     ResumeDocument,
@@ -39,6 +40,7 @@ from app.schemas.resume_document import (
     ResumeDocumentSummary,
     ResumeDocumentUpdate,
 )
+from app.services.company_names import Merges
 from app.services.evidence_items import candidate_id_or_none
 from app.services.resume_blocks import ensure_ids
 from app.services.resume_mapping import profile_to_content
@@ -252,7 +254,9 @@ async def detect_conflicts(
         raise ProfileNotFoundError
     structured = StructuredProfile.model_validate(profile.structured_profile)
     achievements = await approved_achievements(session, document.candidate_id)
-    return reconcile(structured, achievements, identity)
+    candidate = await session.get(Candidate, document.candidate_id)
+    merges = Merges.from_stored(candidate.employer_merges if candidate else None)
+    return reconcile(structured, achievements, identity, merges)
 
 
 async def get_conflicts(session: AsyncSession, document_id: uuid.UUID) -> ConflictsResponse:

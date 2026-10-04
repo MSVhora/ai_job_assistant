@@ -10,6 +10,7 @@ from app.core.config import get_settings
 from app.models import Achievement
 from app.schemas.profile import ExperienceItem, StructuredProfile
 from app.schemas.resume_document import Conflict, ConflictAction, ConflictKind, ConflictSeverity
+from app.services.company_names import Merges
 from app.services.employer_mapping import Experience, experiences_of
 from app.services.profile_derivation import resolve_date
 from app.services.skill_canon import load_aliases
@@ -107,32 +108,43 @@ def _window(job: ExperienceItem) -> tuple[date, date] | None:
     return start, max(start, end)
 
 
-def _employer_job(profile: StructuredProfile, ref: dict[str, object]) -> ExperienceItem | None:
-    for job in profile.experience:
-        if job.company == ref.get("company") and job.start_date == ref.get("start_date"):
-            return job
-    return None
+def _employer_jobs(
+    profile: StructuredProfile, ref: dict[str, object], merges: Merges
+) -> list[ExperienceItem]:
+    """Every stint at the referenced employer (a company-level ref names all of them)."""
+    company = ref.get("company")
+    wanted = merges.key(company if isinstance(company, str) else None)
+    if wanted == "":
+        return []
+    return [job for job in profile.experience if merges.key(job.company) == wanted]
 
 
 def _is_confirmed_employer(ref: dict[str, object] | None) -> bool:
     return ref is not None and ref.get("kind") != "personal" and ref.get("source") != "suggested"
 
 
+def _outside(window: tuple[date, date], starts: date, ends: date) -> bool:
+    return _month(ends) < _month(window[0]) or _month(starts) > _month(window[1])
+
+
 def detect_date_outside_employment(
-    profile: StructuredProfile, achievements: Iterable[Achievement]
+    profile: StructuredProfile, achievements: Iterable[Achievement], merges: Merges | None = None
 ) -> list[Conflict]:
     found: list[Conflict] = []
     for achievement in achievements:
         ref = achievement.employer_ref
         if not _is_confirmed_employer(ref) or ref is None or achievement.time_start is None:
             continue
-        job = _employer_job(profile, ref)
-        window = _window(job) if job else None
-        if window is None:
+        windows = [
+            window
+            for job in _employer_jobs(profile, ref, merges or Merges())
+            if (window := _window(job)) is not None
+        ]
+        if not windows:
             continue
         starts = achievement.time_start
         ends = achievement.time_end or starts
-        if _month(ends) < _month(window[0]) or _month(starts) > _month(window[1]):
+        if all(_outside(window, starts, ends) for window in windows):
             found.append(
                 _conflict(
                     "date_outside_employment",
@@ -145,23 +157,25 @@ def detect_date_outside_employment(
 
 
 def detect_employer_not_in_profile(
-    profile: StructuredProfile, achievements: Iterable[Achievement]
+    profile: StructuredProfile, achievements: Iterable[Achievement], merges: Merges | None = None
 ) -> list[Conflict]:
-    missing: dict[tuple[str, str], int] = {}
+    known = merges or Merges()
+    missing: dict[str, tuple[str, int]] = {}
     for achievement in achievements:
         ref = achievement.employer_ref
-        if not _is_confirmed_employer(ref) or ref is None or _employer_job(profile, ref):
+        if not _is_confirmed_employer(ref) or ref is None or _employer_jobs(profile, ref, known):
             continue
-        key = (str(ref.get("company") or ""), str(ref.get("start_date") or ""))
-        missing[key] = missing.get(key, 0) + 1
+        company = str(ref.get("company") or "")
+        key = known.key(company)
+        missing[key] = (company, missing.get(key, (company, 0))[1] + 1)
     return [
         _conflict(
             "employer_not_in_profile",
             "warning",
             f"{count} achievement(s) are mapped to {company}, which is not in your profile.",
-            {"company": company, "start_date": start_date},
+            {"company": company, "start_date": ""},
         )
-        for (company, start_date), count in missing.items()
+        for company, count in missing.values()
     ]
 
 
@@ -269,12 +283,14 @@ def _contradicts(metric: str, bullet: str) -> bool:
     return False
 
 
-def _scoped_bullets(profile: StructuredProfile, achievement: Achievement) -> list[str]:
+def _scoped_bullets(
+    profile: StructuredProfile, achievement: Achievement, merges: Merges
+) -> list[str]:
     ref = achievement.employer_ref
     if _is_confirmed_employer(ref) and ref is not None:
-        job = _employer_job(profile, ref)
-        if job is not None:
-            return list(job.bullets)
+        jobs = _employer_jobs(profile, ref, merges)
+        if jobs:
+            return [bullet for job in jobs for bullet in job.bullets]
     key = (achievement.project_key or "").casefold()
     short = key.rsplit("/", 1)[-1]
     for project in profile.projects:
@@ -284,11 +300,11 @@ def _scoped_bullets(profile: StructuredProfile, achievement: Achievement) -> lis
 
 
 def detect_metric_contradiction(
-    profile: StructuredProfile, achievements: Iterable[Achievement]
+    profile: StructuredProfile, achievements: Iterable[Achievement], merges: Merges | None = None
 ) -> list[Conflict]:
     found: list[Conflict] = []
     for achievement in achievements:
-        bullets = _scoped_bullets(profile, achievement)
+        bullets = _scoped_bullets(profile, achievement, merges or Merges())
         metrics = [
             str(metric.get("text") or "")
             for metric in achievement.metrics
@@ -321,13 +337,18 @@ def _overlap_days(first: Experience, second: Experience) -> int:
     return (min(first_end, second_end) - max(first.start, second.start)).days + 1
 
 
-def detect_overlapping_roles(profile: StructuredProfile) -> list[Conflict]:
+def detect_overlapping_roles(
+    profile: StructuredProfile, merges: Merges | None = None
+) -> list[Conflict]:
     minimum = get_settings().resume_overlap_min_days
+    known = merges or Merges()
     roles = experiences_of(profile)
     found: list[Conflict] = []
     for index, first in enumerate(roles):
         for second in roles[index + 1 :]:
             if first.start is None or second.start is None:
+                continue
+            if known.key(first.company) == known.key(second.company):
                 continue
             days = _overlap_days(first, second)
             if days < minimum:
@@ -355,13 +376,14 @@ def reconcile(
     profile: StructuredProfile,
     achievements: list[Achievement],
     github_identity: GitHubIdentity | None = None,
+    merges: Merges | None = None,
 ) -> list[Conflict]:
     """Every conflict between the profile and approved evidence; nothing is changed or resolved."""
     return [
-        *detect_date_outside_employment(profile, achievements),
-        *detect_employer_not_in_profile(profile, achievements),
+        *detect_date_outside_employment(profile, achievements, merges),
+        *detect_employer_not_in_profile(profile, achievements, merges),
         *detect_identity_mismatch(profile, github_identity),
         *detect_skill_conflicts(profile, achievements),
-        *detect_metric_contradiction(profile, achievements),
-        *detect_overlapping_roles(profile),
+        *detect_metric_contradiction(profile, achievements, merges),
+        *detect_overlapping_roles(profile, merges),
     ]

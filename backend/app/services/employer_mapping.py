@@ -1,4 +1,5 @@
 import uuid
+from collections import Counter
 from dataclasses import dataclass, field
 from datetime import date
 
@@ -6,8 +7,9 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Profile
+from app.models import Candidate, Profile
 from app.schemas.profile import StructuredProfile
+from app.services.company_names import Merges, normalize_company
 from app.services.profile_derivation import resolve_date
 
 NON_REPO_PREFIXES = ("resume:", "note:", "link:")
@@ -21,12 +23,74 @@ class Experience:
     start_raw: str | None
     start: date | None
     end: date | None
+    is_current: bool = False
+
+
+@dataclass(frozen=True)
+class EmployerGroup:
+    """One employer: every experience entry whose company names are the same company."""
+
+    key: str
+    name: str
+    entries: tuple[Experience, ...]
+    aliases: tuple[str, ...]
+    merged_from: tuple[str, ...]
+
+    @property
+    def start(self) -> date | None:
+        starts = [entry.start for entry in self.entries if entry.start is not None]
+        return min(starts) if starts else None
+
+    @property
+    def end(self) -> date | None:
+        ends = [day for entry in self.entries if (day := entry.end or entry.start) is not None]
+        return max(ends) if ends else None
+
+    @property
+    def current(self) -> bool:
+        return any(entry.is_current for entry in self.entries)
+
+
+def _group(key: str, entries: list[Experience], merges: Merges) -> EmployerGroup:
+    names = Counter(entry.company for entry in entries)
+    ranked = sorted(names, key=lambda name: (-names[name], -len(name), name))
+    name = merges.canonical(key) or ranked[0]
+    members = merges.members(key)
+    aliases = tuple(dict.fromkeys([name, *ranked, *members]))
+    ordered = sorted(
+        entries, key=lambda entry: (entry.start is None, entry.start or date.max, entry.start_raw)
+    )
+    return EmployerGroup(
+        key=key,
+        name=name,
+        entries=tuple(ordered),
+        aliases=aliases,
+        merged_from=tuple(member for member in members if member != name),
+    )
+
+
+def group_experiences(
+    experiences: list[Experience], merges: Merges | None = None
+) -> list[EmployerGroup]:
+    """Entries grouped by company (and confirmed merges), most recent employer first."""
+    merges = merges or Merges()
+    buckets: dict[str, list[Experience]] = {}
+    for experience in experiences:
+        buckets.setdefault(merges.key(experience.company), []).append(experience)
+    groups = [_group(key, entries, merges) for key, entries in buckets.items()]
+    groups.sort(key=lambda g: (-(g.end.toordinal() if g.end else 0), g.name.casefold()))
+    return groups
 
 
 @dataclass(frozen=True)
 class ProfileFacts:
     skills: list[str] = field(default_factory=list[str])
     experiences: list[Experience] = field(default_factory=list[Experience])
+    merges: Merges = field(default_factory=Merges)
+
+    @property
+    def groups(self) -> list[EmployerGroup]:
+        return group_experiences(self.experiences, self.merges)
 
 
 def experiences_of(structured: StructuredProfile) -> list[Experience]:
@@ -41,7 +105,11 @@ def experiences_of(structured: StructuredProfile) -> list[Experience]:
             end = date.today()  # noqa: DTZ011
         result.append(
             Experience(
-                job.company, job.start_date, start, max(start, end) if start and end else end
+                job.company,
+                job.start_date,
+                start,
+                max(start, end) if start and end else end,
+                is_current=job.is_current,
             )
         )
     return result
@@ -64,7 +132,9 @@ async def load_profile_facts(session: AsyncSession, candidate_id: uuid.UUID) -> 
         skills.extend(structured.skills)
         for experience in experiences_of(structured):
             experiences.setdefault((experience.company, experience.start_raw), experience)
-    return ProfileFacts(skills=skills, experiences=list(experiences.values()))
+    candidate = await session.get(Candidate, candidate_id)
+    merges = Merges.from_stored(candidate.employer_merges if candidate else None)
+    return ProfileFacts(skills=skills, experiences=list(experiences.values()), merges=merges)
 
 
 def _overlap_days(start: date, end: date, experience: Experience) -> int:
@@ -74,57 +144,69 @@ def _overlap_days(start: date, end: date, experience: Experience) -> int:
     return (min(end, experience_end) - max(start, experience.start)).days + 1
 
 
+def _group_overlap(start: date, end: date, group: EmployerGroup) -> int:
+    """Days of [start, end] spent at the employer, over all its stints (never above the span)."""
+    total = sum(max(0, _overlap_days(start, end, entry)) for entry in group.entries)
+    return min(total, (end - start).days + 1)
+
+
+def _suggestion(group: EmployerGroup) -> dict[str, object]:
+    return {"company": group.name, "start_date": None, "source": "suggested"}
+
+
 def suggest_employer(
-    project_key: str | None, start: date | None, end: date | None, experiences: list[Experience]
+    project_key: str | None, start: date | None, end: date | None, groups: list[EmployerGroup]
 ) -> dict[str, object] | None:
     """Best date-overlap employer for a repository chunk (a suggestion until the user confirms)."""
     if project_key is None or project_key.startswith(NON_REPO_PREFIXES) or start is None:
         return None
     span_end = end or start
-    best: tuple[int, Experience] | None = None
-    for experience in experiences:
-        overlap = _overlap_days(start, span_end, experience)
+    best: tuple[int, EmployerGroup] | None = None
+    for group in groups:
+        overlap = _group_overlap(start, span_end, group)
         if overlap > 0 and (best is None or overlap > best[0]):
-            best = (overlap, experience)
-    if best is None:
-        return None
-    return {"company": best[1].company, "start_date": best[1].start_raw, "source": "suggested"}
+            best = (overlap, group)
+    return None if best is None else _suggestion(best[1])
 
 
 def suggest_for_scope(
-    start: date | None, end: date | None, experiences: list[Experience]
+    start: date | None, end: date | None, groups: list[EmployerGroup]
 ) -> dict[str, object] | None:
-    """Suggest an employer only when exactly one employment overlaps > 50 % of the repo's span."""
+    """Suggest an employer only when exactly one employer covers > 50 % of the repo's span."""
     if start is None:
         return None
     span_end = max(end or start, start)
     span_days = (span_end - start).days + 1
     matches = [
-        experience
-        for experience in experiences
-        if _overlap_days(start, span_end, experience) > span_days * SPAN_OVERLAP_SHARE
+        group
+        for group in groups
+        if _group_overlap(start, span_end, group) > span_days * SPAN_OVERLAP_SHARE
     ]
-    if len(matches) != 1:
+    return _suggestion(matches[0]) if len(matches) == 1 else None
+
+
+def group_for_company(groups: list[EmployerGroup], name: object) -> EmployerGroup | None:
+    """The employer a stored or submitted company name belongs to (exact alias, else same key)."""
+    if not isinstance(name, str) or not name.strip():
         return None
-    return {
-        "company": matches[0].company,
-        "start_date": matches[0].start_raw,
-        "source": "suggested",
-    }
+    wanted = name.strip().casefold()
+    key = normalize_company(name)
+    for group in groups:
+        if wanted in {alias.casefold() for alias in group.aliases} or group.key == key:
+            return group
+    return None
 
 
 def normalize_employer_ref(
-    ref: dict[str, object] | None, experiences: list[Experience]
+    ref: dict[str, object] | None, groups: list[EmployerGroup]
 ) -> dict[str, object] | None:
-    """Validate a user-chosen mapping; returns the stored shape or raises ValueError."""
+    """Validate a chosen employer; returns the company-level shape stored, or raises ValueError."""
     if ref is None:
         return None
     if ref.get("kind") == PERSONAL_KIND:
         return {"kind": PERSONAL_KIND, "source": "user"}
-    company = ref.get("company")
-    start_date = ref.get("start_date")
-    for experience in experiences:
-        if experience.company == company and experience.start_raw == start_date:
-            return {"company": company, "start_date": start_date, "source": "user"}
-    msg = "employer must be one of your profile's experience entries or personal"
-    raise ValueError(msg)
+    group = group_for_company(groups, ref.get("company"))
+    if group is None:
+        msg = "employer must be one of your employers or personal"
+        raise ValueError(msg)
+    return {"company": group.name, "start_date": None, "source": "user"}

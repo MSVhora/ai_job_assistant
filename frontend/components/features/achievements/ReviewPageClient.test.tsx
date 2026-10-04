@@ -87,7 +87,7 @@ describe("ReviewPageClient", () => {
     expect(screen.getByText("Private repo")).toBeInTheDocument();
     expect(screen.getByText("Evidence updated — re-review")).toBeInTheDocument();
     expect(screen.getByText("1 to confirm")).toBeInTheDocument();
-    expect(screen.getByText(/Employer: Acme Corp \(Mar 2021\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Employer: Acme Corp/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Repository ada/engine" })).toHaveAttribute(
       "href",
       "https://github.com/ada/engine",

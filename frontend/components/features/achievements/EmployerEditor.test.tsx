@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { editAchievement, listEmployers, listGithubScopes } from "@/lib/api";
 
 import { renderWithClient } from "../test-utils";
-import { scope } from "../evidence/fixtures";
+import { employerOption, PERSONAL_OPTION, scope } from "../evidence/fixtures";
 import { achievement } from "./fixtures";
 import { EmployerEditor } from "./EmployerEditor";
 
@@ -17,15 +17,7 @@ vi.mock("@/lib/api", async (importOriginal) => ({
 }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-const EMPLOYERS = [
-  {
-    kind: "experience" as const,
-    label: "Acme Corp (Mar 2021)",
-    company: "Acme Corp",
-    start_date: "Mar 2021",
-  },
-  { kind: "personal" as const, label: "Personal / open source", company: null, start_date: null },
-];
+const EMPLOYERS = [employerOption("Acme Corp", { label: "Acme Corp (Mar 2021)" }), PERSONAL_OPTION];
 
 describe("EmployerEditor", () => {
   beforeEach(() => {
@@ -45,7 +37,7 @@ describe("EmployerEditor", () => {
 
     const select = await screen.findByRole("combobox", { name: "Employer" });
 
-    await screen.findByRole("option", { name: "Same as repository (Acme Corp (Mar 2021))" });
+    await screen.findByRole("option", { name: "Same as repository (Acme Corp)" });
     expect(select).toHaveValue("");
     expect(screen.getByRole("button", { name: "Save employer" })).toBeDisabled();
   });
@@ -79,7 +71,7 @@ describe("EmployerEditor", () => {
 
     await waitFor(() => {
       expect(editAchievement).toHaveBeenCalledWith("a1", {
-        employer_ref: { company: "Acme Corp", start_date: "Mar 2021" },
+        employer_ref: { company: "Acme Corp" },
       });
     });
   });

@@ -7,8 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.pagination import SEARCHES_PAGE, TOTAL_COUNT_HEADER, Pagination
 from app.deps import get_db, pagination
 from app.models import EvidenceItemStatus, EvidenceKind
+from app.schemas.cost import CostEstimateResponse
 from app.schemas.evidence import (
     ChunkSummaryResponse,
+    EmployerMergeRequest,
+    EmployerMergeSuggestionsResponse,
     EmployerOption,
     EvidenceStatusResponse,
     ItemResponse,
@@ -26,6 +29,8 @@ from app.schemas.evidence import (
     TokenCheckResponse,
 )
 from app.services import (
+    employer_merge_suggest,
+    employer_merges,
     evidence_chunks,
     evidence_items,
     evidence_notes,
@@ -48,6 +53,37 @@ async def list_employers(
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> list[EmployerOption]:
     return await evidence_sync.employer_options(session)
+
+
+@router.post("/employers/merge-suggestions/estimate", response_model=CostEstimateResponse)
+async def estimate_merge_suggestions(
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> CostEstimateResponse:
+    return CostEstimateResponse.from_estimate(
+        await employer_merge_suggest.estimate_suggestions(session)
+    )
+
+
+@router.post("/employers/merge-suggestions", response_model=EmployerMergeSuggestionsResponse)
+async def suggest_employer_merges(
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> EmployerMergeSuggestionsResponse:
+    return await employer_merge_suggest.suggest_merges(session)
+
+
+@router.post("/employers/merges", response_model=list[EmployerOption])
+async def merge_employers(
+    payload: EmployerMergeRequest,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> list[EmployerOption]:
+    return await employer_merges.merge_employers(session, payload)
+
+
+@router.delete("/employers/merges/{key}", response_model=list[EmployerOption])
+async def unmerge_employer(
+    key: str, session: Annotated[AsyncSession, Depends(get_db)]
+) -> list[EmployerOption]:
+    return await employer_merges.unmerge_employer(session, key)
 
 
 @router.get("/github/token", response_model=TokenCheckResponse | None)

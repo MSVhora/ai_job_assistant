@@ -11,6 +11,7 @@ from app.schemas.gap_fill import GapFillRequest, GapFillResponse
 from app.schemas.job_search import SearchQueriesResponse, SearchQueryGenerateRequest
 from app.schemas.matching import MatchRebuildStatusResponse
 from app.schemas.profile import (
+    ExperienceCreate,
     ProfileCreate,
     ProfileResponse,
     ProfileSummary,
@@ -141,6 +142,16 @@ async def get_rebuild_matches_status(
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> MatchRebuildStatusResponse:
     return await match_rebuild.get_latest_rebuild(session, profile_id)
+
+
+@router.post("/profiles/{profile_id}/experience", response_model=ProfileResponse, status_code=201)
+async def add_profile_experience(
+    profile_id: uuid.UUID,
+    payload: ExperienceCreate,
+    background_tasks: BackgroundTasks,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> ProfileResponse:
+    return await profile_service.add_experience(session, background_tasks, profile_id, payload)
 
 
 @router.delete("/profiles/{profile_id}", status_code=204)

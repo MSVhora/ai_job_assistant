@@ -23,6 +23,7 @@ from app.models import (
     EvidenceItemStatus,
     ResumeDocument,
 )
+from app.models import Candidate as CandidateRow
 from app.schemas.resume_document import (
     Bullet,
     GapItem,
@@ -38,6 +39,7 @@ from app.schemas.resume_document import (
     WorkEntry,
 )
 from app.services import resume_documents
+from app.services.company_names import Merges
 from app.services.embedding import embed_texts
 from app.services.evidence_items import candidate_id_or_none
 from app.services.profile_derivation import resolve_date
@@ -96,6 +98,7 @@ class Context:
     jd: JDAnalysis | None = None
     vector: list[float] | None = None
     weight: float = 0.0
+    merges: Merges = field(default_factory=Merges)
     today: date = field(default_factory=lambda: datetime.now(UTC).date())
 
 
@@ -160,7 +163,7 @@ def _candidates(ctx: Context) -> tuple[list[Candidate], int]:
     found: list[Candidate] = []
     unplaced = 0
     for achievement in ctx.achievements.values():
-        block_id = block_for_achievement(achievement, ctx.content)
+        block_id = block_for_achievement(achievement, ctx.content, ctx.merges)
         if block_id is None:
             unplaced += 1
             continue
@@ -208,7 +211,9 @@ def _apply_overlaps(ctx: Context, candidates: list[Candidate]) -> set[str]:
     """Drop the lower-priority role of each overlapping pair; return the dropped block ids."""
     forced = frozenset(ctx.generation.included_roles)
     spans = _role_spans(ctx, candidates)
-    _, omissions = resolve_overlaps(spans, ctx.settings.resume_overlap_min_days, forced)
+    _, omissions = resolve_overlaps(
+        spans, ctx.settings.resume_overlap_min_days, forced, ctx.merges.key
+    )
     position = {job.id: index for index, job in enumerate(ctx.content.work)}
     for omission in omissions:
         entry = next(job for job in ctx.content.work if job.id == omission.role.block_id)
@@ -377,6 +382,7 @@ async def load_context(session: AsyncSession, document: ResumeDocument) -> Conte
         session, document.candidate_id, exclude_private=generation.exclude_private
     )
     links = await load_links(session, [a.id for a in achievements])
+    candidate = await session.get(CandidateRow, document.candidate_id)
     return Context(
         session=session,
         document=document,
@@ -385,6 +391,7 @@ async def load_context(session: AsyncSession, document: ResumeDocument) -> Conte
         settings=get_settings(),
         achievements={a.id: a for a in achievements},
         links=links,
+        merges=Merges.from_stored(candidate.employer_merges if candidate else None),
     )
 
 
@@ -507,7 +514,7 @@ async def write_on_demand(
     if achievement.status != AchievementStatus.approved:
         raise AchievementNotFoundError
     ensure_ids(ctx.content)
-    block_id = block_for_achievement(achievement, ctx.content)
+    block_id = block_for_achievement(achievement, ctx.content, ctx.merges)
     entry = find_block(ctx.content, block_id) if block_id else None
     if entry is None:
         msg = "the achievement belongs to a role or project that is not in this document"

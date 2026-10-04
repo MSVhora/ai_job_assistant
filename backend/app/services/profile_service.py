@@ -1,6 +1,6 @@
 import logging
 import uuid
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any, cast
 
 from fastapi import BackgroundTasks
@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.db import session_factory
 from app.core.errors import (
+    DuplicateExperienceError,
     ProfileNotFoundError,
     ResumeDraftUnavailableError,
     ResumeNotFoundError,
@@ -17,6 +18,8 @@ from app.core.errors import (
 from app.core.pagination import DEFAULT_PAGE, Pagination
 from app.models import Profile, ProfileRevision, Resume, RevisionSource
 from app.schemas.profile import (
+    ExperienceCreate,
+    ExperienceItem,
     ProfileCreate,
     ProfileResponse,
     ProfileSummary,
@@ -29,6 +32,8 @@ from app.schemas.profile import (
 from app.schemas.resume import DraftProfileResponse
 from app.services import embedding, matching, profile_derivation, query_builder
 from app.services import sources as sources_service
+from app.services.company_names import normalize_company
+from app.services.profile_derivation import resolve_date
 from app.services.resume_service import get_or_create_candidate
 
 logger = logging.getLogger(__name__)
@@ -351,6 +356,57 @@ async def save_profile(
     )
     filename = await _resume_filename(session, profile.source_resume_id)
     return _profile_response(profile, filename, last_revision)
+
+
+def _clean(value: str | None) -> str | None:
+    cleaned = (value or "").strip()
+    return cleaned or None
+
+
+def _insert_position(jobs: list[ExperienceItem], start: date | None) -> int:
+    """Keep the list newest first: before the first role that started earlier, else at the end."""
+    if start is None:
+        return len(jobs)
+    for index, job in enumerate(jobs):
+        existing = resolve_date(job.start_date)
+        if existing is not None and existing < start:
+            return index
+    return len(jobs)
+
+
+async def add_experience(
+    session: AsyncSession,
+    background_tasks: BackgroundTasks,
+    profile_id: uuid.UUID,
+    payload: ExperienceCreate,
+) -> ProfileResponse:
+    """Add one role to the profile through the normal save path (revision, embedding, rescoring)."""
+    profile = await session.get(Profile, profile_id)
+    if profile is None:
+        raise ProfileNotFoundError
+    structured = StructuredProfile.model_validate(profile.structured_profile)
+    role = ExperienceItem(
+        company=payload.company.strip(),
+        title=_clean(payload.title),
+        location=_clean(payload.location),
+        start_date=_clean(payload.start_date),
+        end_date=_clean(payload.end_date),
+        is_current=payload.is_current,
+    )
+    key = normalize_company(role.company)
+    for job in structured.experience:
+        same_dates = (job.start_date or "", job.end_date or "") == (
+            role.start_date or "",
+            role.end_date or "",
+        )
+        if normalize_company(job.company) == key and same_dates:
+            raise DuplicateExperienceError
+    jobs = list(structured.experience)
+    jobs.insert(_insert_position(jobs, resolve_date(role.start_date)), role)
+    structured.experience = jobs
+    return await save_profile(
+        session, background_tasks, profile_id, ProfileUpdate(structured_profile=structured)
+    )
 
 
 async def update_preferences(

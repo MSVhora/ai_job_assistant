@@ -33,6 +33,7 @@ export type JobPostingSummary = components["schemas"]["JobPostingSummary"];
 export type JobPostingDetail = components["schemas"]["JobPostingDetail"];
 export type MatchResponse = components["schemas"]["MatchResponse"];
 export type CostEstimate = components["schemas"]["CostEstimateResponse"];
+export type ExperienceCreate = components["schemas"]["ExperienceCreate"];
 export type MatchingOutcome = components["schemas"]["MatchingOutcome"];
 export type StoredPreferences = components["schemas"]["StoredPreferences"];
 export type MatchListParams = operations["list_matches_api_matches_get"]["parameters"]["query"];
@@ -97,6 +98,16 @@ export async function getProfile(profileId: string): Promise<ProfileResponse> {
 
 export async function createProfile(payload: ProfileCreate): Promise<ProfileResponse> {
   return apiFetch<ProfileResponse>("/api/profiles", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function addProfileExperience(
+  profileId: string,
+  payload: ExperienceCreate,
+): Promise<ProfileResponse> {
+  return apiFetch<ProfileResponse>(`/api/profiles/${encodeURIComponent(profileId)}/experience`, {
     method: "POST",
     body: JSON.stringify(payload),
   });

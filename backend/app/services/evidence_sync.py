@@ -4,7 +4,7 @@ import logging
 import time
 import uuid
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import TYPE_CHECKING, Literal, cast
 
 from fastapi import BackgroundTasks
@@ -58,6 +58,7 @@ from app.schemas.evidence import (
 )
 from app.services.achievement_review import apply_scope_employer, mark_stale_after_sync
 from app.services.employer_mapping import (
+    EmployerGroup,
     load_profile_facts,
     normalize_employer_ref,
     suggest_for_scope,
@@ -241,11 +242,11 @@ async def _suggestions(
             .group_by(EvidenceItem.scope_id)
         )
     ).all()
-    experiences = (await load_profile_facts(session, candidate_id)).experiences
+    groups = (await load_profile_facts(session, candidate_id)).groups
     suggestions: dict[uuid.UUID, dict[str, object]] = {}
     for scope_id, first, last in spans:
         suggestion = suggest_for_scope(
-            first.date() if first else None, last.date() if last else None, experiences
+            first.date() if first else None, last.date() if last else None, groups
         )
         if scope_id is not None and suggestion is not None:
             suggestions[scope_id] = suggestion
@@ -360,12 +361,12 @@ async def update_scopes(session: AsyncSession, payload: ScopeUpdateRequest) -> l
         if not payload.acknowledged_disclosure:
             raise DisclosureRequiredError
         account.acknowledged_at = datetime.now(UTC)
-    experiences = (await load_profile_facts(session, candidate.id)).experiences
+    groups = (await load_profile_facts(session, candidate.id)).groups
     employers: dict[str, dict[str, object] | None] = {}
     for item in payload.scopes:
         if "employer_ref" in item.model_fields_set:
             try:
-                employers[item.ref] = normalize_employer_ref(item.employer_ref, experiences)
+                employers[item.ref] = normalize_employer_ref(item.employer_ref, groups)
             except ValueError as exc:
                 raise InvalidEmployerError from exc
     updated: list[ScopeResponse] = []
@@ -383,20 +384,42 @@ async def update_scopes(session: AsyncSession, payload: ScopeUpdateRequest) -> l
     return updated
 
 
+def _month_year(day: date) -> str:
+    return day.strftime("%b %Y")
+
+
+def _span(group: EmployerGroup) -> str | None:
+    if group.start is None:
+        return None
+    end = "Present" if group.current else (group.end or group.start)
+    return f"{_month_year(group.start)} – {end if isinstance(end, str) else _month_year(end)}"
+
+
+def _employer_option(group: EmployerGroup) -> EmployerOption:
+    span = _span(group)
+    roles = len(group.entries)
+    parts = [group.name, span, f"{roles} roles" if roles > 1 else None]
+    return EmployerOption(
+        kind="experience",
+        label=" · ".join(part for part in parts if part),
+        company=group.name,
+        key=group.key,
+        entries=roles,
+        span=span,
+        aliases=list(group.aliases),
+        merged_from=list(group.merged_from),
+    )
+
+
 async def employer_options(session: AsyncSession) -> list[EmployerOption]:
+    """One option per employer (company group), then personal work."""
     candidate_id = await _candidate_id(session)
     options: list[EmployerOption] = []
     if candidate_id is not None:
-        for experience in (await load_profile_facts(session, candidate_id)).experiences:
-            label = f"{experience.company} ({experience.start_raw or 'dates unknown'})"
-            options.append(
-                EmployerOption(
-                    kind="experience",
-                    label=label,
-                    company=experience.company,
-                    start_date=experience.start_raw,
-                )
-            )
+        options = [
+            _employer_option(group)
+            for group in (await load_profile_facts(session, candidate_id)).groups
+        ]
     options.append(EmployerOption(kind="personal", label="Personal / open source"))
     return options
 

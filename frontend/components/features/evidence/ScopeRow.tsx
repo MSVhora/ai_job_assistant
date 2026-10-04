@@ -1,10 +1,11 @@
 "use client";
 
+import { EmployerSelect } from "@/components/features/employers/EmployerSelect";
 import { Badge } from "@/components/ui/badge";
 import { Select } from "@/components/ui/select";
 import type { EmployerOption, EvidenceScope } from "@/lib/api";
-import { optionKey, optionRef } from "@/lib/employer-options";
-import { employerKey, employerLabel } from "@/lib/evidence-progress";
+import { findOption, keyForRef, optionRef } from "@/lib/employer-options";
+import { employerLabel } from "@/lib/evidence-progress";
 import { viewOf, type ScopePatch } from "@/lib/scope-draft";
 
 const CONTENT_LEVELS = [
@@ -29,7 +30,7 @@ export function ScopeRow({
   const suggestion = scope.suggested_employer ?? null;
   const synced = scope.last_synced_at !== null;
   const changeEmployer = (key: string) => {
-    const match = employers.find((option) => optionKey(option) === key);
+    const match = findOption(employers, key);
     onChange({ employer_ref: match === undefined ? null : optionRef(match) });
   };
   return (
@@ -84,22 +85,15 @@ export function ScopeRow({
           ))}
         </Select>
         {synced && (
-          <Select
-            aria-label={`Employer for ${scope.ref}`}
-            value={employerKey(view.employer_ref)}
+          <EmployerSelect
+            ariaLabel={`Employer for ${scope.ref}`}
+            value={keyForRef(employers, view.employer_ref)}
+            options={employers}
+            noneLabel="Unmapped (treated as a project)"
             disabled={disabled}
             className="w-56"
-            onChange={(event) => {
-              changeEmployer(event.target.value);
-            }}
-          >
-            <option value="">Unmapped (treated as a project)</option>
-            {employers.map((option) => (
-              <option key={optionKey(option)} value={optionKey(option)}>
-                {option.label}
-              </option>
-            ))}
-          </Select>
+            onChange={changeEmployer}
+          />
         )}
         {synced && suggestion !== null && view.employer_ref === null && (
           <button

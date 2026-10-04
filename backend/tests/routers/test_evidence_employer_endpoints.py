@@ -15,7 +15,7 @@ from sqlalchemy import select, text
 from app.core.config import get_settings
 from app.core.db import session_factory
 from app.main import app
-from app.models import Achievement, EvidenceItem, EvidenceKind, EvidenceScope
+from app.models import Achievement, Candidate, EvidenceItem, EvidenceKind, EvidenceScope
 from app.schemas.evidence import ScopeCandidate
 
 pytestmark = pytest.mark.usefixtures("clean_tables")
@@ -75,20 +75,21 @@ async def test_the_employer_options_come_from_every_profile_plus_personal(
 
     options = (await client.get("/api/evidence/employers")).json()
 
-    assert options == [
-        {
-            "kind": "experience",
-            "label": "Acme Corp (Mar 2021)",
-            "company": "Acme Corp",
-            "start_date": "Mar 2021",
-        },
-        {
-            "kind": "personal",
-            "label": "Personal / open source",
-            "company": None,
-            "start_date": None,
-        },
-    ]
+    acme, personal = options
+    assert (acme["kind"], acme["company"], acme["key"], acme["entries"]) == (
+        "experience",
+        "Acme Corp",
+        "acme",
+        1,
+    )
+    assert acme["label"].startswith("Acme Corp · Mar 2021")
+    assert acme["aliases"] == ["Acme Corp"]
+    assert acme["merged_from"] == []
+    assert (personal["kind"], personal["key"], personal["label"]) == (
+        "personal",
+        "personal",
+        "Personal / open source",
+    )
 
 
 async def test_without_profiles_only_the_personal_option_exists(client: AsyncClient) -> None:
@@ -111,35 +112,51 @@ async def test_a_valid_mapping_is_stored_and_applied_to_the_repos_achievements(
     response = await patch_scope(client, "ada/engine", ACME)
 
     assert response.status_code == 200
-    assert response.json()[0]["employer_ref"] == {**ACME, "source": "user"}
+    company_level = {"company": "Acme Corp", "start_date": None}
+    assert response.json()[0]["employer_ref"] == {**company_level, "source": "user"}
     async with session_factory() as session:
         stored = await session.get_one(Achievement, achievement_id)
-    assert stored.employer_ref == {**ACME, "source": "scope"}
+    assert stored.employer_ref == {**company_level, "source": "scope"}
     cleared = await patch_scope(client, "ada/engine", None)
     assert cleared.json()[0]["employer_ref"] is None
     async with session_factory() as session:
         assert (await session.get_one(Achievement, achievement_id)).employer_ref is None
 
 
-@pytest.mark.parametrize(
-    "employer",
-    [
-        {"company": "Nowhere Inc", "start_date": "2020"},
-        {"company": "Acme Corp", "start_date": "2001"},
-    ],
-)
-async def test_a_mapping_outside_the_profiles_experience_is_rejected(
-    client: AsyncClient, employer: dict[str, str]
-) -> None:
+async def test_a_mapping_to_an_unknown_employer_is_rejected(client: AsyncClient) -> None:
     await seed_profile_light()
     await client.post("/api/evidence/github/scopes/refresh")
 
-    response = await patch_scope(client, "ada/engine", employer)
+    response = await patch_scope(
+        client, "ada/engine", {"company": "Nowhere Inc", "start_date": "2020"}
+    )
 
     assert response.status_code == 400
-    assert "experience entries" in response.json()["detail"]
+    assert "your employers" in response.json()["detail"]
     scopes = (await client.get("/api/evidence/github/scopes")).json()
     assert {s["ref"]: s["employer_ref"] for s in scopes}["ada/engine"] is None
+
+
+async def test_a_merged_company_is_stored_under_its_canonical_name(client: AsyncClient) -> None:
+    await seed_profile_light()
+    async with session_factory() as session:
+        candidate = (await session.execute(select(Candidate))).scalars().one()
+        candidate.employer_merges = {
+            "groups": [{"canonical": "Acme Group", "members": ["Acme Group", "Acme Corp"]}]
+        }
+        await session.commit()
+    await client.post("/api/evidence/github/scopes/refresh")
+
+    response = await patch_scope(client, "ada/engine", {"company": "Acme Corp"})
+
+    assert response.json()[0]["employer_ref"] == {
+        "company": "Acme Group",
+        "start_date": None,
+        "source": "user",
+    }
+    options = (await client.get("/api/evidence/employers")).json()
+    assert options[0]["company"] == "Acme Group"
+    assert options[0]["merged_from"] == ["Acme Corp"]
 
 
 async def test_personal_mapping_needs_no_profile(client: AsyncClient) -> None:
@@ -160,7 +177,11 @@ async def test_a_repo_active_during_exactly_one_job_gets_a_suggestion(client: As
 
     scopes = {s["ref"]: s for s in (await client.get("/api/evidence/github/scopes")).json()}
 
-    assert scopes["ada/engine"]["suggested_employer"] == {**ACME, "source": "suggested"}
+    assert scopes["ada/engine"]["suggested_employer"] == {
+        "company": "Acme Corp",
+        "start_date": None,
+        "source": "suggested",
+    }
     assert scopes["ada/side"]["suggested_employer"] is None
     assert scopes["ada/engine"]["employer_ref"] is None
 

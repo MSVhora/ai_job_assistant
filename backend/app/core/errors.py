@@ -231,7 +231,32 @@ class ResumeRenderError(DomainError):
 
 class InvalidEmployerError(DomainError):
     status_code = 400
-    default_detail = "employer must be one of your profile's experience entries or personal"
+    default_detail = "employer must be one of your employers or personal"
+
+
+class DuplicateExperienceError(DomainError):
+    status_code = 409
+    default_detail = "this role is already in the profile"
+
+
+class InvalidEmployerMergeError(DomainError):
+    status_code = 400
+    default_detail = "a merge needs two or more different companies from your profile"
+
+
+class NoEmployersToCompareError(DomainError):
+    status_code = 400
+    default_detail = "you need at least two different employers before merges can be suggested"
+
+
+class EmployerMergeSuggestionError(DomainError):
+    status_code = 502
+    default_detail = "employer merge suggestions failed"
+
+
+class EmployerMergeNotFoundError(DomainError):
+    status_code = 404
+    default_detail = "that employer merge does not exist"
 
 
 class DuplicateExtractionError(DomainError):

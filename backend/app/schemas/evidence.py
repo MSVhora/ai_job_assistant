@@ -22,6 +22,7 @@ __all__ = [
     "SyncRequest",
     "SyncRunResponse",
     "SyncStartResponse",
+    "TokenCheckResponse",
 ]
 
 
@@ -63,6 +64,8 @@ class ScopeCandidate(BaseModel):
     is_fork: bool = False
     description: str | None = None
     pushed_at: datetime | None = None
+    contributed: bool = False
+    outside_lookback: bool = False
 
 
 class ScopeState(BaseModel):
@@ -138,6 +141,16 @@ class ScopeResponse(BaseModel):
     last_synced_at: datetime | None
     employer_ref: dict[str, object] | None
     suggested_employer: dict[str, object] | None = None
+    contributed: bool = False
+    visible: bool = True
+
+
+class TokenCheckResponse(BaseModel):
+    login: str
+    token_type: Literal["classic", "fine_grained_or_app"]
+    scopes: list[str]
+    private_access: bool | None
+    warnings: list[str]
 
 
 class EmployerOption(BaseModel):

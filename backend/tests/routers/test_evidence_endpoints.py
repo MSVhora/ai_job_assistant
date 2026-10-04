@@ -91,6 +91,110 @@ async def test_listing_scopes_stores_new_repos_disabled_and_flags_them_once(
     assert (status["login"], status["scopes_total"], status["scopes_enabled"]) == ("ada", 3, 0)
 
 
+async def test_listing_marks_contributed_repos_and_skips_old_unrelated_ones(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(get_settings(), "github_token", TOKEN)
+    install_evidence_source(
+        monkeypatch,
+        ScriptedEvidenceSource(
+            scopes=[
+                ScopeCandidate(ref="ada/engine", contributed=True),
+                ScopeCandidate(ref="ada/ancient", outside_lookback=True),
+                ScopeCandidate(ref="outsider/lib", contributed=True),
+            ]
+        ),
+    )
+
+    listed = (await client.get("/api/evidence/github/scopes")).json()
+
+    assert [scope["ref"] for scope in listed] == ["ada/engine", "outsider/lib"]
+    assert all(scope["contributed"] is True and scope["visible"] is True for scope in listed)
+
+
+async def test_a_stored_repo_the_provider_stops_listing_is_marked_not_visible(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(get_settings(), "github_token", TOKEN)
+    first = ScriptedEvidenceSource(scopes=scopes())
+    install_evidence_source(monkeypatch, first)
+    await client.get("/api/evidence/github/scopes")
+    await enable(client, "ada/engine")
+    install_evidence_source(
+        monkeypatch,
+        ScriptedEvidenceSource(scopes=[ScopeCandidate(ref="ada/secret", is_private=True)]),
+    )
+
+    listed = {
+        scope["ref"]: scope for scope in (await client.get("/api/evidence/github/scopes")).json()
+    }
+
+    assert listed["ada/secret"]["visible"] is True
+    assert listed["ada/engine"]["visible"] is False
+    assert listed["ada/engine"]["enabled"] is True
+    assert listed["grace/fork"]["visible"] is False
+
+
+async def test_a_repo_that_is_old_but_already_stored_stays_visible(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(get_settings(), "github_token", TOKEN)
+    install_evidence_source(monkeypatch, ScriptedEvidenceSource(scopes=scopes()))
+    await client.get("/api/evidence/github/scopes")
+    install_evidence_source(
+        monkeypatch,
+        ScriptedEvidenceSource(scopes=[ScopeCandidate(ref="ada/engine", outside_lookback=True)]),
+    )
+
+    listed = {
+        scope["ref"]: scope for scope in (await client.get("/api/evidence/github/scopes")).json()
+    }
+
+    assert listed["ada/engine"]["visible"] is True
+
+
+@pytest.mark.parametrize(
+    ("permissions", "token_type", "private_access", "warns"),
+    [
+        (["public_repo", "read:org"], "classic", False, True),
+        (["repo", "read:org"], "classic", True, False),
+        ([], "fine_grained_or_app", None, False),
+    ],
+)
+async def test_the_token_check_reports_scopes_and_warns_when_private_repos_are_hidden(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+    permissions: list[str],
+    token_type: str,
+    private_access: bool | None,
+    warns: bool,
+) -> None:
+    monkeypatch.setattr(get_settings(), "github_token", TOKEN)
+    install_evidence_source(monkeypatch, ScriptedEvidenceSource(permissions=permissions))
+
+    body = (await client.get("/api/evidence/github/token")).json()
+
+    assert body["login"] == "ada"
+    assert body["token_type"] == token_type
+    assert body["private_access"] is private_access
+    assert body["scopes"] == sorted(permissions)
+    assert bool(body["warnings"]) is warns
+    if warns:
+        assert "`repo`" in body["warnings"][0]
+    assert TOKEN not in str(body)
+
+
+async def test_the_token_check_requires_a_configured_token(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    install_evidence_source(monkeypatch, ScriptedEvidenceSource(configured=False))
+
+    response = await client.get("/api/evidence/github/token")
+
+    assert response.status_code == 400
+    assert "GITHUB_TOKEN" in response.json()["detail"]
+
+
 async def test_scopes_require_a_configured_token(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:

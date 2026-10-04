@@ -54,6 +54,7 @@ from app.schemas.evidence import (
     SyncPage,
     SyncRunResponse,
     SyncStartResponse,
+    TokenCheckResponse,
 )
 from app.services.achievement_review import apply_scope_employer, mark_stale_after_sync
 from app.services.employer_mapping import (
@@ -148,6 +149,7 @@ def _scope_response(
     is_new: bool,
     suggested: dict[str, object] | None = None,
 ) -> ScopeResponse:
+    """`visible` is false for a stored scope the provider no longer lists (lost access, deleted)."""
     return ScopeResponse(
         ref=scope.ref,
         is_private=scope.is_private,
@@ -161,6 +163,8 @@ def _scope_response(
         last_synced_at=scope.last_synced_at,
         employer_ref=scope.employer_ref,
         suggested_employer=suggested,
+        contributed=live.contributed if live else False,
+        visible=live is not None,
     )
 
 
@@ -248,6 +252,36 @@ async def _suggestions(
     return suggestions
 
 
+async def check_token() -> TokenCheckResponse:
+    """What the configured token can do, so a missing `repo` scope is reported, not silent.
+
+    Classic tokens report their scopes; fine-grained tokens report none, so their private
+    access is unknown here and shows up as missing repositories instead.
+    """
+    source = _require_source()
+    try:
+        identity = await source.identify()
+    except EvidenceSourceError as exc:
+        logger.warning("evidence.token failed error_type=%s", type(exc).__name__)
+        raise EvidenceSourceUnavailableError(str(exc)) from exc
+    scopes = sorted(identity.permissions)
+    classic = bool(scopes)
+    private_access = ("repo" in scopes) if classic else None
+    warnings: list[str] = []
+    if private_access is False:
+        warnings.append(
+            "This classic token lacks the top-level `repo` scope, so private repositories are "
+            "hidden. Edit the token on GitHub and tick `repo`, then reload this page."
+        )
+    return TokenCheckResponse(
+        login=identity.login,
+        token_type="classic" if classic else "fine_grained_or_app",
+        scopes=scopes,
+        private_access=private_access,
+        warnings=warnings,
+    )
+
+
 async def list_scopes(session: AsyncSession) -> list[ScopeResponse]:
     source = _require_source()
     candidate = await get_or_create_candidate(session)
@@ -265,6 +299,8 @@ async def list_scopes(session: AsyncSession) -> list[ScopeResponse]:
     for candidate_scope in live:
         scope = stored.pop(candidate_scope.ref, None)
         if scope is None:
+            if candidate_scope.outside_lookback:
+                continue
             scope = EvidenceScope(
                 source_id=account.id,
                 ref=candidate_scope.ref,

@@ -1,0 +1,26 @@
+{
+  "data": {
+    "viewer": {
+      "contributionsCollection": {
+        "commitContributionsByRepository": [
+          {
+            "repository": {
+              "nameWithOwner": "ada/engine",
+              "isPrivate": false
+            }
+          }
+        ],
+        "pullRequestContributionsByRepository": [
+          {
+            "repository": {
+              "nameWithOwner": "booth/private-app",
+              "isPrivate": true
+            }
+          }
+        ],
+        "pullRequestReviewContributionsByRepository": [],
+        "issueContributionsByRepository": []
+      }
+    }
+  }
+}

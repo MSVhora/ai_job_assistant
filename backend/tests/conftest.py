@@ -10,6 +10,10 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent
 
 
 def pytest_configure(config: pytest.Config) -> None:
+    # litellm runs load_dotenv() on import, which finds the repo-root .env and exports its real
+    # values into the test process. A blank token is never overridden by it (and Settings reads
+    # blank as unset), so the real GitHub token cannot reach a test or a failing assertion.
+    os.environ.setdefault("GITHUB_TOKEN", "")
     os.environ.setdefault("UPLOADS_DIR", str(BACKEND_DIR / ".pytest-uploads"))
     test_url = os.environ.get("TEST_DATABASE_URL")
     if test_url:

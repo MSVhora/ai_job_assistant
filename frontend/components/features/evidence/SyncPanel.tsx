@@ -23,7 +23,7 @@ export function SyncPanel({ status }: { status: EvidenceStatus }) {
     setConfirmingFull(false);
     start.mutate(mode, {
       onSuccess: () => {
-        toast.success(mode === "full" ? "Full re-sync started" : "Refresh started");
+        toast.success(mode === "full" ? "Full re-sync started" : "Sync started");
       },
     });
   };
@@ -39,7 +39,7 @@ export function SyncPanel({ status }: { status: EvidenceStatus }) {
               run("incremental");
             }}
           >
-            Refresh
+            Sync now
           </Button>
           <Button
             variant="secondary"
@@ -54,8 +54,8 @@ export function SyncPanel({ status }: { status: EvidenceStatus }) {
       }
     >
       <p className="mb-3 text-xs text-gray-600">
-        Refresh picks up what changed since the last sync. A sync stops before it uses up its GitHub
-        request budget and continues where it left off next time.
+        Sync now picks up what changed since the last sync. A sync stops before it uses up its
+        GitHub request budget and continues where it left off next time.
         {status.scopes_enabled === 0 && " Enable at least one repository first."}
       </p>
       {latest.data !== undefined && latest.data !== null ? (

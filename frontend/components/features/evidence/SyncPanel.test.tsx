@@ -34,7 +34,7 @@ describe("SyncPanel", () => {
     const user = userEvent.setup();
     renderWithClient(<SyncPanel status={status()} />);
 
-    await user.click(screen.getByRole("button", { name: "Refresh" }));
+    await user.click(screen.getByRole("button", { name: "Sync now" }));
 
     await waitFor(() => {
       expect(startGithubSync).toHaveBeenCalledWith("incremental");
@@ -69,7 +69,7 @@ describe("SyncPanel", () => {
 
   it("disables syncing until a repository is enabled or a token exists", () => {
     const { unmount } = renderWithClient(<SyncPanel status={status({ scopes_enabled: 0 })} />);
-    expect(screen.getByRole("button", { name: "Refresh" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Sync now" })).toBeDisabled();
     expect(screen.getByText(/Enable at least one repository first/)).toBeInTheDocument();
     unmount();
 
@@ -89,7 +89,7 @@ describe("SyncPanel", () => {
 
     expect(await screen.findByText("Syncing…")).toBeInTheDocument();
     expect(screen.getByText(/7 items · 12 GitHub requests used/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Refresh" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Sync now" })).toBeDisabled();
   });
 
   it("tells you when a run paused and when it resumes", async () => {
@@ -106,7 +106,7 @@ describe("SyncPanel", () => {
     const note = screen.getByRole("status");
     expect(note).toHaveTextContent("request budget for this run is used up");
     expect(note).toHaveTextContent(/Resumes at/);
-    expect(screen.getByRole("button", { name: "Refresh" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Sync now" })).toBeEnabled();
   });
 
   it("surfaces warnings, chunk counts and re-review hints from a finished run", async () => {

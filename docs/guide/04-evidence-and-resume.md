@@ -47,7 +47,12 @@ mapping are part of the same draft.
 
 ### What the list contains
 
-The list is everything your token can read, plus the repositories you **contributed to**:
+The list is **stored**: opening the Evidence page reads it from the database and does not call
+GitHub. The first visit loads it automatically (a few seconds, up to about ten); after that it only
+changes when you press **Refresh from GitHub**, for example after you were added to a new
+repository. The page shows when it was last refreshed. Sync and extraction are separate, background
+operations and do not depend on a refresh. The list is everything your token can read, plus the
+repositories you **contributed to**:
 GitHub's contribution history (commits, pull requests, reviews and issues, for every year you have
 contributions) is merged in. That is how repositories you only worked on through a fork, or can no
 longer browse, still show up for you to pick. The badges tell you what each row is:
@@ -62,15 +67,18 @@ longer browse, still show up for you to pick. The badges tell you what each row 
 
 Repositories you did not contribute to are listed only if they were pushed within
 `EVIDENCE_LOOKBACK_YEARS` (default 6, maximum 30); raise it in `.env` to see older ones. A
-repository you contributed to is always listed, whatever its age. The contribution history is
-cached for five minutes and, if GitHub cannot return it (rate limit, SSO block), the list simply
-falls back to the plain repository list without the "Contributed" badges.
+repository you contributed to is always listed, whatever its age. If GitHub cannot return the
+contribution history during a refresh (rate limit, SSO block), the list falls back to the plain
+repository list without the "Contributed" badges. A refresh never enables anything: repositories it
+finds are added unselected and marked **New** until the next refresh.
 
 If a classic token is missing the top-level `repo` scope, a warning appears under the GitHub
-connection (`GET /api/evidence/github/token` reports the scopes); fine-grained tokens report no
-scopes, so for them a missing private repository is the only symptom.
+connection (`GET /api/evidence/github/token` reports the scopes stored at the last refresh);
+fine-grained tokens report no scopes, so for them a missing private repository is the only
+symptom.
 
-`GET /api/evidence/github/scopes` returns this list and stores any new repository **disabled**.
+`GET /api/evidence/github/scopes` returns the stored list; `POST /api/evidence/github/scopes/refresh`
+reads GitHub and stores it, adding any new repository **disabled**.
 The page saves your selection with one `PATCH /api/evidence/github/scopes` (up to 200 repositories
 per request; larger selections are sent in batches):
 
@@ -85,7 +93,9 @@ A refresh can never silently widen what is ingested: repositories found later ar
 ## Sync and refresh
 
 `POST /api/evidence/github/sync` starts a background run (202) and returns `sync_id`; poll
-`GET /api/evidence/syncs/{id}`.
+`GET /api/evidence/syncs/{id}`. The page asks the server for the latest run whenever it opens, so
+the progress banner is still there after a reload or after visiting another page. (Do not confuse
+this with **Refresh from GitHub** above, which only updates the repository list.)
 
 | Mode | What it does |
 |---|---|
@@ -155,7 +165,9 @@ with a later issue).
    for an unpriced model), and how much of it comes from private repositories. Nothing is sent.
 2. `POST /api/evidence/extract` with `confirmed_estimate_id` starts the run. If the evidence,
    prompt version or model changed since the estimate you get a 409 and estimate again.
-3. Poll `GET /api/evidence/extract/runs/{id}`; list drafts with `GET /api/achievements?status=draft`.
+3. Poll `GET /api/evidence/extract/runs/{id}`; `GET /api/evidence/extract/runs` lists runs newest
+   first, which is how the page finds a run that is still going after a reload or a visit to
+   another page. List drafts with `GET /api/achievements?status=draft`.
 
 What keeps drafts honest: the model may only cite evidence from the chunk it was given
 (anything else is rejected); a number counts as **evidence-verified** only if the model quotes it
@@ -215,10 +227,10 @@ header (or open `/evidence`).
    ask for a one-line confirmation. Pick a content level per repository, and once a repository has
    synced, map it to an employer (the page suggests one when the repository was active during
    exactly one job) or to *Personal / open source*.
-3. **Sync** has **Refresh** (what changed since last time) and **Full re-sync** (re-reads the whole
+3. **Sync** has **Sync now** (what changed since last time) and **Full re-sync** (re-reads the whole
    look-back window; a confirmation explains that approved achievements are never changed). The
    banner shows progress per repository, GitHub requests used, warnings, and — when a run stops
-   early — *Paused, resumes at HH:MM*; start a refresh to continue from where it stopped.
+   early — *Paused, resumes at HH:MM*; sync again to continue from where it stopped.
 4. **Notes, links and resume** adds your own evidence (see above).
 5. **Achievements** shows the chunk summary and **Estimate extraction**, a dialog with chunk counts,
    the token and cost estimate (or "cost unavailable") and, again, how many chunks come from

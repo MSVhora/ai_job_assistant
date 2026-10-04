@@ -1,10 +1,16 @@
 "use client";
 
-import { screen, waitFor, within } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { listEmployers, listGithubScopes, updateGithubScopes } from "@/lib/api";
+import {
+  listEmployers,
+  listGithubScopes,
+  refreshGithubScopes,
+  updateGithubScopes,
+} from "@/lib/api";
 
 import { renderWithClient } from "../test-utils";
 import { scope, status } from "./fixtures";
@@ -13,6 +19,7 @@ import { ScopeTable } from "./ScopeTable";
 vi.mock("@/lib/api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/api")>()),
   listGithubScopes: vi.fn(),
+  refreshGithubScopes: vi.fn(),
   updateGithubScopes: vi.fn(),
   listEmployers: vi.fn(),
 }));
@@ -34,6 +41,7 @@ describe("ScopeTable", () => {
   beforeEach(() => {
     vi.mocked(listGithubScopes).mockReset();
     vi.mocked(updateGithubScopes).mockReset();
+    vi.mocked(refreshGithubScopes).mockReset();
     vi.mocked(listEmployers).mockReset();
     vi.mocked(listEmployers).mockResolvedValue(EMPLOYERS);
     vi.mocked(updateGithubScopes).mockResolvedValue([]);
@@ -304,6 +312,112 @@ describe("ScopeTable", () => {
     await screen.findByText("ada/engine");
 
     expect(screen.queryByText(/Select my contributions/)).not.toBeInTheDocument();
+  });
+
+  it("shows when the list was last refreshed without calling GitHub", async () => {
+    vi.mocked(listGithubScopes).mockResolvedValue([scope()]);
+    renderWithClient(<ScopeTable status={status()} />);
+
+    expect(await screen.findByText(/Last refreshed/)).toBeInTheDocument();
+    expect(refreshGithubScopes).not.toHaveBeenCalled();
+  });
+
+  it("refreshes from GitHub on demand and shows the repositories it found", async () => {
+    vi.mocked(listGithubScopes).mockResolvedValue([scope({ ref: "ada/engine" })]);
+    vi.mocked(refreshGithubScopes).mockResolvedValue([
+      scope({ ref: "ada/engine" }),
+      scope({ ref: "ada/brand-new", is_new: true }),
+    ]);
+    const user = userEvent.setup();
+    renderWithClient(<ScopeTable status={status()} />);
+    await screen.findByText("ada/engine");
+
+    await user.click(screen.getByRole("button", { name: "Refresh from GitHub" }));
+
+    expect(await screen.findByText("ada/brand-new")).toBeInTheDocument();
+    expect(refreshGithubScopes).toHaveBeenCalledTimes(1);
+  });
+
+  it("disables the button and says what is happening while it refreshes", async () => {
+    vi.mocked(listGithubScopes).mockResolvedValue([scope()]);
+    vi.mocked(refreshGithubScopes).mockReturnValue(new Promise(() => undefined));
+    const user = userEvent.setup();
+    renderWithClient(<ScopeTable status={status()} />);
+    await screen.findByText("ada/engine");
+
+    await user.click(screen.getByRole("button", { name: "Refresh from GitHub" }));
+
+    expect(screen.getByRole("button", { name: "Refreshing…" })).toBeDisabled();
+    expect(screen.getByRole("status")).toHaveTextContent(/around ten seconds/);
+  });
+
+  it("keeps unsaved selections across a refresh", async () => {
+    vi.mocked(listGithubScopes).mockResolvedValue([scope({ ref: "ada/engine" })]);
+    vi.mocked(refreshGithubScopes).mockResolvedValue([
+      scope({ ref: "ada/engine" }),
+      scope({ ref: "ada/other" }),
+    ]);
+    const user = userEvent.setup();
+    renderWithClient(<ScopeTable status={status()} />);
+    await user.click(await screen.findByRole("checkbox", include("ada/engine")));
+
+    await user.click(screen.getByRole("button", { name: "Refresh from GitHub" }));
+    await screen.findByText("ada/other");
+
+    expect(screen.getByRole("checkbox", include("ada/engine"))).toBeChecked();
+    expect(screen.getByText("1 unsaved change")).toBeInTheDocument();
+  });
+
+  it("reports a failed refresh and allows another try", async () => {
+    vi.mocked(listGithubScopes).mockResolvedValue([scope()]);
+    vi.mocked(refreshGithubScopes).mockRejectedValueOnce(new Error("rate limited by GitHub"));
+    vi.mocked(refreshGithubScopes).mockResolvedValueOnce([scope(), scope({ ref: "ada/second" })]);
+    const user = userEvent.setup();
+    renderWithClient(<ScopeTable status={status()} />);
+    await screen.findByText("ada/engine");
+
+    await user.click(screen.getByRole("button", { name: "Refresh from GitHub" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("rate limited by GitHub");
+
+    await user.click(screen.getByRole("button", { name: "Refresh from GitHub" }));
+    expect(await screen.findByText("ada/second")).toBeInTheDocument();
+  });
+
+  it("loads the list by itself, once, on the very first visit", async () => {
+    vi.mocked(listGithubScopes).mockResolvedValue([]);
+    vi.mocked(refreshGithubScopes).mockResolvedValue([scope({ ref: "ada/first" })]);
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const page = () => (
+      <QueryClientProvider client={client}>
+        <ScopeTable status={status({ scopes_refreshed_at: null })} />
+      </QueryClientProvider>
+    );
+    const { rerender } = render(page());
+
+    expect(await screen.findByText("ada/first")).toBeInTheDocument();
+    rerender(page());
+
+    expect(refreshGithubScopes).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not load by itself when the list was refreshed before or no token is set", async () => {
+    vi.mocked(listGithubScopes).mockResolvedValue([scope()]);
+    const view = renderWithClient(<ScopeTable status={status()} />);
+    await screen.findByText("ada/engine");
+    view.unmount();
+    renderWithClient(
+      <ScopeTable status={status({ configured: false, scopes_refreshed_at: null })} />,
+    );
+
+    expect(refreshGithubScopes).not.toHaveBeenCalled();
+  });
+
+  it("tells a first-time user to load the list when it is still empty", async () => {
+    vi.mocked(listGithubScopes).mockResolvedValue([]);
+    vi.mocked(refreshGithubScopes).mockRejectedValue(new Error("boom"));
+    renderWithClient(<ScopeTable status={status({ scopes_refreshed_at: null })} />);
+
+    expect(await screen.findByText(/press Refresh from GitHub/)).toBeInTheDocument();
   });
 
   it("says when the filter matches nothing", async () => {

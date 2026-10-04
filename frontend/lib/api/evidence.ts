@@ -41,8 +41,17 @@ export async function updateGithubScopes(
   });
 }
 
-export async function getTokenCheck(): Promise<TokenCheck> {
-  return apiFetch<TokenCheck>(`${BASE}/github/token`);
+/** The token's scopes as of the last refresh; null until the list has been refreshed once. */
+export async function getTokenCheck(): Promise<TokenCheck | null> {
+  return apiFetch<TokenCheck | null>(`${BASE}/github/token`);
+}
+
+/** Asks GitHub for the repository list and stores it; takes several seconds. */
+export async function refreshGithubScopes(): Promise<EvidenceScope[]> {
+  return apiFetch<EvidenceScope[]>(`${BASE}/github/scopes/refresh`, {
+    method: "POST",
+    timeoutMs: 120_000,
+  });
 }
 
 export async function listEmployers(): Promise<EmployerOption[]> {
@@ -114,6 +123,10 @@ export async function startExtraction(confirmedEstimateId: string): Promise<Extr
     method: "POST",
     body: JSON.stringify({ confirmed_estimate_id: confirmedEstimateId }),
   });
+}
+
+export async function listExtractionRuns(limit = 1): Promise<ExtractionRun[]> {
+  return apiFetch<ExtractionRun[]>(`${BASE}/extract/runs?limit=${String(limit)}`);
 }
 
 export async function getExtractionRun(runId: string): Promise<ExtractionRun> {

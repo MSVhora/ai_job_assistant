@@ -7,6 +7,7 @@ import {
   getTokenCheck,
   listEmployers,
   listGithubScopes,
+  refreshGithubScopes,
   listSyncs,
   startGithubSync,
   updateGithubScopes,
@@ -37,6 +38,18 @@ export function useTokenCheck(enabled: boolean) {
     queryFn: getTokenCheck,
     enabled,
     staleTime: 60_000,
+  });
+}
+
+export function useRefreshScopes() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: refreshGithubScopes,
+    onSuccess: (scopes) => {
+      queryClient.setQueryData(["evidence-scopes"], scopes);
+      void queryClient.invalidateQueries({ queryKey: ["evidence-status"] });
+      void queryClient.invalidateQueries({ queryKey: ["evidence-token"] });
+    },
   });
 }
 

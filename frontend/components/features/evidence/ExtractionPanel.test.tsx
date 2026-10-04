@@ -5,11 +5,14 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  ApiError,
   estimateExtraction,
   getChunkSummary,
   getExtractionRun,
+  listExtractionRuns,
   startExtraction,
   type ExtractionEstimate,
+  type ExtractionRun,
 } from "@/lib/api";
 
 import { renderWithClient } from "../test-utils";
@@ -20,6 +23,7 @@ vi.mock("@/lib/api", async (importOriginal) => ({
   estimateExtraction: vi.fn(),
   getChunkSummary: vi.fn(),
   getExtractionRun: vi.fn(),
+  listExtractionRuns: vi.fn(),
   startExtraction: vi.fn(),
 }));
 
@@ -49,11 +53,27 @@ function estimate(overrides: Partial<ExtractionEstimate> = {}): ExtractionEstima
   };
 }
 
+function run(overrides: Partial<ExtractionRun> = {}): ExtractionRun {
+  return {
+    id: "run-1",
+    status: "running",
+    estimate: {},
+    progress: { total: 5, done: 2 },
+    usage: {},
+    error: null,
+    created_at: "2026-10-03T10:00:00Z",
+    updated_at: "2026-10-03T10:00:00Z",
+    ...overrides,
+  };
+}
+
 describe("ExtractionPanel", () => {
   beforeEach(() => {
     vi.mocked(estimateExtraction).mockReset();
     vi.mocked(getChunkSummary).mockReset();
     vi.mocked(getExtractionRun).mockReset();
+    vi.mocked(listExtractionRuns).mockReset();
+    vi.mocked(listExtractionRuns).mockResolvedValue([]);
     vi.mocked(startExtraction).mockReset();
     vi.mocked(getChunkSummary).mockResolvedValue({
       chunks: 10,
@@ -206,5 +226,48 @@ describe("ExtractionPanel", () => {
       "href",
       "/evidence/review",
     );
+  });
+
+  it("picks up a run that is still going after a reload", async () => {
+    const running = run({ id: "run-live", status: "running" });
+    vi.mocked(listExtractionRuns).mockResolvedValue([running]);
+    vi.mocked(getExtractionRun).mockResolvedValue(running);
+    renderWithClient(<ExtractionPanel />);
+
+    expect(await screen.findByRole("region", { name: "Extraction status" })).toBeInTheDocument();
+    expect(getExtractionRun).toHaveBeenCalledWith("run-live");
+  });
+
+  it("shows no banner when the latest run already finished", async () => {
+    vi.mocked(listExtractionRuns).mockResolvedValue([run({ status: "succeeded" })]);
+    renderWithClient(<ExtractionPanel />);
+
+    await screen.findByText(/10 evidence chunks/);
+
+    await waitFor(() => {
+      expect(listExtractionRuns).toHaveBeenCalled();
+    });
+    expect(screen.queryByRole("region", { name: "Extraction status" })).not.toBeInTheDocument();
+    expect(getExtractionRun).not.toHaveBeenCalled();
+  });
+
+  it("attaches to the running extraction when starting another one is refused", async () => {
+    vi.mocked(estimateExtraction).mockResolvedValue(estimate());
+    vi.mocked(startExtraction).mockRejectedValue(
+      new ApiError(409, "an achievement extraction is already active", {
+        detail: "an achievement extraction is already active",
+        active_run_id: "run-live",
+      }),
+    );
+    vi.mocked(getExtractionRun).mockResolvedValue(run({ id: "run-live", status: "running" }));
+    const user = userEvent.setup();
+    renderWithClient(<ExtractionPanel />);
+    await screen.findByText(/10 evidence chunks/);
+
+    await user.click(screen.getByRole("button", { name: "Estimate extraction" }));
+    await user.click(await screen.findByRole("button", { name: "Extract achievements" }));
+
+    expect(await screen.findByRole("region", { name: "Extraction status" })).toBeInTheDocument();
+    expect(getExtractionRun).toHaveBeenCalledWith("run-live");
   });
 });

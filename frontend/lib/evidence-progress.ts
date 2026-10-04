@@ -1,4 +1,4 @@
-import type { ExtractionRun, SyncRun } from "@/lib/api";
+import { ApiError, type ExtractionRun, type SyncRun } from "@/lib/api";
 
 const ACTIVE = new Set(["pending", "running"]);
 
@@ -146,4 +146,12 @@ export function employerKey(ref: Record<string, unknown> | null | undefined): st
 export function formatResumeAt(date: Date | null): string | null {
   if (date === null || Number.isNaN(date.getTime())) return null;
   return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+/** The id of the extraction already running, from the 409 a second start is answered with. */
+export function activeRunIdFrom(error: unknown): string | null {
+  if (!(error instanceof ApiError) || error.status !== 409) return null;
+  const body: unknown = error.body;
+  if (typeof body !== "object" || body === null || !("active_run_id" in body)) return null;
+  return typeof body.active_run_id === "string" ? body.active_run_id : null;
 }

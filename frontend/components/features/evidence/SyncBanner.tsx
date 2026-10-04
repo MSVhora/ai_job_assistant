@@ -39,7 +39,7 @@ export function SyncBanner({ run }: { run: SyncRun }) {
             />
           )}
           {LABELS[view.status] ?? view.status}
-          <Badge>{view.mode === "full" ? "Full re-sync" : "Refresh"}</Badge>
+          <Badge>{view.mode === "full" ? "Full re-sync" : "Sync"}</Badge>
         </p>
         <p className="text-xs text-gray-600">
           {view.items} items · {view.requests} GitHub requests used

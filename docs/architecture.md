@@ -155,9 +155,11 @@ sequenceDiagram
     participant D as Postgres
 
     B->>A: GET /api/evidence/github/scopes
+    A->>D: read the stored repository list (no GitHub call)
+    B->>A: POST /api/evidence/github/scopes/refresh (first visit, or the Refresh button)
     A->>S: identify + list_scopes
-    S->>H: GET /user, GET /user/repos
-    A->>D: store new repos as evidence_scope (disabled)
+    S->>H: GET /user, GET /user/repos, GraphQL contributionsCollection per year
+    A->>D: upsert evidence_scope (new repos disabled), scopes_refreshed_at, token scopes
     B->>A: PATCH /api/evidence/github/scopes (enable, private needs the disclosure)
     B->>A: POST /api/evidence/github/sync (mode: incremental | full)
     A->>D: sweep stale runs, active-run check, insert evidence_sync_run (partial unique index)
@@ -573,6 +575,8 @@ erDiagram
         jsonb extra_identities "emails for commit matching"
         timestamptz acknowledged_at "private-repo disclosure ack"
         timestamptz last_synced_at
+        timestamptz scopes_refreshed_at "when the repository list was last read from GitHub"
+        jsonb token_scopes "classic token scopes at that refresh"
         timestamptz created_at
     }
 
@@ -581,6 +585,12 @@ erDiagram
         uuid source_id FK "CASCADE"
         text ref "owner/repo; unique per source"
         boolean is_private
+        boolean is_fork
+        text description
+        timestamptz pushed_at
+        boolean contributed "GitHub contribution history includes it"
+        boolean visible "listed by the latest refresh"
+        boolean new_since_refresh "first seen in the latest refresh"
         boolean enabled "default false"
         text content_level "messages_and_prs | metadata_only"
         jsonb employer_ref

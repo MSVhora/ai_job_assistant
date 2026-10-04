@@ -1,10 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Card } from "@/components/ui/card";
-import { useEmployers, useGithubScopes, useUpdateScopes } from "@/hooks/use-evidence-sync";
+import {
+  useEmployers,
+  useGithubScopes,
+  useRefreshScopes,
+  useUpdateScopes,
+} from "@/hooks/use-evidence-sync";
 import type { EvidenceStatus } from "@/lib/api";
 import {
   changeCount,
@@ -22,6 +27,8 @@ import {
 
 import { DisclosureModal } from "./DisclosureModal";
 import { ScopePager } from "./ScopePager";
+import { ScopeRefreshBar } from "./ScopeRefreshBar";
+import { ScopeStates } from "./ScopeStates";
 import { ScopeRow } from "./ScopeRow";
 import { ScopeSaveBar } from "./ScopeSaveBar";
 import { ScopeToolbar } from "./ScopeToolbar";
@@ -30,12 +37,22 @@ export function ScopeTable({ status }: { status: EvidenceStatus }) {
   const scopes = useGithubScopes(status.configured);
   const employers = useEmployers();
   const update = useUpdateScopes();
+  const refresh = useRefreshScopes();
+  const { mutate: refreshScopes } = refresh;
+  const autoRefreshed = useRef(false);
   const [draft, setDraft] = useState<ScopeDraft>({});
   const [query, setQuery] = useState("");
   const [onlyContributed, setOnlyContributed] = useState(false);
   const [confirming, setConfirming] = useState<string[]>([]);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState<number>(SCOPE_PAGE_SIZES[0]);
+
+  useEffect(() => {
+    if (status.configured && status.scopes_refreshed_at == null && !autoRefreshed.current) {
+      autoRefreshed.current = true;
+      refreshScopes();
+    }
+  }, [status.configured, status.scopes_refreshed_at, refreshScopes]);
 
   const all = scopes.data ?? [];
   const matching = filterScopes(all, query, onlyContributed);
@@ -67,30 +84,26 @@ export function ScopeTable({ status }: { status: EvidenceStatus }) {
     <Card
       title={<h2 className="text-base font-bold text-gray-900">Repositories</h2>}
       action={
-        scopes.isFetching && <span className="text-xs text-gray-500">Loading repositories…</span>
+        status.configured && (
+          <ScopeRefreshBar
+            refreshedAt={status.scopes_refreshed_at}
+            pending={refresh.isPending}
+            error={refresh.error}
+            onRefresh={() => {
+              refreshScopes();
+            }}
+          />
+        )
       }
     >
-      {!status.configured && (
-        <p className="text-sm text-gray-600">Connect GitHub to list your repositories.</p>
-      )}
-      {status.configured && scopes.isPending && (
-        <div className="h-24 animate-pulse rounded-2xl bg-gray-100" aria-busy="true" />
-      )}
-      {scopes.isError && (
-        <div role="alert" className="flex items-center justify-between gap-3 text-sm text-red-700">
-          <span>Could not load your repositories. Check the token and try again.</span>
-          <button
-            type="button"
-            onClick={() => void scopes.refetch()}
-            className="rounded-full border border-red-300 px-3 py-1 text-xs font-semibold hover:bg-red-50"
-          >
-            Retry
-          </button>
-        </div>
-      )}
-      {scopes.isSuccess && all.length === 0 && (
-        <p className="text-sm text-gray-600">No repositories found for this token.</p>
-      )}
+      <ScopeStates
+        configured={status.configured}
+        pending={scopes.isPending}
+        failed={scopes.isError}
+        empty={scopes.isSuccess && all.length === 0 && !refresh.isPending}
+        neverRefreshed={status.scopes_refreshed_at == null}
+        onRetry={() => void scopes.refetch()}
+      />
       {scopes.isSuccess && all.length > 0 && (
         <>
           <p className="mb-3 text-xs text-gray-600">

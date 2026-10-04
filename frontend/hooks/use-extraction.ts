@@ -2,7 +2,12 @@
 
 import { skipToken, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { estimateExtraction, getExtractionRun, startExtraction } from "@/lib/api";
+import {
+  estimateExtraction,
+  getExtractionRun,
+  listExtractionRuns,
+  startExtraction,
+} from "@/lib/api";
 import { isActiveStatus } from "@/lib/evidence-progress";
 
 const POLL_INTERVAL_MS = 2000;
@@ -12,7 +17,21 @@ export function useEstimateExtraction() {
 }
 
 export function useStartExtraction() {
-  return useMutation({ mutationFn: (estimateId: string) => startExtraction(estimateId) });
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (estimateId: string) => startExtraction(estimateId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["extraction-latest"] }),
+  });
+}
+
+/** The newest extraction run, so a run that is still going is found again after a reload. */
+export function useLatestExtraction() {
+  return useQuery({
+    queryKey: ["extraction-latest"],
+    queryFn: async () => (await listExtractionRuns(1))[0] ?? null,
+    refetchInterval: (query) =>
+      isActiveStatus(query.state.data?.status) ? POLL_INTERVAL_MS : false,
+  });
 }
 
 export function useExtractionRun(runId: string | null) {

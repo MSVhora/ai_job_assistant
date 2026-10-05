@@ -54,9 +54,14 @@ export function ReviewPageClient() {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <ReviewTabs active={tab} onChange={changeTab} />
-        <Link href="/evidence" className="text-sm font-semibold text-violet-700 underline">
-          Back to evidence
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link href="/evidence/impact" className="text-sm font-semibold text-violet-700 underline">
+            Add impact
+          </Link>
+          <Link href="/evidence" className="text-sm font-semibold text-violet-700 underline">
+            Back to evidence
+          </Link>
+        </div>
       </div>
       <p className="text-sm text-gray-600">{TAB_HINTS[tab]}</p>
       <div className="flex flex-wrap items-center gap-3">

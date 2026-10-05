@@ -15,6 +15,7 @@ const FLAG_LABELS: Record<string, string> = {
   result_removed_unsupported: "Result removed: no supporting quote",
   merged: "Merged from several achievements",
   split: "Split from another achievement",
+  impact_skipped: "No measurable impact",
 };
 
 export const IMPACT_LABELS: Record<string, string> = {

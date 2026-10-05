@@ -9,6 +9,7 @@ import {
 } from "@tanstack/react-query";
 
 import {
+  addImpact,
   bulkApprove,
   bulkReject,
   confirmMetric,
@@ -16,12 +17,14 @@ import {
   getAchievement,
   getAchievementGroups,
   getBulkEligible,
+  getImpactQueue,
   linkEvidence,
   listAchievementsPage,
   listMergeProposals,
   listRevisions,
   mergeAchievements,
   runAchievementAction,
+  skipImpact,
   splitAchievement,
   unlinkEvidence,
   type AchievementAction,
@@ -67,6 +70,10 @@ export function useAchievementGroups(enabled: boolean) {
   });
 }
 
+export function useImpactQueue() {
+  return useQuery({ queryKey: ["impact-queue"], queryFn: getImpactQueue });
+}
+
 export function useBulkEligible(enabled: boolean) {
   return useQuery({
     queryKey: ["bulk-eligible"],
@@ -86,6 +93,7 @@ function useRefreshAchievements() {
       "merge-proposals",
       "bulk-eligible",
       "achievement-groups",
+      "impact-queue",
     ]) {
       void queryClient.invalidateQueries({ queryKey: [key] });
     }
@@ -161,4 +169,17 @@ export function useBulkApprove() {
 export function useBulkReject() {
   const refresh = useRefreshAchievements();
   return useMutation({ mutationFn: (ids: string[]) => bulkReject(ids), onSuccess: refresh });
+}
+
+export function useAddImpact() {
+  const refresh = useRefreshAchievements();
+  return useMutation({
+    mutationFn: ({ id, text }: { id: string; text: string }) => addImpact(id, text),
+    onSuccess: refresh,
+  });
+}
+
+export function useSkipImpact() {
+  const refresh = useRefreshAchievements();
+  return useMutation({ mutationFn: (id: string) => skipImpact(id), onSuccess: refresh });
 }

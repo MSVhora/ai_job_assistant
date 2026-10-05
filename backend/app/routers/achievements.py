@@ -12,6 +12,7 @@ from app.schemas.achievement import (
     AchievementGroupsResponse,
     AchievementResponse,
     AchievementUpdate,
+    AddImpactRequest,
     BulkApproveRequest,
     BulkApproveResponse,
     BulkEligibleResponse,
@@ -30,10 +31,13 @@ from app.schemas.achievement import (
 from app.services import (
     achievement_extraction,
     achievement_groups,
+    achievement_impact,
     achievement_merge,
     achievement_review,
     achievements,
 )
+
+IMPACT_QUEUE_LIMIT = 40
 
 router = APIRouter(prefix="/api", tags=["achievements"])
 
@@ -137,6 +141,17 @@ async def achievement_groups_summary(
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> AchievementGroupsResponse:
     return await achievement_groups.draft_groups(session)
+
+
+@router.get("/achievements/impact-queue", response_model=list[AchievementResponse])
+async def impact_queue(
+    response: Response,
+    session: Annotated[AsyncSession, Depends(get_db)],
+    page: Annotated[Pagination, Depends(pagination(IMPACT_QUEUE_LIMIT))],
+) -> list[AchievementResponse]:
+    items, total = await achievement_impact.impact_queue(session, page)
+    response.headers[TOTAL_COUNT_HEADER] = str(total)
+    return items
 
 
 @router.get("/achievements/merge-proposals", response_model=list[MergeProposalResponse])
@@ -262,6 +277,23 @@ async def confirm_metric(
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> AchievementResponse:
     return await achievement_review.confirm_metric(session, achievement_id, payload)
+
+
+@router.post("/achievements/{achievement_id}/impact", response_model=AchievementResponse)
+async def add_impact(
+    achievement_id: uuid.UUID,
+    payload: AddImpactRequest,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> AchievementResponse:
+    return await achievement_impact.add_impact(session, achievement_id, payload)
+
+
+@router.post("/achievements/{achievement_id}/skip-impact", response_model=AchievementResponse)
+async def skip_impact(
+    achievement_id: uuid.UUID,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> AchievementResponse:
+    return await achievement_impact.skip_impact(session, achievement_id)
 
 
 @router.post(

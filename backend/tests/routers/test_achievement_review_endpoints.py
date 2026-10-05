@@ -270,6 +270,72 @@ async def test_list_filters_by_impact_type_and_confirmed_metric(client: AsyncCli
     assert await titles(impact_type="cost", has_metric="true") == ["Proven"]
 
 
+async def test_impact_queue_lists_ranked_achievements_without_a_confirmed_metric(
+    client: AsyncClient,
+) -> None:
+    candidate_id, _, items = await seed_evidence_chunk(bodies=[*BODIES, "Four", "Five"])
+    await seed_achievement(
+        candidate_id, item_ids=items[:1], title="Feature", difficulty=2, impact_type="other"
+    )
+    await seed_achievement(
+        candidate_id, item_ids=items[1:2], title="Speedup", difficulty=4, impact_type="performance"
+    )
+    await seed_achievement(
+        candidate_id, item_ids=items[2:3], title="Has number", metrics=[metric_row("9 min", "user")]
+    )
+    await seed_achievement(candidate_id, item_ids=items[3:4], title="Set aside", status="rejected")
+
+    response = await client.get("/api/achievements/impact-queue")
+
+    assert [a["title"] for a in response.json()] == ["Speedup", "Feature"]
+    assert response.headers["x-total-count"] == "2"
+    limited = await client.get("/api/achievements/impact-queue", params={"limit": 1})
+    assert len(limited.json()) == 1
+    assert limited.headers["x-total-count"] == "2"
+
+
+async def test_adding_impact_stores_a_user_verified_metric_and_leaves_the_queue(
+    client: AsyncClient,
+) -> None:
+    _, achievement_id, _ = await seeded()
+    url = f"/api/achievements/{achievement_id}"
+
+    added = await client.post(f"{url}/impact", json={"text": "  Cut churn by 12%  "})
+    queue = await client.get("/api/achievements/impact-queue")
+    revisions = (await client.get(f"{url}/revisions")).json()
+    blank = await client.post(f"{url}/impact", json={"text": "   "})
+
+    assert added.status_code == 200
+    assert added.json()["metrics"] == [
+        {"text": "Cut churn by 12%", "source_quote": "", "evidence_ids": [], "verified": "user"}
+    ]
+    assert added.json()["edited_by_user"] is True
+    assert queue.json() == []
+    assert revisions[0]["source"] == "metric_confirmation"
+    assert blank.status_code == 422
+
+
+async def test_skipping_impact_removes_it_from_the_queue_until_a_number_is_added(
+    client: AsyncClient,
+) -> None:
+    _, achievement_id, _ = await seeded()
+    url = f"/api/achievements/{achievement_id}"
+
+    skipped = await client.post(f"{url}/skip-impact")
+    again = await client.post(f"{url}/skip-impact")
+    queue = (await client.get("/api/achievements/impact-queue")).json()
+    revisions = (await client.get(f"{url}/revisions")).json()
+    await client.post(f"{url}/impact", json={"text": "5x faster"})
+    after = (await client.get(url)).json()
+
+    assert skipped.json()["review_flags"] == ["impact_skipped"]
+    assert again.status_code == 200
+    assert queue == []
+    assert len(revisions) == 1
+    assert "impact_skipped" not in after["review_flags"]
+    assert (await client.post(f"/api/achievements/{uuid.uuid4()}/skip-impact")).status_code == 404
+
+
 async def test_bulk_approval_routes_preview_then_commit(client: AsyncClient) -> None:
     candidate_id, _, items = await seed_evidence_chunk(bodies=BODIES)
     clean = await seed_achievement(candidate_id, item_ids=items[:1], title="Clean")

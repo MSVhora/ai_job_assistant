@@ -16,7 +16,7 @@ export function AchievementBadges({ achievement }: { achievement: Achievement })
       <Badge>Difficulty {achievement.difficulty}/5</Badge>
       <SourceBadges achievement={achievement} />
       {achievement.review_flags
-        .filter((flag) => flag !== "metric_needs_confirmation")
+        .filter((flag) => flag !== "metric_needs_confirmation" && flag !== "impact_skipped")
         .map((flag) => (
           <Badge key={flag} variant="warn">
             {flagLabel(flag)}

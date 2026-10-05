@@ -149,3 +149,18 @@ export async function bulkArchive(ids: string[]): Promise<BulkTransitionResult> 
 export async function getAchievementGroups(): Promise<AchievementGroups> {
   return apiFetch<AchievementGroups>(`${BASE}/groups`);
 }
+
+export async function getImpactQueue(): Promise<{ items: Achievement[]; total: number }> {
+  return apiFetchWithTotal<Achievement[]>(`${BASE}/impact-queue`);
+}
+
+export async function addImpact(achievementId: string, text: string): Promise<Achievement> {
+  return apiFetch<Achievement>(path(achievementId, "/impact"), {
+    method: "POST",
+    body: JSON.stringify({ text }),
+  });
+}
+
+export async function skipImpact(achievementId: string): Promise<Achievement> {
+  return apiFetch<Achievement>(path(achievementId, "/skip-impact"), { method: "POST" });
+}

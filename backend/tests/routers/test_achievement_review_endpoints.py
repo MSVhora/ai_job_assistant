@@ -1,5 +1,6 @@
 import logging
 import uuid
+from datetime import date
 from typing import Any
 
 import pytest
@@ -36,7 +37,7 @@ async def seeded(**kwargs: Any) -> tuple[uuid.UUID, uuid.UUID, list[uuid.UUID]]:
     return candidate_id, await seed_achievement(candidate_id, item_ids=use, **kwargs), items
 
 
-async def test_the_list_ranks_by_difficulty_and_evidence_and_filters() -> None:
+async def test_the_list_ranks_by_priority_and_filters() -> None:
     candidate_id, _, items = await seed_evidence_chunk(bodies=BODIES)
     await seed_achievement(candidate_id, item_ids=items[:1], title="Easy", difficulty=1)
     await seed_achievement(
@@ -192,6 +193,81 @@ async def test_revisions_are_paginated_with_a_total(client: AsyncClient) -> None
     assert len(response.json()) == 2
     assert response.headers["x-total-count"] == "3"
     assert (await client.get(f"{base}/revisions", params={"limit": 500})).status_code == 422
+
+
+def metric_row(text: str, verified: str) -> dict[str, object]:
+    return {"text": text, "source_quote": "q", "evidence_ids": [], "verified": verified}
+
+
+async def test_rank_puts_confirmed_impact_ahead_of_difficulty_and_age(
+    client: AsyncClient,
+) -> None:
+    candidate_id, _, items = await seed_evidence_chunk(bodies=[*BODIES, "Four"])
+    metric = [
+        {"text": "cut churn 12%", "source_quote": "q", "evidence_ids": [], "verified": "user"}
+    ]
+    await seed_achievement(
+        candidate_id, item_ids=items[:1], title="Hard feature", difficulty=5, impact_type="other"
+    )
+    await seed_achievement(
+        candidate_id,
+        item_ids=items[1:2],
+        title="Revenue win",
+        difficulty=3,
+        impact_type="revenue",
+        metrics=metric,
+    )
+    await seed_achievement(
+        candidate_id,
+        item_ids=items[2:3],
+        title="Old revenue win",
+        difficulty=3,
+        impact_type="revenue",
+        metrics=metric,
+        time_start=date(2012, 1, 1),
+    )
+    await seed_achievement(
+        candidate_id, item_ids=items[3:4], title="Easy feature", difficulty=1, impact_type="other"
+    )
+
+    titles = [a["title"] for a in (await client.get("/api/achievements")).json()]
+
+    assert titles == ["Revenue win", "Old revenue win", "Hard feature", "Easy feature"]
+
+
+async def test_rank_breaks_ties_by_evidence_and_pages_consistently(client: AsyncClient) -> None:
+    candidate_id, _, items = await seed_evidence_chunk(bodies=BODIES)
+    await seed_achievement(candidate_id, item_ids=items[:1], title="Thin")
+    await seed_achievement(candidate_id, item_ids=items[:3], title="Thick")
+
+    full = [a["title"] for a in (await client.get("/api/achievements")).json()]
+    second = (await client.get("/api/achievements", params={"limit": 1, "offset": 1})).json()
+
+    assert full == ["Thick", "Thin"]
+    assert [a["title"] for a in second] == ["Thin"]
+
+
+async def test_list_filters_by_impact_type_and_confirmed_metric(client: AsyncClient) -> None:
+    candidate_id, _, items = await seed_evidence_chunk(bodies=[*BODIES, "Four"])
+    confirmed = [{"text": "9 min", "source_quote": "q", "evidence_ids": [], "verified": "evidence"}]
+    pending = [
+        {"text": "2x", "source_quote": "q", "evidence_ids": [], "verified": "needs_confirmation"}
+    ]
+    await seed_achievement(
+        candidate_id, item_ids=items[:1], title="Proven", impact_type="cost", metrics=confirmed
+    )
+    await seed_achievement(
+        candidate_id, item_ids=items[1:2], title="Unconfirmed", impact_type="cost", metrics=pending
+    )
+    await seed_achievement(candidate_id, item_ids=items[2:3], title="Bare", impact_type="ux")
+
+    async def titles(**params: str) -> list[str]:
+        return [a["title"] for a in (await client.get("/api/achievements", params=params)).json()]
+
+    assert await titles(has_metric="true") == ["Proven"]
+    assert set(await titles(has_metric="false")) == {"Unconfirmed", "Bare"}
+    assert set(await titles(impact_type="cost")) == {"Proven", "Unconfirmed"}
+    assert await titles(impact_type="cost", has_metric="true") == ["Proven"]
 
 
 async def test_bulk_approval_routes_preview_then_commit(client: AsyncClient) -> None:

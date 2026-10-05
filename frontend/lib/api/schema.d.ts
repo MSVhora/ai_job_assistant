@@ -5665,11 +5665,13 @@ export interface operations {
             query?: {
                 status?: components["schemas"]["AchievementStatus"];
                 project_key?: string | null;
-                private?: boolean | null;
-                stale?: boolean | null;
                 sort?: "rank" | "recent";
                 employer?: string | null;
                 employer_kind?: ("personal" | "unassigned") | null;
+                impact_type?: string | null;
+                has_metric?: boolean | null;
+                private?: boolean | null;
+                stale?: boolean | null;
                 limit?: number;
                 offset?: number;
             };

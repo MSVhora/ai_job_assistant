@@ -29,6 +29,8 @@ export interface AchievementListParams {
   private?: boolean | undefined;
   project_key?: string | undefined;
   employer?: string | undefined;
+  impact_type?: string | undefined;
+  has_metric?: boolean | undefined;
   employer_kind?: "personal" | "unassigned" | undefined;
   limit?: number | undefined;
   offset?: number | undefined;

@@ -373,6 +373,7 @@ async def seed_achievement(
     stale: bool = False,
     skills: "list[str] | None" = None,
     employer_ref: "dict[str, Any] | None" = None,
+    impact_type: str = "performance",
 ) -> "uuid.UUID":
     """Seed an achievement linked (first one primary) to the given evidence items."""
     from datetime import UTC, date, datetime
@@ -391,7 +392,7 @@ async def seed_achievement(
             result="Result",
             metrics=metrics or [],
             skills=skills or [],
-            impact_type="performance",
+            impact_type=impact_type,
             difficulty=difficulty,
             project_key=project_key,
             embedding=embedding,

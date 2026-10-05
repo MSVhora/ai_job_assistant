@@ -19,21 +19,38 @@ export const TAB_HINTS: Record<ReviewTab, string> = {
   attention: "Approved achievements whose evidence changed after a refresh: look again.",
 };
 
+export type MetricFilter = "" | "yes" | "no";
+
+export interface ReviewFilters {
+  privateOnly: boolean;
+  repository: string;
+  employer: string;
+  impact: string;
+  metric: MetricFilter;
+}
+
+export const NO_FILTERS: ReviewFilters = {
+  privateOnly: false,
+  repository: "",
+  employer: "",
+  impact: "",
+  metric: "",
+};
+
 export function paramsForTab(
   tab: ReviewTab,
-  privateOnly: boolean,
+  filters: ReviewFilters,
   offset: number,
-  repository = "",
-  employer = "",
 ): AchievementListParams {
-  const base: AchievementListParams = {
+  return {
     status: tab === "attention" ? "approved" : tab,
     limit: PAGE_SIZE,
     offset,
     ...(tab === "attention" ? { stale: true } : {}),
-    ...(privateOnly ? { private: true } : {}),
-    ...(repository === "" ? {} : { project_key: repository }),
-    ...employerParams(employer),
+    ...(filters.privateOnly ? { private: true } : {}),
+    ...(filters.repository === "" ? {} : { project_key: filters.repository }),
+    ...(filters.impact === "" ? {} : { impact_type: filters.impact }),
+    ...(filters.metric === "" ? {} : { has_metric: filters.metric === "yes" }),
+    ...employerParams(filters.employer),
   };
-  return base;
 }

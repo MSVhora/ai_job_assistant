@@ -5,13 +5,11 @@ import { Button } from "@/components/ui/button";
 import type { Achievement } from "@/lib/api";
 
 import { AchievementCard } from "./AchievementCard";
-import { PAGE_SIZE, paramsForTab, type ReviewTab } from "./review-tabs";
+import { PAGE_SIZE, paramsForTab, type ReviewFilters, type ReviewTab } from "./review-tabs";
 
 export function AchievementList({
   tab,
-  privateOnly,
-  repository,
-  employer,
+  filters,
   offset,
   selected,
   onSelect,
@@ -19,16 +17,14 @@ export function AchievementList({
   onPage,
 }: {
   tab: ReviewTab;
-  privateOnly: boolean;
-  repository: string;
-  employer: string;
+  filters: ReviewFilters;
   offset: number;
   selected: ReadonlyMap<string, string>;
   onSelect: (achievement: Achievement, selected: boolean) => void;
   onOpen: (id: string) => void;
   onPage: (offset: number) => void;
 }) {
-  const list = useAchievements(paramsForTab(tab, privateOnly, offset, repository, employer));
+  const list = useAchievements(paramsForTab(tab, filters, offset));
   const action = useAchievementAction();
 
   if (list.isPending) {

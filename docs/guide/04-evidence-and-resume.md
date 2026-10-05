@@ -203,7 +203,9 @@ always see what was edited, merged or confirmed and when.
 - **Grouped review.** `GET /api/achievements/groups` returns the drafts grouped by employer and
   then repository, with how many are clean (bulk-approvable) and the ids in each. `GET
   /api/achievements` also filters by `employer` (a company) or `employer_kind`
-  (`personal` / `unassigned`), next to `project_key`.
+  (`personal` / `unassigned`), `impact_type` and `has_metric` (a confirmed metric: verified from
+  evidence or by you), next to `project_key`. `sort=rank` (the default) orders by the resume
+  builder's base priority; `sort=recent` by creation time.
 - **Merge and split.** `POST /api/achievements/merge` combines two or more achievements into a new
   draft (evidence, skills and metrics are unioned) and archives the sources.
   `GET /api/achievements/merge-proposals` only *suggests* likely duplicates (same repository,
@@ -297,7 +299,9 @@ header (or open `/evidence`).
 
 - Tabs **Draft**, **Approved**, **Rejected** and **Needs attention** (approved achievements whose
   evidence changed). A *Private-derived only* filter narrows any tab. Cards are ranked by
-  difficulty and amount of evidence and carry badges: *Private repo*, *Evidence updated —
+  the same priority the resume builder uses (impact type, whether a metric is confirmed, difficulty
+  and recency; more evidence breaks ties), so confirmed impact comes first and feature-only work
+  sinks. *Impact* and *Metric* filters narrow any tab, and cards carry badges: *Private repo*, *Evidence updated —
   re-review*, metrics to confirm, impact, difficulty, employer or project.
 - **Approve** is disabled with the reason shown until the achievement has evidence and no
   unconfirmed metric. **Approve all fully-evidenced…** previews the clean drafts with

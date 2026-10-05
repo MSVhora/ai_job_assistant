@@ -1,4 +1,5 @@
 import uuid
+from dataclasses import dataclass
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Response
@@ -80,14 +81,30 @@ def _employer_params(
     return employer, employer_kind
 
 
+@dataclass(frozen=True)
+class _Facets:
+    impact_type: str | None
+    has_metric: bool | None
+    private: bool | None
+    stale: bool | None
+
+
+def _facet_params(
+    impact_type: Annotated[str | None, Query(max_length=30)] = None,
+    has_metric: Annotated[bool | None, Query()] = None,
+    private: Annotated[bool | None, Query()] = None,
+    stale: Annotated[bool | None, Query()] = None,
+) -> _Facets:
+    return _Facets(impact_type, has_metric, private, stale)
+
+
 def _achievement_filters(
     employer_filter: Annotated[
         tuple[str | None, Literal["personal", "unassigned"] | None], Depends(_employer_params)
     ],
+    facets: Annotated[_Facets, Depends(_facet_params)],
     status: Annotated[AchievementStatus, Query()] = AchievementStatus.draft,
     project_key: Annotated[str | None, Query(max_length=255)] = None,
-    private: Annotated[bool | None, Query()] = None,
-    stale: Annotated[bool | None, Query()] = None,
     sort: Annotated[Literal["rank", "recent"], Query()] = "rank",
 ) -> achievements.AchievementFilters:
     return achievements.AchievementFilters(
@@ -95,8 +112,10 @@ def _achievement_filters(
         project_key=project_key,
         employer=employer_filter[0],
         employer_kind=employer_filter[1],
-        private=private,
-        stale=stale,
+        impact_type=facets.impact_type,
+        has_metric=facets.has_metric,
+        private=facets.private,
+        stale=facets.stale,
         sort=sort,
     )
 

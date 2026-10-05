@@ -11,19 +11,22 @@ import { AchievementDrawer } from "./AchievementDrawer";
 import { AchievementList } from "./AchievementList";
 import { BulkApproveModal } from "./BulkApproveModal";
 import { EmployerFilter } from "./EmployerFilter";
+import { ImpactFilters } from "./ImpactFilters";
 import { MergeDialog, type MergeCandidate } from "./MergeDialog";
 import { MergeProposals } from "./MergeProposals";
 import { employerRepositories } from "@/lib/draft-groups";
 import { RepositoryFilter } from "./RepositoryFilter";
 import { ReviewTabs } from "./ReviewTabs";
 import { ViewActions } from "./ViewActions";
-import { TAB_HINTS, type ReviewTab } from "./review-tabs";
+import { TAB_HINTS, type MetricFilter, type ReviewTab } from "./review-tabs";
 
 export function ReviewPageClient() {
   const [tab, setTab] = useState<ReviewTab>("draft");
   const [privateOnly, setPrivateOnly] = useState(false);
   const [repository, setRepository] = useState("");
   const [employer, setEmployer] = useState("");
+  const [impact, setImpact] = useState("");
+  const [metric, setMetric] = useState<MetricFilter>("");
   const groups = useAchievementGroups(tab === "draft").data?.groups ?? [];
   const [offset, setOffset] = useState(0);
   const [selected, setSelected] = useState<ReadonlyMap<string, string>>(new Map());
@@ -111,15 +114,25 @@ export function ReviewPageClient() {
           setSelected(new Map());
         }}
       />
+      <ImpactFilters
+        impact={impact}
+        metric={metric}
+        onImpact={(next) => {
+          setImpact(next);
+          setOffset(0);
+        }}
+        onMetric={(next) => {
+          setMetric(next);
+          setOffset(0);
+        }}
+      />
       {tab === "draft" && (
         <ViewActions groups={groups} employer={employer} repository={repository} />
       )}
       {tab === "draft" && <MergeProposals onMerge={setMergePair} />}
       <AchievementList
         tab={tab}
-        privateOnly={privateOnly}
-        repository={repository}
-        employer={employer}
+        filters={{ privateOnly, repository, employer, impact, metric }}
         offset={offset}
         selected={selected}
         onSelect={toggle}

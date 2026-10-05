@@ -350,4 +350,18 @@ describe("ReviewPageClient", () => {
     expect(screen.queryByRole("option", { name: /me\/tool/ })).not.toBeInTheDocument();
     expect(screen.getByRole("option", { name: /acme\/api/ })).toBeInTheDocument();
   });
+
+  it("asks for achievements with a confirmed metric of one impact type", async () => {
+    const user = userEvent.setup();
+    renderWithClient(<ReviewPageClient />);
+
+    await user.selectOptions(await screen.findByLabelText("Impact"), "revenue");
+    await user.selectOptions(screen.getByLabelText("Metric"), "yes");
+
+    await waitFor(() => {
+      expect(listAchievementsPage).toHaveBeenLastCalledWith(
+        expect.objectContaining({ impact_type: "revenue", has_metric: true }),
+      );
+    });
+  });
 });

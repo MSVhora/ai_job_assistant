@@ -1,15 +1,19 @@
 import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Literal
 
 from sqlalchemy import Select, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import load_only
 
+from app.core.config import get_settings
 from app.core.pagination import DEFAULT_PAGE, Pagination
 from app.models import Achievement, AchievementEvidence, AchievementStatus
 from app.schemas.achievement import AchievementResponse, EvidenceLinkResponse
 from app.services.evidence_items import candidate_id_or_none
+from app.services.resume_priority import CONFIRMED_METRICS, base_priority
 
 
 @dataclass(frozen=True)
@@ -18,6 +22,8 @@ class AchievementFilters:
     project_key: str | None = None
     employer: str | None = None
     employer_kind: Literal["personal", "unassigned"] | None = None
+    impact_type: str | None = None
+    has_metric: bool | None = None
     private: bool | None = None
     stale: bool | None = None
     sort: Literal["rank", "recent"] = "rank"
@@ -46,6 +52,13 @@ def _filtered(candidate_id: uuid.UUID, filters: AchievementFilters) -> Select[tu
     if filters.project_key is not None:
         query = query.where(Achievement.project_key == filters.project_key)
     query = _by_employer(query, filters)
+    if filters.impact_type is not None:
+        query = query.where(Achievement.impact_type == filters.impact_type)
+    if filters.has_metric is not None:
+        confirmed = or_(
+            *(Achievement.metrics.contains([{"verified": kind}]) for kind in CONFIRMED_METRICS)
+        )
+        query = query.where(confirmed if filters.has_metric else ~confirmed)
     if filters.private is not None:
         query = query.where(Achievement.derived_from_private.is_(filters.private))
     if filters.stale is not None:
@@ -103,6 +116,34 @@ async def build_responses(
     return responses
 
 
+RANK_COLUMNS = (
+    Achievement.metrics,
+    Achievement.impact_type,
+    Achievement.difficulty,
+    Achievement.time_start,
+    Achievement.time_end,
+    Achievement.created_at,
+)
+
+
+async def _ranked_ids(session: AsyncSession, query: Select[tuple[Achievement]]) -> list[uuid.UUID]:
+    """Ids best first by the resume builder's base priority (impact, metric, difficulty, recency);
+    more evidence, then newer, break ties."""
+    rows = (await session.execute(query.options(load_only(*RANK_COLUMNS)))).scalars().all()
+    counts = await evidence_counts(session, [row.id for row in rows])
+    settings, today = get_settings(), datetime.now(UTC).date()
+    scored = sorted(
+        rows,
+        key=lambda row: (
+            -base_priority(row, today, settings),
+            -counts.get(row.id, 0),
+            -row.created_at.timestamp(),
+            str(row.id),
+        ),
+    )
+    return [row.id for row in scored]
+
+
 async def list_achievements(
     session: AsyncSession, filters: AchievementFilters, page: Pagination = DEFAULT_PAGE
 ) -> list[AchievementResponse]:
@@ -111,19 +152,14 @@ async def list_achievements(
         return []
     query = _filtered(candidate_id, filters)
     if filters.sort == "rank":
-        evidence_count = (
-            select(func.count())
-            .select_from(AchievementEvidence)
-            .where(AchievementEvidence.achievement_id == Achievement.id)
-            .correlate(Achievement)
-            .scalar_subquery()
+        ids = (await _ranked_ids(session, query))[page.offset : page.offset + page.limit]
+        found = (
+            (await session.execute(select(Achievement).where(Achievement.id.in_(ids))))
+            .scalars()
+            .all()
         )
-        query = query.order_by(
-            (Achievement.difficulty * (1 + evidence_count)).desc(),
-            Achievement.created_at.desc(),
-            Achievement.id,
-        )
-    else:
-        query = query.order_by(Achievement.created_at.desc(), Achievement.id)
+        by_id = {row.id: row for row in found}
+        return await build_responses(session, [by_id[achievement_id] for achievement_id in ids])
+    query = query.order_by(Achievement.created_at.desc(), Achievement.id)
     rows = list((await session.execute(query.limit(page.limit).offset(page.offset))).scalars())
     return await build_responses(session, rows)

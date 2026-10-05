@@ -11,6 +11,8 @@ export type BulkEligible = Schemas["BulkEligibleResponse"];
 export type BulkApproveResult = Schemas["BulkApproveResponse"];
 export type BulkTransitionResult = Schemas["BulkTransitionResponse"];
 export type AchievementGroups = Schemas["AchievementGroupsResponse"];
+export type OlderVersionPreview = Schemas["RetirePreview"];
+export type OlderVersionResult = Schemas["RetireOlderResult"];
 export type EmployerGroup = Schemas["EmployerGroup"];
 export type RepositoryGroup = Schemas["RepositoryGroup"];
 export type MergeProposal = Schemas["MergeProposalResponse"];
@@ -163,4 +165,12 @@ export async function addImpact(achievementId: string, text: string): Promise<Ac
 
 export async function skipImpact(achievementId: string): Promise<Achievement> {
   return apiFetch<Achievement>(path(achievementId, "/skip-impact"), { method: "POST" });
+}
+
+export async function getOlderVersion(): Promise<OlderVersionPreview> {
+  return apiFetch<OlderVersionPreview>(`${BASE}/older-version`);
+}
+
+export async function archiveOlderVersion(): Promise<OlderVersionResult> {
+  return apiFetch<OlderVersionResult>(`${BASE}/older-version/archive`, { method: "POST" });
 }

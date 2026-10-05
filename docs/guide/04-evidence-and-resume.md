@@ -213,6 +213,15 @@ always see what was edited, merged or confirmed and when.
   confirmed for ranking and the resume writer, and is audited as a `metric_confirmation`
   revision); `POST …/skip-impact` records that there is no number to give (a `impact_skipped`
   review flag) so it leaves the queue until you add one.
+- **Replacing an older extraction.** Extraction is stamped with its prompt version
+  (`achievement_v2`: at most 2 achievements per chunk, routine feature work left out unless the
+  evidence shows an outcome, and a definition for every impact type). Bumping the version makes
+  every chunk pending again and the estimate shows the cost. Approved achievements are never
+  changed by a re-extract, so the new drafts sit beside them. `GET /api/achievements/older-version`
+  previews how many approved achievements from an older version could be replaced: only those
+  whose source chunk was successfully re-extracted and that you have not edited.
+  `POST …/older-version/archive` archives them (terminal, with a `replaced_by_new_prompt`
+  revision). Approve the new drafts you want before archiving.
 - **Merge and split.** `POST /api/achievements/merge` combines two or more achievements into a new
   draft (evidence, skills and metrics are unioned) and archives the sources.
   `GET /api/achievements/merge-proposals` only *suggests* likely duplicates (same repository,
@@ -319,6 +328,10 @@ header (or open `/evidence`).
 - **Add impact** (link on this page, `/evidence/impact`) walks the queue one achievement at a time
   with its action, result and evidence quote: type the measurable outcome and **Save impact**,
   choose **No number to give** to drop it from the queue, or **Not now** to come back later.
+- On the **Approved** tab, a *Replace older extractions* panel appears once chunks have been
+  re-extracted under a newer prompt: it states how many older approved achievements can be
+  archived (and how many are kept, because you edited them or their source was not re-extracted)
+  and archives them after you confirm.
 - **Approve** is disabled with the reason shown until the achievement has evidence and no
   unconfirmed metric. **Approve all fully-evidenced…** previews the clean drafts with
   checkboxes before approving.

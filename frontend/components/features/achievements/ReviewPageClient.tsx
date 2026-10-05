@@ -14,6 +14,7 @@ import { EmployerFilter } from "./EmployerFilter";
 import { ImpactFilters } from "./ImpactFilters";
 import { MergeDialog, type MergeCandidate } from "./MergeDialog";
 import { MergeProposals } from "./MergeProposals";
+import { RetireOlderPanel } from "./RetireOlderPanel";
 import { employerRepositories } from "@/lib/draft-groups";
 import { RepositoryFilter } from "./RepositoryFilter";
 import { ReviewTabs } from "./ReviewTabs";
@@ -134,6 +135,7 @@ export function ReviewPageClient() {
       {tab === "draft" && (
         <ViewActions groups={groups} employer={employer} repository={repository} />
       )}
+      {tab === "approved" && <RetireOlderPanel />}
       {tab === "draft" && <MergeProposals onMerge={setMergePair} />}
       <AchievementList
         tab={tab}

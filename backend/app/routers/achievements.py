@@ -25,6 +25,8 @@ from app.schemas.achievement import (
     ExtractRequest,
     MergeProposalResponse,
     MergeRequest,
+    RetireOlderResult,
+    RetirePreview,
     RevisionResponse,
     SplitRequest,
 )
@@ -33,6 +35,7 @@ from app.services import (
     achievement_groups,
     achievement_impact,
     achievement_merge,
+    achievement_retire,
     achievement_review,
     achievements,
 )
@@ -152,6 +155,20 @@ async def impact_queue(
     items, total = await achievement_impact.impact_queue(session, page)
     response.headers[TOTAL_COUNT_HEADER] = str(total)
     return items
+
+
+@router.get("/achievements/older-version", response_model=RetirePreview)
+async def older_version_preview(
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> RetirePreview:
+    return await achievement_retire.preview(session)
+
+
+@router.post("/achievements/older-version/archive", response_model=RetireOlderResult)
+async def archive_older_version(
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> RetireOlderResult:
+    return await achievement_retire.retire_older(session)
 
 
 @router.get("/achievements/merge-proposals", response_model=list[MergeProposalResponse])

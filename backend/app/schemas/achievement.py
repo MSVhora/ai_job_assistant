@@ -241,6 +241,17 @@ class AchievementGroupsResponse(BaseModel):
     groups: list[EmployerGroup]
 
 
+class RetirePreview(BaseModel):
+    prompt_version: str
+    would_archive: int
+    kept_edited: int
+    kept_not_reextracted: int
+
+
+class RetireOlderResult(BaseModel):
+    archived: int
+
+
 class RevisionResponse(BaseModel):
     id: uuid.UUID
     source: str

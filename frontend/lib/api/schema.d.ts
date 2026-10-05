@@ -914,6 +914,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/achievements/older-version": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Older Version Preview */
+        get: operations["older_version_preview_api_achievements_older_version_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/achievements/older-version/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Archive Older Version */
+        post: operations["archive_older_version_api_achievements_older_version_archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/achievements/merge-proposals": {
         parameters: {
             query?: never;
@@ -3492,6 +3526,22 @@ export interface components {
             /** Parse Version */
             parse_version: string;
         };
+        /** RetireOlderResult */
+        RetireOlderResult: {
+            /** Archived */
+            archived: number;
+        };
+        /** RetirePreview */
+        RetirePreview: {
+            /** Prompt Version */
+            prompt_version: string;
+            /** Would Archive */
+            would_archive: number;
+            /** Kept Edited */
+            kept_edited: number;
+            /** Kept Not Reextracted */
+            kept_not_reextracted: number;
+        };
         /** RevisionResponse */
         RevisionResponse: {
             /**
@@ -5810,6 +5860,46 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    older_version_preview_api_achievements_older_version_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetirePreview"];
+                };
+            };
+        };
+    };
+    archive_older_version_api_achievements_older_version_archive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RetireOlderResult"];
                 };
             };
         };

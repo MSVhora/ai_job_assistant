@@ -126,7 +126,7 @@ async def test_a_chunk_becomes_a_validated_draft_with_evidence_revision_and_embe
     assert draft.metrics[0]["evidence_ids"] == [str(item_ids[0])]
     assert draft.skills == ["Python", "PostgreSQL"]
     assert draft.embedding is not None
-    assert (draft.prompt_version, draft.derived_from_private) == ("achievement_v1", False)
+    assert (draft.prompt_version, draft.derived_from_private) == ("achievement_v2", False)
     async with session_factory() as session:
         links = (await session.execute(select(AchievementEvidence))).scalars().all()
         revisions = (await session.execute(select(AchievementRevision))).scalars().all()
@@ -344,14 +344,14 @@ async def test_a_new_prompt_version_reextracts_and_supersedes_old_drafts(
     calls = llm(monkeypatch, achievement_json())
     await seed_evidence_chunk(bodies=BODIES)
     await run_once()
-    monkeypatch.setattr(achievement_extraction, "ACHIEVEMENT_PROMPT_VERSION", "achievement_v2")
+    monkeypatch.setattr(achievement_extraction, "ACHIEVEMENT_PROMPT_VERSION", "achievement_v3")
 
     await run_once()
 
     assert len(calls) == 2
     stored = {draft.prompt_version: draft for draft in await drafts()}
-    assert stored["achievement_v1"].status is AchievementStatus.archived
-    assert stored["achievement_v2"].status is AchievementStatus.draft
+    assert stored["achievement_v2"].status is AchievementStatus.archived
+    assert stored["achievement_v3"].status is AchievementStatus.draft
 
 
 async def test_one_failing_chunk_does_not_fail_the_run_and_is_retried_next_time(

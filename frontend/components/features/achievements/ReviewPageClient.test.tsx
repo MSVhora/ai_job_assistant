@@ -10,6 +10,7 @@ import {
   getAchievementGroups,
   getBulkEligible,
   getEvidenceItem,
+  getOlderVersion,
   listAchievementsPage,
   listEmployers,
   listGithubScopes,
@@ -31,6 +32,7 @@ vi.mock("@/lib/api", async (importOriginal) => ({
   getAchievementGroups: vi.fn(),
   getBulkEligible: vi.fn(),
   getEvidenceItem: vi.fn(),
+  getOlderVersion: vi.fn(),
   listEmployers: vi.fn(),
   listGithubScopes: vi.fn(),
   listAchievementsPage: vi.fn(),
@@ -52,6 +54,7 @@ describe("ReviewPageClient", () => {
       getAchievementGroups,
       getBulkEligible,
       getEvidenceItem,
+      getOlderVersion,
       listAchievementsPage,
       listEmployers,
       listGithubScopes,
@@ -65,6 +68,12 @@ describe("ReviewPageClient", () => {
     vi.mocked(listAchievementsPage).mockImplementation(() => page());
     vi.mocked(listMergeProposals).mockResolvedValue([]);
     vi.mocked(getAchievementGroups).mockResolvedValue({ groups: [] });
+    vi.mocked(getOlderVersion).mockResolvedValue({
+      prompt_version: "achievement_v2",
+      would_archive: 0,
+      kept_edited: 0,
+      kept_not_reextracted: 0,
+    });
     vi.mocked(listEmployers).mockResolvedValue([]);
     vi.mocked(listGithubScopes).mockResolvedValue([]);
     vi.mocked(listRevisions).mockResolvedValue([]);

@@ -10,6 +10,7 @@ import {
 
 import {
   addImpact,
+  archiveOlderVersion,
   bulkApprove,
   bulkReject,
   confirmMetric,
@@ -18,6 +19,7 @@ import {
   getAchievementGroups,
   getBulkEligible,
   getImpactQueue,
+  getOlderVersion,
   linkEvidence,
   listAchievementsPage,
   listMergeProposals,
@@ -74,6 +76,10 @@ export function useImpactQueue() {
   return useQuery({ queryKey: ["impact-queue"], queryFn: getImpactQueue });
 }
 
+export function useOlderVersion(enabled: boolean) {
+  return useQuery({ queryKey: ["older-version"], queryFn: getOlderVersion, enabled });
+}
+
 export function useBulkEligible(enabled: boolean) {
   return useQuery({
     queryKey: ["bulk-eligible"],
@@ -94,6 +100,7 @@ function useRefreshAchievements() {
       "bulk-eligible",
       "achievement-groups",
       "impact-queue",
+      "older-version",
     ]) {
       void queryClient.invalidateQueries({ queryKey: [key] });
     }
@@ -182,4 +189,9 @@ export function useAddImpact() {
 export function useSkipImpact() {
   const refresh = useRefreshAchievements();
   return useMutation({ mutationFn: (id: string) => skipImpact(id), onSuccess: refresh });
+}
+
+export function useArchiveOlderVersion() {
+  const refresh = useRefreshAchievements();
+  return useMutation({ mutationFn: archiveOlderVersion, onSuccess: refresh });
 }

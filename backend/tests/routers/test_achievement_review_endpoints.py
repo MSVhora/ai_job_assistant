@@ -8,7 +8,11 @@ from fakes import fake_vector, seed_achievement, seed_evidence_chunk
 from httpx import ASGITransport, AsyncClient
 
 from app.core.config import get_settings
+from app.core.db import session_factory
 from app.main import app
+from app.models import EvidenceChunk
+from app.services.achievement_extraction import ACHIEVEMENT_PROMPT_VERSION
+from app.services.evidence_pipeline.dedupe import digest
 
 pytestmark = pytest.mark.usefixtures("clean_tables")
 
@@ -334,6 +338,35 @@ async def test_skipping_impact_removes_it_from_the_queue_until_a_number_is_added
     assert len(revisions) == 1
     assert "impact_skipped" not in after["review_flags"]
     assert (await client.post(f"/api/achievements/{uuid.uuid4()}/skip-impact")).status_code == 404
+
+
+async def test_older_version_routes_preview_then_archive(client: AsyncClient) -> None:
+    candidate_id, chunk_id, items = await seed_evidence_chunk(bodies=BODIES)
+    async with session_factory() as session:
+        chunk = await session.get_one(EvidenceChunk, chunk_id)
+        chunk.extracted_hash = digest(chunk.content_hash, ACHIEVEMENT_PROMPT_VERSION)
+        source_hash = chunk.content_hash
+        await session.commit()
+    old = await seed_achievement(
+        candidate_id,
+        item_ids=items[:1],
+        status="approved",
+        prompt_version="achievement_v1",
+        source_chunk_hash=source_hash,
+    )
+
+    preview = (await client.get("/api/achievements/older-version")).json()
+    done = (await client.post("/api/achievements/older-version/archive")).json()
+    after = (await client.get(f"/api/achievements/{old}")).json()
+
+    assert preview == {
+        "prompt_version": ACHIEVEMENT_PROMPT_VERSION,
+        "would_archive": 1,
+        "kept_edited": 0,
+        "kept_not_reextracted": 0,
+    }
+    assert done == {"archived": 1}
+    assert after["status"] == "archived"
 
 
 async def test_bulk_approval_routes_preview_then_commit(client: AsyncClient) -> None:

@@ -374,6 +374,9 @@ async def seed_achievement(
     skills: "list[str] | None" = None,
     employer_ref: "dict[str, Any] | None" = None,
     impact_type: str = "performance",
+    prompt_version: str | None = None,
+    source_chunk_hash: str | None = None,
+    edited: bool = False,
 ) -> "uuid.UUID":
     """Seed an achievement linked (first one primary) to the given evidence items."""
     from datetime import UTC, date, datetime
@@ -402,6 +405,9 @@ async def seed_achievement(
             derived_from_private=private,
             evidence_stale_at=datetime.now(UTC) if stale else None,
             employer_ref=employer_ref,
+            prompt_version=prompt_version,
+            source_chunk_hash=source_chunk_hash,
+            edited_by_user=edited,
         )
         session.add(achievement)
         await session.flush()

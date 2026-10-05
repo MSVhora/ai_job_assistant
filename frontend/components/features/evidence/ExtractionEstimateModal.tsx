@@ -38,6 +38,12 @@ export function ExtractionEstimateModal({
             <li>{estimate.chunks_to_extract} chunks will be sent to your LLM provider.</li>
             <li>{estimate.chunks_cached} are already cached and cost nothing.</li>
             <li>{estimate.chunks_up_to_date} are up to date and skipped.</li>
+            {estimate.chunks_skipped_short > 0 && (
+              <li>
+                {estimate.chunks_skipped_short} are too short to hold an achievement and are left
+                out.
+              </li>
+            )}
           </ul>
           <p aria-live="polite">
             Estimated cost: ≈ {tokens.toLocaleString()} tokens,{" "}

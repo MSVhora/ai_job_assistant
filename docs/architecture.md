@@ -46,7 +46,7 @@ Non-negotiable layering rules (enforced by the
   neither knows the model), logs `cost_usd` on every call and backs the confirm-gated
   cost estimates; it routes a model per task (`LLMTask`: classify, extract, write, judge, each
   with an optional `LLM_MODEL_<TASK>` override, falling back to `LLM_MODEL`), caps concurrent
-  provider calls (`LLM_MAX_CONCURRENCY`, one semaphore per event loop) and meters tokens and
+  provider calls (`LLM_MAX_CONCURRENCY`, default 4, one semaphore per event loop) and meters tokens and
   cost per run (`usage_meter()`). Around it, `services/redaction.py` strips emails, phone
   numbers, IPs, tokens and keys from evidence text before it is sent or cached, and
   `services/llm_cache.py` caches structured outputs in `llm_output_cache` keyed by a SHA-256 of

@@ -91,6 +91,7 @@ class ExtractionEstimateResponse(BaseModel):
     chunks_up_to_date: int
     chunks_cached: int
     chunks_to_extract: int
+    chunks_skipped_short: int = 0
     llm_cost: CostEstimateResponse
     embedding_cost: CostEstimateResponse
     total_usd: float | None

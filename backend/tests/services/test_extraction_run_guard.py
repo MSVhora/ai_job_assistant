@@ -22,6 +22,7 @@ pytestmark = pytest.mark.usefixtures("clean_tables")
 @pytest.fixture(autouse=True)
 def _key(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(get_settings(), "gemini_api_key", "test-key")
+    monkeypatch.setattr(get_settings(), "extraction_min_chunk_chars", 0)
 
 
 async def _start(estimate_id: str) -> uuid.UUID:

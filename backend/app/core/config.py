@@ -40,7 +40,11 @@ class Settings(BaseSettings):
     llm_model_extract: str | None = None
     llm_model_write: str | None = None
     llm_model_judge: str | None = None
-    llm_max_concurrency: Annotated[int, Field(ge=1, le=16)] = 2
+    llm_max_concurrency: Annotated[int, Field(ge=1, le=16)] = 4
+    # Extraction runs this many chunks at once (bounded by llm_max_concurrency and the DB pool);
+    # chunks shorter than the minimum carry too little to extract and are skipped (0 = none).
+    extraction_concurrency: Annotated[int, Field(ge=1, le=8)] = 4
+    extraction_min_chunk_chars: Annotated[int, Field(ge=0, le=5000)] = 200
     evidence_redaction_enabled: bool = True
     # Optional USD-per-million-token overrides for models LiteLLM's price map lacks or has stale.
     llm_price_in_per_mtok: Annotated[float | None, Field(ge=0)] = None
@@ -99,6 +103,8 @@ class Settings(BaseSettings):
     # is kept in .env only; the request budget and rate-limit floor pause a run before GitHub does.
     github_token: str | None = None
     github_api_url: str = "https://api.github.com"
+    # Repositories synced at once; the shared request budget and rate-limit floor still apply.
+    evidence_sync_concurrency: Annotated[int, Field(ge=1, le=6)] = 3
     github_max_requests_per_run: Annotated[int, Field(ge=1, le=5000)] = 1500
     github_min_remaining_pct: Annotated[int, Field(ge=0, le=90)] = 10
     evidence_lookback_years: Annotated[int, Field(ge=1, le=30)] = 6

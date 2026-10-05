@@ -184,3 +184,36 @@ async def test_resume_generation_flow_logs_no_jd_comment_prompt_or_evidence_text
     for call in prompts:
         for message in call["messages"]:
             assert message["content"][:80] not in logged
+
+
+async def test_agent_flow_logs_no_evidence_text_questions_or_prompts(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    from fakes import FakeAgentLLM, install_agent_embeddings, seed_resume_world
+
+    caplog.set_level(logging.DEBUG)
+    for name, existing in logging.root.manager.loggerDict.items():
+        if name.startswith("app") and isinstance(existing, logging.Logger):
+            existing.disabled = False
+    llm = FakeAgentLLM()
+    prompts = install_acompletion(monkeypatch, llm)
+    install_agent_embeddings(monkeypatch)
+    world = await seed_resume_world(embeddings=True)
+    question = (
+        f"Tell me about a time you made something faster: Faster nightly import {RESUME_MARKER}"
+    )
+
+    created = await client.post("/api/agent/sessions", json={"profile_id": str(world["profile"])})
+    sent = await client.post(
+        f"/api/agent/sessions/{created.json()['id']}/messages", json={"content": question}
+    )
+
+    assert (created.status_code, sent.status_code) == (201, 200)
+    assert prompts, "the flow must have exercised the LLM wrapper"
+    logged = "\n".join(record.getMessage() for record in caplog.records)
+    assert "agent.answer" in logged
+    assert "cost_usd=" in logged
+    assert RESUME_MARKER not in logged
+    assert "batching writes in Python" not in logged
+    assert API_KEY not in logged
+    assert not KEY_SHAPED.search(logged)

@@ -86,7 +86,7 @@ async def test_updated_at_trigger_and_set_null_migrations_round_trip(
         assert await _updated_at_triggers() == 0
 
         await _alembic("upgrade", "head")
-        assert await _updated_at_triggers() == 12
+        assert await _updated_at_triggers() == 13
         assert await _canonical_fk_delete_action() == "n"
     finally:
         await _alembic("upgrade", "head")
@@ -100,7 +100,7 @@ async def test_evidence_core_migration_round_trip(migrated_database: None) -> No
 
         await _alembic("upgrade", "head")
         assert await _evidence_objects() == (6, 4, 1)
-        assert await _updated_at_triggers() == 12
+        assert await _updated_at_triggers() == 13
     finally:
         await _alembic("upgrade", "head")
 
@@ -146,7 +146,7 @@ async def test_achievements_migration_round_trip(migrated_database: None) -> Non
 
         await _alembic("upgrade", "head")
         assert await achievement_objects() == (4, 3, 1)
-        assert await _updated_at_triggers() == 12
+        assert await _updated_at_triggers() == 13
     finally:
         await _alembic("upgrade", "head")
 
@@ -187,7 +187,7 @@ async def test_resume_document_migration_round_trip_and_checks(migrated_database
 
         await _alembic("upgrade", "head")
         assert await resume_objects() == (2, 1)
-        assert await _updated_at_triggers() == 12
+        assert await _updated_at_triggers() == 13
 
         profile_id = await seed_profile_light()
         await insert(profile_id, 1, 0)
@@ -251,6 +251,27 @@ async def test_resume_document_generation_migration_round_trip(migrated_database
         async with session_factory() as session:
             await session.execute(text("TRUNCATE profile, candidate, resume_document CASCADE"))
             await session.commit()
+        await _alembic("upgrade", "head")
+
+
+async def test_agent_session_migration_round_trips(migrated_database: None) -> None:
+    async def tables() -> set[str]:
+        async with session_factory() as session:
+            rows = await session.execute(
+                text(
+                    "SELECT table_name FROM information_schema.tables"
+                    " WHERE table_name IN ('agent_session', 'agent_message')"
+                )
+            )
+            return {row[0] for row in rows}
+
+    try:
+        await _alembic("downgrade", "0030")
+        assert await tables() == set()
+
+        await _alembic("upgrade", "head")
+        assert await tables() == {"agent_session", "agent_message"}
+    finally:
         await _alembic("upgrade", "head")
 
 

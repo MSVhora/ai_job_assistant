@@ -265,6 +265,71 @@ the included / not-included lists in `resume_document.layout`. If nothing fits, 
 the layout is empty with a warning. `POST …/fit` re-fits on demand (layout only) and `POST …/render`
 fits again and returns the PDF, which is never stored.
 
+### Interview agent (sequence)
+
+See [guide 05](guide/05-interview-agent.md). A turn is one synchronous request — no streaming, no
+tools — in `services/agent.py`. Only `approved` achievements and the evidence linked to them are
+ever read; a question the evidence cannot answer gets a fixed reply instead of a model call.
+
+<!-- diagram: interview-agent-sequence -->
+```mermaid
+sequenceDiagram
+    participant B as Browser
+    participant A as FastAPI
+    participant G as LLM (LiteLLM)
+    participant D as Postgres
+
+    B->>A: POST /api/agent/sessions/{id}/messages
+    A->>D: persist the user message
+    A->>A: route by rules (intro, behavioral, technical, motivation, hypothetical, out_of_scope)
+    opt no rule fires
+        A->>G: classify task (cheap model)
+    end
+    opt follow-up with history
+        A->>G: rewrite to a standalone question (classify task)
+    end
+    A->>D: approved achievements, hybrid score (cosine, skills, recency, impact), top 6
+    A->>D: linked evidence items and top-2 chunks per achievement (drill-down)
+    alt nothing above AGENT_MIN_RETRIEVAL_SCORE, or a motivation question with no job
+        A-->>B: fixed no-evidence reply (no model call)
+    else
+        A->>G: write task - fenced blocks [P] [J] [A#] [E#], answer with inline markers
+        A->>A: validate - markers resolve, numbers/versions/tools/ownership in cited text
+        A->>G: judge task - entailment of each cited sentence
+        opt a sentence fails
+            A->>G: write task - one repair round-trip
+            A->>A: re-validate, drop what still fails
+        end
+        A->>D: persist the answer, citations, grounding report, usage
+        opt turns fell out of the window
+            A->>G: classify task - fold into the rolling summary
+        end
+        A-->>B: answer + citations + grounding
+    end
+```
+
+![interview-agent-sequence diagram](./assets/interview-agent-sequence.svg)
+
+Retrieval (`services/agent_retrieval.py`) scores each approved achievement as
+`0.55·cosine + 0.25·skill overlap + 0.10·recency + 0.10·impact` (weights in `Settings`, summing to
+1), narrows to the project or employer the question names, and keeps the top six above the floor.
+An intro skips the query and takes the three highest impact/recency achievements. Context blocks
+get short markers: `[A#]` achievement, `[E#]` evidence item (with its best chunk text appended),
+`[P]` the profile's identity facts (built in code from `structured_profile`, never generated), and
+`[J]` the pinned match's posting and rationale, which can describe the job but never back a claim
+about the candidate. Evidence is redacted before it reaches a prompt and fenced as untrusted data.
+
+`services/agent_grounding.py` is the guardrail. An uncited sentence that states a fact (a number, a
+tool, a first-person past-tense claim, or any statement outside a short list of hedges and offers)
+is flagged; so is a cited sentence whose number, version, year, tool or ownership verb (led, owned,
+architected…) is absent from the cited text (the same checks the resume writer uses), and one the
+`judge` model finds unsupported. One repair call rewrites the answer; what still fails is dropped,
+and an answer with nothing left becomes the fixed refusal. The grounding report
+(`grounded | partial | refused | not_applicable`, the dropped sentences, `used_private`) is stored
+on the message, as are the citations and token usage. `agent_memory.py` keeps the last
+`AGENT_HISTORY_TURNS` turns verbatim and folds older ones into `agent_session.summary`; a summary
+that adds a number or tool absent from what it folds is replaced by a plain list of the questions.
+
 Search runs start **only** from an explicit `POST /api/jobs/search` — never automatically —
 and are tracked in `job_search` (status + per-source `{source, status, count, warning}`
 outcomes, queryable via `GET /api/jobs/searches/{id}`). A failing source is a run warning,
@@ -406,7 +471,7 @@ never a run failure. With no salary floor set the connector also sends
 Source of truth: `backend/app/models/` + Alembic migrations. See
 [plan §4](plans/v1/v1-implementation-plan.md#4-data-model) for the data model narrative.
 
-`updated_at` on `candidate`, `profile`, `job_search`, `match`, `match_rebuild` and (since `0026`) `resume_document` is maintained by a
+`updated_at` on `candidate`, `profile`, `job_search`, `match`, `match_rebuild`, (since `0026`) `resume_document` and (since `0031`) `agent_session` is maintained by a
 `set_updated_at()` database trigger (migration `0021`), so bulk `UPDATE`s bump it too; an update that
 changes nothing leaves it alone, and one that sets it explicitly keeps that value. New tables with the
 column add the trigger through `app/core/migration_helpers.py`. `job_posting.canonical_id` is
@@ -442,6 +507,10 @@ erDiagram
     profile ||--o{ resume_document : "tailored from (CASCADE)"
     match |o--o{ resume_document : "job description from (SET NULL)"
     resume_document ||--o{ resume_document_revision : "snapshots (newest 20)"
+    candidate ||--o{ agent_session : "owns"
+    profile ||--o{ agent_session : "practised for (CASCADE)"
+    match |o--o{ agent_session : "job context from (SET NULL)"
+    agent_session ||--o{ agent_message : "turns (CASCADE)"
 
     candidate {
         uuid id PK
@@ -738,6 +807,31 @@ erDiagram
         jsonb content
         varchar source "create | manual_edit | generate | bullet_edit | apply_comments"
         timestamptz created_at
+    }
+
+    agent_session {
+        uuid id PK
+        uuid candidate_id FK "RESTRICT"
+        uuid profile_id FK "CASCADE"
+        uuid match_id FK "SET NULL, nullable"
+        varchar title
+        text style_notes "tone only, nullable"
+        text summary "rolling memory of older turns, nullable"
+        integer summarized_through "messages already folded into the summary"
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    agent_message {
+        uuid id PK
+        uuid session_id FK "CASCADE"
+        agent_role role "user | assistant"
+        text content
+        varchar question_type "nullable"
+        jsonb citations "marker, kind, achievement_id, evidence_item_id, url, quote, private"
+        jsonb grounding "status, flagged sentences, gaps, repaired, used_private"
+        jsonb usage "calls, tokens, cost_usd"
+        timestamptz created_at "clock_timestamp()"
     }
 
     llm_output_cache {

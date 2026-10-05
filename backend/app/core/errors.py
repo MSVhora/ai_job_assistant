@@ -221,6 +221,11 @@ class InvalidCommentTargetError(DomainError):
     default_detail = "the comment must target a section or bullet of this document"
 
 
+class AgentSessionNotFoundError(DomainError):
+    status_code = 404
+    default_detail = "interview session not found"
+
+
 class CannotFitError(DomainError):
     status_code = 422
     default_detail = (

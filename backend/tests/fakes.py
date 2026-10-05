@@ -779,3 +779,161 @@ async def seed_employers(*companies: str) -> None:
         ]
         profile.structured_profile = data
         await session.commit()
+
+
+class FakeAgentLLM:
+    """Scripted completion handler for the interview agent's prompts."""
+
+    def __init__(
+        self,
+        *,
+        classify: str = "behavioral",
+        answer: "Callable[[str, dict[str, str]], str] | None" = None,
+        repair: "Callable[[str, dict[str, str]], str] | None" = None,
+        judge_fail: "set[str] | None" = None,
+        judge_error: bool = False,
+        summary: str = "The candidate practised a behavioural question.",
+        rewrite: "Callable[[str], str] | None" = None,
+    ) -> None:
+        self.classify = classify
+        self.answer = answer
+        self.repair = repair
+        self.judge_fail = judge_fail or set()
+        self.judge_error = judge_error
+        self.summary = summary
+        self.rewrite = rewrite
+        self.calls: list[dict[str, Any]] = []
+
+    def count(self, kind: str) -> int:
+        return sum(1 for call in self.calls if call["kind"] == kind)
+
+    def prompts(self, kind: str) -> list[str]:
+        return [call["prompt"] for call in self.calls if call["kind"] == kind]
+
+    @staticmethod
+    def blocks(prompt: str) -> dict[str, str]:
+        return {
+            match.group(1): match.group(2)
+            for match in re.finditer(
+                r"<<<BLOCK \[(\w+)\][^\n]*\n(.*?)\nBLOCK \[\w+\]>>>", prompt, re.DOTALL
+            )
+        }
+
+    def __call__(self, **kwargs: Any) -> object:
+        system = kwargs["messages"][0]["content"]
+        prompt = kwargs["messages"][-1]["content"]
+        if "classify one interview question" in system:
+            self.calls.append({"kind": "classify", "prompt": prompt})
+            return llm_response(json.dumps({"type": self.classify}))
+        if "rewrite an interview follow-up" in system:
+            self.calls.append({"kind": "rewrite", "prompt": prompt})
+            question = prompt.rsplit("Follow-up question: ", 1)[1].split("\n")[0]
+            return llm_response(self.rewrite(question) if self.rewrite else question)
+        if "answer interview questions for a candidate" in system:
+            return llm_response(json.dumps(self._answer(prompt)))
+        if "check sentences of an interview answer" in system:
+            if self.judge_error:
+                self.calls.append({"kind": "judge", "prompt": prompt})
+                return ProviderError(400)
+            return llm_response(json.dumps(self._judge(prompt)))
+        if "running summary" in system:
+            self.calls.append({"kind": "summary", "prompt": prompt})
+            return llm_response(self.summary)
+        msg = "unexpected prompt"
+        raise AssertionError(msg)
+
+    def _answer(self, prompt: str) -> dict[str, Any]:
+        blocks = self.blocks(prompt)
+        if prompt.startswith("Your previous answer failed verification"):
+            self.calls.append({"kind": "repair", "prompt": prompt})
+            handler = self.repair
+        else:
+            self.calls.append({"kind": "answer", "prompt": prompt})
+            handler = self.answer
+        if handler is not None:
+            return {"answer": handler(prompt, blocks), "gaps": []}
+        first = next((key for key in blocks if key.startswith("A")), None)
+        if first is None:
+            return {"answer": "", "gaps": ["no evidence"]}
+        title = blocks[first].split("\n", 1)[0].removeprefix("Title: ")
+        return {"answer": f"I worked on {title.lower()} [{first}].", "gaps": []}
+
+    def _judge(self, prompt: str) -> dict[str, Any]:
+        sentences = re.findall(r"Sentence (\d+): (.*)", prompt)
+        self.calls.append({"kind": "judge", "prompt": prompt, "sentences": sentences})
+        verdicts = [
+            {
+                "index": int(index),
+                "entailed": not any(marker in text for marker in self.judge_fail),
+                "reason": "unsupported claim",
+            }
+            for index, text in sentences
+        ]
+        return {"verdicts": verdicts}
+
+
+def install_agent_embeddings(monkeypatch: Any) -> list[dict[str, Any]]:
+    """Embed any text containing a seeded achievement title as that title's vector."""
+    titles = [spec["title"] for spec in WORLD_ACHIEVEMENTS]
+
+    def handler(**kwargs: Any) -> object:
+        vectors = []
+        for text in kwargs["input"]:
+            title = next((t for t in titles if t.lower() in text.lower()), text)
+            vectors.append(fake_vector(title))
+        return embedding_response(vectors)
+
+    return install_aembedding(monkeypatch, handler)
+
+
+async def seed_match(
+    profile_id: "uuid.UUID",
+    *,
+    description: str = "Build Kafka and Airflow pipelines for the data platform team.",
+    rationale: str | None = "Strong Python and pipeline background.",
+) -> "uuid.UUID":
+    from app.core.db import session_factory
+    from app.models import JobPosting, Match
+
+    async with session_factory() as session:
+        posting = JobPosting(
+            source="adzuna",
+            external_id=hashlib.sha256(description.encode()).hexdigest()[:20],
+            title="Data Engineer",
+            company="Initech",
+            url="https://jobs.example.com/1",
+            description=description,
+            raw_payload={},
+        )
+        session.add(posting)
+        await session.flush()
+        match = Match(
+            profile_id=profile_id,
+            job_posting_id=posting.id,
+            final_score=0.8,
+            rationale=rationale,
+        )
+        session.add(match)
+        await session.flush()
+        match_id: uuid.UUID = match.id
+        await session.commit()
+        return match_id
+
+
+async def new_agent_session(
+    profile_id: "uuid.UUID",
+    *,
+    match_id: "uuid.UUID | None" = None,
+    style_notes: str | None = None,
+) -> "uuid.UUID":
+    from app.core.db import session_factory
+    from app.schemas.agent import AgentSessionCreate
+    from app.services import agent
+
+    async with session_factory() as session:
+        created = await agent.create_session(
+            session,
+            AgentSessionCreate(profile_id=profile_id, match_id=match_id, style_notes=style_notes),
+        )
+        await session.commit()
+        return created.id

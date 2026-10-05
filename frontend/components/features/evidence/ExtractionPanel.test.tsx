@@ -34,6 +34,7 @@ function estimate(overrides: Partial<ExtractionEstimate> = {}): ExtractionEstima
     chunks_up_to_date: 4,
     chunks_cached: 1,
     chunks_to_extract: 5,
+    chunks_skipped_short: 0,
     llm_cost: {
       prompt_tokens: 4000,
       completion_tokens: 2000,

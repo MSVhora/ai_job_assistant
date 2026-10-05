@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import json
 import logging
@@ -16,6 +17,7 @@ from app.adapters.llm import (
     CostEstimate,
     LLMError,
     LLMTask,
+    StructuredResult,
     UsageMeter,
     estimate_cost,
     estimate_structured_cost,
@@ -88,9 +90,13 @@ class _Label:
     line: str
 
 
+ALWAYS_EXTRACTED = frozenset({"note", "resume_entry"})
+
+
 @dataclass(frozen=True)
 class _Unit:
     chunk_id: uuid.UUID
+    kind: str
     project_key: str | None
     title: str | None
     text: str
@@ -179,6 +185,7 @@ async def _load_units(session: AsyncSession, candidate_id: uuid.UUID) -> list[_U
         units.append(
             _Unit(
                 chunk_id=chunk.id,
+                kind=chunk.kind,
                 project_key=chunk.project_key,
                 title=chunk.title,
                 text=chunk.text,
@@ -192,6 +199,20 @@ async def _load_units(session: AsyncSession, candidate_id: uuid.UUID) -> list[_U
             )
         )
     return units
+
+
+def _split_pending(units: list[_Unit]) -> tuple[list[_Unit], int]:
+    """(chunks to extract, how many outstanding chunks are too short to be worth a call).
+
+    Your own notes and resume lines are never skipped. A short chunk is not marked extracted, so
+    lowering `EXTRACTION_MIN_CHUNK_CHARS` brings it back.
+    """
+    minimum = get_settings().extraction_min_chunk_chars
+    outstanding = [unit for unit in units if unit.extracted_hash != unit.key]
+    worth = [
+        unit for unit in outstanding if unit.kind in ALWAYS_EXTRACTED or len(unit.text) >= minimum
+    ]
+    return worth, len(outstanding) - len(worth)
 
 
 def _sum_estimates(estimates: list[CostEstimate], model: str) -> CostEstimate:
@@ -223,7 +244,7 @@ async def estimate(session: AsyncSession) -> ExtractionEstimateResponse:
     """What an extraction would cost, computed from the real chunk prompts (nothing is sent)."""
     candidate_id = await candidate_id_or_none(session)
     units = [] if candidate_id is None else await _load_units(session, candidate_id)
-    pending = [unit for unit in units if unit.extracted_hash != unit.key]
+    pending, skipped = _split_pending(units)
     keys = [unit.cache_key for unit in pending]
     cached: set[str] = (
         set(
@@ -257,7 +278,8 @@ async def estimate(session: AsyncSession) -> ExtractionEstimateResponse:
     return ExtractionEstimateResponse(
         estimate_id=_estimate_id(pending),
         chunks_total=len(units),
-        chunks_up_to_date=len(units) - len(pending),
+        chunks_up_to_date=len(units) - len(pending) - skipped,
+        chunks_skipped_short=skipped,
         chunks_cached=len(pending) - len(to_call),
         chunks_to_extract=len(to_call),
         llm_cost=CostEstimateResponse.from_estimate(llm),
@@ -473,11 +495,21 @@ async def _mark_extracted(session: AsyncSession, unit: _Unit) -> None:
         chunk.extracted_hash = unit.key
 
 
-async def _process_unit(
-    candidate_id: uuid.UUID, unit: _Unit, context: ProfileFacts, meter: UsageMeter
-) -> _UnitResult:
+async def _process_unit(candidate_id: uuid.UUID, unit: _Unit, context: ProfileFacts) -> _UnitResult:
     result = _UnitResult()
-    hits_before = meter.cache_hits
+    called = False
+
+    async def call() -> StructuredResult[ExtractionBatch]:
+        nonlocal called
+        called = True
+        return await parse_structured(
+            unit.prompt,
+            schema=ExtractionBatch,
+            system=SYSTEM_PROMPT,
+            temperature=0.0,
+            task=LLMTask.extract,
+        )
+
     async with session_factory() as session:
         existing = await _existing_for_chunk(session, candidate_id, unit)
         if any(row.prompt_version == ACHIEVEMENT_PROMPT_VERSION for row in existing):
@@ -492,19 +524,13 @@ async def _process_unit(
                 prompt_version=ACHIEVEMENT_PROMPT_VERSION,
                 key_parts=unit.cache_parts,
                 schema=ExtractionBatch,
-                call=lambda: parse_structured(
-                    unit.prompt,
-                    schema=ExtractionBatch,
-                    system=SYSTEM_PROMPT,
-                    temperature=0.0,
-                    task=LLMTask.extract,
-                ),
+                call=call,
             )
         except LLMError:
             await session.rollback()
             result.failed = True
             return result
-        result.cached = meter.cache_hits > hits_before
+        result.cached = not called
         _supersede(session, existing)
         labels = {label.label for label in unit.labels}
         built: list[
@@ -612,6 +638,37 @@ async def _reconcile_stale(session: AsyncSession, candidate_id: uuid.UUID) -> No
             achievement.evidence_stale_at = now
 
 
+async def _extract_concurrently(
+    run_id: uuid.UUID,
+    candidate_id: uuid.UUID,
+    pending: list[_Unit],
+    context: ProfileFacts,
+    counters: _Counters,
+    meter: UsageMeter,
+) -> None:
+    """Run chunks a few at a time. Each chunk owns its session; the counters, the run row and the
+    meter are only touched on the event loop, and progress is written under a lock."""
+    gate = asyncio.Semaphore(get_settings().extraction_concurrency)
+    progress = asyncio.Lock()
+
+    async def work(unit: _Unit) -> None:
+        async with gate:
+            outcome = await _process_unit(candidate_id, unit, context)
+        async with progress:
+            counters.done += 1
+            counters.failed += 1 if outcome.failed else 0
+            counters.cached += 1 if outcome.cached else 0
+            counters.achievements += outcome.created
+            counters.rejected += outcome.rejected
+            counters.flagged += outcome.flagged
+            counters.embed_failed += outcome.embed_failed
+            await _record_progress(run_id, counters, meter)
+
+    async with asyncio.TaskGroup() as group:
+        for unit in pending:
+            group.create_task(work(unit))
+
+
 async def run_extraction(run_id: uuid.UUID) -> None:
     started = time.monotonic()
     async with session_factory() as session:
@@ -624,26 +681,18 @@ async def run_extraction(run_id: uuid.UUID) -> None:
         candidate_id = run.candidate_id
         units = await _load_units(session, candidate_id)
         context = await load_profile_facts(session, candidate_id)
-    pending = [unit for unit in units if unit.extracted_hash != unit.key]
+    pending, skipped = _split_pending(units)
     counters = _Counters(total=len(pending))
     with usage_meter() as meter:
-        for unit in pending:
-            outcome = await _process_unit(candidate_id, unit, context, meter)
-            counters.done += 1
-            counters.failed += 1 if outcome.failed else 0
-            counters.cached += 1 if outcome.cached else 0
-            counters.achievements += outcome.created
-            counters.rejected += outcome.rejected
-            counters.flagged += outcome.flagged
-            counters.embed_failed += outcome.embed_failed
-            await _record_progress(run_id, counters, meter)
+        await _extract_concurrently(run_id, candidate_id, pending, context, counters, meter)
     status = await _finish(run_id, candidate_id, counters)
     logger.info(
-        "achievements.done run_id=%s status=%s chunks=%d achievements=%d failed=%d "
-        "duration_ms=%.0f",
+        "achievements.done run_id=%s status=%s chunks=%d skipped_short=%d achievements=%d "
+        "failed=%d duration_ms=%.0f",
         run_id,
         status.value,
         counters.total,
+        skipped,
         counters.achievements,
         counters.failed,
         (time.monotonic() - started) * 1000,

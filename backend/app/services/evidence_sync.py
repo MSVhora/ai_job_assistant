@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import json
 import logging
@@ -642,14 +643,32 @@ class _ScopeResult:
     paused: EvidenceSourcePausedError | None = None
 
 
+async def _commit_progress(
+    session: AsyncSession,
+    run: EvidenceSyncRun,
+    lock: asyncio.Lock,
+    ref: str,
+    page: SyncPage | None,
+    update: dict[str, object],
+) -> None:
+    """Merge into the run row and commit. Scopes sync concurrently and share this one JSON row, so
+    each write re-reads it under the lock instead of overwriting another scope's entry."""
+    async with lock:
+        await session.refresh(run, attribute_names=["progress", "usage", "rate_limit"])
+        _merge_progress(run, ref, page, update)
+        await session.commit()
+
+
 async def _sync_scope(
     run_id: uuid.UUID,
     scope_id: uuid.UUID,
     candidate_id: uuid.UUID,
     source: EvidenceSource,
     mode: SyncMode,
+    lock: asyncio.Lock,
 ) -> _ScopeResult:
     result = _ScopeResult()
+    started = time.monotonic()
     async with session_factory() as session:
         scope = await session.get(EvidenceScope, scope_id)
         run = await session.get(EvidenceSyncRun, run_id)
@@ -659,8 +678,9 @@ async def _sync_scope(
         if mode == "full":
             scope.cursor = {}
         scope.sync_state = SyncStatus.running
-        _merge_progress(run, ref, None, {"status": "running", "items": 0, "filtered": 0})
-        await session.commit()
+        await _commit_progress(
+            session, run, lock, ref, None, {"status": "running", "items": 0, "filtered": 0}
+        )
         state = ScopeState(
             ref=ref,
             is_private=scope.is_private,
@@ -675,20 +695,37 @@ async def _sync_scope(
                 filtered += dropped
                 if page.next_cursor is not None:
                     scope.cursor = page.next_cursor
-                _merge_progress(
-                    run, ref, page, {"status": "running", "items": stored, "filtered": filtered}
+                await _commit_progress(
+                    session,
+                    run,
+                    lock,
+                    ref,
+                    page,
+                    {"status": "running", "items": stored, "filtered": filtered},
                 )
-                await session.commit()
             await _attach_squash_commits(session, candidate_id, ref)
             scope.sync_state = SyncStatus.succeeded
             scope.last_synced_at = datetime.now(UTC)
-            _merge_progress(run, ref, None, {"status": "ok", "items": stored, "filtered": filtered})
-            await session.commit()
+            await _commit_progress(
+                session,
+                run,
+                lock,
+                ref,
+                None,
+                {"status": "ok", "items": stored, "filtered": filtered},
+            )
             result.items = stored
+            logger.info(
+                "evidence.scope done ref=%s items=%d filtered=%d duration_ms=%.0f",
+                ref,
+                stored,
+                filtered,
+                (time.monotonic() - started) * 1000,
+            )
         except EvidenceSourcePausedError as exc:
             await session.rollback()
             await _mark_scope(
-                session, scope_id, run_id, _Mark(SyncStatus.paused, "paused", exc.reason)
+                session, scope_id, run_id, _Mark(SyncStatus.paused, "paused", exc.reason), lock
             )
             result.items = stored
             result.paused = exc
@@ -697,7 +734,7 @@ async def _sync_scope(
             warning = str(exc) if isinstance(exc, EvidenceSourceError) else STORAGE_WARNING
             logger.warning("evidence.scope failed error_type=%s", type(exc).__name__)
             await _mark_scope(
-                session, scope_id, run_id, _Mark(SyncStatus.failed, "failed", warning)
+                session, scope_id, run_id, _Mark(SyncStatus.failed, "failed", warning), lock
             )
             result.items = stored
             result.warning = f"{ref}: {warning}"
@@ -712,15 +749,52 @@ class _Mark:
 
 
 async def _mark_scope(
-    session: AsyncSession, scope_id: uuid.UUID, run_id: uuid.UUID, mark: _Mark
+    session: AsyncSession,
+    scope_id: uuid.UUID,
+    run_id: uuid.UUID,
+    mark: _Mark,
+    lock: asyncio.Lock,
 ) -> None:
     scope = await session.get(EvidenceScope, scope_id)
     run = await session.get(EvidenceSyncRun, run_id)
     if scope is None or run is None:
         return
     scope.sync_state = mark.state
-    _merge_progress(run, scope.ref, None, {"status": mark.label, "warning": mark.warning})
-    await session.commit()
+    await _commit_progress(
+        session, run, lock, scope.ref, None, {"status": mark.label, "warning": mark.warning}
+    )
+
+
+async def _sync_scopes(
+    run_id: uuid.UUID,
+    scope_ids: list[uuid.UUID],
+    candidate_id: uuid.UUID,
+    source: EvidenceSource,
+    mode: SyncMode,
+    outcome: _RunOutcome,
+) -> None:
+    """Sync a few repositories at once. Once any of them pauses (rate limit, request budget) no
+    further repository is started; those already running finish or pause on their own."""
+    gate = asyncio.Semaphore(get_settings().evidence_sync_concurrency)
+    lock = asyncio.Lock()
+
+    async def work(scope_id: uuid.UUID) -> None:
+        async with gate:
+            if outcome.paused is not None:
+                return
+            scope_result = await _sync_scope(run_id, scope_id, candidate_id, source, mode, lock)
+        outcome.items += scope_result.items
+        if scope_result.paused is not None:
+            outcome.paused = outcome.paused or scope_result.paused
+        elif scope_result.warning is not None:
+            outcome.scopes_failed += 1
+            outcome.warnings.append(scope_result.warning)
+        else:
+            outcome.scopes_ok += 1
+
+    async with asyncio.TaskGroup() as group:
+        for scope_id in scope_ids:
+            group.create_task(work(scope_id))
 
 
 async def run_sync(run_id: uuid.UUID, mode: SyncMode) -> None:
@@ -749,17 +823,7 @@ async def run_sync(run_id: uuid.UUID, mode: SyncMode) -> None:
         )
     outcome = _RunOutcome()
     source = registry.get_source(SOURCE_KIND)
-    for scope_id in scope_ids:
-        scope_result = await _sync_scope(run_id, scope_id, candidate_id, source, mode)
-        outcome.items += scope_result.items
-        if scope_result.paused is not None:
-            outcome.paused = scope_result.paused
-            break
-        if scope_result.warning is not None:
-            outcome.scopes_failed += 1
-            outcome.warnings.append(scope_result.warning)
-        else:
-            outcome.scopes_ok += 1
+    await _sync_scopes(run_id, scope_ids, candidate_id, source, mode, outcome)
     if outcome.scopes_ok or outcome.paused is not None:
         outcome.chunks = await _rebuild_chunks(candidate_id)
         outcome.stale_flagged = await _flag_stale(candidate_id)

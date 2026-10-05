@@ -1,6 +1,7 @@
 import asyncio
 import uuid
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import pytest
 from fakes import ScriptedEvidenceSource, install_evidence_source
@@ -217,6 +218,7 @@ async def test_unchanged_items_are_left_untouched_so_a_user_restore_sticks(
 async def test_budget_pause_marks_run_and_scope_paused_and_keeps_committed_pages(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr(get_settings(), "evidence_sync_concurrency", 1)
     await seed_scopes("ada/a", "ada/b")
     resume = datetime.now(UTC) + timedelta(hours=1)
     source = ScriptedEvidenceSource(
@@ -242,6 +244,50 @@ async def test_budget_pause_marks_run_and_scope_paused_and_keeps_committed_pages
     assert scope.cursor == {"stage": "commits"}
     assert set(await load_items()) == {"c1"}
     assert [state.ref for state in source.seen] == ["ada/a"]
+
+
+class SlowSource(ScriptedEvidenceSource):
+    in_flight = 0
+    peak = 0
+
+    async def sync_scope(self, scope: Any) -> Any:
+        type(self).in_flight += 1
+        type(self).peak = max(type(self).peak, type(self).in_flight)
+        try:
+            async for step in super().sync_scope(scope):
+                await asyncio.sleep(0.02)
+                yield step
+        finally:
+            type(self).in_flight -= 1
+
+
+async def test_scopes_sync_concurrently_and_each_keeps_its_own_progress(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(get_settings(), "evidence_sync_concurrency", 3)
+    refs = [f"ada/r{index}" for index in range(6)]
+    await seed_scopes(*refs)
+    SlowSource.in_flight = SlowSource.peak = 0
+    source = SlowSource(
+        {
+            ref: [
+                page([item("commit", f"{ref}-1")], "commits"),
+                page([item("commit", f"{ref}-2")], "done"),
+            ]
+            for ref in refs
+        }
+    )
+    install_evidence_source(monkeypatch, source)
+
+    run_id = await sync()
+
+    run = await load_run(run_id)
+    assert run.status is SyncStatus.succeeded
+    assert SlowSource.peak == 3
+    assert set(run.progress["scopes"]) == set(refs)
+    assert {entry["status"] for entry in run.progress["scopes"].values()} == {"ok"}
+    assert run.progress["items"] == 12
+    assert len(await load_items()) == 12
 
 
 async def test_a_paused_run_does_not_block_the_next_start_which_resumes_from_the_cursor(

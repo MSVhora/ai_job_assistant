@@ -300,7 +300,13 @@ header (or open `/evidence`).
 5. **Achievements** shows the chunk summary and **Estimate extraction**, a dialog with chunk counts,
    the token and cost estimate (or "cost unavailable") and, again, how many chunks come from
    private repositories — the second checkpoint before anything is sent. Confirm to start; the page
-   follows the run and links to the review page when it finishes.
+   follows the run and links to the review page when it finishes. Chunks run a few at a time
+   (`EXTRACTION_CONCURRENCY`, within `LLM_MAX_CONCURRENCY`), and chunks with under
+   `EXTRACTION_MIN_CHUNK_CHARS` of text (default 200: a lone one-line commit, an empty-bodied PR)
+   are left out and counted in the dialog; your notes and resume lines are never left out.
+   Repositories also sync a few at a time (`EVIDENCE_SYNC_CONCURRENCY`, default 3); the request
+   budget and rate-limit floor are shared, and a pause stops further repositories from starting.
+   If your provider returns rate-limit errors, lower `LLM_MAX_CONCURRENCY`.
 
 **`/evidence/review`** — decide:
 

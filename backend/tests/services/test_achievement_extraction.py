@@ -1,8 +1,10 @@
+import asyncio
 import json
 import uuid
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
+import litellm
 import pytest
 from fakes import (
     ProviderError,
@@ -50,6 +52,7 @@ def _settings(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "llm_retry_attempts", 1)
     monkeypatch.setattr(settings, "llm_retry_base_delay_s", 0.0)
     monkeypatch.setattr(settings, "llm_model_extract", None)
+    monkeypatch.setattr(settings, "extraction_min_chunk_chars", 0)
 
 
 def achievement_json(**overrides: object) -> dict[str, Any]:
@@ -224,6 +227,115 @@ async def test_a_lost_marker_is_served_from_the_cache_without_duplicates_or_call
     assert len(calls) == 1
     assert len(await drafts()) == 1
     assert (await run_row(run_id)).status is SyncStatus.succeeded
+
+
+async def test_chunks_are_extracted_concurrently_up_to_the_configured_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = get_settings()
+    monkeypatch.setattr(settings, "extraction_concurrency", 3)
+    monkeypatch.setattr(settings, "llm_max_concurrency", 8)
+    payload = json.dumps({"achievements": [achievement_json()]})
+    in_flight = peak = 0
+
+    async def slow(**_: Any) -> Any:
+        nonlocal in_flight, peak
+        in_flight += 1
+        peak = max(peak, in_flight)
+        await asyncio.sleep(0.02)
+        in_flight -= 1
+        return llm_response(payload)
+
+    monkeypatch.setattr(litellm, "acompletion", slow)
+    candidate_id, _, _ = await seed_evidence_chunk(bodies=["chunk 0 body"], project_key="ada/p0")
+    for index in range(1, 8):
+        await seed_evidence_chunk(
+            bodies=[f"chunk {index} body"], project_key=f"ada/p{index}", candidate_id=candidate_id
+        )
+
+    run_id = await run_once()
+
+    run = await run_row(run_id)
+    assert peak == 3
+    assert run.status is SyncStatus.succeeded
+    assert (run.progress["done"], run.progress["total"], run.progress["achievements"]) == (8, 8, 8)
+    assert len(await drafts()) == 8
+
+
+async def test_cache_hits_are_counted_exactly_when_chunks_run_concurrently(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = llm(monkeypatch, achievement_json())
+    candidate_id, _, _ = await seed_evidence_chunk(bodies=["chunk 0 body"], project_key="ada/p0")
+    for index in range(1, 4):
+        await seed_evidence_chunk(
+            bodies=[f"chunk {index} body"], project_key=f"ada/p{index}", candidate_id=candidate_id
+        )
+    await run_once()
+    async with session_factory() as session:
+        await session.execute(text("UPDATE evidence_chunk SET extracted_hash = NULL"))
+        await session.execute(text("UPDATE achievement SET status = 'archived'"))
+        await session.commit()
+    first_calls = len(calls)
+
+    run_id = await run_once()
+
+    run = await run_row(run_id)
+    assert len(calls) == first_calls
+    assert (run.progress["cached"], run.progress["done"]) == (4, 4)
+
+
+async def test_short_chunks_are_skipped_but_notes_never_are(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(get_settings(), "extraction_min_chunk_chars", 200)
+    calls = llm(monkeypatch, achievement_json())
+    candidate_id, short_chunk, _ = await seed_evidence_chunk(
+        bodies=["tiny fix"], project_key="ada/short"
+    )
+    _, long_chunk, _ = await seed_evidence_chunk(
+        bodies=["Cut the import from 42 minutes to 9 minutes. " * 6],
+        project_key="ada/long",
+        candidate_id=candidate_id,
+    )
+    _, note_chunk, _ = await seed_evidence_chunk(
+        bodies=["my note"], project_key="ada/note", candidate_id=candidate_id
+    )
+    async with session_factory() as session:
+        await session.execute(
+            text("UPDATE evidence_chunk SET kind = 'note' WHERE id = :id"), {"id": note_chunk}
+        )
+        await session.commit()
+        current = await estimate(session)
+
+    run_id = await run_once()
+
+    assert (current.chunks_to_extract, current.chunks_skipped_short) == (2, 1)
+    assert (await run_row(run_id)).progress["total"] == 2
+    assert len(calls) == 2
+    async with session_factory() as session:
+        assert (await session.get_one(EvidenceChunk, short_chunk)).extracted_hash is None
+        assert (await session.get_one(EvidenceChunk, long_chunk)).extracted_hash is not None
+        assert (await session.get_one(EvidenceChunk, note_chunk)).extracted_hash is not None
+
+
+async def test_lowering_the_minimum_brings_skipped_chunks_back(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = get_settings()
+    monkeypatch.setattr(settings, "extraction_min_chunk_chars", 200)
+    await seed_evidence_chunk(bodies=["tiny fix"])
+    async with session_factory() as session:
+        skipped = await estimate(session)
+        with pytest.raises(NothingToExtractError):
+            await start_extraction(session, BackgroundTasks(), skipped.estimate_id)
+
+    monkeypatch.setattr(settings, "extraction_min_chunk_chars", 0)
+    async with session_factory() as session:
+        brought_back = await estimate(session)
+
+    assert (skipped.chunks_skipped_short, skipped.chunks_to_extract) == (1, 0)
+    assert (brought_back.chunks_skipped_short, brought_back.chunks_to_extract) == (0, 1)
 
 
 async def test_a_new_prompt_version_reextracts_and_supersedes_old_drafts(

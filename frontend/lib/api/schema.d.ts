@@ -2257,6 +2257,11 @@ export interface components {
             chunks_cached: number;
             /** Chunks To Extract */
             chunks_to_extract: number;
+            /**
+             * Chunks Skipped Short
+             * @default 0
+             */
+            chunks_skipped_short: number;
             llm_cost: components["schemas"]["CostEstimateResponse"];
             embedding_cost: components["schemas"]["CostEstimateResponse"];
             /** Total Usd */

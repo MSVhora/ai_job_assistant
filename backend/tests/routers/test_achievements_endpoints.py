@@ -44,6 +44,7 @@ def _key(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "gemini_api_key", "test-key")
     monkeypatch.setattr(settings, "llm_retry_attempts", 1)
     monkeypatch.setattr(settings, "llm_retry_base_delay_s", 0.0)
+    monkeypatch.setattr(settings, "extraction_min_chunk_chars", 0)
 
 
 @pytest.fixture

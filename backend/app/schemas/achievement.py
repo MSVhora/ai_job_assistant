@@ -178,6 +178,18 @@ class SplitRequest(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=200)
 
 
+class AddImpactRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=200)
+
+    @model_validator(mode="after")
+    def _not_blank(self) -> "AddImpactRequest":
+        self.text = self.text.strip()
+        if not self.text:
+            msg = "describe the measurable outcome"
+            raise ValueError(msg)
+        return self
+
+
 class BulkApproveRequest(BaseModel):
     ids: list[uuid.UUID] = Field(min_length=1, max_length=1000)
 

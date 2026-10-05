@@ -206,6 +206,13 @@ always see what was edited, merged or confirmed and when.
   (`personal` / `unassigned`), `impact_type` and `has_metric` (a confirmed metric: verified from
   evidence or by you), next to `project_key`. `sort=rank` (the default) orders by the resume
   builder's base priority; `sort=recent` by creation time.
+- **Add impact.** Commits rarely say what a change was worth, so real numbers mostly come from
+  you. `GET /api/achievements/impact-queue` lists the top 40 drafts and approved achievements with
+  no confirmed metric, best first by the shared priority (`X-Total-Count` is how many qualify).
+  `POST /api/achievements/{id}/impact` adds your figure as a user-verified metric (it counts as
+  confirmed for ranking and the resume writer, and is audited as a `metric_confirmation`
+  revision); `POST …/skip-impact` records that there is no number to give (a `impact_skipped`
+  review flag) so it leaves the queue until you add one.
 - **Merge and split.** `POST /api/achievements/merge` combines two or more achievements into a new
   draft (evidence, skills and metrics are unioned) and archives the sources.
   `GET /api/achievements/merge-proposals` only *suggests* likely duplicates (same repository,
@@ -303,6 +310,9 @@ header (or open `/evidence`).
   and recency; more evidence breaks ties), so confirmed impact comes first and feature-only work
   sinks. *Impact* and *Metric* filters narrow any tab, and cards carry badges: *Private repo*, *Evidence updated —
   re-review*, metrics to confirm, impact, difficulty, employer or project.
+- **Add impact** (link on this page, `/evidence/impact`) walks the queue one achievement at a time
+  with its action, result and evidence quote: type the measurable outcome and **Save impact**,
+  choose **No number to give** to drop it from the queue, or **Not now** to come back later.
 - **Approve** is disabled with the reason shown until the achievement has evidence and no
   unconfirmed metric. **Approve all fully-evidenced…** previews the clean drafts with
   checkboxes before approving.

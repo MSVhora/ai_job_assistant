@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Literal
 
-from sqlalchemy import Select, func, or_, select
+from sqlalchemy import ColumnElement, Select, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import load_only
 
@@ -27,6 +27,10 @@ class AchievementFilters:
     private: bool | None = None
     stale: bool | None = None
     sort: Literal["rank", "recent"] = "rank"
+
+
+def has_confirmed_metric() -> ColumnElement[bool]:
+    return or_(*(Achievement.metrics.contains([{"verified": kind}]) for kind in CONFIRMED_METRICS))
 
 
 def _by_employer(
@@ -55,9 +59,7 @@ def _filtered(candidate_id: uuid.UUID, filters: AchievementFilters) -> Select[tu
     if filters.impact_type is not None:
         query = query.where(Achievement.impact_type == filters.impact_type)
     if filters.has_metric is not None:
-        confirmed = or_(
-            *(Achievement.metrics.contains([{"verified": kind}]) for kind in CONFIRMED_METRICS)
-        )
+        confirmed = has_confirmed_metric()
         query = query.where(confirmed if filters.has_metric else ~confirmed)
     if filters.private is not None:
         query = query.where(Achievement.derived_from_private.is_(filters.private))
@@ -126,7 +128,7 @@ RANK_COLUMNS = (
 )
 
 
-async def _ranked_ids(session: AsyncSession, query: Select[tuple[Achievement]]) -> list[uuid.UUID]:
+async def ranked_ids(session: AsyncSession, query: Select[tuple[Achievement]]) -> list[uuid.UUID]:
     """Ids best first by the resume builder's base priority (impact, metric, difficulty, recency);
     more evidence, then newer, break ties."""
     rows = (await session.execute(query.options(load_only(*RANK_COLUMNS)))).scalars().all()
@@ -152,7 +154,7 @@ async def list_achievements(
         return []
     query = _filtered(candidate_id, filters)
     if filters.sort == "rank":
-        ids = (await _ranked_ids(session, query))[page.offset : page.offset + page.limit]
+        ids = (await ranked_ids(session, query))[page.offset : page.offset + page.limit]
         found = (
             (await session.execute(select(Achievement).where(Achievement.id.in_(ids))))
             .scalars()

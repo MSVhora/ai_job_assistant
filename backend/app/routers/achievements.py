@@ -8,11 +8,13 @@ from app.core.pagination import SEARCHES_PAGE, TOTAL_COUNT_HEADER, Pagination
 from app.deps import get_db, pagination
 from app.models import AchievementStatus
 from app.schemas.achievement import (
+    AchievementGroupsResponse,
     AchievementResponse,
     AchievementUpdate,
     BulkApproveRequest,
     BulkApproveResponse,
     BulkEligibleResponse,
+    BulkTransitionResponse,
     ConfirmMetricRequest,
     EvidenceLinkCreate,
     ExtractionEstimateResponse,
@@ -24,7 +26,13 @@ from app.schemas.achievement import (
     RevisionResponse,
     SplitRequest,
 )
-from app.services import achievement_extraction, achievement_merge, achievement_review, achievements
+from app.services import (
+    achievement_extraction,
+    achievement_groups,
+    achievement_merge,
+    achievement_review,
+    achievements,
+)
 
 router = APIRouter(prefix="/api", tags=["achievements"])
 
@@ -65,7 +73,17 @@ async def get_extraction_run(
     return await achievement_extraction.get_run(session, run_id)
 
 
+def _employer_params(
+    employer: Annotated[str | None, Query(max_length=255)] = None,
+    employer_kind: Annotated[Literal["personal", "unassigned"] | None, Query()] = None,
+) -> tuple[str | None, Literal["personal", "unassigned"] | None]:
+    return employer, employer_kind
+
+
 def _achievement_filters(
+    employer_filter: Annotated[
+        tuple[str | None, Literal["personal", "unassigned"] | None], Depends(_employer_params)
+    ],
     status: Annotated[AchievementStatus, Query()] = AchievementStatus.draft,
     project_key: Annotated[str | None, Query(max_length=255)] = None,
     private: Annotated[bool | None, Query()] = None,
@@ -73,7 +91,13 @@ def _achievement_filters(
     sort: Annotated[Literal["rank", "recent"], Query()] = "rank",
 ) -> achievements.AchievementFilters:
     return achievements.AchievementFilters(
-        status=status, project_key=project_key, private=private, stale=stale, sort=sort
+        status=status,
+        project_key=project_key,
+        employer=employer_filter[0],
+        employer_kind=employer_filter[1],
+        private=private,
+        stale=stale,
+        sort=sort,
     )
 
 
@@ -87,6 +111,13 @@ async def list_achievements(
     total = await achievements.count_achievements(session, filters)
     response.headers[TOTAL_COUNT_HEADER] = str(total)
     return await achievements.list_achievements(session, filters, page)
+
+
+@router.get("/achievements/groups", response_model=AchievementGroupsResponse)
+async def achievement_groups_summary(
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> AchievementGroupsResponse:
+    return await achievement_groups.draft_groups(session)
 
 
 @router.get("/achievements/merge-proposals", response_model=list[MergeProposalResponse])
@@ -107,8 +138,9 @@ async def merge_achievements(
 @router.get("/achievements/bulk-approve/eligible", response_model=BulkEligibleResponse)
 async def bulk_approve_eligible(
     session: Annotated[AsyncSession, Depends(get_db)],
+    project_key: Annotated[str | None, Query(max_length=255)] = None,
 ) -> BulkEligibleResponse:
-    return await achievement_review.bulk_eligible(session)
+    return await achievement_review.bulk_eligible(session, project_key)
 
 
 @router.post("/achievements/bulk-approve", response_model=BulkApproveResponse)
@@ -117,6 +149,26 @@ async def bulk_approve(
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> BulkApproveResponse:
     return await achievement_review.bulk_approve(session, payload.ids)
+
+
+@router.post("/achievements/bulk-reject", response_model=BulkTransitionResponse)
+async def bulk_reject(
+    payload: BulkApproveRequest,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> BulkTransitionResponse:
+    return await achievement_review.bulk_set_status(
+        session, payload.ids, AchievementStatus.rejected
+    )
+
+
+@router.post("/achievements/bulk-archive", response_model=BulkTransitionResponse)
+async def bulk_archive(
+    payload: BulkApproveRequest,
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> BulkTransitionResponse:
+    return await achievement_review.bulk_set_status(
+        session, payload.ids, AchievementStatus.archived
+    )
 
 
 @router.get("/achievements/{achievement_id}", response_model=AchievementResponse)

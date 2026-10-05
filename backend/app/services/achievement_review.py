@@ -1,6 +1,6 @@
 import logging
 import uuid
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 
 from sqlalchemy import delete, exists, func, select, update
@@ -31,6 +31,7 @@ from app.schemas.achievement import (
     BulkEligibleItem,
     BulkEligibleResponse,
     BulkSkipped,
+    BulkTransitionResponse,
     ConfirmMetricRequest,
     EvidenceLinkCreate,
     RevisionResponse,
@@ -44,7 +45,7 @@ from app.services.achievement_rules import (
     diff_fields,
     snapshot,
 )
-from app.services.achievements import build_responses
+from app.services.achievements import build_responses, evidence_counts
 from app.services.embedding import embed_texts
 from app.services.employer_mapping import load_profile_facts, normalize_employer_ref
 from app.services.evidence_items import candidate_id_or_none
@@ -142,22 +143,25 @@ async def get_achievement(session: AsyncSession, achievement_id: uuid.UUID) -> A
     return await respond(session, await owned_achievement(session, achievement_id))
 
 
-async def _facts(session: AsyncSession, achievement: Achievement) -> Facts:
-    count = (
-        await session.execute(
-            select(func.count())
-            .select_from(AchievementEvidence)
-            .where(AchievementEvidence.achievement_id == achievement.id)
-        )
-    ).scalar_one()
+def _facts_from(achievement: Achievement, evidence_count: int) -> Facts:
     return Facts(
         status=achievement.status,
-        evidence_count=count,
+        evidence_count=evidence_count,
         metrics=achievement.metrics,
         review_flags=achievement.review_flags,
         stale=achievement.evidence_stale_at is not None,
         private=achievement.derived_from_private,
     )
+
+
+async def _facts(session: AsyncSession, achievement: Achievement) -> Facts:
+    counts = await evidence_counts(session, [achievement.id])
+    return _facts_from(achievement, counts.get(achievement.id, 0))
+
+
+async def _facts_map(session: AsyncSession, rows: Sequence[Achievement]) -> dict[uuid.UUID, Facts]:
+    counts = await evidence_counts(session, [row.id for row in rows])
+    return {row.id: _facts_from(row, counts.get(row.id, 0)) for row in rows}
 
 
 async def _repository_employer(
@@ -214,20 +218,20 @@ async def edit(
     return await respond(session, achievement)
 
 
-async def transition(
+async def _move(
     session: AsyncSession,
-    achievement_id: uuid.UUID,
+    achievement: Achievement,
     target: AchievementStatus,
+    facts: Facts | None,
     *,
-    bulk: bool = False,
-) -> AchievementResponse:
-    achievement = await owned_achievement(session, achievement_id)
+    bulk: bool,
+) -> None:
     current = achievement.status
     if not can_transition(current, target):
         msg = f"an achievement cannot move from {current.value} to {target.value}"
         raise AchievementConflictError(msg)
-    if target is AchievementStatus.approved:
-        blockers = approval_blockers(await _facts(session, achievement))
+    if target is AchievementStatus.approved and facts is not None:
+        blockers = approval_blockers(facts)
         if blockers:
             raise AchievementConflictError("cannot approve: " + "; ".join(blockers))
         if achievement.embedding is None:
@@ -239,6 +243,18 @@ async def transition(
         achievement.evidence_stale_at = None
     achievement.status = target
     add_revision(session, achievement.id, AchievementRevisionSource.status_change, diff)
+
+
+async def transition(
+    session: AsyncSession,
+    achievement_id: uuid.UUID,
+    target: AchievementStatus,
+    *,
+    bulk: bool = False,
+) -> AchievementResponse:
+    achievement = await owned_achievement(session, achievement_id)
+    facts = await _facts(session, achievement) if target is AchievementStatus.approved else None
+    await _move(session, achievement, target, facts, bulk=bulk)
     return await respond(session, achievement)
 
 
@@ -380,52 +396,88 @@ async def list_revisions(
     )
 
 
-async def bulk_eligible(session: AsyncSession) -> BulkEligibleResponse:
+async def bulk_eligible(
+    session: AsyncSession, project_key: str | None = None
+) -> BulkEligibleResponse:
     candidate_id = await candidate_id_or_none(session)
     if candidate_id is None:
         return BulkEligibleResponse(count=0, items=[])
+    query = select(Achievement).where(
+        Achievement.candidate_id == candidate_id,
+        Achievement.status == AchievementStatus.draft,
+    )
+    if project_key is not None:
+        query = query.where(Achievement.project_key == project_key)
     drafts = (
-        (
-            await session.execute(
-                select(Achievement)
-                .where(
-                    Achievement.candidate_id == candidate_id,
-                    Achievement.status == AchievementStatus.draft,
-                )
-                .order_by(Achievement.created_at, Achievement.id)
-            )
-        )
+        (await session.execute(query.order_by(Achievement.created_at, Achievement.id)))
         .scalars()
         .all()
     )
-    items: list[BulkEligibleItem] = []
-    for draft in drafts:
-        facts = await _facts(session, draft)
-        if not bulk_blockers(facts):
-            items.append(
-                BulkEligibleItem(
-                    id=draft.id, title=draft.title, evidence_count=facts.evidence_count
-                )
-            )
+    facts = await _facts_map(session, drafts)
+    items = [
+        BulkEligibleItem(
+            id=draft.id, title=draft.title, evidence_count=facts[draft.id].evidence_count
+        )
+        for draft in drafts
+        if not bulk_blockers(facts[draft.id])
+    ]
     return BulkEligibleResponse(count=len(items), items=items)
 
 
-async def bulk_approve(session: AsyncSession, ids: list[uuid.UUID]) -> BulkApproveResponse:
-    approved: list[uuid.UUID] = []
+def _bulk_reasons(target: AchievementStatus, row: Achievement, facts: Facts) -> list[str]:
+    if target is AchievementStatus.approved:
+        return bulk_blockers(facts)
+    if not can_transition(row.status, target):
+        return [f"it cannot move from {row.status.value} to {target.value}"]
+    return []
+
+
+async def _bulk_transition(
+    session: AsyncSession, ids: list[uuid.UUID], target: AchievementStatus
+) -> tuple[list[uuid.UUID], list[BulkSkipped]]:
+    unique = list(dict.fromkeys(ids))
+    candidate_id = await candidate_id_or_none(session)
+    rows: dict[uuid.UUID, Achievement] = {}
+    if candidate_id is not None:
+        found = (
+            (
+                await session.execute(
+                    select(Achievement).where(
+                        Achievement.candidate_id == candidate_id, Achievement.id.in_(unique)
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        rows = {row.id: row for row in found}
+    facts = await _facts_map(session, list(rows.values()))
+    done: list[uuid.UUID] = []
     skipped: list[BulkSkipped] = []
-    for achievement_id in dict.fromkeys(ids):
-        try:
-            achievement = await owned_achievement(session, achievement_id)
-        except AchievementNotFoundError:
+    for achievement_id in unique:
+        row = rows.get(achievement_id)
+        if row is None:
             skipped.append(BulkSkipped(id=achievement_id, reasons=["not found"]))
             continue
-        blockers = bulk_blockers(await _facts(session, achievement))
-        if blockers:
-            skipped.append(BulkSkipped(id=achievement_id, reasons=blockers))
+        reasons = _bulk_reasons(target, row, facts[achievement_id])
+        if reasons:
+            skipped.append(BulkSkipped(id=achievement_id, reasons=reasons))
             continue
-        await transition(session, achievement_id, AchievementStatus.approved, bulk=True)
-        approved.append(achievement_id)
-    return BulkApproveResponse(approved=approved, skipped=skipped)
+        await _move(session, row, target, facts[achievement_id], bulk=True)
+        done.append(achievement_id)
+    return done, skipped
+
+
+async def bulk_approve(session: AsyncSession, ids: list[uuid.UUID]) -> BulkApproveResponse:
+    done, skipped = await _bulk_transition(session, ids, AchievementStatus.approved)
+    return BulkApproveResponse(approved=done, skipped=skipped)
+
+
+async def bulk_set_status(
+    session: AsyncSession, ids: list[uuid.UUID], target: AchievementStatus
+) -> BulkTransitionResponse:
+    done, skipped = await _bulk_transition(session, ids, target)
+    return BulkTransitionResponse(done=done, skipped=skipped)
 
 
 async def mark_stale_after_sync(session: AsyncSession, candidate_id: uuid.UUID) -> int:

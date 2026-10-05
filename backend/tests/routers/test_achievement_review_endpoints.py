@@ -209,11 +209,88 @@ async def test_bulk_approval_routes_preview_then_commit(client: AsyncClient) -> 
     ).json()
     empty = await client.post("/api/achievements/bulk-approve", json={"ids": []})
 
-    assert [item["title"] for item in preview["items"]] == ["Clean"]
-    assert preview["count"] == 1
-    assert done["approved"] == [str(clean)]
-    assert [skip["id"] for skip in done["skipped"]] == [str(private)]
+    assert [item["title"] for item in preview["items"]] == ["Clean", "Private"]
+    assert preview["count"] == 2
+    assert done["approved"] == [str(clean), str(private)]
+    assert done["skipped"] == []
     assert empty.status_code == 422
+
+
+async def test_bulk_reject_and_archive_routes(client: AsyncClient) -> None:
+    candidate_id, _, items = await seed_evidence_chunk(bodies=BODIES)
+    draft = await seed_achievement(candidate_id, item_ids=items[:1], title="Draft")
+    approved = await seed_achievement(
+        candidate_id, item_ids=items[1:2], status="approved", title="Approved"
+    )
+
+    rejected = await client.post("/api/achievements/bulk-reject", json={"ids": [str(draft)]})
+    archived = await client.post("/api/achievements/bulk-archive", json={"ids": [str(approved)]})
+    wrong = await client.post("/api/achievements/bulk-reject", json={"ids": [str(approved)]})
+
+    assert rejected.json()["done"] == [str(draft)]
+    assert archived.json()["done"] == [str(approved)]
+    assert wrong.json()["done"] == []
+    assert len(wrong.json()["skipped"]) == 1
+
+
+async def test_groups_route_counts_drafts_per_employer_and_repository(
+    client: AsyncClient,
+) -> None:
+    candidate_id, _, items = await seed_evidence_chunk(bodies=[*BODIES, "Four"])
+    acme = {"company": "Acme", "source": "scope"}
+    await seed_achievement(candidate_id, item_ids=items[:1], title="A", employer_ref=acme)
+    await seed_achievement(
+        candidate_id, item_ids=[], title="B", employer_ref=acme, project_key="ada/other"
+    )
+    await seed_achievement(
+        candidate_id,
+        item_ids=items[1:2],
+        title="C",
+        employer_ref={"kind": "personal", "source": "scope"},
+    )
+    await seed_achievement(candidate_id, item_ids=items[2:3], title="D")
+
+    groups = (await client.get("/api/achievements/groups")).json()["groups"]
+
+    summary = [(g["kind"], g["label"], g["total"], g["eligible"]) for g in groups]
+    assert summary[0] == ("employer", "Acme", 2, 1)
+    assert set(summary[1:]) == {("personal", "Personal", 1, 1), ("unassigned", "No employer", 1, 1)}
+    assert {(r["project_key"], r["total"]) for r in groups[0]["repositories"]} == {
+        ("ada/engine", 1),
+        ("ada/other", 1),
+    }
+
+
+async def test_list_filters_by_employer_personal_and_unassigned(client: AsyncClient) -> None:
+    candidate_id, _, items = await seed_evidence_chunk(bodies=[*BODIES, "Four", "Five"])
+    await seed_achievement(
+        candidate_id,
+        item_ids=items[:1],
+        title="Acme",
+        employer_ref={"company": "Acme", "source": "scope"},
+    )
+    await seed_achievement(
+        candidate_id,
+        item_ids=items[1:2],
+        title="Other",
+        employer_ref={"company": "Globex", "source": "scope"},
+    )
+    await seed_achievement(
+        candidate_id,
+        item_ids=items[2:3],
+        title="Mine",
+        employer_ref={"kind": "personal", "source": "scope"},
+    )
+    await seed_achievement(candidate_id, item_ids=items[3:4], title="Nobody")
+
+    async def titles(**params: str) -> list[str]:
+        response = await client.get("/api/achievements", params=params)
+        return [row["title"] for row in response.json()]
+
+    assert await titles(employer="Acme") == ["Acme"]
+    assert await titles(employer_kind="personal") == ["Mine"]
+    assert await titles(employer_kind="unassigned") == ["Nobody"]
+    assert (await client.get("/api/achievements", params={"employer_kind": "x"})).status_code == 422
 
 
 async def test_merge_proposals_route_lists_pairs_without_applying_them(client: AsyncClient) -> None:

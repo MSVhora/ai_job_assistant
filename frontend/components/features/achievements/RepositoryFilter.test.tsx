@@ -125,4 +125,13 @@ describe("RepositoryFilter", () => {
     });
     expect(screen.queryByRole("combobox", { name: "Repository" })).not.toBeInTheDocument();
   });
+
+  it("lists only the allowed repositories when an employer narrows the choice", async () => {
+    renderWithClient(
+      <RepositoryFilter value="" onChange={vi.fn()} allowed={new Set(["ada/side"])} />,
+    );
+
+    await screen.findByRole("option", { name: /ada\/side/ });
+    expect(screen.queryByRole("option", { name: /ada\/engine/ })).not.toBeInTheDocument();
+  });
 });

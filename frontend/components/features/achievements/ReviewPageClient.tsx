@@ -4,21 +4,27 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { useAchievementGroups } from "@/hooks/use-achievements";
 import type { Achievement } from "@/lib/api";
 
 import { AchievementDrawer } from "./AchievementDrawer";
 import { AchievementList } from "./AchievementList";
 import { BulkApproveModal } from "./BulkApproveModal";
+import { EmployerFilter } from "./EmployerFilter";
 import { MergeDialog, type MergeCandidate } from "./MergeDialog";
 import { MergeProposals } from "./MergeProposals";
+import { employerRepositories } from "@/lib/draft-groups";
 import { RepositoryFilter } from "./RepositoryFilter";
 import { ReviewTabs } from "./ReviewTabs";
+import { ViewActions } from "./ViewActions";
 import { TAB_HINTS, type ReviewTab } from "./review-tabs";
 
 export function ReviewPageClient() {
   const [tab, setTab] = useState<ReviewTab>("draft");
   const [privateOnly, setPrivateOnly] = useState(false);
   const [repository, setRepository] = useState("");
+  const [employer, setEmployer] = useState("");
+  const groups = useAchievementGroups(tab === "draft").data?.groups ?? [];
   const [offset, setOffset] = useState(0);
   const [selected, setSelected] = useState<ReadonlyMap<string, string>>(new Map());
   const [openId, setOpenId] = useState<string | null>(null);
@@ -36,6 +42,7 @@ export function ReviewPageClient() {
 
   const changeTab = (next: ReviewTab) => {
     setTab(next);
+    setEmployer("");
     setOffset(0);
     setSelected(new Map());
   };
@@ -82,19 +89,37 @@ export function ReviewPageClient() {
           </Button>
         )}
       </div>
+      {tab === "draft" && (
+        <EmployerFilter
+          groups={groups}
+          value={employer}
+          onChange={(next) => {
+            setEmployer(next);
+            const allowed = employerRepositories(groups, next);
+            if (allowed !== undefined && !allowed.has(repository)) setRepository("");
+            setOffset(0);
+            setSelected(new Map());
+          }}
+        />
+      )}
       <RepositoryFilter
         value={repository}
+        allowed={tab === "draft" ? employerRepositories(groups, employer) : undefined}
         onChange={(next) => {
           setRepository(next);
           setOffset(0);
           setSelected(new Map());
         }}
       />
+      {tab === "draft" && (
+        <ViewActions groups={groups} employer={employer} repository={repository} />
+      )}
       {tab === "draft" && <MergeProposals onMerge={setMergePair} />}
       <AchievementList
         tab={tab}
         privateOnly={privateOnly}
         repository={repository}
+        employer={employer}
         offset={offset}
         selected={selected}
         onSelect={toggle}

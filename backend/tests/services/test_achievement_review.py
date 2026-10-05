@@ -368,7 +368,7 @@ async def test_only_approved_achievements_with_changed_linked_items_are_flagged(
     assert (await load(other)).evidence_stale_at is None
 
 
-async def test_bulk_approval_covers_only_clean_non_private_drafts_and_records_bulk() -> None:
+async def test_bulk_approval_covers_only_clean_drafts_and_records_bulk() -> None:
     candidate_id, _, items = await seed_evidence_chunk(
         bodies=[*BODIES, "Four", "Five", "Six", "Seven"]
     )
@@ -390,20 +390,65 @@ async def test_bulk_approval_covers_only_clean_non_private_drafts_and_records_bu
         review.bulk_approve, [clean, private, flagged, pending, bare, stale, uuid.uuid4(), clean]
     )
 
-    assert [item.id for item in eligible.items] == [clean]
-    assert eligible.count == 1
+    assert [item.id for item in eligible.items] == [clean, private]
+    assert eligible.count == 2
     assert eligible.items[0].evidence_count == 1
-    assert outcome.approved == [clean]
+    assert outcome.approved == [clean, private]
     reasons = {skip.id: " ".join(skip.reasons) for skip in outcome.skipped}
-    assert "private data" in reasons[private]
     assert "redaction placeholder" in reasons[flagged]
     assert "need confirmation" in reasons[pending]
     assert "no evidence link" in reasons[bare]
     assert "evidence changed" in reasons[stale]
-    assert len(outcome.skipped) == 6
+    assert len(outcome.skipped) == 5
     (revision,) = await revisions(clean)
     assert revision.diff == {"status": ["draft", "approved"], "bulk": True}
-    assert (await load(private)).status is AchievementStatus.draft
+    assert (await load(private)).status is AchievementStatus.approved
+
+
+async def test_bulk_eligible_can_be_limited_to_one_repository() -> None:
+    candidate_id, _, items = await seed_evidence_chunk(bodies=BODIES)
+    mine = await seed_achievement(candidate_id, item_ids=items[:1], title="Mine")
+    await seed_achievement(
+        candidate_id, item_ids=items[1:2], title="Other", project_key="ada/other"
+    )
+
+    eligible = await call(review.bulk_eligible, "ada/engine")
+
+    assert [item.id for item in eligible.items] == [mine]
+
+
+async def test_bulk_reject_moves_only_drafts_and_records_bulk() -> None:
+    candidate_id, _, items = await seed_evidence_chunk(bodies=BODIES)
+    draft = await seed_achievement(candidate_id, item_ids=items[:1], title="Draft")
+    approved = await seed_achievement(
+        candidate_id, item_ids=items[1:2], status="approved", title="Approved"
+    )
+
+    outcome = await call(
+        review.bulk_set_status, [draft, approved, uuid.uuid4()], AchievementStatus.rejected
+    )
+
+    assert outcome.done == [draft]
+    reasons = {skip.id: " ".join(skip.reasons) for skip in outcome.skipped}
+    assert "cannot move from approved to rejected" in reasons[approved]
+    assert len(outcome.skipped) == 2
+    assert (await load(draft)).status is AchievementStatus.rejected
+    (revision,) = await revisions(draft)
+    assert revision.diff == {"status": ["draft", "rejected"], "bulk": True}
+
+
+async def test_bulk_archive_moves_only_approved() -> None:
+    candidate_id, _, items = await seed_evidence_chunk(bodies=BODIES)
+    approved = await seed_achievement(
+        candidate_id, item_ids=items[:1], status="approved", title="Approved"
+    )
+    draft = await seed_achievement(candidate_id, item_ids=items[1:2], title="Draft")
+
+    outcome = await call(review.bulk_set_status, [approved, draft], AchievementStatus.archived)
+
+    assert outcome.done == [approved]
+    assert [skip.id for skip in outcome.skipped] == [draft]
+    assert (await load(approved)).status is AchievementStatus.archived
 
 
 async def test_a_confirmed_repo_employer_is_applied_to_its_existing_achievements() -> None:

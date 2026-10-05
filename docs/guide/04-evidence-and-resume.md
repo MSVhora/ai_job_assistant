@@ -193,9 +193,17 @@ always see what was edited, merged or confirmed and when.
   Evidence can be linked or unlinked (an approved achievement always keeps at least one link).
 - **Bulk approval** is a preview and a commit: `GET /api/achievements/bulk-approve/eligible` lists
   the clean drafts (evidence present, no pending metric, no redaction placeholder, evidence
-  unchanged, and **not derived from private data**, which always needs an individual look);
+  unchanged; drafts derived from private repositories qualify, since most work lives in private
+  repositories and the card still carries the *Private repo* badge);
   `POST /api/achievements/bulk-approve` approves the ids you choose and reports what it skipped and
-  why. Unapprove undoes it.
+  why. Unapprove undoes it. `eligible` also takes `project_key` to preview one repository.
+  `POST /api/achievements/bulk-reject` (drafts only) and `…/bulk-archive` (approved only) move up to
+  1000 ids at once with the same skipped-with-reasons report; nothing is ever approved without a
+  request from you.
+- **Grouped review.** `GET /api/achievements/groups` returns the drafts grouped by employer and
+  then repository, with how many are clean (bulk-approvable) and the ids in each. `GET
+  /api/achievements` also filters by `employer` (a company) or `employer_kind`
+  (`personal` / `unassigned`), next to `project_key`.
 - **Merge and split.** `POST /api/achievements/merge` combines two or more achievements into a new
   draft (evidence, skills and metrics are unioned) and archives the sources.
   `GET /api/achievements/merge-proposals` only *suggests* likely duplicates (same repository,
@@ -292,8 +300,11 @@ header (or open `/evidence`).
   difficulty and amount of evidence and carry badges: *Private repo*, *Evidence updated —
   re-review*, metrics to confirm, impact, difficulty, employer or project.
 - **Approve** is disabled with the reason shown until the achievement has evidence and no
-  unconfirmed metric. **Approve all fully-evidenced…** previews the clean, non-private drafts with
+  unconfirmed metric. **Approve all fully-evidenced…** previews the clean drafts with
   checkboxes before approving.
+- **Employer filter** (draft tab) narrows the list to one employer, *Personal* or *No employer*,
+  with draft counts. Once an employer or repository is chosen, **Approve N clean** and **Reject all
+  N** act on that whole view, each behind a confirmation that shows the count.
 - Opening a card shows a panel with the story (STAR) editor, metrics (confirm as written, or edit
   the value), tags, the evidence with source links and quotes, split controls and the full revision
   history. Tick two or more cards to **Merge**, or use the *possible duplicates* list, which only

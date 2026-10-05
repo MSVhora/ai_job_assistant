@@ -9,6 +9,10 @@ export type AchievementUpdate = Schemas["AchievementUpdate"];
 export type EvidenceLink = Schemas["EvidenceLinkResponse"];
 export type BulkEligible = Schemas["BulkEligibleResponse"];
 export type BulkApproveResult = Schemas["BulkApproveResponse"];
+export type BulkTransitionResult = Schemas["BulkTransitionResponse"];
+export type AchievementGroups = Schemas["AchievementGroupsResponse"];
+export type EmployerGroup = Schemas["EmployerGroup"];
+export type RepositoryGroup = Schemas["RepositoryGroup"];
 export type MergeProposal = Schemas["MergeProposalResponse"];
 export type MergeRequest = Schemas["MergeRequest"];
 export type SplitRequest = Schemas["SplitRequest"];
@@ -24,6 +28,8 @@ export interface AchievementListParams {
   stale?: boolean | undefined;
   private?: boolean | undefined;
   project_key?: string | undefined;
+  employer?: string | undefined;
+  employer_kind?: "personal" | "unassigned" | undefined;
   limit?: number | undefined;
   offset?: number | undefined;
 }
@@ -122,4 +128,22 @@ export async function bulkApprove(ids: string[]): Promise<BulkApproveResult> {
     method: "POST",
     body: JSON.stringify({ ids }),
   });
+}
+
+export async function bulkReject(ids: string[]): Promise<BulkTransitionResult> {
+  return apiFetch<BulkTransitionResult>(`${BASE}/bulk-reject`, {
+    method: "POST",
+    body: JSON.stringify({ ids }),
+  });
+}
+
+export async function bulkArchive(ids: string[]): Promise<BulkTransitionResult> {
+  return apiFetch<BulkTransitionResult>(`${BASE}/bulk-archive`, {
+    method: "POST",
+    body: JSON.stringify({ ids }),
+  });
+}
+
+export async function getAchievementGroups(): Promise<AchievementGroups> {
+  return apiFetch<AchievementGroups>(`${BASE}/groups`);
 }

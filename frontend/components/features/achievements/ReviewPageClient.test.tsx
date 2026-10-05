@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   bulkApprove,
   getAchievement,
+  getAchievementGroups,
   getBulkEligible,
   getEvidenceItem,
   listAchievementsPage,
@@ -27,6 +28,7 @@ vi.mock("@/lib/api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/api")>()),
   bulkApprove: vi.fn(),
   getAchievement: vi.fn(),
+  getAchievementGroups: vi.fn(),
   getBulkEligible: vi.fn(),
   getEvidenceItem: vi.fn(),
   listEmployers: vi.fn(),
@@ -47,6 +49,7 @@ describe("ReviewPageClient", () => {
     for (const fn of [
       bulkApprove,
       getAchievement,
+      getAchievementGroups,
       getBulkEligible,
       getEvidenceItem,
       listAchievementsPage,
@@ -61,6 +64,7 @@ describe("ReviewPageClient", () => {
     }
     vi.mocked(listAchievementsPage).mockImplementation(() => page());
     vi.mocked(listMergeProposals).mockResolvedValue([]);
+    vi.mocked(getAchievementGroups).mockResolvedValue({ groups: [] });
     vi.mocked(listEmployers).mockResolvedValue([]);
     vi.mocked(listGithubScopes).mockResolvedValue([]);
     vi.mocked(listRevisions).mockResolvedValue([]);
@@ -304,5 +308,46 @@ describe("ReviewPageClient", () => {
 
     expect(await screen.findByText(/No draft qualifies for bulk approval/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Approve 0" })).toBeDisabled();
+  });
+
+  it("narrows repositories to the chosen employer and clears a repository outside it", async () => {
+    const repo = (key: string) => ({
+      project_key: key,
+      total: 1,
+      eligible: 1,
+      draft_ids: [key],
+      eligible_ids: [key],
+    });
+    vi.mocked(getAchievementGroups).mockResolvedValue({
+      groups: [
+        {
+          kind: "employer",
+          label: "Acme",
+          total: 1,
+          eligible: 1,
+          repositories: [repo("acme/api")],
+        },
+        {
+          kind: "personal",
+          label: "Personal",
+          total: 1,
+          eligible: 1,
+          repositories: [repo("me/tool")],
+        },
+      ],
+    });
+    vi.mocked(listGithubScopes).mockResolvedValue([
+      scope({ ref: "acme/api", enabled: true }),
+      scope({ ref: "me/tool", enabled: true }),
+    ]);
+    const user = userEvent.setup();
+    renderWithClient(<ReviewPageClient />);
+
+    await user.selectOptions(await screen.findByLabelText("Repository"), "me/tool");
+    await user.selectOptions(await screen.findByLabelText("Employer"), "employer:Acme");
+
+    expect(screen.getByLabelText("Repository")).toHaveValue("");
+    expect(screen.queryByRole("option", { name: /me\/tool/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /acme\/api/ })).toBeInTheDocument();
   });
 });

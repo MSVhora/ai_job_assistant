@@ -18,14 +18,17 @@ function optionLabel(scope: EvidenceScope, employers: EmployerOption[]): string 
 export function RepositoryFilter({
   value,
   onChange,
+  allowed,
 }: {
   value: string;
   onChange: (repository: string) => void;
+  allowed?: ReadonlySet<string> | undefined;
 }) {
   const scopes = useGithubScopes(true);
   const employers = useEmployers();
   const repositories = (scopes.data ?? [])
     .filter((scope) => scope.enabled || scope.last_synced_at !== null)
+    .filter((scope) => allowed === undefined || allowed.has(scope.ref))
     .sort((left, right) => left.ref.localeCompare(right.ref));
   const chosen = repositories.find((scope) => scope.ref === value);
 

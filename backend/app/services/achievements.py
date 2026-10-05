@@ -1,8 +1,9 @@
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Literal
 
-from sqlalchemy import Select, func, select
+from sqlalchemy import Select, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.pagination import DEFAULT_PAGE, Pagination
@@ -15,9 +16,27 @@ from app.services.evidence_items import candidate_id_or_none
 class AchievementFilters:
     status: AchievementStatus = AchievementStatus.draft
     project_key: str | None = None
+    employer: str | None = None
+    employer_kind: Literal["personal", "unassigned"] | None = None
     private: bool | None = None
     stale: bool | None = None
     sort: Literal["rank", "recent"] = "rank"
+
+
+def _by_employer(
+    query: Select[tuple[Achievement]], filters: AchievementFilters
+) -> Select[tuple[Achievement]]:
+    company = Achievement.employer_ref["company"].as_string()
+    kind = Achievement.employer_ref["kind"].as_string()
+    if filters.employer is not None:
+        return query.where(company == filters.employer)
+    if filters.employer_kind == "personal":
+        return query.where(kind == "personal")
+    if filters.employer_kind == "unassigned":
+        return query.where(
+            or_(company.is_(None), company == ""), or_(kind.is_(None), kind != "personal")
+        )
+    return query
 
 
 def _filtered(candidate_id: uuid.UUID, filters: AchievementFilters) -> Select[tuple[Achievement]]:
@@ -26,6 +45,7 @@ def _filtered(candidate_id: uuid.UUID, filters: AchievementFilters) -> Select[tu
     )
     if filters.project_key is not None:
         query = query.where(Achievement.project_key == filters.project_key)
+    query = _by_employer(query, filters)
     if filters.private is not None:
         query = query.where(Achievement.derived_from_private.is_(filters.private))
     if filters.stale is not None:
@@ -40,6 +60,19 @@ async def count_achievements(session: AsyncSession, filters: AchievementFilters)
         return 0
     subquery = _filtered(candidate_id, filters).subquery()
     return (await session.execute(select(func.count()).select_from(subquery))).scalar_one()
+
+
+async def evidence_counts(
+    session: AsyncSession, achievement_ids: Sequence[uuid.UUID]
+) -> dict[uuid.UUID, int]:
+    if not achievement_ids:
+        return {}
+    counted = await session.execute(
+        select(AchievementEvidence.achievement_id, func.count())
+        .where(AchievementEvidence.achievement_id.in_(achievement_ids))
+        .group_by(AchievementEvidence.achievement_id)
+    )
+    return dict(counted.tuples().all())
 
 
 async def build_responses(

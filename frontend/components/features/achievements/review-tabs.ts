@@ -1,4 +1,5 @@
 import type { AchievementListParams } from "@/lib/api";
+import { employerParams } from "@/lib/draft-groups";
 
 export type ReviewTab = "draft" | "approved" | "rejected" | "attention";
 
@@ -23,6 +24,7 @@ export function paramsForTab(
   privateOnly: boolean,
   offset: number,
   repository = "",
+  employer = "",
 ): AchievementListParams {
   const base: AchievementListParams = {
     status: tab === "attention" ? "approved" : tab,
@@ -31,6 +33,7 @@ export function paramsForTab(
     ...(tab === "attention" ? { stale: true } : {}),
     ...(privateOnly ? { private: true } : {}),
     ...(repository === "" ? {} : { project_key: repository }),
+    ...employerParams(employer),
   };
   return base;
 }

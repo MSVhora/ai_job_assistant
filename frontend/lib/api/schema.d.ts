@@ -880,6 +880,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/achievements/groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Achievement Groups Summary */
+        get: operations["achievement_groups_summary_api_achievements_groups_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/achievements/merge-proposals": {
         parameters: {
             query?: never;
@@ -942,6 +959,40 @@ export interface paths {
         put?: never;
         /** Bulk Approve */
         post: operations["bulk_approve_api_achievements_bulk_approve_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/achievements/bulk-reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bulk Reject */
+        post: operations["bulk_reject_api_achievements_bulk_reject_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/achievements/bulk-archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Bulk Archive */
+        post: operations["bulk_archive_api_achievements_bulk_archive_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1451,6 +1502,11 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AchievementGroupsResponse */
+        AchievementGroupsResponse: {
+            /** Groups */
+            groups: components["schemas"]["EmployerGroup"][];
+        };
         /**
          * AchievementOrigin
          * @enum {string}
@@ -1641,6 +1697,13 @@ export interface components {
             id: string;
             /** Reasons */
             reasons: string[];
+        };
+        /** BulkTransitionResponse */
+        BulkTransitionResponse: {
+            /** Done */
+            done: string[];
+            /** Skipped */
+            skipped: components["schemas"]["BulkSkipped"][];
         };
         /** Bullet */
         Bullet: {
@@ -1909,6 +1972,22 @@ export interface components {
             start_date?: string | null;
             /** End Date */
             end_date?: string | null;
+        };
+        /** EmployerGroup */
+        EmployerGroup: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "employer" | "personal" | "unassigned";
+            /** Label */
+            label: string;
+            /** Total */
+            total: number;
+            /** Eligible */
+            eligible: number;
+            /** Repositories */
+            repositories: components["schemas"]["RepositoryGroup"][];
         };
         /**
          * EmployerMergeRequest
@@ -3061,6 +3140,19 @@ export interface components {
          * @enum {string}
          */
         RemoteType: "remote" | "hybrid" | "on_site";
+        /** RepositoryGroup */
+        RepositoryGroup: {
+            /** Project Key */
+            project_key: string | null;
+            /** Total */
+            total: number;
+            /** Eligible */
+            eligible: number;
+            /** Draft Ids */
+            draft_ids: string[];
+            /** Eligible Ids */
+            eligible_ids: string[];
+        };
         /** ResolveConflictRequest */
         ResolveConflictRequest: {
             /**
@@ -5576,6 +5668,8 @@ export interface operations {
                 private?: boolean | null;
                 stale?: boolean | null;
                 sort?: "rank" | "recent";
+                employer?: string | null;
+                employer_kind?: ("personal" | "unassigned") | null;
                 limit?: number;
                 offset?: number;
             };
@@ -5601,6 +5695,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    achievement_groups_summary_api_achievements_groups_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AchievementGroupsResponse"];
                 };
             };
         };
@@ -5660,7 +5774,9 @@ export interface operations {
     };
     bulk_approve_eligible_api_achievements_bulk_approve_eligible_get: {
         parameters: {
-            query?: never;
+            query?: {
+                project_key?: string | null;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -5674,6 +5790,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BulkEligibleResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -5698,6 +5823,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BulkApproveResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bulk_reject_api_achievements_bulk_reject_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkApproveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkTransitionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bulk_archive_api_achievements_bulk_archive_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BulkApproveRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkTransitionResponse"];
                 };
             };
             /** @description Validation Error */

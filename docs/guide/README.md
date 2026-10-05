@@ -15,6 +15,7 @@ A self-hosted, single-user, **BYOK** (bring-your-own-key) web app:
 | 2 | [Upload & profile review](02-upload-and-profile.md) | The resume → profile pipeline, editing, gap-fill |
 | 3 | [Job discovery & matching](03-job-discovery-and-matching.md) | Sources (official vs scraper), search, ranked matches |
 | 4 | [Evidence, achievements and review (draft)](04-evidence-and-resume.md) | v6: connect GitHub, add notes, extract and review achievements, build and review a resume |
+| 5 | [Interview agent (draft)](05-interview-agent.md) | v6: practise questions answered from your approved evidence, with citations |
 | — | [Architecture](../architecture.md) | How the pieces fit, diagrams, database schema |
 
 ## Feature status

@@ -13,6 +13,7 @@ pytestmark = pytest.mark.usefixtures("clean_tables")
 TABLES_WITH_UPDATED_AT = [
     "achievement",
     "achievement_extraction_run",
+    "agent_session",
     "candidate",
     "evidence_chunk",
     "evidence_item",

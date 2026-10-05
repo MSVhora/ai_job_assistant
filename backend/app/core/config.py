@@ -120,6 +120,14 @@ class Settings(BaseSettings):
     resume_max_pages: Annotated[int, Field(ge=1, le=4)] = 4
     # v6 #56: upper bound on Typst compiles one page-fit run may spend (3 presets x ~7 each).
     resume_fit_max_compiles: Annotated[int, Field(ge=3, le=200)] = 30
+    # v6 #58: interview agent. Retrieval score = weighted cosine + skill overlap + recency +
+    # impact over approved achievements; below the floor the agent says it has no evidence.
+    agent_history_turns: Annotated[int, Field(ge=1, le=20)] = 6
+    agent_min_retrieval_score: Annotated[float, Field(ge=0, le=1)] = 0.30
+    agent_weight_cosine: Annotated[float, Field(ge=0, le=1)] = 0.55
+    agent_weight_overlap: Annotated[float, Field(ge=0, le=1)] = 0.25
+    agent_weight_recency: Annotated[float, Field(ge=0, le=1)] = 0.10
+    agent_weight_impact: Annotated[float, Field(ge=0, le=1)] = 0.10
     evidence_bot_logins: list[str] = [
         "dependabot",
         "renovate",
@@ -177,6 +185,19 @@ class Settings(BaseSettings):
         )
         if not math.isclose(total, 1.0, rel_tol=0.0, abs_tol=0.01):
             msg = f"resume priority weights must sum to 1.0 (±0.01), got {total:.4f}"
+            raise ValueError(msg)
+        return self
+
+    @model_validator(mode="after")
+    def _check_agent_weights(self) -> "Settings":
+        total = (
+            self.agent_weight_cosine
+            + self.agent_weight_overlap
+            + self.agent_weight_recency
+            + self.agent_weight_impact
+        )
+        if not math.isclose(total, 1.0, rel_tol=0.0, abs_tol=0.01):
+            msg = f"agent retrieval weights must sum to 1.0 (±0.01), got {total:.4f}"
             raise ValueError(msg)
         return self
 

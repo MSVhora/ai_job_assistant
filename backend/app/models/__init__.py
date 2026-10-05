@@ -7,6 +7,7 @@ from app.models.achievement import (
     AchievementRevisionSource,
     AchievementStatus,
 )
+from app.models.agent import AgentMessage, AgentRole, AgentSession
 from app.models.candidate import Candidate
 from app.models.evidence import (
     ContentLevel,
@@ -42,6 +43,9 @@ __all__ = [
     "AchievementRevision",
     "AchievementRevisionSource",
     "AchievementStatus",
+    "AgentMessage",
+    "AgentRole",
+    "AgentSession",
     "Candidate",
     "ContentLevel",
     "EvidenceChunk",

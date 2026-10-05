@@ -15,6 +15,7 @@ from app.core.errors import (
 from app.core.pagination import TOTAL_COUNT_HEADER
 from app.routers import (
     achievements,
+    agent,
     evidence,
     health,
     jobs,
@@ -51,6 +52,7 @@ def create_app() -> FastAPI:
     application.include_router(evidence.router)
     application.include_router(achievements.router)
     application.include_router(resume_documents.router)
+    application.include_router(agent.router)
     application.add_exception_handler(DomainError, cast("ExceptionHandler", domain_error_handler))
     application.add_exception_handler(
         RequestValidationError, cast("ExceptionHandler", request_validation_error_handler)

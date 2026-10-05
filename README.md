@@ -57,6 +57,8 @@ A first successful match takes about five minutes (details in the [user guide](d
 
 6. **Build a resume from your evidence** — connect GitHub and add notes, approve the achievements extracted from them, then create a 1–4 page resume (optionally tailored to a pasted job description or one of your matches). You review every bullet as text with its evidence and private-repo marks, comment on sections, copy it as plain text, Markdown or JSON Resume, and only then generate a PDF. [Evidence & resume →](docs/guide/04-evidence-and-resume.md)
 
+7. **Practise interview questions** *(API only until the chat screen ships)* — ask behavioral, technical, intro and motivation questions and get answers in your voice, built only from your approved achievements and cited to the commits, pull requests and notes behind them. Anything your evidence does not cover is refused with a prompt to add a note, never invented. [Interview agent →](docs/guide/05-interview-agent.md)
+
 ## Development
 
 | Where | Command |

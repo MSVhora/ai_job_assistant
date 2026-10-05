@@ -1,7 +1,7 @@
 # Issue #58 — Interview agent backend: router, retrieval, answers, citations, guardrails (Week 4)
 
-**Status:** Proposed — for owner review
-**Tracks:** GitHub issue #58 (milestone `v6`, branch `v6/50-agent-retrieval-router-answer`)
+**Status:** Implemented (2026-10-05) — see *Implementation notes* for deviations
+**Tracks:** GitHub issue #58 (milestone `v6`, branch `v6/58-agent-retrieval-router-answer`)
 **Plan of record:** [v6-implementation-plan.md](v6-implementation-plan.md) §7, §9 (migration `0027`), §12
 **Depends on:** #49, #52, #53 (approved achievements), #55's verifier utilities
 **Blocks:** #59 (UI), #60 (agent eval)
@@ -57,7 +57,7 @@ Answer interview-style questions in the user's voice from **approved** achieveme
 - `tests/services/test_agent_answers.py` (recorded LLM): intro uses profile summary + top achievements; behavioral cites one achievement in STAR shape; technical drill-down includes chunk quotes; "why X over Y" without rationale evidence → says so and offers a note; unanswerable question refuses; hypothetical labelled as approach; prompt-injection text in evidence does not change behaviour.
 - `tests/services/test_agent_memory.py`: window and summary rollover; summary never contains new factual claims (checked with the verifier against prior messages); session reload preserves order.
 - `tests/routers/test_agent_endpoints.py`: ownership 404s, foreign match 404, message persistence on both paths, error path keeps the user message.
-- `tests/db/test_migrations.py` (+ `tests/db/test_schema_standards.py` picks the new tables up): `0027` round trip.
+- `tests/db/test_migrations.py` (+ `tests/db/test_schema_standards.py` picks the new tables up): `0031` round trip.
 
 ### Standards from v5 (must hold from the first commit)
 
@@ -84,3 +84,16 @@ the backend gate (`ruff check . && ruff format --check . && pyright && pytest --
 ## Out of scope
 
 Streaming, voice, mock-interview scoring, tools/web access, multi-session analytics, answers about the user from outside approved evidence.
+
+## Implementation notes — deviations from the plan above
+
+- **Answer schema is `{answer, gaps}`.** Markers are parsed from the inline `[A1]`/`[E1]`/`[P]`/`[J]` text rather than from a separate `claims[]` list: the sentences the user reads are exactly the ones validated, and there is no second structure to drift from the prose.
+- **`[P]` and `[J]` markers.** Profile identity facts (name, headline, roles, skills) and the pinned job are context blocks of their own, built in code. `[J]` can describe the job but is rejected as the only support for a first-person experience claim.
+- **Ownership check added.** Besides numbers, versions, years and tools, a cited sentence that uses led/owned/architected/managed-style verbs the cited text does not use is flagged (the resume verifier's ownership families).
+- **An uncited sentence is "factual"** if it has a figure, a recognised tool, a first-person past-tense claim, or is longer than five words and not a question or a hedge/offer; hypotheticals only need markers for experience claims.
+- **Retrieval keeps only hits at or above the floor** (plan: top 6 then gate on the best). `AGENT_MIN_RETRIEVAL_SCORE` defaults to 0.30 and is untuned against real embeddings; tune it with the #60 recorded run.
+- **recall@5 gate not asserted.** No recorded real-vector `questions.yaml` exists yet, so retrieval tests use deterministic fake vectors (each achievement's own title ranks first); the recall@5 ≥ 0.80 gate belongs to #60.
+- **Model failure is a stored reply, not a 502.** The request session rolls back on an exception, which would drop the user's question, so a failed model call stores an assistant message with `grounding.error: true` and a retry hint (HTTP 200).
+- **Memory.** `agent_session.summarized_through` (an added column) records how many messages the summary already covers; a summary that adds a figure or tool absent from what it folds is replaced by a plain list of the questions asked.
+- **Migration** is `0031`; `agent_message.created_at` defaults to `clock_timestamp()` so the question and its answer, written in one transaction, keep their order.
+- **Verification:** backend gate and the new tests pass against a scratch database; nothing was run against a live model.

@@ -11,6 +11,7 @@ export function AchievementList({
   tab,
   privateOnly,
   repository,
+  employer,
   offset,
   selected,
   onSelect,
@@ -20,13 +21,14 @@ export function AchievementList({
   tab: ReviewTab;
   privateOnly: boolean;
   repository: string;
+  employer: string;
   offset: number;
   selected: ReadonlyMap<string, string>;
   onSelect: (achievement: Achievement, selected: boolean) => void;
   onOpen: (id: string) => void;
   onPage: (offset: number) => void;
 }) {
-  const list = useAchievements(paramsForTab(tab, privateOnly, offset, repository));
+  const list = useAchievements(paramsForTab(tab, privateOnly, offset, repository, employer));
   const action = useAchievementAction();
 
   if (list.isPending) {

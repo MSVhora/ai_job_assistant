@@ -372,6 +372,7 @@ async def seed_achievement(
     private: bool = False,
     stale: bool = False,
     skills: "list[str] | None" = None,
+    employer_ref: "dict[str, Any] | None" = None,
 ) -> "uuid.UUID":
     """Seed an achievement linked (first one primary) to the given evidence items."""
     from datetime import UTC, date, datetime
@@ -399,6 +400,7 @@ async def seed_achievement(
             review_flags=flags or [],
             derived_from_private=private,
             evidence_stale_at=datetime.now(UTC) if stale else None,
+            employer_ref=employer_ref,
         )
         session.add(achievement)
         await session.flush()

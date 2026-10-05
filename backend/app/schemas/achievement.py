@@ -179,7 +179,7 @@ class SplitRequest(BaseModel):
 
 
 class BulkApproveRequest(BaseModel):
-    ids: list[uuid.UUID] = Field(min_length=1, max_length=200)
+    ids: list[uuid.UUID] = Field(min_length=1, max_length=1000)
 
 
 class BulkEligibleItem(BaseModel):
@@ -201,6 +201,31 @@ class BulkSkipped(BaseModel):
 class BulkApproveResponse(BaseModel):
     approved: list[uuid.UUID]
     skipped: list[BulkSkipped]
+
+
+class BulkTransitionResponse(BaseModel):
+    done: list[uuid.UUID]
+    skipped: list[BulkSkipped]
+
+
+class RepositoryGroup(BaseModel):
+    project_key: str | None
+    total: int
+    eligible: int
+    draft_ids: list[uuid.UUID]
+    eligible_ids: list[uuid.UUID]
+
+
+class EmployerGroup(BaseModel):
+    kind: Literal["employer", "personal", "unassigned"]
+    label: str
+    total: int
+    eligible: int
+    repositories: list[RepositoryGroup]
+
+
+class AchievementGroupsResponse(BaseModel):
+    groups: list[EmployerGroup]
 
 
 class RevisionResponse(BaseModel):

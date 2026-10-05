@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   apiFetchVoid,
   bulkApprove,
+  bulkArchive,
+  bulkReject,
   confirmMetric,
   createLink,
   deleteNote,
@@ -160,6 +162,15 @@ describe("evidence and achievement API clients", () => {
 
     await bulkApprove(["a1"]);
     expect(lastCall().body).toEqual({ ids: ["a1"] });
+
+    await bulkReject(["a2"]);
+    expect(lastCall()).toMatchObject({
+      url: expect.stringContaining("/api/achievements/bulk-reject") as unknown,
+      body: { ids: ["a2"] },
+    });
+
+    await bulkArchive(["a3"]);
+    expect(lastCall().url).toContain("/api/achievements/bulk-archive");
   });
 
   it("unlinks evidence with DELETE and asks for bounded revisions", async () => {

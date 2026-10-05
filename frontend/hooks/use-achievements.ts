@@ -10,9 +10,11 @@ import {
 
 import {
   bulkApprove,
+  bulkReject,
   confirmMetric,
   editAchievement,
   getAchievement,
+  getAchievementGroups,
   getBulkEligible,
   linkEvidence,
   listAchievementsPage,
@@ -57,6 +59,14 @@ export function useMergeProposals() {
   return useQuery({ queryKey: ["merge-proposals"], queryFn: listMergeProposals });
 }
 
+export function useAchievementGroups(enabled: boolean) {
+  return useQuery({
+    queryKey: ["achievement-groups"],
+    queryFn: getAchievementGroups,
+    enabled,
+  });
+}
+
 export function useBulkEligible(enabled: boolean) {
   return useQuery({
     queryKey: ["bulk-eligible"],
@@ -75,6 +85,7 @@ function useRefreshAchievements() {
       "achievement-revisions",
       "merge-proposals",
       "bulk-eligible",
+      "achievement-groups",
     ]) {
       void queryClient.invalidateQueries({ queryKey: [key] });
     }
@@ -145,4 +156,9 @@ export function useMergeAchievements() {
 export function useBulkApprove() {
   const refresh = useRefreshAchievements();
   return useMutation({ mutationFn: (ids: string[]) => bulkApprove(ids), onSuccess: refresh });
+}
+
+export function useBulkReject() {
+  const refresh = useRefreshAchievements();
+  return useMutation({ mutationFn: (ids: string[]) => bulkReject(ids), onSuccess: refresh });
 }

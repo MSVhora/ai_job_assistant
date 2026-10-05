@@ -61,7 +61,8 @@ def approval_blockers(facts: Facts) -> list[str]:
 
 
 def bulk_blockers(facts: Facts) -> list[str]:
-    """Extra restrictions for bulk approval: clean, non-private, current items only."""
+    """Extra restrictions for bulk approval: clean, current drafts. Private-derived ones qualify:
+    most work is in private repositories, and the review page shows the private badge."""
     blockers = approval_blockers(facts)
     if facts.status is not AchievementStatus.draft:
         blockers.append("it is not a draft")
@@ -69,8 +70,6 @@ def bulk_blockers(facts: Facts) -> list[str]:
         blockers.append("it contains a redaction placeholder")
     if facts.stale:
         blockers.append("its evidence changed")
-    if facts.private:
-        blockers.append("it is derived from private data and needs an individual look")
     return blockers
 
 

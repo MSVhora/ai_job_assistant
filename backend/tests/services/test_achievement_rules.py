@@ -74,7 +74,6 @@ def test_confirmed_metrics_do_not_block() -> None:
         ({"status": D.approved}, "not a draft"),
         ({"review_flags": [PLACEHOLDER_FLAG]}, "redaction placeholder"),
         ({"stale": True}, "evidence changed"),
-        ({"private": True}, "private data"),
     ],
 )
 def test_bulk_approval_excludes_each_unsafe_case(override: dict[str, object], reason: str) -> None:
@@ -85,6 +84,10 @@ def test_bulk_approval_excludes_each_unsafe_case(override: dict[str, object], re
 
 def test_a_clean_draft_is_bulk_eligible() -> None:
     assert bulk_blockers(facts()) == []
+
+
+def test_a_private_derived_draft_is_still_bulk_eligible() -> None:
+    assert bulk_blockers(facts(private=True)) == []
 
 
 def test_diff_fields_reports_only_changed_fields_as_old_new_pairs() -> None:

@@ -10,6 +10,7 @@ from app.adapters.job_sources.base import (
     JobPostingData,
     RawJobPosting,
     clean_text,
+    json_array,
     parse_datetime,
 )
 from app.models import JobType, RemoteType
@@ -34,8 +35,9 @@ _WORKPLACE_TYPE_MAP: dict[str, RemoteType] = {
 
 def _salary_pair(value: object) -> tuple[float | None, float | None]:
     numbers: list[float] = []
-    if isinstance(value, list):
-        for entry in value:
+    entries = json_array(value)
+    if entries is not None:
+        for entry in entries:
             numbers.extend(_numbers(entry))
     else:
         numbers = _numbers(value)
@@ -67,17 +69,21 @@ def _remote_type(payload: dict[str, object]) -> RemoteType | None:
 
 
 def _posted_at(payload: dict[str, object]) -> datetime | None:
-    parsed = parse_datetime(payload.get("postedAtTimestamp")) or parse_datetime(
+    return parse_datetime(payload.get("postedAtTimestamp")) or parse_datetime(
         payload.get("postedAt")
     )
-    return parsed
+
+
+def _expires_at(payload: dict[str, object]) -> datetime | None:
+    return parse_datetime(payload.get("expireAt"))
 
 
 def normalize(raw: RawJobPosting) -> JobPostingData:
     payload = raw.payload
     title = clean_text(payload.get("title"))
     if title is None:
-        raise ConnectorError("linkedin posting has no title")
+        msg = "linkedin posting has no title"
+        raise ConnectorError(msg)
     description = clean_text(payload.get("descriptionText")) or clean_text(
         payload.get("descriptionHtml")
     )
@@ -93,9 +99,11 @@ def normalize(raw: RawJobPosting) -> JobPostingData:
             remote_type=_remote_type(payload),
             description=description,
             posted_at=_posted_at(payload),
+            expires_at=_expires_at(payload),
             salary_min=salary_min,
             salary_max=salary_max,
             raw_payload=payload,
         )
     except ValidationError as exc:
-        raise ConnectorError(f"linkedin posting failed normalization: {exc}") from exc
+        msg = f"linkedin posting failed normalization: {exc}"
+        raise ConnectorError(msg) from exc

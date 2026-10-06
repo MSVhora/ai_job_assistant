@@ -86,7 +86,7 @@ export function FeaturesSection() {
                     : "border-fuchsia-200/70 bg-gradient-to-br from-white via-fuchsia-50/80 to-violet-50/60 shadow-fuchsia-200/50 hover:shadow-fuchsia-300/60"
                 }`}
               >
-                <p className="text-xs font-bold uppercase tracking-widest text-violet-600">
+                <p className="text-xs font-bold tracking-widest text-violet-600 uppercase">
                   {feature.eyebrow}
                 </p>
                 <h3 className="mt-2 text-2xl font-bold tracking-tight">{feature.title}</h3>

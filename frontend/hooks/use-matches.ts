@@ -1,12 +1,13 @@
 "use client";
 
-import { keepPreviousData, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, skipToken, useQuery } from "@tanstack/react-query";
 
 import { listMatchesPage, type MatchListParams } from "@/lib/api";
 
-export type MatchFilterValues = Pick<
-  MatchListParams,
-  "location" | "remote_type" | "job_type" | "posted_within_days" | "sort"
+type WithUndefined<T> = { [K in keyof T]: T[K] | undefined };
+
+export type MatchFilterValues = WithUndefined<
+  Pick<MatchListParams, "location" | "remote_type" | "job_type" | "posted_within_days" | "sort">
 >;
 
 // Slider position equivalent to the server defaults (MATCH_WEIGHT_ROLE_FIT=0.4,
@@ -24,12 +25,13 @@ export const DEFAULT_MATCH_FILTERS: MatchFilterValues = {
 
 export function useMatches(
   profileId: string | null,
-  params: Pick<MatchListParams, "limit" | "offset" | "priority"> & MatchFilterValues,
+  params: WithUndefined<Pick<MatchListParams, "limit" | "offset" | "priority" | "status">> &
+    MatchFilterValues,
 ) {
   return useQuery({
     queryKey: ["matches", profileId, params],
-    queryFn: () => listMatchesPage({ profile_id: profileId as string, ...params }),
-    enabled: profileId !== null,
+    queryFn:
+      profileId !== null ? () => listMatchesPage({ profile_id: profileId, ...params }) : skipToken,
     placeholderData: keepPreviousData,
   });
 }

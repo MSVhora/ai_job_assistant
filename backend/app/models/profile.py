@@ -23,6 +23,10 @@ class Profile(Base):
     # new column + backfill migration, never a silent dimension change.
     embedding: Mapped[list[float] | None] = mapped_column(Vector(768), nullable=True)
     search_queries: Mapped[dict[str, object] | None] = mapped_column(JSONB, nullable=True)
+    # Content-hash cache for LLM query generation (issue #31): SHA-256 over the
+    # prompt-consumed inputs; stored specs are regenerated only when it changes.
+    queries_input_hash: Mapped[str | None] = mapped_column(nullable=True)
+
     # Dashboard *view* preferences (match priority weighting) — distinct from the
     # resume-derived preferences inside structured_profile. Deliberately not
     # revision-audited (issue #11): a slider wiggle is not profile content.

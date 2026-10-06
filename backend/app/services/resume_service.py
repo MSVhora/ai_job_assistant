@@ -6,11 +6,12 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import UploadFile
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.errors import FileTooLargeError, TextExtractionError
+from app.core.pagination import DEFAULT_PAGE, Pagination
 from app.models import Candidate, Profile, Resume
 from app.schemas.resume import ResumeSummaryResponse, ResumeUploadResponse
 from app.services.text_extraction import SupportedKind, extract_docx, extract_pdf, sniff_file_type
@@ -30,7 +31,13 @@ async def get_or_create_candidate(session: AsyncSession) -> Candidate:
     return candidate
 
 
-async def list_resumes(session: AsyncSession) -> list[ResumeSummaryResponse]:
+async def count_resumes(session: AsyncSession) -> int:
+    return (await session.execute(select(func.count()).select_from(Resume))).scalar_one()
+
+
+async def list_resumes(
+    session: AsyncSession, page: Pagination = DEFAULT_PAGE
+) -> list[ResumeSummaryResponse]:
     result = await session.execute(select(Candidate).limit(1))
     candidate = result.scalars().first()
     if candidate is None:
@@ -44,7 +51,11 @@ async def list_resumes(session: AsyncSession) -> list[ResumeSummaryResponse]:
         names_by_resume.setdefault(source_resume_id, []).append(name)
 
     resumes = await session.execute(
-        select(Resume).where(Resume.candidate_id == candidate.id).order_by(Resume.created_at.desc())
+        select(Resume)
+        .where(Resume.candidate_id == candidate.id)
+        .order_by(Resume.created_at.desc(), Resume.id)
+        .limit(page.limit)
+        .offset(page.offset)
     )
     return [
         ResumeSummaryResponse(
@@ -85,19 +96,20 @@ async def upload_resume(session: AsyncSession, file: UploadFile) -> ResumeUpload
     content_type = file.content_type or "application/octet-stream"
 
     if file.size is not None and file.size > max_bytes:
-        raise FileTooLargeError(f"file exceeds the {settings.resume_max_upload_mb} MB limit")
+        msg = f"file exceeds the {settings.resume_max_upload_mb} MB limit"
+        raise FileTooLargeError(msg)
     data = await file.read()
     if len(data) > max_bytes:
-        raise FileTooLargeError(f"file exceeds the {settings.resume_max_upload_mb} MB limit")
+        msg = f"file exceeds the {settings.resume_max_upload_mb} MB limit"
+        raise FileTooLargeError(msg)
 
     kind = sniff_file_type(filename, data[:8])
     candidate = await get_or_create_candidate(session)
 
     text, page_count = await asyncio.to_thread(_extract_from_bytes, data, kind)
     if not text.strip():
-        raise TextExtractionError(
-            "no readable text found — scanned or image-only PDFs are not supported"
-        )
+        msg = "no readable text found — scanned or image-only PDFs are not supported"
+        raise TextExtractionError(msg)
 
     destination = _save_file(settings.uploads_dir, data, kind)
     parsed_at = datetime.now(UTC)

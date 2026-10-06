@@ -3,7 +3,7 @@ import math
 import random
 from collections.abc import Callable
 from types import SimpleNamespace
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import litellm
 
@@ -12,7 +12,13 @@ from app.adapters.job_sources.base import (
     JobPostingData,
     JobSearchQuery,
     RawJobPosting,
+    SourceFilterDecl,
 )
+from app.schemas.profile import StructuredProfile
+from app.services import profile_derivation
+
+if TYPE_CHECKING:
+    import uuid
 
 VALID_PROFILE: dict[str, Any] = {
     "contact": {
@@ -33,8 +39,8 @@ VALID_PROFILE: dict[str, Any] = {
             "company": "Acme Corp",
             "title": "Senior Data Analyst",
             "start_date": "Mar 2021",
-            "end_date": None,
-            "is_current": True,
+            "end_date": "Dec 2022",
+            "is_current": False,
             "bullets": ["Led reporting", "Built dashboards"],
         }
     ],
@@ -57,6 +63,13 @@ VALID_PROFILE: dict[str, Any] = {
         {"title": "Languages", "entries": ["English - native", "German - fluent"]},
     ],
 }
+
+
+def derived_valid_profile() -> dict[str, Any]:
+    """VALID_PROFILE as the extraction/save pipeline stores it post-#32."""
+    profile = StructuredProfile.model_validate(VALID_PROFILE)
+    profile_derivation.apply_derived_fields(profile)
+    return profile.model_dump(mode="json")
 
 
 def llm_response(
@@ -107,6 +120,7 @@ class FakeJobSource:
         supports_exclusions: bool = False,
         postings: list[JobPostingData] | None = None,
         error: Exception | None = None,
+        filters: list[SourceFilterDecl] | None = None,
     ) -> None:
         self.name = name
         self.is_official_api = False
@@ -115,7 +129,11 @@ class FakeJobSource:
         self._configured = configured
         self._postings = postings or []
         self._error = error
+        self._filters = filters or []
         self.queries: list[JobSearchQuery] = []
+
+    def filters(self) -> list[SourceFilterDecl]:
+        return self._filters
 
     def is_configured(self) -> bool:
         return self._configured
@@ -133,7 +151,8 @@ class FakeJobSource:
         for posting in self._postings:
             if posting.external_id == raw.external_id:
                 return posting
-        raise ConnectorError(f"un-mappable posting {raw.external_id}")
+        msg = f"un-mappable posting {raw.external_id}"
+        raise ConnectorError(msg)
 
 
 def fake_vector(text: str, dim: int = 768) -> list[float]:
@@ -163,3 +182,33 @@ def install_aembedding(monkeypatch: Any, handler: Callable[..., object]) -> list
 
     monkeypatch.setattr(litellm, "aembedding", _spy)
     return calls
+
+
+async def seed_profile_light(name: str = "Seeker") -> Any:
+    """Create a profile (no embedding) and return its id."""
+
+    from sqlalchemy import select
+
+    from app.core.db import session_factory
+    from app.models import Candidate, Profile
+    from app.schemas.profile import StructuredProfile
+
+    async with session_factory() as session:
+        result = await session.execute(select(Candidate).limit(1))
+        candidate = result.scalars().first()
+        if candidate is None:
+            candidate = Candidate()
+            session.add(candidate)
+            await session.flush()
+        profile = Profile(
+            candidate_id=candidate.id,
+            name=name,
+            structured_profile=StructuredProfile.model_validate(VALID_PROFILE).model_dump(
+                mode="json"
+            ),
+        )
+        session.add(profile)
+        await session.flush()
+        profile_id: uuid.UUID = profile.id
+        await session.commit()
+        return profile_id

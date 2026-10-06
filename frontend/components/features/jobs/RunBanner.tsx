@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import { useJobSearchStatus } from "@/hooks/use-job-search";
+import { formatUsd } from "@/lib/format-cost";
 
 const STATUS_LABELS: Record<string, string> = {
   pending: "Run queued…",
@@ -23,17 +24,21 @@ const STATUS_STYLES: Record<string, string> = {
 
 export function RunBanner({
   searchId,
+  profileId,
   onDismiss,
 }: {
-  searchId: string | null;
+  searchId: string;
+  profileId: string | null;
   onDismiss: () => void;
 }) {
-  const status = useJobSearchStatus(searchId);
+  const status = useJobSearchStatus(searchId, profileId);
 
-  if (searchId === null) return null;
-
-  const active = status.isPending || (status.data?.status === "pending" || status.data?.status === "running");
-  const tone = status.data !== undefined ? (STATUS_STYLES[status.data.status] ?? "border-gray-200 bg-white") : "border-violet-200 bg-violet-50/80";
+  const active =
+    status.isPending || status.data?.status === "pending" || status.data?.status === "running";
+  const tone =
+    status.data !== undefined
+      ? (STATUS_STYLES[status.data.status] ?? "border-gray-200 bg-white")
+      : "border-violet-200 bg-violet-50/80";
 
   return (
     <section
@@ -41,7 +46,10 @@ export function RunBanner({
       className={`rounded-3xl border p-5 shadow-lg shadow-gray-100 ${tone}`}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span aria-live="polite" className="flex items-center gap-2.5 text-base font-bold tracking-tight text-gray-900">
+        <span
+          aria-live="polite"
+          className="flex items-center gap-2.5 text-base font-bold tracking-tight text-gray-900"
+        >
           {active && (
             <span
               className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-violet-600 border-t-transparent"
@@ -90,30 +98,28 @@ export function RunBanner({
                 key={outcome.source}
                 className="flex flex-wrap items-center gap-2 rounded-xl border border-white bg-white/80 px-3 py-2 text-sm shadow-sm"
               >
-                <span className="font-semibold text-gray-900">
-                  {outcome.source}
-                </span>
+                <span className="font-semibold text-gray-900">{outcome.source}</span>
                 <Badge
                   variant={
                     outcome.status === "ok"
                       ? "success"
-                      : (outcome.status === "failed" ? "danger" : "warn")
+                      : outcome.status === "failed"
+                        ? "danger"
+                        : "warn"
                   }
                 >
                   {outcome.status}
                 </Badge>
-                {outcome.status === "ok" && <span className="text-gray-600">{outcome.count} posting(s) stored</span>}
-                {outcome.warning && (
-                  <span className="text-amber-700">{outcome.warning}</span>
+                {outcome.status === "ok" && (
+                  <span className="text-gray-600">{outcome.count} posting(s) stored</span>
                 )}
+                {outcome.warning && <span className="text-amber-700">{outcome.warning}</span>}
               </li>
             ))}
             {status.data.matching && (
               <li className="flex flex-wrap items-center gap-2 rounded-xl border border-white bg-white/80 px-3 py-2 text-sm shadow-sm">
                 <span className="font-semibold text-gray-900">matching</span>
-                <Badge
-                  variant={status.data.matching.status === "ok" ? "success" : "warn"}
-                >
+                <Badge variant={status.data.matching.status === "ok" ? "success" : "warn"}>
                   {status.data.matching.status}
                 </Badge>
                 {status.data.matching.status === "ok" && (
@@ -122,12 +128,13 @@ export function RunBanner({
                     {status.data.matching.rationale_count} rationale(s) · rerank tokens{" "}
                     {status.data.matching.rerank_prompt_tokens}+
                     {status.data.matching.rerank_completion_tokens}
+                    {status.data.matching.rerank_cost_usd !== null &&
+                      status.data.matching.rerank_cost_usd !== undefined &&
+                      ` · ≈ ${formatUsd(status.data.matching.rerank_cost_usd)}`}
                   </span>
                 )}
                 {status.data.matching.warning && (
-                  <span className="text-amber-700">
-                    {status.data.matching.warning}
-                  </span>
+                  <span className="text-amber-700">{status.data.matching.warning}</span>
                 )}
               </li>
             )}
@@ -135,14 +142,14 @@ export function RunBanner({
           {status.data.status === "succeeded" && (
             <p className="text-sm text-gray-700">
               Matches are ranked against the profile — see the ranked matches below. The
-              why-this-matches rationale covers the top postings; it refreshes on the next
-              search after profile changes.
+              why-this-matches rationale covers the top postings; it refreshes on the next search
+              after profile changes.
             </p>
           )}
           {status.data.status === "failed" && (
             <p role="alert" className="text-sm text-red-700">
-              Every source failed — nothing was ingested. Check the per-source warnings
-              above (usually a missing or rejected API key), fix the configuration in{" "}
+              Every source failed — nothing was ingested. Check the per-source warnings above
+              (usually a missing or rejected API key), fix the configuration in{" "}
               <Link
                 href="/setup"
                 className="font-semibold text-violet-700 underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"

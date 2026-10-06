@@ -1,14 +1,15 @@
 # AGENTS.md
 
 Guidance for AI coding agents working in this repo. These rules apply to every task.
-Detailed per-area standards live in `docs/instructions/` and are loaded automatically via `opencode.json`.
+Detailed per-area standards live in `docs/instructions/` and are loaded automatically: OpenCode via `opencode.json`, Claude Code via the root `CLAUDE.md` (which `@`-imports each instruction file — add new files there too).
+Rules marked *(v5 #40)*–*(v5 #47)* in those files are the target state that the [v5 plans](docs/plans/v5/v5-hardening-plan.md) bring the code up to.
 
 ## Project
 
 AI Job Assistant — self-hosted, single-user, BYOK (bring-your-own-key) web app:
 resume upload → AI-extracted, human-reviewed profile → multi-source job discovery → ranked matches with explanations.
 
-- **Plan of record:** `docs/plans/v1-implementation-plan.md` — read it before non-trivial work. Do not silently drift from its scope; if something in it is wrong or changed, say so in the response.
+- **Plan of record:** the plan for the version in progress under `docs/plans/v{N}/` (v1–v4 are shipped; `docs/plans/v1/v1-implementation-plan.md` defines the product scope) — read it before non-trivial work. Do not silently drift from its scope; if something in it is wrong or changed, say so in the response.
 
 ## Stack
 
@@ -36,7 +37,7 @@ backend/
 frontend/
   app/, components/ (ui/ + features/), lib/, hooks/
 docs/instructions/  # coding standards (always loaded)
-docs/plans/         # versioned implementation plans
+docs/plans/         # versioned implementation plans (v1/, v2/, v3/ per-version folders)
 ```
 
 ## Non-negotiables
@@ -47,10 +48,20 @@ docs/plans/         # versioned implementation plans
 4. **Never commit secrets.** Keys live in `.env` (gitignored), documented in `.env.example`.
 5. **Never trust the client.** Backend re-validates everything with pydantic regardless of frontend checks.
 
+## Git workflow
+
+- **Milestone branch, one per version.** At milestone start, cut `v{N}/milestone` (e.g. `v4/milestone`) from `main`. This is the integration target for the whole milestone; `main` only receives the milestone as one reviewed unit.
+- **One branch per issue (off the milestone branch).** Create `v{N}/{issue-number}-{slug}` (e.g. `v4/31-query-builder-cache`) from `v{N}/milestone` before starting an issue; docs-only changes may go straight to `main`.
+- **Merge issues into the milestone branch on close, not before.** When the issue is tested and complete: merge its branch into `v{N}/milestone`, merging `main` into the milestone branch at the same time (`git merge main` into the milestone first — this is the *one* allowed merge direction into the milestone). Resolving drift in small chunks keeps the final milestone→main merge conflict-free. Then delete the issue branch (local + remote). Run the lint/test gates before each merge so the milestone branch is always green.
+- **Milestone merge needs owner review.** When every issue in the milestone is done and tested: merge `v{N}/milestone` into `main` with `--no-ff` (one recoverable milestone commit), `git pull`, then delete the milestone branch (local + remote).
+- **With multiple milestones in flight** (e.g. two collaborators): `main` moves with code, not just docs — merge `main` into your milestone branch at *every* issue merge (more often if main is churny), avoid scoping two active milestones to the same hot files (`core/config.py`, `models/`, `adapters/job_sources/`, match scoring), and never cut a milestone branch from anything but current `main`.
+- Never commit directly to `main` for issue work; never rebase the milestone branch mid-milestone (keeps tested states testable); keep the milestone-commit message convention.
+
+
 ## Definition of done (before reporting a task complete)
 
-- Backend touched: `ruff check . && ruff format --check . && pytest` pass (run in `backend/`).
-- Frontend touched: `npm run lint && npm run build` pass (run in `frontend/`).
+- Backend touched: `ruff check . && ruff format --check . && pyright && pytest --cov=app` pass (run in `backend/`, scratch `TEST_DATABASE_URL` set so the DB tests and the coverage floor are real), and `pre-commit run --all-files` is clean.
+- Frontend touched: `npm run lint && npm run format:check && npm run typecheck && npm test && npm run build` pass (run in `frontend/`).
 - Model changes: migration generated, reviewed, and included in the same change.
 - New external dep: justified in the response (prefer stdlib / what the stack already uses).
 - Setup or behavior changed: `.env.example` / README updated.
@@ -61,12 +72,13 @@ docs/plans/         # versioned implementation plans
 | What | Command |
 |---|---|
 | Backend dev | `uvicorn app.main:app --reload` (in `backend/`) |
-| Backend lint/format | `ruff check .` / `ruff format .` (in `backend/`) |
-| Backend tests | `pytest` (in `backend/`) |
+| Backend lint/format/types | `ruff check .` / `ruff format .` / `pyright` (in `backend/`) |
+| Backend tests | `pytest --cov=app` (in `backend/`) |
 | New migration | `alembic revision --autogenerate -m "descriptive_message"` (in `backend/`) |
 | Apply migrations | `alembic upgrade head` (in `backend/`) |
 | Frontend dev | `npm run dev` (in `frontend/`) |
-| Frontend lint/build | `npm run lint` / `npm run build` (in `frontend/`) |
+| Frontend lint/format/types/tests | `npm run lint` / `npm run format` (`format:check`) / `npm run typecheck` / `npm test` (in `frontend/`) |
+| Frontend build | `npm run build` (in `frontend/`) |
 | Full stack | `docker compose up -d` |
 | Re-render doc diagrams | `node scripts/render-diagrams.mjs` (repo root; needs `@mermaid-js/mermaid-cli`) |
 

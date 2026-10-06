@@ -1,6 +1,6 @@
 # 1 — Getting Started
 
-**Status: live** (scaffold + health check)
+**Status: live**
 
 ## What you need
 
@@ -83,11 +83,11 @@ To explore the dashboard without any providers, seed a synthetic dataset (profil
 "Jane Doe (demo)" plus deterministic postings and matches — zero LLM/Apify spend):
 
 ```bash
-docker cp backend/scripts/seed_demo.py ai_job_assistant-api-1:/tmp/
-docker exec ai_job_assistant-api-1 python /tmp/seed_demo.py
+docker compose cp backend/scripts/seed_demo.py api:/tmp/
+docker compose exec api python /tmp/seed_demo.py
 ```
 
-Seeded postings carry the `demo-` external_id prefix; `python /tmp/seed_demo.py --reset`
+Seeded postings carry the `demo-` external_id prefix; `docker compose exec api python /tmp/seed_demo.py --reset`
 removes only demo data, never real search results.
 
 Upload a resume on the home page, then save its AI draft as one or more named profiles —
@@ -102,7 +102,7 @@ Engineer") that you review, edit, and later match separately. See the next guide
 | Port 3000/8000 already in use | Stop the other process or change the port mapping in `docker-compose.yml` |
 | Frontend shows stale UI after code changes | The `web` container is missing the live source mounts (or predates them) — `docker compose up -d --build web`, then hard-refresh the browser |
 | `llm_configured:false` | `GEMINI_API_KEY` missing in `.env`; restart `api` after editing |
-| Frontend can't reach API | `NEXT_PUBLIC_API_BASE_URL` should be `http://localhost:8000` |
+| Frontend can't reach API | `NEXT_PUBLIC_API_BASE_URL` should be `http://localhost:8000`. If you serve the frontend from another origin, add it to the backend's `CORS_ORIGINS` (a JSON list, default `["http://localhost:3000"]`) and restart `api` |
 
 ## Next
 

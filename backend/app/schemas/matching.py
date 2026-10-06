@@ -1,3 +1,4 @@
+import enum
 import uuid
 from datetime import datetime
 from typing import Literal
@@ -11,16 +12,52 @@ _MAX_LOCATION = 200
 _MAX_RATIONALE = 600
 
 MatchSort = Literal["final_score", "vector_score", "posted_at"]
+MatchListStatus = Literal["active", "saved", "dismissed", "all"]
+
+
+class MatchSignalKind(enum.StrEnum):
+    open = "open"
+    save = "save"
+    unsave = "unsave"
+    dismiss = "dismiss"
+    undismiss = "undismiss"
+
+
+class MatchSignalRequest(BaseModel):
+    kind: MatchSignalKind
+
 
 __all__ = [
     "MatchFilters",
+    "MatchListStatus",
     "MatchQueryParams",
+    "MatchRebuildStatusResponse",
     "MatchResponse",
+    "MatchSignalKind",
+    "MatchSignalRequest",
     "MatchSort",
+    "MatchingOutcome",
     "RerankItem",
     "RerankResult",
-    "MatchingOutcome",
 ]
+
+
+class MatchRebuildStatusResponse(BaseModel):
+    """Rebuild-run status; `id=None`, `status="idle"` when the profile never rebuilt.
+
+    `stale_count` is computed at read time: stored matches whose posting is
+    outside the profile's scoped corpus — the discrepancy the rebuild cleans.
+    """
+
+    id: uuid.UUID | None = None
+    profile_id: uuid.UUID
+    status: Literal["idle", "pending", "running", "succeeded", "failed"]
+    stale_count: int
+    corpus_count: int
+    scored_count: int
+    warning: str | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
 
 
 class MatchFilters(BaseModel):
@@ -52,6 +89,7 @@ class MatchQueryParams(MatchFilters):
         ),
     )
     sort: MatchSort = "final_score"
+    status: MatchListStatus = "active"
     limit: int = Field(default=50, ge=1, le=200)
     offset: int = Field(default=0, ge=0)
 
@@ -64,16 +102,23 @@ class RerankItem(BaseModel):
 
 
 class RerankResult(BaseModel):
-    items: list[RerankItem] = Field(default_factory=list)
+    items: list[RerankItem] = Field(default_factory=list[RerankItem])
 
 
 class MatchResponse(BaseModel):
     id: uuid.UUID
     job_posting: JobPostingSummary
-    vector_score: float
+    vector_score: float | None = None
+    skill_score: float | None = None
+    recency_score: float | None = None
+    salary_score: float | None = None
     role_fit: float | None = None
     company_fit: float | None = None
     final_score: float
     rationale: str | None = Field(default=None, max_length=_MAX_RATIONALE)
     created_at: datetime
     updated_at: datetime
+    first_opened_at: datetime | None = None
+    clicked_apply_at: datetime | None = None
+    saved_at: datetime | None = None
+    dismissed_at: datetime | None = None

@@ -10,22 +10,14 @@ import { Card } from "@/components/ui/card";
 import { useProfile, useUpdateProfile } from "@/hooks/use-profiles";
 import { useResumeDraft } from "@/hooks/use-resume-draft";
 
-export function MergeMode({
-  profileId,
-  resumeId,
-}: {
-  profileId: string;
-  resumeId: string;
-}) {
+export function MergeMode({ profileId, resumeId }: { profileId: string; resumeId: string }) {
   const router = useRouter();
   const profileQuery = useProfile(profileId);
   const draftQuery = useResumeDraft(resumeId);
   const updateProfile = useUpdateProfile();
 
   if (profileQuery.isPending || draftQuery.isPending) {
-    return (
-      <div className="h-96 animate-pulse rounded-3xl bg-white/60" aria-live="polite" />
-    );
+    return <div className="h-96 animate-pulse rounded-3xl bg-white/60" aria-live="polite" />;
   }
 
   if (profileQuery.isError) {
@@ -70,7 +62,7 @@ export function MergeMode({
         isSaving={updateProfile.isPending}
         saveError={updateProfile.error?.message ?? null}
         savedRevisionSource={updateProfile.data?.last_revision?.source ?? null}
-        onSave={(merged) =>
+        onSave={(merged) => {
           updateProfile.mutate(
             {
               profileId,
@@ -78,14 +70,19 @@ export function MergeMode({
             },
             {
               onSuccess: () => {
-                void router.replace(`/profile?profile=${profileId}`);
+                router.replace(`/profile?profile=${profileId}`);
               },
             },
-          )
-        }
-        onDiscard={() => void router.replace(`/profile?profile=${profileId}`)}
+          );
+        }}
+        onDiscard={() => {
+          router.replace(`/profile?profile=${profileId}`);
+        }}
       />
-      <Link href="/profile" className="text-center text-sm font-medium text-gray-600 underline underline-offset-2 hover:text-gray-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600">
+      <Link
+        href="/profile"
+        className="text-center text-sm font-medium text-gray-600 underline underline-offset-2 hover:text-gray-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
+      >
         Back to all profiles
       </Link>
     </div>

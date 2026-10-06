@@ -24,6 +24,13 @@ const numericText = z
     message: "Must be a number",
   });
 
+const country = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .regex(/^[a-z]{2}$/, "Two-letter country code, e.g. in")
+  .or(z.literal(""));
+
 export const profileFormSchema = z
   .object({
     contact: z.object({
@@ -31,6 +38,7 @@ export const profileFormSchema = z
       email: z.string(),
       phone: z.string(),
       location: z.string(),
+      country,
       links: z.array(
         z.object({
           label: z.string(),
@@ -89,10 +97,13 @@ export const profileFormSchema = z
     ),
     extra_sections: z.array(
       z.object({
-        title: z.string().min(1, "Section title is required"),
+        title: z.string(),
         entries: z.array(z.string()),
       }),
     ),
+    // Server-derived display value (issue #32); read back from the API but
+    // never sent — the backend recomputes it on every save.
+    years_of_experience: z.string(),
     preferences: z.object({
       target_title: z.string(),
       target_location: z.string(),
@@ -101,6 +112,8 @@ export const profileFormSchema = z
       salary_max: numericText,
       currency: z.string(),
       seniority: seniority,
+      // Server-managed provenance for seniority; display-only here.
+      seniority_source: z.string(),
       work_authorization: z.string(),
     }),
   })
@@ -132,6 +145,7 @@ const defaultPreferences = {
   salary_max: "",
   currency: "",
   seniority: "" as (typeof seniority)["options"][number],
+  seniority_source: "",
   work_authorization: "",
 };
 
@@ -142,65 +156,66 @@ export function toFormValues(profile: StructuredProfile): ProfileFormValues {
       email: profile.contact.email ?? "",
       phone: profile.contact.phone ?? "",
       location: profile.contact.location ?? "",
-      links: (profile.contact.links ?? []).map((link) => ({
+      country: profile.contact.country ?? "",
+      links: profile.contact.links.map((link) => ({
         label: link.label ?? "",
         url: link.url,
       })),
     },
     headline: profile.headline ?? "",
     summary: profile.summary ?? "",
-    skills: profile.skills ?? [],
-    experience: (profile.experience ?? []).map((item) => ({
+    skills: profile.skills,
+    experience: profile.experience.map((item) => ({
       company: item.company ?? "",
       title: item.title ?? "",
       location: item.location ?? "",
       start_date: item.start_date ?? "",
       end_date: item.end_date ?? "",
-      is_current: item.is_current ?? false,
-      bullets: item.bullets ?? [],
+      is_current: item.is_current,
+      bullets: item.bullets,
     })),
-    projects: (profile.projects ?? []).map((item) => ({
+    projects: profile.projects.map((item) => ({
       name: item.name,
       role: item.role ?? "",
       url: item.url ?? "",
       start_date: item.start_date ?? "",
       end_date: item.end_date ?? "",
       description: item.description ?? "",
-      bullets: item.bullets ?? [],
-      technologies: item.technologies ?? [],
+      bullets: item.bullets,
+      technologies: item.technologies,
     })),
-    education: (profile.education ?? []).map((item) => ({
+    education: profile.education.map((item) => ({
       institution: item.institution ?? "",
       degree: item.degree ?? "",
       field: item.field ?? "",
       start_date: item.start_date ?? "",
       end_date: item.end_date ?? "",
     })),
-    certifications: (profile.certifications ?? []).map((item) => ({
+    certifications: profile.certifications.map((item) => ({
       name: item.name,
       issuer: item.issuer ?? "",
       issued_date: item.issued_date ?? "",
     })),
-    awards: (profile.awards ?? []).map((item) => ({
+    awards: profile.awards.map((item) => ({
       title: item.title,
       issuer: item.issuer ?? "",
       issued_date: item.issued_date ?? "",
     })),
-    extra_sections: (profile.extra_sections ?? []).map((section) => ({
+    extra_sections: profile.extra_sections.map((section) => ({
       title: section.title,
-      entries: section.entries ?? [],
+      entries: section.entries,
     })),
+    years_of_experience: profile.years_of_experience?.toString() ?? "",
     preferences: profile.preferences
       ? {
           target_title: profile.preferences.target_title ?? "",
           target_location: profile.preferences.target_location ?? "",
-          remote_preference: (profile.preferences.remote_preference ??
-            "") as (typeof remotePreference)["options"][number],
+          remote_preference: profile.preferences.remote_preference ?? "",
           salary_min: profile.preferences.salary_min?.toString() ?? "",
           salary_max: profile.preferences.salary_max?.toString() ?? "",
           currency: profile.preferences.currency ?? "",
-          seniority: (profile.preferences.seniority ??
-            "") as (typeof seniority)["options"][number],
+          seniority: profile.preferences.seniority ?? "",
+          seniority_source: profile.preferences.seniority_source ?? "",
           work_authorization: profile.preferences.work_authorization ?? "",
         }
       : { ...defaultPreferences },
@@ -240,6 +255,7 @@ export function toProfilePayload(values: ProfileFormValues): StructuredProfile {
       email: optionalText(values.contact.email),
       phone: optionalText(values.contact.phone),
       location: optionalText(values.contact.location),
+      country: optionalText(values.contact.country),
       links: values.contact.links
         .filter((link) => link.url.trim() !== "")
         .map((link) => ({

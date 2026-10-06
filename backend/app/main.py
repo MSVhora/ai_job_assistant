@@ -1,4 +1,5 @@
 import logging
+from typing import TYPE_CHECKING, cast
 
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
@@ -11,7 +12,11 @@ from app.core.errors import (
     domain_error_handler,
     request_validation_error_handler,
 )
+from app.core.pagination import TOTAL_COUNT_HEADER
 from app.routers import ats, health, jobs, matches, profile, resume, setup
+
+if TYPE_CHECKING:
+    from starlette.types import ExceptionHandler
 
 logging.basicConfig(level=logging.INFO)
 
@@ -23,8 +28,9 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=settings.cors_origins,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Content-Type", "Accept"],
+        expose_headers=[TOTAL_COUNT_HEADER],
     )
     application.include_router(health.router)
     application.include_router(setup.router)
@@ -33,8 +39,10 @@ def create_app() -> FastAPI:
     application.include_router(ats.router)
     application.include_router(jobs.router)
     application.include_router(matches.router)
-    application.add_exception_handler(DomainError, domain_error_handler)
-    application.add_exception_handler(RequestValidationError, request_validation_error_handler)
+    application.add_exception_handler(DomainError, cast("ExceptionHandler", domain_error_handler))
+    application.add_exception_handler(
+        RequestValidationError, cast("ExceptionHandler", request_validation_error_handler)
+    )
     application.add_middleware(DbCommitMiddleware)
     return application
 

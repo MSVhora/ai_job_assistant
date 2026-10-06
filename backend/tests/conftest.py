@@ -1,5 +1,6 @@
 import os
 import shutil
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
@@ -50,6 +51,14 @@ async def clean_tables(migrated_database: None) -> None:
 
 
 @pytest.fixture(autouse=True)
+def fresh_settings() -> Iterator[None]:
+    from app.core.config import get_settings
+
+    yield
+    get_settings.cache_clear()
+
+
+@pytest.fixture(autouse=True)
 def no_real_llm(monkeypatch: pytest.MonkeyPatch) -> None:
     """Default-deny completion fake.
 
@@ -63,7 +72,8 @@ def no_real_llm(monkeypatch: pytest.MonkeyPatch) -> None:
     from app.adapters.llm import LLMError
 
     async def _no_llm(**kwargs: object) -> object:
-        raise LLMError("LLM provider not faked in tests")
+        msg = "LLM provider not faked in tests"
+        raise LLMError(msg)
 
     monkeypatch.setattr(litellm, "acompletion", _no_llm)
 

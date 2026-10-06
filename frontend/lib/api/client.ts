@@ -12,11 +12,13 @@ const STATUS_FALLBACK_MESSAGES: Record<number, string> = {
 
 export class ApiError extends Error {
   readonly status: number;
+  readonly body?: unknown;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, body?: unknown) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.body = body;
   }
 }
 
@@ -30,6 +32,16 @@ export class ExtractionFailedError extends ApiError {
   }
 }
 
+export class DuplicateRunError extends ApiError {
+  readonly activeSearchId: string | null;
+
+  constructor(activeSearchId: string | null) {
+    super(409, `A search for this profile and source is already running`);
+    this.name = "DuplicateRunError";
+    this.activeSearchId = activeSearchId;
+  }
+}
+
 function formatValidationDetail(detail: unknown[]): string {
   const parts: string[] = [];
   for (const item of detail) {
@@ -38,25 +50,39 @@ function formatValidationDetail(detail: unknown[]): string {
     const location = Array.isArray(entry.loc)
       ? entry.loc.filter((part) => part !== "body").join(".")
       : "";
-    const message = String(entry.msg ?? "invalid value");
+    const message = typeof entry.msg === "string" ? entry.msg : "invalid value";
     parts.push(location === "" ? message : `${location}: ${message}`);
   }
-  if (parts.length === 0) return STATUS_FALLBACK_MESSAGES[422];
+  if (parts.length === 0) return STATUS_FALLBACK_MESSAGES[422] ?? "The request was invalid.";
   return `Invalid input — ${parts.join("; ")}`;
 }
 
-async function errorMessage(response: Response, path: string): Promise<string> {
+async function parseErrorBody(
+  response: Response,
+  path: string,
+): Promise<{ message: string; body: unknown }> {
   try {
     const body: unknown = await response.json();
     if (typeof body === "object" && body !== null && "detail" in body) {
       const detail: unknown = body.detail;
-      if (typeof detail === "string") return detail;
-      if (Array.isArray(detail)) return formatValidationDetail(detail);
+      if (typeof detail === "string") return { message: detail, body };
+      if (Array.isArray(detail)) {
+        return { message: formatValidationDetail(detail), body };
+      }
     }
+    return { message: JSON.stringify(body), body };
   } catch {
     // fall through to the fallback message
   }
-  return STATUS_FALLBACK_MESSAGES[response.status] ?? `API error ${response.status} on ${path}`;
+  return {
+    message: STATUS_FALLBACK_MESSAGES[response.status] ?? `API error ${response.status} on ${path}`,
+    body: undefined,
+  };
+}
+
+async function fail(response: Response, path: string): Promise<never> {
+  const { message, body } = await parseErrorBody(response, path);
+  throw new ApiError(response.status, message, body);
 }
 
 type ApiFetchInit = RequestInit & { timeoutMs?: number };
@@ -79,12 +105,15 @@ export async function apiFetch<T>(path: string, init?: ApiFetchInit): Promise<T>
     throw new ApiError(0, `network error: ${cause instanceof Error ? cause.message : "unknown"}`);
   }
   if (!response.ok) {
-    throw new ApiError(response.status, await errorMessage(response, path));
+    await fail(response, path);
   }
   return (await response.json()) as T;
 }
 
-export async function apiFetchWithTotal<T>(path: string, init?: ApiFetchInit): Promise<{ items: T; total: number }> {
+export async function apiFetchWithTotal<T>(
+  path: string,
+  init?: ApiFetchInit,
+): Promise<{ items: T; total: number }> {
   const { timeoutMs = DEFAULT_TIMEOUT_MS, ...requestInit } = init ?? {};
   let response: Response;
   const headers = new Headers(requestInit.headers);
@@ -101,7 +130,7 @@ export async function apiFetchWithTotal<T>(path: string, init?: ApiFetchInit): P
     throw new ApiError(0, `network error: ${cause instanceof Error ? cause.message : "unknown"}`);
   }
   if (!response.ok) {
-    throw new ApiError(response.status, await errorMessage(response, path));
+    await fail(response, path);
   }
   const items = (await response.json()) as T;
   const total = Number(response.headers.get("X-Total-Count"));

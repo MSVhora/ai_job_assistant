@@ -2,7 +2,9 @@
 
 How AI Job Assistant fits together — components, data flows, and the database schema.
 For day-to-day usage see the [user guide](guide/README.md); for scope see the
-[v1 implementation plan](plans/v1-implementation-plan.md).
+[v4 search-relevance plan](plans/v4/v4-search-relevance-plan.md) (earlier:
+[v1](plans/v1/v1-implementation-plan.md), [v2](plans/v2/v2-implementation-plan.md),
+[v3](plans/v3/v3-implementation-plan.md)).
 
 ## System overview (flow diagram)
 
@@ -39,7 +41,10 @@ Non-negotiable layering rules (enforced by the
 - `routers/` — HTTP only: parse, call a service, return a response model
 - `services/` — business logic; raise domain errors
 - `models/` — SQLAlchemy 2.0 ORM; the schema source of truth
-- `adapters/llm.py` — the **only** place that talks to an LLM provider; it also owns
+- `adapters/llm.py` — the **only** place that talks to an LLM provider; it prices calls
+  (`estimate_cost`: LiteLLM's price map, optional `LLM_PRICE_*` overrides, `unknown` when
+  neither knows the model), logs `cost_usd` on every call and backs the confirm-gated
+  cost estimates; it also owns
   resilience: the shared retry policy (`adapters/retry.py`, configurable via
   `LLM_RETRY_*`, default 3 attempts) applies exponential backoff with jitter on
   429/5xx/transport errors across LLM and job-source calls, honouring a provider's
@@ -102,20 +107,28 @@ sequenceDiagram
     participant G as Gemini (LiteLLM)
     participant D as Postgres + pgvector
 
-    B->>A: POST /api/jobs/search
-    A-->>B: background run accepted
+    B->>A: POST /api/jobs/search (one source per run, with profile_id and filters)
+    A->>A: resolve omitted filters from the profile (country, location, salary — request values always win)
+    A->>D: sweep runs stuck in pending/running past MAX_RUN_AGE_MINUTES → marked failed (lock released)
+    A->>D: active-run check — a non-terminal run for the same (profile, source)? → 409 + active run id
+    A-->>B: background run accepted (resolved payload echoed on the run)
     A->>D: job_search row (status + per-source outcomes)
-    A->>C: query enabled sources
+    A->>C: query the run's single source (freshness: Adzuna max_days_old, LinkedIn datePosted bucket)
     C-->>A: raw postings (failures skip + warn)
     A->>A: normalize + dedupe (source, external_id) — upsert refresh
     A->>G: embed descriptions
-    A->>D: upsert postings + embeddings
-    A->>D: hard filters + cosine → top N
-    A->>G: re-rank top N + rationale
+    A->>D: upsert postings + embeddings + search_posting rows (append-only)
+    A->>D: cross-source dedupe pass — trigram+company+country grouping → canonical_id, merge rules (issue #38)
+    A->>D: hard filters + hybrid signals (cosine, skill overlap, recency, salary fit) → ranked candidates (issue #37)
+    A->>G: re-rank top N by hybrid score + rationale
     A->>D: store matches
-    B->>A: GET /api/jobs/searches/{id} → run status + warnings
-    B->>A: GET /api/jobs/searches/{id}/postings → unranked run results
+    B->>A: GET /api/jobs/searches (profile_id) -> recent runs
+    B->>A: GET /api/jobs/searches/{id}?profile_id= → run status + warnings (404 unless owned)
+    B->>A: GET /api/jobs/searches/{id}/postings?profile_id= → unranked run results (404 unless owned)
     B->>A: GET /api/matches → ranked + "why this matches"
+    B->>A: POST /api/matches/{id}/signals · GET /api/matches/{id}/apply → engagement signals (issue #39)
+    B->>A: POST /api/profiles/{id}/tune-queries → confirm-gated LLM rewrite of stored query specs (issue #39)
+    B->>A: POST · GET /api/profiles/{id}/rebuild-matches → scoped corpus rebuild run (issue #25)
 ```
 
 ![search-matching-sequence diagram](./assets/search-matching-sequence.svg)
@@ -125,6 +138,51 @@ and are tracked in `job_search` (status + per-source `{source, status, count, wa
 outcomes, queryable via `GET /api/jobs/searches/{id}`). A failing source is a run warning,
 never an error. Background runs open fresh sessions from `session_factory` and commit
 explicitly, since they outlive the request scope.
+
+**One source per run (v3 issue #30):** `JobSearchRequest.source` is a required single
+source (no more `sources` list); `source_queries` may only refine that source (mismatched
+keys → 422). The UI's Start search wizard enforces the same shape. With a single source a
+run is `succeeded` or `failed` — the `partial` status remains only for older stored rows.
+
+**One active run per (profile, source) (v4 issue #36):** a partial unique index
+`uq_job_search_active_run ON job_search (profile_id, source) WHERE status IN ('pending',
+'running')` (enforcement survives multi-worker; `job_search.source` was backfilled from the
+query echo in migration 0017) rejects a duplicate start; `start_search` returns **409
+Conflict with the active run's id** (`{"detail", "active_search_id"}`), and the wizard
+offers a "Go to active run" button wired into the run banner. Runs on *other* sources for
+the same profile stay concurrent. Runs stuck past `MAX_RUN_AGE_MINUTES` (default 30) are
+marked failed by a sweeper at the top of `start_search`, releasing the lock.
+
+**Profile scoping (v3 issue #24):** every search is owned by a profile —
+`JobSearchRequest.profile_id` is required (400 when absent, 404 for an unknown profile),
+`job_search.profile_id` is NOT NULL, and both run-status/read endpoints require a
+`profile_id` query param and answer 404 when it does not match the run's owner
+(single-user app: state ownership, never leak across profiles). There is no
+`latest_profile_id` fallback anymore. The posting↔search link lives in the append-only
+`search_posting` join table (a posting re-found by a later search gains a row; nothing is
+overwritten), which also replaces the mutable `job_posting.job_search_id` pointer.
+
+**Scoped matching corpus + rebuild (v3 issue #25):** `rescore_matches` scores only the
+profile's own corpus (postings joined through `search_posting → job_search.profile_id`)
+— never the global postings table. Pre-scoping matches are never auto-deleted: the
+explicit `POST /api/profiles/{id}/rebuild-matches` runs the scoped rescore as a
+background task (status/metadata queryable via `GET`, banner shows corpus size) and
+deletes that profile's out-of-corpus matches. On `/jobs` the selected profile rides in
+the `?profile=` URL param and the search form refuses to submit without one.
+
+**Read-side freshness (v3 issue #26):** matches and search results share one SQL filter —
+closed postings (`is_closed`) or expired postings (`expires_at < now()`) never surface;
+with no source-reported expiry a posting goes stale after `STALE_POSTING_DAYS`
+(default 45) since `posted_at`. A source-reported expiry is authoritative (LinkedIn
+`expireAt`); Adzuna has none, so the grace window governs. `posted_within_days` stacks on
+top. The filter is read-time only — the scoring corpus and rebuild cleanup are untouched.
+
+**Query-time freshness (v3 issue #27):** the search request accepts `max_days_old`
+(1–90), rendered by `query_rendering.py` into every connector query. Adzuna sends it
+directly (`max_days_old`); the LinkedIn actor input's `datePosted` resolves through the
+`{date_posted_bucket}` YAML placeholder (≤1 → `past24Hours`, ≤7 → `pastWeek`, ≤30 →
+`pastMonth`, else `anyTime`). Sources without a native parameter ignore it; the value is
+echoed in the run's stored query.
 
 ## Source enablement (issue #8)
 
@@ -149,12 +207,7 @@ Search queries are **profile data**: a second LLM call at extraction drafts per-
 specs (`{title, skills, exclude}` per enabled source) into `resume.search_queries`; saving a
 profile copies them; `POST /api/profiles/{id}/search-queries` regenerates from the current
 content (temperature 0.8 + anti-repeat instruction, so Regenerate observably changes the
-result). Searches are **filter-first**: the renderer maps each spec to the source's native
-capabilities — Adzuna gets `what_phrase` + `what_or` + `what_exclude` + `salary_min`,
-LinkedIn gets a natural-language keywords line (+ salary mention; it has no exclusion or
-salary filter). `job_search.query` stores exactly what was sent, and the run status echoes
-it.
-
+result). Generated specs are stamped `prompt_version` (`search_query_v3` since #31).
 ## ATS score (`POST /api/ats/score`)
 
 Score-and-fix takes either a freshly uploaded **resume** (`resume_id`) or a saved
@@ -167,10 +220,78 @@ priority), strengths, gaps and prioritized rewrite suggestions. The backend reco
 its own breakdown, and the user-facing report page (`frontend/app/ats`) is stateless —
 nothing is persisted and each run lives only in the browser.
 
-## Database schema (v1, ER diagram)
+Since #31, generation consumes the **full profile** (skills, preferences, country,
+summary — a shared digest builder also feeds the embedding, kept byte-identical) and is
+cached by a content hash: `profile.queries_input_hash` = SHA-256 over the canonical
+structured profile + enabled source names + filter declarations + `prompt_version`.
+Automatic generation (extraction, background-refresh after a content-changing profile
+save or a completed gap-fill turn) runs at temperature 0 and fires only when the stored
+hash no longer matches the recomputed one; the manual regenerate endpoint always forces a
+hot variant and rewrites the hash. Refresh runs happen in background tasks that open
+fresh sessions — never in the request path.
+
+Since #32, the profile carries deterministic derived experience signals: `years_of_experience`
+is parsed from the verbatim experience date strings purely in Python (no LLM), and when the
+user never set `preferences.seniority`, it is filled from YOE via Settings band thresholds
+(`SENIORITY_BAND_*`), stamped `seniority_source: "derived"`. Derivation re-runs on every
+extraction/create/save and after applied gap-fill turns; user-set values are never overwritten
+and legacy provenance is treated as user-set. Both values join the shared digest builder, so
+they reach the query-generation prompt and the profile embedding (old profiles re-embed
+opportunistically on their next save); the rerank prompt picks them up via #37.
+
+## Source filter capabilities (v3 issue #28)
+
+Each `JobSource` declares its advanced filters in one schema (`SourceFilterDecl`: key,
+label, type, select options, help text): Adzuna in code (`adzuna.py`), YAML-configured
+actors in `connectors.yaml` (`filters:` per source). `GET /api/sources` serves the
+declarations (`filters` field, alongside the legacy `supports_exclusions`), the backend
+validates `source_queries[name].options` against the declaring source (unknown key /
+bad type / bad enum → 400 naming the key), and connectors map validated options to
+native parameters — Adzuna in `_apply_options`, YAML sources via
+`{option:<key>}` placeholders in `connectors.yaml` (native types preserved; keys omitted
+when unset). `query_rendering.py` stays the single render seam; a new source = a
+declaration + mapper, with no changes to search logic.
+
+Searches are **filter-first, precedence-in-rendering** (v4 issue #33): the renderer builds
+a per-source **term plan** (`TermPlan`, carried on `JobSearchQuery`) whose slots are named
+after Adzuna's params (`what_phrase`, `what_and`, `what_or`, `what_exclude`, `what`) plus
+the LinkedIn slots (`keywords` NL brief, `date_posted` bucket). Adzuna precedence:
+`what_phrase` + `what_and`/`what_or` combined; `what` only when no phrase. LinkedIn
+precedence (v4 issue #35): a user-typed request `query` overrides the synthesized NL
+brief `"{title} with {skills}, {seniority} level"` (seniority resolved from the
+profile; no salary text); the spec's exclude terms are appended as a `not …` clause
+in either case — NL is the only LinkedIn exclusion channel post-Aug-2026, and
+`limitPerSource` is clamped by `MAX_APIFY_RESULTS_PER_RUN`. The
+connectors act as mechanical plan→param mappers (dumb guard when a plan is empty);
+connectors.yaml apify actors consume `keywords: "{keywords}"`,
+`location: "{location}"`, `datePosted: "{date_posted_bucket}"` with plan-first
+resolution. Unknown sources keep the plain free-text pass-through (`query`). The
+normative precedence tables live in the `TermPlan`/connector docstrings and in
+`services/query_rendering.py`; test_query_rendering.py locks the matrix per source.
+`job_search.query` stores exactly what was sent, and the run status echoes it.
+`what_and` is filled from the spec's must-have `skills_all` list (v4 issue #34).
+
+Adzuna runs are **multi-pass within a call budget** (v4 issue #34): the connector
+issues a broad pass and, when a title phrase exists and `title_only` was not
+explicitly set, a `title_only` pass — deduped by `external_id` (broad pass wins)
+— and paginates to page 2 only when a page fills its 50 rows and
+`results_wanted` exceeds what is collected. Calls per run = Σ(sub-queries ×
+pages), capped by `max_adzuna_calls_per_run` (default 4) with a stop-and-log,
+never a run failure. With no salary floor set the connector also sends
+`salary_include_unknown=1`.
+
+## Database schema (ER diagram)
+
 
 Source of truth: `backend/app/models/` + Alembic migrations. See
-[plan §4](plans/v1-implementation-plan.md#4-data-model) for the data model narrative.
+[plan §4](plans/v1/v1-implementation-plan.md#4-data-model) for the data model narrative.
+
+`updated_at` on `candidate`, `profile`, `job_search`, `match` and `match_rebuild` is maintained by a
+`set_updated_at()` database trigger (migration `0021`), so bulk `UPDATE`s bump it too; an update that
+changes nothing leaves it alone, and one that sets it explicitly keeps that value. New tables with the
+column add the trigger through `app/core/migration_helpers.py`. `job_posting.canonical_id` is
+`ON DELETE SET NULL` (migration `0022`). `backend/scripts/audit_schema.py` is the read-only audit
+(unindexed FKs, missing `ON DELETE`, nullable timestamps, unconventional names) that a test keeps empty.
 
 <!-- diagram: database-schema-er -->
 ```mermaid
@@ -179,8 +300,11 @@ erDiagram
     candidate ||--o{ profile : "tracks"
     profile ||--o{ profile_revision : "audit trail"
     profile ||--o{ match : "ranked against"
-    job_search ||--o{ job_posting : "ingestion runs"
+    profile ||--o{ job_search : "owns searches"
+    job_search ||--o{ search_posting : "found by run"
+    job_posting ||--o{ search_posting : "found in search"
     job_posting ||--o{ match : "produces"
+    profile ||--o{ match_rebuild : "rebuild runs"
 
     candidate {
         uuid id PK
@@ -194,6 +318,7 @@ erDiagram
         text name "track name, e.g. Senior Android Developer"
         jsonb structured_profile "contact, headline, skills, experience, projects, education, certifications, extra sections, embedded preferences"
         jsonb search_queries "per-source query specs + generation stamp; Regenerate overwrites"
+        text queries_input_hash "SHA-256 of the query-generation inputs (issue #31); stored specs regenerate only when it changes"
         jsonb preferences "dashboard view preference {priority: 0-1} — role-fit vs company-fit weighting at match read time (issue #11); distinct from resume-derived prefs inside structured_profile"
         uuid source_resume_id FK "resume whose draft seeded this profile (provenance)"
         vector embedding "pgvector, dim 768 (gemini-embedding-001, truncated via dimensions param); refreshed on every content save/gap-fill"
@@ -227,12 +352,21 @@ erDiagram
 
     job_search {
         uuid id PK
+        uuid profile_id FK "owning profile — searches are profile-scoped (v3 #24); cascade on profile delete"
+        text source "the one source this run targets (issue #36); partial unique index (profile_id, source) while pending/running"
         text status "pending | running | succeeded | partial | failed"
         jsonb query "validated search request (issue #7)"
         jsonb results "per-source {source, status, count, warning?}"
         jsonb matching "per-run MatchingOutcome: status, counts, rerank token usage (issue #10)"
         timestamptz created_at
         timestamptz updated_at
+    }
+
+    search_posting {
+        uuid id PK
+        uuid search_id FK "run that found the posting; CASCADE"
+        uuid posting_id FK "CASCADE"
+        timestamptz created_at "append-only: unique (search_id, posting_id), nothing overwritten (v3 #24)"
     }
 
     job_posting {
@@ -243,28 +377,50 @@ erDiagram
         text company
         text url "posting click-through link"
         text location
+        text country "run's resolved 2-letter country — dedupe grouping key (issue #38); null for pre-#38 rows"
         text job_type "native enum, nullable"
         text remote_type "native enum, nullable"
         text description
+        uuid canonical_id FK "self-FK: null = own canonical; duplicates point at the canonical row (issue #38) — trigram-merged, matches collapse onto it"
+        jsonb source_urls "merged record [{source, url}] of duplicates folded into this canonical row (issue #38)"
         timestamptz posted_at
+        timestamptz expires_at "source-reported (LinkedIn expireAt); null when unknown"
+        boolean is_closed "not null, default false; future seam — no producing source yet (v3 #26)"
         numeric salary_min
         numeric salary_max
         text currency
         jsonb raw_payload "original source data for debugging/re-mapping"
         vector embedding "pgvector, dim 768 (gemini-embedding-001, truncated via dimensions param); null when the embed call failed"
         timestamptz fetched_at
-        uuid job_search_id FK "nullable; last run that returned this posting"
     }
 
     match {
         uuid id PK
         uuid profile_id FK "matching unit is the profile (owner decision 2026-09-02); CASCADE on profile or posting delete"
         uuid job_posting_id FK
-        real vector_score "clamped cosine similarity (1 - distance), SQL-computed"
+        real vector_score "clamped cosine similarity (1 - distance), SQL-computed; null for un-embedded postings (issue #37 fallback)"
+        real skill_score "top-skill word-boundary hit fraction over title+description, SQL (issue #37)"
+        real recency_score "exp(-days_since_posting/match_recency_decay_days), 0.5 for unknown dates (issue #37)"
+        real salary_score "salary-band fit: 1.0 unknown, 0.5 without a preference band (issue #37)"
         real role_fit "LLM re-rank 0-10, null when not re-ranked; stored so #11 can re-weight without an LLM call"
         real company_fit "LLM re-rank 0-10, null when not re-ranked"
-        real final_score "weighted blend when re-ranked, vector_score otherwise"
+        real final_score "weighted blend (vector, skill, recency, salary + LLM verdicts; issue #37) — fallback rows renormalize skill+recency+salary"
         text rationale "LLM why-this-matches, top N only; cleared when profile content changes"
+        timestamptz first_opened_at "first job-detail open, first-write-wins (issue #39)"
+        timestamptz clicked_apply_at "first apply-URL redirect click via /api/matches/{id}/apply (issue #39)"
+        timestamptz saved_at "explicit one-click save; unsave clears it (issue #39)"
+        timestamptz dismissed_at "explicit dismiss — hides the match from the default list; undismiss clears (issue #39)"
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    match_rebuild {
+        uuid id PK
+        uuid profile_id FK "CASCADE"
+        text status "pending | running | succeeded | failed"
+        integer corpus_count "postings found by this profile's searches (scoped corpus size)"
+        integer scored_count "corpus postings that had embeddings to score"
+        text warning "degraded-notice, e.g. re-rank unavailable"
         timestamptz created_at
         timestamptz updated_at
     }
@@ -286,7 +442,13 @@ resume-derived preferences inside `structured_profile`, and is deliberately
 revision-free. Preferences extracted from the resume stay inside the profile's
 `structured_profile`; the matching work (#10) reads blend weights from `Settings`
 (`MATCH_WEIGHT_*` in `.env.example`) and stores the re-rank sub-scores on `match` so the
-slider re-weights without an LLM call. Multi-profile moved the opposite way — from v2
+slider re-weights without an LLM call. Engagement timestamps (#39) land on `match`
+as nullable timestamptz (`first_opened_at`, `clicked_apply_at`, `saved_at`,
+`dismissed_at`): implicit signals ride existing behavior (detail open; the apply
+redirect endpoint), the two explicit ones are one-click and reversible, and a manual
+`tune-queries` pass aggregates them to rewrite stored query specs. The stored
+`queries_input_hash` is overwritten with the current-inputs hash at tune time so the
+freshness guard cannot revert the tuned specs. Multi-profile moved the opposite way — from v2
 into v1 (issue #6, owner decision 2026-09-01): `profile` is now the home of
 `structured_profile` and the revision audit.
 
@@ -302,3 +464,16 @@ to the embedding model) live in
 - Resume text is stored locally (Postgres + uploads volume) and sent only to your LLM provider
 - Scraping-based sources run under your own Apify account after an explicit disclosure
   acknowledgment
+- CORS allows only `CORS_ORIGINS`, the methods `GET/POST/PATCH/DELETE/OPTIONS` and the request
+  headers `Content-Type`/`Accept`; `X-Total-Count` is exposed so the UI can read list totals
+- Every outbound call has an explicit timeout: job-source clients 30 s, LLM and embedding
+  calls `LLM_TIMEOUT_S` (default 60 s); a timeout is retried by the shared policy and reported
+  as "request timed out"
+- List endpoints are bounded (`limit` default 100, max 200, plus `offset`, total in
+  `X-Total-Count`): profiles, resumes, matches; recent runs default to 20; a run's postings
+  default to 250 (max 1000) so a full run is returned
+- Error contract: every error body is `{"detail": "<message>"}`, with extra machine keys only
+  where documented (`active_search_id` on the duplicate-run 409); a test enumerates every
+  `DomainError` subclass against it
+- Logs never contain resume text, prompts, job descriptions or key-shaped strings (a regression
+  test runs upload → extract → profile → search under log capture)

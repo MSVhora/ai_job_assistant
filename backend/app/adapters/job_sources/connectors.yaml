@@ -4,9 +4,30 @@ sources:
     actor_id: hKByXkMQaC5Qt9UMN
     external_id_field: id
     input:
-      keywords: "{query}"
+      keywords: "{keywords}"
       location: "{location}"
       limitPerSource: "{results_wanted}"
-      datePosted: anyTime
-      autoConvertToAiSearch: true
+      datePosted: "{date_posted_bucket}"
+      distance: "{option:distance_miles}"
+      under10Applicants: "{option:under_10_applicants}"
+      companyIds: "{option:company_ids}"
+      geoId: "{option:geo_id}"
+      autoConvertToAiSearch: false
       scrapeCompany: false
+    filters:
+      - key: distance_miles
+        label: Radius (miles)
+        type: number
+        placeholder: "25"
+        help_text: Distance from the location to search within; requires a location
+      - key: under_10_applicants
+        label: Fewer than 10 applicants
+        type: boolean
+      - key: company_ids
+        label: Company IDs
+        type: multiselect
+        help_text: LinkedIn company IDs to target (third-party scraper source)
+      - key: geo_id
+        label: Geo ID
+        type: text
+        help_text: LinkedIn geoId for the location, overrides the location field; preferred deterministic form

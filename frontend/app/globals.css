@@ -210,7 +210,8 @@ body {
   }
   .scrollbar-hidden::-webkit-scrollbar {
     display: none;
-  }  .marquee-track {
+  }
+  .marquee-track {
     animation: marquee 36s linear infinite;
   }
   .marquee-track-reverse {

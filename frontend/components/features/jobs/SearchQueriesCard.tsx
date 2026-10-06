@@ -2,24 +2,16 @@
 
 import { useState } from "react";
 
-import { Badge } from "@/components/ui/badge";
 import { Field } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { useRegenerateQueries } from "@/hooks/use-job-search";
-import type { StoredSearchQueries, StructuredProfile } from "@/lib/api";
+import { useRegenerateQueries, useTuneQueries } from "@/hooks/use-job-search";
+import type { SourceInfo, StoredSearchQueries, StructuredProfile } from "@/lib/api";
 import { useFormContext } from "react-hook-form";
 
 import { seedSpec, type SearchFormValues } from "./search-form-schema";
+import { QueryCostConfirm } from "./QueryCostConfirm";
 
-function relativeAge(iso: string): string {
-  const minutes = Math.max(1, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
-  if (minutes < 60) return `${minutes} min ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 24) return `${hours} h ago`;
-  return `${Math.round(hours / 24)} d ago`;
-}
-
-export function isQueriesStale(
+function isQueriesStale(
   queries: StoredSearchQueries | null | undefined,
   updatedAt: string | undefined,
 ): boolean {
@@ -28,13 +20,13 @@ export function isQueriesStale(
 }
 
 export function SearchQueriesCard({
-  sources,
+  source,
   profileId,
   structuredProfile,
   storedQueries,
   updatedAt,
 }: {
-  sources: { name: string; is_official_api: boolean; supports_exclusions: boolean }[];
+  source: SourceInfo;
   profileId: string | null;
   structuredProfile: StructuredProfile | null;
   storedQueries: StoredSearchQueries | null | undefined;
@@ -42,121 +34,158 @@ export function SearchQueriesCard({
 }) {
   const form = useFormContext<SearchFormValues>();
   const regenerate = useRegenerateQueries();
-  const [openSource, setOpenSource] = useState<string | null>(sources[0]?.name ?? null);
+  const tune = useTuneQueries();
+  const [confirming, setConfirming] = useState<"tune" | "regenerate" | null>(null);
   const stale = isQueriesStale(storedQueries, updatedAt);
+  const stored = storedQueries?.queries[source.name];
+  const seed = structuredProfile !== null ? seedSpec(structuredProfile) : null;
+  const busier = regenerate.isPending || tune.isPending;
 
   const regenerateQueries = () => {
     if (profileId === null || regenerate.isPending) return;
-    regenerate.mutate({ profileId });
+    regenerate.mutate(
+      { profileId },
+      {
+        onSettled: () => {
+          setConfirming(null);
+        },
+      },
+    );
+  };
+
+  const startTune = () => {
+    if (profileId === null || tune.isPending) return;
+    tune.mutate(profileId, {
+      onSettled: () => {
+        setConfirming(null);
+      },
+    });
   };
 
   return (
-    <section className="rounded-2xl border border-gray-200 bg-gray-50/60 p-3" aria-label="Search queries">
+    <section
+      className="rounded-2xl border border-gray-200 bg-gray-50/60 p-3"
+      aria-label="Search query"
+    >
       <div className="mb-1 flex flex-wrap items-center justify-between gap-2 px-1">
-        <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+        <h2 className="text-xs font-semibold tracking-wide text-gray-500 uppercase">
           AI search queries
         </h2>
         {profileId !== null && structuredProfile !== null && (
-          <button
-            type="button"
-            onClick={regenerateQueries}
-            disabled={regenerate.isPending}
-            className="rounded-full border border-violet-300 bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700 hover:bg-violet-100 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
-          >
-            {regenerate.isPending ? "Regenerating…" : "↻ Regenerate"}
-          </button>
+          <div className="flex items-center gap-2">
+            <span aria-live="polite" className="text-[11px] text-gray-500">
+              {tune.isPending
+                ? "Tuning queries…"
+                : tune.isError
+                  ? "Tuning failed"
+                  : tune.isSuccess
+                    ? "Queries tuned"
+                    : regenerate.isPending
+                      ? "Regenerating queries…"
+                      : regenerate.isError
+                        ? "Regeneration failed"
+                        : regenerate.isSuccess
+                          ? "Queries regenerated"
+                          : ""}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setConfirming("regenerate");
+              }}
+              disabled={busier}
+              className="rounded-full border border-violet-300 bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700 hover:bg-violet-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {regenerate.isPending ? "Regenerating…" : "↻ Regenerate"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setConfirming("tune");
+              }}
+              disabled={busier}
+              className="rounded-full border border-gray-300 bg-white px-3 py-1 text-xs font-semibold text-gray-700 hover:border-violet-300 hover:text-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Tune my queries
+            </button>
+          </div>
         )}
       </div>
+      {confirming !== null && !busier && profileId !== null && (
+        <QueryCostConfirm
+          kind={confirming}
+          profileId={profileId}
+          onConfirm={confirming === "tune" ? startTune : regenerateQueries}
+          onCancel={() => {
+            setConfirming(null);
+          }}
+          pending={busier}
+        />
+      )}
+      {tune.isError && (
+        <p role="alert" className="mb-2 rounded-xl bg-red-50 px-3 py-2 text-xs text-red-700">
+          {tune.error instanceof Error
+            ? `Tuning failed: ${tune.error.message}`
+            : "Tuning failed — your stored queries are unchanged."}
+        </p>
+      )}
       {stale && (
         <p role="status" className="mb-2 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
           Queries are stale — the profile changed after generation. Press Regenerate.
         </p>
       )}
-      <div className="flex flex-col gap-2">
-        {sources.map((source) => {
-          const stored = storedQueries?.queries[source.name];
-          const seed = structuredProfile !== null ? seedSpec(structuredProfile) : null;
-          const seeded = seed !== null && (seed.title !== "" || seed.skills.length > 0);
-          const open = openSource === source.name;
-          return (
-            <div key={source.name} className="rounded-xl border border-gray-200 bg-white">
-              <button
-                type="button"
-                onClick={() => setOpenSource(open ? null : source.name)}
-                aria-expanded={open}
-                className="flex w-full flex-wrap items-center gap-2 px-3 py-2.5 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
-              >
-                <span className="text-sm font-semibold text-gray-900">{source.name}</span>
-                <Badge variant={source.is_official_api ? "official-api" : "third-party-scraper"}>
-                  {source.is_official_api ? "Official API" : "Third-party scraper"}
-                </Badge>
-                {stored === undefined && (
-                  <span className="text-[11px] text-gray-500">
-                    {seeded ? "seed prefilled" : "no generated query yet"}
-                  </span>
-                )}
-                <svg
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                  aria-hidden="true"
-                  className={`ml-auto h-4 w-4 shrink-0 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`}
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M5.3 7.3a1 1 0 011.4 0L10 10.6l3.3-3.3a1 1 0 111.4 1.4l-4 4a1 1 0 01-1.4 0l-4-4a1 1 0 010-1.4z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              </button>
-              {open && (
-                <div className="flex flex-col gap-2.5 border-t border-gray-100 p-3">
-                  <Field label="Title" htmlFor={`query-${source.name}-title`}>
-                    <Input
-                      id={`query-${source.name}-title`}
-                      maxLength={80}
-                      {...form.register(`queries.${source.name}.title`)}
-                      placeholder={seed?.title || "Senior Android Engineer"}
-                    />
-                  </Field>
-                  <Field
-                    label="Skills (comma-separated)"
-                    htmlFor={`query-${source.name}-skills`}
-                    hint="Sent as any-of keywords where the source supports it."
-                  >
-                    <Input
-                      id={`query-${source.name}-skills`}
-                      {...form.register(`queries.${source.name}.skills`)}
-                      placeholder={seed?.skills.join(", ") || "Kotlin, Java"}
-                    />
-                  </Field>
-                  {source.supports_exclusions ? (
-                    <Field
-                      label="Exclude (optional, comma-separated)"
-                      htmlFor={`query-${source.name}-exclude`}
-                      hint="Supported by this source."
-                    >
-                      <Input
-                        id={`query-${source.name}-exclude`}
-                        {...form.register(`queries.${source.name}.exclude`)}
-                        placeholder="intern"
-                      />
-                    </Field>
-                  ) : (
-                    <p className="text-xs text-gray-500">
-                      This source does not support exclusions.
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
+      <div className="flex flex-col gap-2.5">
+        <Field label="Title" htmlFor="query-title">
+          <Input
+            id="query-title"
+            maxLength={80}
+            {...form.register("query.title")}
+            placeholder={seed?.title || "Senior Android Engineer"}
+          />
+        </Field>
+        <Field
+          label="Must-have skills (comma-separated)"
+          htmlFor="query-skills-all"
+          hint="Sent as all-of keywords where the source supports it (Adzuna)."
+        >
+          <Input
+            id="query-skills-all"
+            {...form.register("query.skills_all")}
+            placeholder={seed?.skills.slice(0, 2).join(", ") || "Kotlin, Compose"}
+          />
+        </Field>
+        <Field
+          label="Nice-to-have skills (comma-separated)"
+          htmlFor="query-skills"
+          hint="Sent as any-of keywords where the source supports it."
+        >
+          <Input
+            id="query-skills"
+            {...form.register("query.skills")}
+            placeholder={seed?.skills.join(", ") || "Kotlin, Java"}
+          />
+        </Field>
+        {source.supports_exclusions ? (
+          <Field
+            label="Exclude (optional, comma-separated)"
+            htmlFor="query-exclude"
+            hint="Supported by this source."
+          >
+            <Input id="query-exclude" {...form.register("query.exclude")} placeholder="intern" />
+          </Field>
+        ) : (
+          <p className="text-xs text-gray-500">This source does not support exclusions.</p>
+        )}
+        {storedQueries && (
+          <p className="px-1 text-[11px] text-gray-500">
+            Generated {new Date(storedQueries.generated_at).toLocaleString()} ·{" "}
+            {storedQueries.generated_by}
+          </p>
+        )}
+        {stored === undefined && seed === null && (
+          <p className="px-1 text-[11px] text-gray-500">no generated query yet</p>
+        )}
       </div>
-      {storedQueries && (
-        <p className="mt-2 px-1 text-[11px] text-gray-500">
-          Generated {relativeAge(storedQueries.generated_at)} · {storedQueries.generated_by}
-        </p>
-      )}
     </section>
   );
 }

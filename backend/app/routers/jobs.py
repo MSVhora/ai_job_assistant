@@ -1,16 +1,24 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.deps import get_db
+from app.core.pagination import (
+    SEARCH_POSTINGS_DEFAULT_LIMIT,
+    SEARCH_POSTINGS_MAX_LIMIT,
+    SEARCHES_DEFAULT_LIMIT,
+    TOTAL_COUNT_HEADER,
+    Pagination,
+)
+from app.deps import get_db, pagination
 from app.schemas.job_search import (
     JobPostingDetail,
     JobPostingSummary,
     JobSearchRequest,
     JobSearchStartResponse,
     JobSearchStatusResponse,
+    JobSearchSummary,
     SourceEnableRequest,
     SourceInfoResponse,
 )
@@ -37,20 +45,45 @@ async def start_job_search(
     return await ingestion.start_search(session, background_tasks, payload)
 
 
+@router.get("/jobs/searches", response_model=list[JobSearchSummary])
+async def list_job_searches(
+    profile_id: uuid.UUID,
+    response: Response,
+    session: Annotated[AsyncSession, Depends(get_db)],
+    page: Annotated[Pagination, Depends(pagination(default_limit=SEARCHES_DEFAULT_LIMIT))],
+) -> list[JobSearchSummary]:
+    total = await ingestion.count_profile_searches(session, profile_id)
+    response.headers[TOTAL_COUNT_HEADER] = str(total)
+    return await ingestion.list_profile_searches(session, profile_id, page)
+
+
 @router.get("/jobs/searches/{search_id}", response_model=JobSearchStatusResponse)
 async def get_job_search_status(
     search_id: uuid.UUID,
+    profile_id: uuid.UUID,
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> JobSearchStatusResponse:
-    return await ingestion.get_search_status(session, search_id)
+    return await ingestion.get_search_status(session, search_id, profile_id)
 
 
 @router.get("/jobs/searches/{search_id}/postings", response_model=list[JobPostingSummary])
 async def get_job_search_postings(
     search_id: uuid.UUID,
+    profile_id: uuid.UUID,
+    response: Response,
     session: Annotated[AsyncSession, Depends(get_db)],
+    page: Annotated[
+        Pagination,
+        Depends(
+            pagination(
+                default_limit=SEARCH_POSTINGS_DEFAULT_LIMIT, max_limit=SEARCH_POSTINGS_MAX_LIMIT
+            )
+        ),
+    ],
 ) -> list[JobPostingSummary]:
-    return await ingestion.get_search_postings(session, search_id)
+    total = await ingestion.count_search_postings(session, search_id, profile_id)
+    response.headers[TOTAL_COUNT_HEADER] = str(total)
+    return await ingestion.get_search_postings(session, search_id, profile_id, page)
 
 
 @router.get("/sources", response_model=list[SourceInfoResponse])
@@ -66,4 +99,6 @@ async def enable_source(
     payload: SourceEnableRequest,
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> SourceInfoResponse:
-    return await sources_service.enable_source(session, name, payload.acknowledged_disclosure)
+    return await sources_service.enable_source(
+        session, name, acknowledged_disclosure=payload.acknowledged_disclosure
+    )

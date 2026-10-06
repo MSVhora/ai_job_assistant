@@ -19,18 +19,29 @@ A self-hosted, single-user, **BYOK** (bring-your-own-key) web app:
 
 ## Feature status
 
-The app is being built issue by issue (see [the v1 plan](../plans/v1-implementation-plan.md)).
+The app is being built issue by issue (v1: [plan](../plans/v1/v1-implementation-plan.md), #1–#12;
+v2: [plan](../plans/v2/v2-implementation-plan.md), #13–#23 — UI restructure, branding, dialogs;
+v3: [plan](../plans/v3/v3-implementation-plan.md), #24–#30 — profile-scoped searches and matching
+corpus, posting expiry + freshness filters, capability-driven per-source filters and search UI,
+the Start-search stepper;
+v4: [plan](../plans/v4/v4-search-relevance-plan.md), #31–#39 — profile-grounded queries with a
+content-hash cache, derived seniority, per-source term rendering (Adzuna multi-pass, LinkedIn
+NL brief), a one-active-run guard, hybrid scoring, cross-source de-duplication, engagement
+signals and Tune my queries). All v1–v4 issues are done.
 Each guide marks what is **live now** vs **planned**:
 
 - Live: stack scaffold, health check (`GET /api/health`), resume upload + text extraction
-  ([issue #2](../plans/v1-issue-002-resume-upload.md)), LLM profile extraction to a reviewable
-  draft ([issue #3](../plans/v1-issue-003-llm-extraction.md)), profile persistence + review/edit
-  UI + revision audit ([issue #4](../plans/v1-issue-004-profile-persistence-review-ui.md)),
-  conversational gap-fill ([issue #5](../plans/v1-issue-005-gap-fill.md)), multi-profile tracks
-  + resume list ([issue #6](../plans/v1-issue-006-multi-profile-resume-list.md)), job sources +
-  ingestion ([issue #7](../plans/v1-issue-007-jobsource-adzuna-dedupe.md), [#8](../plans/v1-issue-008-apify-connectors-disclosure.md)),
-  embeddings + hard filters ([issue #9](../plans/v1-issue-009-embeddings-pgvector-hard-filters.md)),
-  ranked matches with LLM re-rank + rationale ([issue #10](../plans/v1-issue-010-matching-rerank-rationale.md)),
+  ([issue #2](../plans/v1/v1-issue-002-resume-upload.md)), LLM profile extraction to a reviewable
+  draft ([issue #3](../plans/v1/v1-issue-003-llm-extraction.md)), profile persistence + review/edit
+  UI + revision audit ([issue #4](../plans/v1/v1-issue-004-profile-persistence-review-ui.md)),
+  conversational gap-fill ([issue #5](../plans/v1/v1-issue-005-gap-fill.md)), multi-profile tracks
+  + resume list ([issue #6](../plans/v1/v1-issue-006-multi-profile-resume-list.md)), job sources +
+  ingestion ([issue #7](../plans/v1/v1-issue-007-jobsource-adzuna-dedupe.md), [#8](../plans/v1/v1-issue-008-apify-connectors-disclosure.md)),
+  embeddings + hard filters ([issue #9](../plans/v1/v1-issue-009-embeddings-pgvector-hard-filters.md)),
+  ranked matches with LLM re-rank + rationale ([issue #10](../plans/v1/v1-issue-010-matching-rerank-rationale.md)),
   priority weighting (role-fit ↔ company-fit slider, issue #11),
   rate-limit backoff on all outbound calls, a synthetic demo seed script, and audited
-  error states ([issue #12](../plans/v1-issue-012-buffer-seed-errors-backoff.md))
+  error states ([issue #12](../plans/v1/v1-issue-012-buffer-seed-errors-backoff.md)),
+  and the v4 search-relevance work: hash-cached profile-grounded queries, derived seniority,
+  hybrid match scoring, cross-source de-duplication, engagement signals and Tune my queries
+  ([v4 plan](../plans/v4/v4-search-relevance-plan.md))

@@ -1,4 +1,10 @@
-import { ApiError, ExtractionFailedError, apiFetch, apiFetchWithTotal } from "./client";
+import {
+  ApiError,
+  DuplicateRunError,
+  ExtractionFailedError,
+  apiFetch,
+  apiFetchWithTotal,
+} from "./client";
 import type { components, operations } from "./schema";
 
 export type HealthResponse = components["schemas"]["HealthResponse"];
@@ -14,7 +20,10 @@ export type GapFillMessage = components["schemas"]["GapFillMessage"];
 export type GapFillResponse = components["schemas"]["GapFillResponse"];
 export type SetupCheck = components["schemas"]["SetupCheckResponse"];
 export type SourceInfo = components["schemas"]["SourceInfoResponse"];
+export type SourceFilterDecl = components["schemas"]["SourceFilterDecl"];
+export type SourceFilterOption = components["schemas"]["SourceFilterOption"];
 export type JobSearchRequest = components["schemas"]["JobSearchRequest"];
+export type JobSearchSummary = components["schemas"]["JobSearchSummary"];
 export type JobSearchStart = components["schemas"]["JobSearchStartResponse"];
 export type JobSearchStatus = components["schemas"]["JobSearchStatusResponse"];
 export type SourceQuerySpec = components["schemas"]["SourceQuerySpec"];
@@ -23,6 +32,7 @@ export type SearchQueriesResponse = components["schemas"]["SearchQueriesResponse
 export type JobPostingSummary = components["schemas"]["JobPostingSummary"];
 export type JobPostingDetail = components["schemas"]["JobPostingDetail"];
 export type MatchResponse = components["schemas"]["MatchResponse"];
+export type CostEstimate = components["schemas"]["CostEstimateResponse"];
 export type MatchingOutcome = components["schemas"]["MatchingOutcome"];
 export type StoredPreferences = components["schemas"]["StoredPreferences"];
 export type AtsScoreRequest = components["schemas"]["AtsScoreRequest"];
@@ -31,9 +41,15 @@ export type AtsCategoryScore = components["schemas"]["AtsCategoryScore"];
 export type AtsKeywordHit = components["schemas"]["AtsKeywordHit"];
 export type AtsSuggestion = components["schemas"]["AtsSuggestion"];
 export type MatchListParams = operations["list_matches_api_matches_get"]["parameters"]["query"];
+export type MatchRebuildStatus = components["schemas"]["MatchRebuildStatusResponse"];
 
-export { ApiError, ExtractionFailedError, apiFetch, apiFetchWithTotal } from "./client";
-
+export {
+  ApiError,
+  DuplicateRunError,
+  ExtractionFailedError,
+  apiFetch,
+  apiFetchWithTotal,
+} from "./client";
 
 export async function getHealth(): Promise<HealthResponse> {
   return apiFetch<HealthResponse>("/api/health");
@@ -108,10 +124,10 @@ export async function updatePreferences(
   profileId: string,
   payload: StoredPreferences,
 ): Promise<StoredPreferences> {
-  return apiFetch<StoredPreferences>(
-    `/api/profiles/${encodeURIComponent(profileId)}/preferences`,
-    { method: "PATCH", body: JSON.stringify(payload) },
-  );
+  return apiFetch<StoredPreferences>(`/api/profiles/${encodeURIComponent(profileId)}/preferences`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function gapFillTurn(
@@ -143,19 +159,63 @@ export async function enableSource(
 }
 
 export async function startJobSearch(payload: JobSearchRequest): Promise<JobSearchStart> {
-  return apiFetch<JobSearchStart>("/api/jobs/search", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  });
+  try {
+    return await apiFetch<JobSearchStart>("/api/jobs/search", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  } catch (cause) {
+    if (cause instanceof ApiError && cause.status === 409 && isDuplicateRunBody(cause.body)) {
+      throw new DuplicateRunError(cause.body.active_search_id ?? null);
+    }
+    throw cause;
+  }
 }
 
-export async function getJobSearchStatus(searchId: string): Promise<JobSearchStatus> {
-  return apiFetch<JobSearchStatus>(`/api/jobs/searches/${encodeURIComponent(searchId)}`);
+function isDuplicateRunBody(body: unknown): body is { active_search_id?: string } {
+  return (
+    typeof body === "object" &&
+    body !== null &&
+    "active_search_id" in body &&
+    (typeof (body as Record<string, unknown>).active_search_id === "string" ||
+      (body as Record<string, unknown>).active_search_id === null)
+  );
 }
 
-export async function getSearchPostings(searchId: string): Promise<JobPostingSummary[]> {
+export async function listProfileSearches(profileId: string): Promise<JobSearchSummary[]> {
+  return apiFetch<JobSearchSummary[]>(
+    `/api/jobs/searches?profile_id=${encodeURIComponent(profileId)}`,
+  );
+}
+
+export async function getJobSearchStatus(
+  searchId: string,
+  profileId: string,
+): Promise<JobSearchStatus> {
+  return apiFetch<JobSearchStatus>(
+    `/api/jobs/searches/${encodeURIComponent(searchId)}?profile_id=${encodeURIComponent(profileId)}`,
+  );
+}
+
+export async function getSearchPostings(
+  searchId: string,
+  profileId: string,
+): Promise<JobPostingSummary[]> {
   return apiFetch<JobPostingSummary[]>(
-    `/api/jobs/searches/${encodeURIComponent(searchId)}/postings`,
+    `/api/jobs/searches/${encodeURIComponent(searchId)}/postings?profile_id=${encodeURIComponent(profileId)}`,
+  );
+}
+
+export async function startMatchRebuild(profileId: string): Promise<MatchRebuildStatus> {
+  return apiFetch<MatchRebuildStatus>(
+    `/api/profiles/${encodeURIComponent(profileId)}/rebuild-matches`,
+    { method: "POST" },
+  );
+}
+
+export async function getMatchRebuildStatus(profileId: string): Promise<MatchRebuildStatus> {
+  return apiFetch<MatchRebuildStatus>(
+    `/api/profiles/${encodeURIComponent(profileId)}/rebuild-matches`,
   );
 }
 
@@ -170,16 +230,14 @@ export async function scoreAts(payload: AtsScoreRequest): Promise<AtsScoreRespon
 export async function listMatches(params: MatchListParams): Promise<MatchResponse[]> {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined && value !== null && value !== "") {
-      query.set(key, String(value));
-    }
+    query.set(key, String(value));
   }
   return apiFetch<MatchResponse[]>(`/api/matches?${query.toString()}`);
 }
 
-export async function listMatchesPage(
-  params: MatchListParams,
-): Promise<{ items: MatchResponse[]; total: number }> {
+export async function listMatchesPage(params: {
+  [K in keyof MatchListParams]: MatchListParams[K] | undefined;
+}): Promise<{ items: MatchResponse[]; total: number }> {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined && value !== null && value !== "") {
@@ -196,5 +254,42 @@ export async function regenerateSearchQueries(
   return apiFetch<SearchQueriesResponse>(
     `/api/profiles/${encodeURIComponent(profileId)}/search-queries`,
     { method: "POST", body: JSON.stringify(sources ? { sources } : {}) },
+  );
+}
+
+export type MatchSignalKind = components["schemas"]["MatchSignalRequest"]["kind"];
+
+export async function recordMatchSignal(
+  matchId: string,
+  kind: MatchSignalKind,
+): Promise<MatchResponse> {
+  return apiFetch<MatchResponse>(`/api/matches/${encodeURIComponent(matchId)}/signals`, {
+    method: "POST",
+    body: JSON.stringify({ kind }),
+  });
+}
+
+export function applyMatchUrl(matchId: string): string {
+  return `/api/matches/${encodeURIComponent(matchId)}/apply`;
+}
+
+export async function estimateTuneQueries(profileId: string): Promise<CostEstimate> {
+  return apiFetch<CostEstimate>(
+    `/api/profiles/${encodeURIComponent(profileId)}/tune-queries/estimate`,
+    { method: "POST" },
+  );
+}
+
+export async function estimateRegenerateQueries(profileId: string): Promise<CostEstimate> {
+  return apiFetch<CostEstimate>(
+    `/api/profiles/${encodeURIComponent(profileId)}/search-queries/estimate`,
+    { method: "POST", body: JSON.stringify({}) },
+  );
+}
+
+export async function tuneSearchQueries(profileId: string): Promise<SearchQueriesResponse> {
+  return apiFetch<SearchQueriesResponse>(
+    `/api/profiles/${encodeURIComponent(profileId)}/tune-queries`,
+    { method: "POST" },
   );
 }

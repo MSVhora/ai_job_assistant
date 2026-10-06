@@ -1,0 +1,927 @@
+import uuid
+from datetime import UTC, datetime
+from typing import Any
+
+import pytest
+from fakes import VALID_PROFILE, derived_valid_profile
+from httpx import ASGITransport, AsyncClient
+from sqlalchemy import select
+
+from app.core.db import session_factory
+from app.main import app
+from app.models import Candidate, Profile, ProfileRevision, Resume, RevisionSource
+
+pytestmark = pytest.mark.usefixtures("clean_tables")
+
+
+@pytest.fixture
+async def client() -> AsyncClient:
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as async_client:
+        yield async_client
+
+
+async def insert_resume_with_draft(draft: dict[str, Any] | None) -> dict[str, str]:
+    async with session_factory() as session:
+        result = await session.execute(select(Candidate).limit(1))
+        candidate = result.scalars().first()
+        if candidate is None:
+            candidate = Candidate()
+            session.add(candidate)
+            await session.flush()
+        resume = Resume(
+            candidate_id=candidate.id,
+            file_path="unused.pdf",
+            original_filename="resume.pdf",
+            content_type="application/pdf",
+            size_bytes=1,
+            extracted_text="resume text",
+            draft_profile=draft,
+            parse_version="gemini/gemini-2.5-flash+profile_prompt_v5" if draft else "text_v1",
+            parsed_at=datetime.now(UTC) if draft else None,
+        )
+        session.add(resume)
+        await session.flush()
+        await session.commit()
+        return {"candidate_id": str(candidate.id), "resume_id": str(resume.id)}
+
+
+async def create_profile(
+    client: AsyncClient,
+    name: str,
+    structured_profile: dict[str, Any],
+    source_resume_id: str | None = None,
+) -> Any:
+    body: dict[str, Any] = {"name": name, "structured_profile": structured_profile}
+    if source_resume_id is not None:
+        body["source_resume_id"] = source_resume_id
+    return await client.post("/api/profiles", json=body)
+
+
+async def fetch_revisions(profile_id: str) -> list[ProfileRevision]:
+    async with session_factory() as session:
+        result = await session.execute(
+            select(ProfileRevision)
+            .where(ProfileRevision.profile_id == uuid.UUID(profile_id))
+            .order_by(ProfileRevision.created_at)
+        )
+        return list(result.scalars().all())
+
+
+def with_headline(profile: dict[str, Any], headline: str) -> dict[str, Any]:
+    return {**profile, "headline": headline}
+
+
+async def test_create_profile_from_unchanged_draft_writes_single_ai_extraction_revision(
+    client: AsyncClient,
+) -> None:
+    inserted = await insert_resume_with_draft(derived_valid_profile())
+
+    response = await create_profile(client, "Android", VALID_PROFILE, inserted["resume_id"])
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["name"] == "Android"
+    assert body["structured_profile"]["contact"]["full_name"] == "Jane Doe"
+    assert body["source_resume_id"] == inserted["resume_id"]
+    assert body["source_resume_filename"] == "resume.pdf"
+    assert body["last_revision"]["source"] == "ai_extraction"
+
+    revisions = await fetch_revisions(body["profile_id"])
+    assert len(revisions) == 1
+    assert revisions[0].source == RevisionSource.ai_extraction
+    assert revisions[0].diff["contact.full_name"] == {"old": None, "new": "Jane Doe"}
+
+
+async def test_create_profile_with_corrections_writes_two_revisions(client: AsyncClient) -> None:
+    inserted = await insert_resume_with_draft(derived_valid_profile())
+
+    response = await create_profile(
+        client,
+        "SWE",
+        with_headline(VALID_PROFILE, "Principal Data Analyst"),
+        inserted["resume_id"],
+    )
+
+    assert response.status_code == 201
+    assert response.json()["last_revision"]["source"] == "manual_edit"
+
+    revisions = await fetch_revisions(response.json()["profile_id"])
+    assert [revision.source for revision in revisions] == [
+        RevisionSource.ai_extraction,
+        RevisionSource.manual_edit,
+    ]
+    assert revisions[1].diff == {
+        "headline": {"old": "Senior Data Analyst", "new": "Principal Data Analyst"}
+    }
+    assert revisions[1].created_at > revisions[0].created_at
+
+
+async def test_create_profile_without_resume_ref_writes_manual_edit_baseline(
+    client: AsyncClient,
+) -> None:
+    response = await create_profile(client, "Manual", VALID_PROFILE)
+
+    assert response.status_code == 201
+    assert response.json()["source_resume_id"] is None
+    assert response.json()["source_resume_filename"] is None
+
+    revisions = await fetch_revisions(response.json()["profile_id"])
+    assert len(revisions) == 1
+    assert revisions[0].source == RevisionSource.manual_edit
+    assert revisions[0].diff["skills"] == {"old": None, "new": ["SQL", "Python", "Tableau"]}
+
+
+async def test_two_profiles_from_same_draft_have_independent_revisions(
+    client: AsyncClient,
+) -> None:
+    inserted = await insert_resume_with_draft(derived_valid_profile())
+    android = await create_profile(client, "Android", VALID_PROFILE, inserted["resume_id"])
+    swe = await create_profile(
+        client,
+        "SWE",
+        with_headline(VALID_PROFILE, "Full-Stack Engineer"),
+        inserted["resume_id"],
+    )
+    assert android.status_code == 201
+    assert swe.status_code == 201
+    android_id = android.json()["profile_id"]
+    swe_id = swe.json()["profile_id"]
+
+    patched = await client.patch(
+        f"/api/profiles/{android_id}",
+        json={"structured_profile": with_headline(VALID_PROFILE, "Android Lead")},
+    )
+    assert patched.status_code == 200
+
+    android_revisions = await fetch_revisions(android_id)
+    swe_revisions = await fetch_revisions(swe_id)
+    assert len(android_revisions) == 2
+    assert android_revisions[1].source == RevisionSource.manual_edit
+    assert len(swe_revisions) == 2
+    assert swe.json()["structured_profile"]["headline"] == "Full-Stack Engineer"
+
+    fetched = await client.get(f"/api/profiles/{swe_id}")
+    assert fetched.json()["structured_profile"]["headline"] == "Full-Stack Engineer"
+    listed = await client.get("/api/profiles")
+    assert [summary["name"] for summary in listed.json()] == ["Android", "SWE"]
+
+
+async def test_content_patch_writes_manual_edit_diff(client: AsyncClient) -> None:
+    created = await create_profile(client, "Android", VALID_PROFILE)
+    profile_id = created.json()["profile_id"]
+
+    response = await client.patch(
+        f"/api/profiles/{profile_id}",
+        json={"structured_profile": with_headline(VALID_PROFILE, "Android Lead")},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["structured_profile"]["headline"] == "Android Lead"
+    assert body["last_revision"]["source"] == "manual_edit"
+    revisions = await fetch_revisions(profile_id)
+    assert len(revisions) == 2
+    assert revisions[1].diff == {"headline": {"old": "Senior Data Analyst", "new": "Android Lead"}}
+
+
+async def test_merge_patch_updates_provenance_and_writes_reupload_merge(
+    client: AsyncClient,
+) -> None:
+    created = await create_profile(client, "Android", VALID_PROFILE)
+    profile_id = created.json()["profile_id"]
+    reuploaded = await insert_resume_with_draft(with_headline(VALID_PROFILE, "Staff Data Analyst"))
+
+    response = await client.patch(
+        f"/api/profiles/{profile_id}",
+        json={
+            "structured_profile": with_headline(VALID_PROFILE, "Staff Data Analyst"),
+            "source_resume_id": reuploaded["resume_id"],
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["last_revision"]["source"] == "reupload_merge"
+    assert body["source_resume_id"] == reuploaded["resume_id"]
+    assert body["source_resume_filename"] == "resume.pdf"
+    revisions = await fetch_revisions(profile_id)
+    assert len(revisions) == 2
+    assert revisions[1].source == RevisionSource.reupload_merge
+    assert revisions[1].diff == {
+        "headline": {"old": "Senior Data Analyst", "new": "Staff Data Analyst"}
+    }
+
+
+async def test_rename_patch_writes_no_revision(client: AsyncClient) -> None:
+    created = await create_profile(client, "Android", VALID_PROFILE)
+    profile_id = created.json()["profile_id"]
+
+    response = await client.patch(f"/api/profiles/{profile_id}", json={"name": "Android Developer"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["name"] == "Android Developer"
+    assert body["last_revision"] is None
+    revisions = await fetch_revisions(profile_id)
+    assert len(revisions) == 1
+
+
+async def test_no_change_content_patch_writes_empty_diff_revision(client: AsyncClient) -> None:
+    created = await create_profile(client, "Android", VALID_PROFILE)
+    profile_id = created.json()["profile_id"]
+
+    response = await client.patch(
+        f"/api/profiles/{profile_id}", json={"structured_profile": VALID_PROFILE}
+    )
+
+    assert response.status_code == 200
+    revisions = await fetch_revisions(profile_id)
+    assert len(revisions) == 2
+    assert revisions[1].source == RevisionSource.manual_edit
+    assert revisions[1].diff == {}
+
+
+async def test_delete_profile_cascades_revisions_and_keeps_other_profiles(
+    client: AsyncClient,
+) -> None:
+    inserted = await insert_resume_with_draft(derived_valid_profile())
+    first = await create_profile(client, "Android", VALID_PROFILE, inserted["resume_id"])
+    second = await create_profile(client, "SWE", VALID_PROFILE, inserted["resume_id"])
+    first_id = first.json()["profile_id"]
+    second_id = second.json()["profile_id"]
+
+    response = await client.delete(f"/api/profiles/{first_id}")
+
+    assert response.status_code == 204
+    assert (await client.get(f"/api/profiles/{first_id}")).status_code == 404
+    assert len(await fetch_revisions(first_id)) == 0
+
+    kept = await client.get(f"/api/profiles/{second_id}")
+    assert kept.status_code == 200
+    assert kept.json()["name"] == "SWE"
+    assert len(await fetch_revisions(second_id)) == 1
+
+
+async def test_unknown_profile_returns_404(client: AsyncClient) -> None:
+    assert (await client.get(f"/api/profiles/{uuid.uuid4()}")).status_code == 404
+    assert (
+        await client.patch(
+            f"/api/profiles/{uuid.uuid4()}", json={"structured_profile": VALID_PROFILE}
+        )
+    ).status_code == 404
+    assert (await client.delete(f"/api/profiles/{uuid.uuid4()}")).status_code == 404
+
+
+async def test_create_with_unknown_resume_returns_404(client: AsyncClient) -> None:
+    response = await create_profile(client, "Android", VALID_PROFILE, str(uuid.uuid4()))
+
+    assert response.status_code == 404
+
+
+async def test_draft_endpoint_returns_persisted_draft(client: AsyncClient) -> None:
+    inserted = await insert_resume_with_draft(VALID_PROFILE)
+
+    response = await client.get(f"/api/resumes/{inserted['resume_id']}/draft")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["resume_id"] == inserted["resume_id"]
+    assert body["candidate_id"] == inserted["candidate_id"]
+    assert body["draft_profile"]["contact"]["full_name"] == "Jane Doe"
+    assert body["parse_version"] == "gemini/gemini-2.5-flash+profile_prompt_v5"
+    assert body["parsed_at"] is not None
+
+
+async def test_draft_endpoint_returns_404_for_unknown_resume(client: AsyncClient) -> None:
+    response = await client.get(f"/api/resumes/{uuid.uuid4()}/draft")
+
+    assert response.status_code == 404
+
+
+async def test_draft_endpoint_returns_409_without_draft(client: AsyncClient) -> None:
+    inserted = await insert_resume_with_draft(None)
+
+    response = await client.get(f"/api/resumes/{inserted['resume_id']}/draft")
+
+    assert response.status_code == 409
+
+
+async def test_malformed_create_returns_422(client: AsyncClient) -> None:
+    assert (await client.post("/api/profiles", json={})).status_code == 422
+    assert (
+        await client.post("/api/profiles", json={"name": "X", "structured_profile": {}})
+    ).status_code == 422
+
+    empty_content = {
+        **VALID_PROFILE,
+        "skills": [],
+        "experience": [],
+        "projects": [],
+        "awards": [],
+        "extra_sections": [],
+    }
+    response = await create_profile(client, "Empty", empty_content)
+    assert response.status_code == 422
+
+
+async def test_malformed_path_param_returns_readable_422(client: AsyncClient) -> None:
+    response = await client.patch("/api/profiles/not-a-uuid", json={"name": "X"})
+
+    assert response.status_code == 422
+    detail = response.json()["detail"]
+    assert isinstance(detail, str)
+    assert "profile_id" in detail
+
+
+async def test_create_profile_copies_draft_search_queries(client: AsyncClient) -> None:
+
+    from fakes import VALID_PROFILE
+
+    inserted = await insert_resume_with_draft(VALID_PROFILE)
+    stored = {
+        "queries": {"adzuna": {"title": "Senior Data Analyst", "skills": ["SQL"]}},
+        "generated_at": "2026-09-01T10:00:00Z",
+        "generated_by": "gemini/gemini-2.5-flash",
+        "prompt_version": "search_query_v1",
+    }
+    async with session_factory() as session:
+        resume = await session.get(Resume, uuid.UUID(inserted["resume_id"]))
+        assert resume is not None
+        resume.search_queries = stored
+        await session.commit()
+
+    response = await create_profile(
+        client, "Data", VALID_PROFILE, source_resume_id=inserted["resume_id"]
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["search_queries"]["queries"]["adzuna"]["title"] == "Senior Data Analyst"
+    async with session_factory() as session:
+        profile = await session.get(Profile, uuid.UUID(body["profile_id"]))
+    assert profile is not None
+    assert profile.search_queries == stored
+
+
+async def test_profile_response_includes_search_queries(client: AsyncClient) -> None:
+    from fakes import VALID_PROFILE
+
+    inserted = await insert_resume_with_draft(VALID_PROFILE)
+    created = (
+        await create_profile(client, "Data", VALID_PROFILE, source_resume_id=inserted["resume_id"])
+    ).json()
+
+    fetched = await client.get(f"/api/profiles/{created['profile_id']}")
+    assert fetched.status_code == 200
+    assert fetched.json()["search_queries"] is None
+
+
+async def test_regenerate_search_queries_persists(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import json
+
+    from fakes import VALID_PROFILE, install_acompletion, llm_response
+
+    from app.core.config import get_settings
+
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    monkeypatch.setattr(get_settings(), "adzuna_app_id", "id")
+    monkeypatch.setattr(get_settings(), "adzuna_app_key", "key")
+    get_settings.cache_clear()
+
+    inserted = await insert_resume_with_draft(VALID_PROFILE)
+    created = (
+        await create_profile(client, "Data", VALID_PROFILE, source_resume_id=inserted["resume_id"])
+    ).json()
+    queries_payload = {"queries": {"adzuna": {"title": "Senior Data Analyst", "skills": ["SQL"]}}}
+    calls = install_acompletion(monkeypatch, lambda **kw: llm_response(json.dumps(queries_payload)))
+
+    response = await client.post(f"/api/profiles/{created['profile_id']}/search-queries")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["queries"]["adzuna"]["title"] == "Senior Data Analyst"
+    assert body["generated_by"] == "gemini/gemini-2.5-flash"
+    assert "Sources needing a query spec: adzuna" in calls[0]["messages"][1]["content"]
+    fetched = (await client.get(f"/api/profiles/{created['profile_id']}")).json()
+    assert fetched["search_queries"]["queries"]["adzuna"]["title"] == "Senior Data Analyst"
+
+
+async def test_regenerate_estimate_endpoint_prices_without_calling_the_provider(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from fakes import VALID_PROFILE, install_acompletion, llm_response
+
+    from app.core.config import get_settings
+
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    monkeypatch.setenv("ADZUNA_APP_ID", "id")
+    monkeypatch.setenv("ADZUNA_APP_KEY", "key")
+    monkeypatch.setenv("LLM_PRICE_IN_PER_MTOK", "1.0")
+    monkeypatch.setenv("LLM_PRICE_OUT_PER_MTOK", "2.0")
+    get_settings.cache_clear()
+    inserted = await insert_resume_with_draft(VALID_PROFILE)
+    created = (
+        await create_profile(client, "Data", VALID_PROFILE, source_resume_id=inserted["resume_id"])
+    ).json()
+    calls = install_acompletion(monkeypatch, lambda **kw: llm_response("{}"))
+
+    response = await client.post(f"/api/profiles/{created['profile_id']}/search-queries/estimate")
+
+    body = response.json()
+    assert response.status_code == 200
+    assert calls == []
+    assert body["prompt_tokens"] > 0
+    assert body["basis"] == "configured_prices"
+    expected = (body["prompt_tokens"] * 1.0 + body["completion_tokens"] * 2.0) / 1_000_000
+    assert body["usd"] == pytest.approx(expected)
+
+
+async def test_regenerate_estimate_unknown_profile_returns_404(client: AsyncClient) -> None:
+    response = await client.post(f"/api/profiles/{uuid.uuid4()}/search-queries/estimate")
+
+    assert response.status_code == 404
+
+
+async def test_regenerate_search_queries_unknown_profile_returns_404(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.core.config import get_settings
+
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    get_settings.cache_clear()
+
+    response = await client.post(f"/api/profiles/{uuid.uuid4()}/search-queries")
+
+    assert response.status_code == 404
+
+
+async def test_regenerate_search_queries_rejects_unknown_source(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from fakes import VALID_PROFILE
+
+    from app.core.config import get_settings
+
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    monkeypatch.setattr(get_settings(), "adzuna_app_id", "id")
+    monkeypatch.setattr(get_settings(), "adzuna_app_key", "key")
+    get_settings.cache_clear()
+
+    inserted = await insert_resume_with_draft(VALID_PROFILE)
+    created = (
+        await create_profile(client, "Data", VALID_PROFILE, source_resume_id=inserted["resume_id"])
+    ).json()
+
+    response = await client.post(
+        f"/api/profiles/{created['profile_id']}/search-queries",
+        json={"sources": ["apify_linkedin"]},
+    )
+
+    assert response.status_code == 400
+
+
+async def test_regenerate_failure_keeps_persisted_queries(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from fakes import VALID_PROFILE, ProviderError, install_acompletion
+
+    from app.core.config import get_settings
+
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    monkeypatch.setattr(get_settings(), "adzuna_app_id", "id")
+    monkeypatch.setattr(get_settings(), "adzuna_app_key", "key")
+
+    async def no_delay(_: float) -> None:
+        return None
+
+    monkeypatch.setattr("app.adapters.retry.asyncio.sleep", no_delay)
+    get_settings.cache_clear()
+
+    inserted = await insert_resume_with_draft(VALID_PROFILE)
+    created = (
+        await create_profile(client, "Data", VALID_PROFILE, source_resume_id=inserted["resume_id"])
+    ).json()
+    stored = {
+        "queries": {"adzuna": {"title": "Keep Me", "skills": ["SQL"]}},
+        "generated_at": "2026-09-01T10:00:00Z",
+        "generated_by": "gemini/gemini-2.5-flash",
+        "prompt_version": "search_query_v1",
+    }
+    async with session_factory() as session:
+        profile = await session.get(Profile, uuid.UUID(created["profile_id"]))
+        assert profile is not None
+        profile.search_queries = stored
+        await session.commit()
+
+    install_acompletion(monkeypatch, lambda **kw: ProviderError(429))
+    response = await client.post(f"/api/profiles/{created['profile_id']}/search-queries")
+
+    assert response.status_code == 502
+    fetched = (await client.get(f"/api/profiles/{created['profile_id']}")).json()
+    assert fetched["search_queries"]["queries"]["adzuna"]["title"] == "Keep Me"
+
+
+async def test_created_profile_is_embedded(client: AsyncClient) -> None:
+    inserted = await insert_resume_with_draft(VALID_PROFILE)
+    created = (
+        await create_profile(client, "Data", VALID_PROFILE, source_resume_id=inserted["resume_id"])
+    ).json()
+
+    async with session_factory() as session:
+        profile = await session.get(Profile, uuid.UUID(created["profile_id"]))
+        assert profile is not None
+        assert profile.embedding is not None
+        assert len(profile.embedding) == 768
+
+
+async def test_content_patch_refreshes_embedding(client: AsyncClient) -> None:
+    inserted = await insert_resume_with_draft(VALID_PROFILE)
+    created = (
+        await create_profile(client, "Data", VALID_PROFILE, source_resume_id=inserted["resume_id"])
+    ).json()
+    profile_id = uuid.UUID(created["profile_id"])
+    async with session_factory() as session:
+        profile = await session.get(Profile, profile_id)
+        assert profile is not None
+        first_embedding = profile.embedding
+    assert first_embedding is not None
+
+    response = await client.patch(
+        f"/api/profiles/{profile_id}",
+        json={"structured_profile": with_headline(VALID_PROFILE, "Principal Data Analyst")},
+    )
+
+    assert response.status_code == 200
+    async with session_factory() as session:
+        profile = await session.get(Profile, profile_id)
+        assert profile is not None
+        assert profile.embedding is not None
+        assert profile.embedding != first_embedding
+
+
+async def test_rename_only_patch_keeps_embedding(client: AsyncClient) -> None:
+    inserted = await insert_resume_with_draft(VALID_PROFILE)
+    created = (
+        await create_profile(client, "Data", VALID_PROFILE, source_resume_id=inserted["resume_id"])
+    ).json()
+    profile_id = uuid.UUID(created["profile_id"])
+
+    response = await client.patch(f"/api/profiles/{profile_id}", json={"name": "Renamed"})
+
+    assert response.status_code == 200
+    async with session_factory() as session:
+        profile = await session.get(Profile, profile_id)
+        assert profile is not None
+        assert profile.embedding is not None
+
+
+async def test_profile_save_survives_embedding_failure(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from fakes import install_aembedding
+
+    from app.adapters.llm import LLMError
+
+    install_aembedding(monkeypatch, lambda **kw: LLMError("provider down"))
+    inserted = await insert_resume_with_draft(VALID_PROFILE)
+
+    response = await create_profile(
+        client, "Data", VALID_PROFILE, source_resume_id=inserted["resume_id"]
+    )
+
+    assert response.status_code == 201
+    async with session_factory() as session:
+        profile = await session.get(Profile, uuid.UUID(response.json()["profile_id"]))
+        assert profile is not None
+        assert profile.embedding is None
+
+
+async def test_patch_preferences_round_trip_writes_no_revision(client: AsyncClient) -> None:
+    inserted = await insert_resume_with_draft(VALID_PROFILE)
+    created = (
+        await create_profile(client, "Data", VALID_PROFILE, source_resume_id=inserted["resume_id"])
+    ).json()
+    profile_id = created["profile_id"]
+    assert created["preferences"] is None
+    revisions_before = len(await fetch_revisions(profile_id))
+
+    response = await client.patch(
+        f"/api/profiles/{profile_id}/preferences", json={"priority": 0.25}
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"priority": 0.25}
+    fetched = (await client.get(f"/api/profiles/{profile_id}")).json()
+    assert fetched["preferences"] == {"priority": 0.25}
+    assert len(await fetch_revisions(profile_id)) == revisions_before
+
+
+async def test_patch_preferences_unknown_profile_returns_404(client: AsyncClient) -> None:
+    response = await client.patch(
+        f"/api/profiles/{uuid.uuid4()}/preferences", json={"priority": 0.5}
+    )
+
+    assert response.status_code == 404
+
+
+async def test_patch_preferences_out_of_range_returns_422(client: AsyncClient) -> None:
+    inserted = await insert_resume_with_draft(VALID_PROFILE)
+    created = (
+        await create_profile(client, "Data", VALID_PROFILE, source_resume_id=inserted["resume_id"])
+    ).json()
+
+    too_high = await client.patch(
+        f"/api/profiles/{created['profile_id']}/preferences", json={"priority": 1.5}
+    )
+    too_low = await client.patch(
+        f"/api/profiles/{created['profile_id']}/preferences", json={"priority": -0.1}
+    )
+
+    assert too_high.status_code == 422
+    assert too_low.status_code == 422
+
+
+async def test_content_save_keeps_preferences(client: AsyncClient) -> None:
+    inserted = await insert_resume_with_draft(VALID_PROFILE)
+    created = (
+        await create_profile(client, "Data", VALID_PROFILE, source_resume_id=inserted["resume_id"])
+    ).json()
+    profile_id = created["profile_id"]
+    await client.patch(f"/api/profiles/{profile_id}/preferences", json={"priority": 0.25})
+
+    saved = await client.patch(
+        f"/api/profiles/{profile_id}",
+        json={"structured_profile": with_headline(VALID_PROFILE, "Principal Data Analyst")},
+    )
+
+    assert saved.status_code == 200
+    fetched = (await client.get(f"/api/profiles/{profile_id}")).json()
+    assert fetched["preferences"] == {"priority": 0.25}
+
+
+async def test_rebuild_matches_endpoint_lifecycle(client: AsyncClient) -> None:
+    from fakes import fake_vector
+
+    from app.models import JobPosting, JobSearch, JobSearchStatus, Match, Profile, SearchPosting
+    from app.services import match_rebuild
+
+    created = await create_profile(client, "Seeker", VALID_PROFILE)
+    assert created.status_code == 201
+    profile_id = uuid.UUID(created.json()["profile_id"])
+
+    async with session_factory() as session:
+        posting = JobPosting(
+            source="adzuna",
+            external_id="ext-0",
+            title="Data Analyst",
+            location="Berlin",
+            description="Analyse data with SQL and Python. " * 10,
+            embedding=fake_vector("rebuild-posting"),
+            raw_payload={"id": "ext-0"},
+        )
+        session.add(posting)
+        await session.flush()
+        search = JobSearch(
+            profile_id=profile_id,
+            source="adzuna",
+            status=JobSearchStatus.succeeded,
+            query={"profile_id": str(profile_id)},
+        )
+        session.add(search)
+        await session.flush()
+        session.add(SearchPosting(search_id=search.id, posting_id=posting.id))
+        stale_posting = JobPosting(
+            source="adzuna",
+            external_id="stale-0",
+            title="Stale",
+            description="x",
+            raw_payload={"id": "stale-0"},
+        )
+        session.add(stale_posting)
+        await session.flush()
+        session.add(
+            Match(
+                profile_id=profile_id,
+                job_posting_id=stale_posting.id,
+                vector_score=0.5,
+                final_score=0.5,
+            )
+        )
+        await session.commit()
+
+    unknown = await client.post(f"/api/profiles/{uuid.uuid4()}/rebuild-matches")
+    assert unknown.status_code == 404
+
+    no_run = await client.get(f"/api/profiles/{profile_id}/rebuild-matches")
+    assert no_run.status_code == 200
+    no_run_body = no_run.json()
+    assert no_run_body["status"] == "idle"
+    assert no_run_body["id"] is None
+    assert no_run_body["stale_count"] == 1
+
+    async with session_factory() as session:
+        profile = await session.get(Profile, profile_id)
+        assert profile is not None
+        profile.embedding = None
+        await session.commit()
+    unembedded_status = await client.post(f"/api/profiles/{profile_id}/rebuild-matches")
+    assert unembedded_status.status_code == 409
+    async with session_factory() as session:
+        profile = await session.get(Profile, profile_id)
+        assert profile is not None
+        profile.embedding = fake_vector("profile")
+        await session.commit()
+
+    started = await client.post(f"/api/profiles/{profile_id}/rebuild-matches")
+    assert started.status_code == 202
+    body = started.json()
+    assert body["profile_id"] == str(profile_id)
+    assert body["status"] == "pending"
+
+    latest = await client.get(f"/api/profiles/{profile_id}/rebuild-matches")
+    assert latest.status_code == 200
+    assert latest.json()["status"] in ("pending", "running", "succeeded")
+
+    await match_rebuild.run_rebuild(uuid.UUID(body["id"]))
+
+    final = await client.get(f"/api/profiles/{profile_id}/rebuild-matches")
+    assert final.status_code == 200
+    final_body = final.json()
+    assert final_body["status"] == "succeeded"
+    assert final_body["corpus_count"] == 1
+    assert final_body["scored_count"] == 1
+    assert final_body["stale_count"] == 0
+
+
+PROFILE_WITH_PREFS = dict(
+    VALID_PROFILE
+    | {
+        "contact": {**VALID_PROFILE["contact"], "country": "de"},
+        "preferences": {
+            "target_location": "Berlin",
+            "salary_min": 50000,
+            "salary_max": 90000,
+            "currency": "EUR",
+        },
+    }
+)
+
+
+async def test_profile_response_exposes_missing_fields(client: AsyncClient) -> None:
+    created = (await create_profile(client, "Data", VALID_PROFILE)).json()
+
+    fetched = await client.get(f"/api/profiles/{created['profile_id']}")
+    assert fetched.status_code == 200
+    body = fetched.json()
+    assert isinstance(body["missing_fields"], list)
+
+
+async def test_create_profile_stores_queries_input_hash(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("ADZUNA_APP_ID", "id")
+    monkeypatch.setenv("ADZUNA_APP_KEY", "key")
+    from app.core.config import get_settings
+
+    get_settings.cache_clear()
+    try:
+        created = (await create_profile(client, "Android", VALID_PROFILE)).json()
+        async with session_factory() as session:
+            profile = await session.get(Profile, uuid.UUID(created["profile_id"]))
+        assert profile is not None
+        assert profile.queries_input_hash is not None
+    finally:
+        get_settings.cache_clear()
+
+
+async def test_save_schedule_query_refresh_on_content_change(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("ADZUNA_APP_ID", "id")
+    monkeypatch.setenv("ADZUNA_APP_KEY", "key")
+    from app.core.config import get_settings
+
+    get_settings.cache_clear()
+    try:
+        created = (await create_profile(client, "Android", VALID_PROFILE)).json()
+        profile_id = created["profile_id"]
+        async with session_factory() as session:
+            row = await session.get(Profile, uuid.UUID(profile_id))
+            row.queries_input_hash = "stale-but-different"
+            await session.commit()
+
+        saved = await client.patch(
+            f"/api/profiles/{profile_id}",
+            json={"structured_profile": with_headline(VALID_PROFILE, "Lead Data Analyst")},
+        )
+        assert saved.status_code == 200
+        async with session_factory() as session:
+            row = await session.get(Profile, uuid.UUID(profile_id))
+        assert row.queries_input_hash is None
+    finally:
+        get_settings.cache_clear()
+
+
+async def test_rename_only_save_skips_query_refresh(client: AsyncClient) -> None:
+    created = (await create_profile(client, "Android", VALID_PROFILE)).json()
+    profile_id = created["profile_id"]
+    async with session_factory() as session:
+        row = await session.get(Profile, uuid.UUID(profile_id))
+        row.queries_input_hash = "kept-hash"
+        await session.commit()
+
+    saved = await client.patch(f"/api/profiles/{profile_id}", json={"name": "Renamed"})
+    assert saved.status_code == 200
+    async with session_factory() as session:
+        row = await session.get(Profile, uuid.UUID(profile_id))
+    assert row.queries_input_hash == "kept-hash"
+
+
+async def test_save_with_unchanged_content_keeps_hash(client: AsyncClient) -> None:
+    created = (await create_profile(client, "Android", VALID_PROFILE)).json()
+    profile_id = created["profile_id"]
+
+    saved = await client.patch(
+        f"/api/profiles/{profile_id}", json={"structured_profile": VALID_PROFILE}
+    )
+    assert saved.status_code == 200
+    async with session_factory() as session:
+        row = await session.get(Profile, uuid.UUID(profile_id))
+        stored_hash = row.queries_input_hash
+    assert stored_hash is not None
+
+
+async def test_create_derives_yoe_and_seniority(client: AsyncClient) -> None:
+    body = (await create_profile(client, "Android", VALID_PROFILE)).json()
+
+    structured = body["structured_profile"]
+    assert structured["years_of_experience"] == 1
+    assert structured["preferences"]["seniority"] == "junior"
+    assert structured["preferences"]["seniority_source"] == "derived"
+    assert "preferences.seniority" not in body["missing_fields"]
+
+
+async def test_save_roundtrips_derived_seniority_without_client_provenance(
+    client: AsyncClient,
+) -> None:
+    created = (await create_profile(client, "Android", VALID_PROFILE)).json()
+    profile_id = created["profile_id"]
+
+    saved = await client.patch(
+        f"/api/profiles/{profile_id}", json={"structured_profile": VALID_PROFILE}
+    )
+
+    assert saved.status_code == 200
+    structured = saved.json()["structured_profile"]
+    assert structured["years_of_experience"] == 1
+    assert structured["preferences"]["seniority"] == "junior"
+    assert structured["preferences"]["seniority_source"] == "derived"
+    revisions = await fetch_revisions(profile_id)
+    assert revisions[-1].diff == {}
+
+
+async def test_manual_seniority_edit_becomes_user_set(client: AsyncClient) -> None:
+    created = (await create_profile(client, "Android", VALID_PROFILE)).json()
+    profile_id = created["profile_id"]
+
+    corrected = {
+        **VALID_PROFILE,
+        "preferences": {**(created["structured_profile"]["preferences"]), "seniority": "senior"},
+    }
+    saved = await client.patch(
+        f"/api/profiles/{profile_id}", json={"structured_profile": corrected}
+    )
+    structured = saved.json()["structured_profile"]
+    assert structured["preferences"]["seniority"] == "senior"
+    assert structured["preferences"]["seniority_source"] == "user"
+
+    later = {
+        **corrected,
+        "experience": corrected["experience"],
+        "headline": "Android Lead",
+    }
+    resaved = await client.patch(f"/api/profiles/{profile_id}", json={"structured_profile": later})
+    structured = resaved.json()["structured_profile"]
+    assert structured["headline"] == "Android Lead"
+    # The user-set value survives subsequent saves untouched.
+    assert structured["preferences"]["seniority"] == "senior"
+    assert structured["preferences"]["seniority_source"] == "user"
+
+
+async def test_save_rederives_seniority_when_dates_change(client: AsyncClient) -> None:
+    created = (await create_profile(client, "Android", VALID_PROFILE)).json()
+    profile_id = created["profile_id"]
+
+    updated_experience = [{**VALID_PROFILE["experience"][0], "end_date": "Dec 2024"}]
+    saved = await client.patch(
+        f"/api/profiles/{profile_id}",
+        json={"structured_profile": {**VALID_PROFILE, "experience": updated_experience}},
+    )
+
+    structured = saved.json()["structured_profile"]
+    assert structured["years_of_experience"] == 3
+    assert structured["preferences"]["seniority"] == "mid"
+    assert structured["preferences"]["seniority_source"] == "derived"

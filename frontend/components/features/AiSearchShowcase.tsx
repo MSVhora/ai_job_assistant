@@ -1,6 +1,8 @@
 function Blip({ className, label }: { className: string; label: string }) {
   return (
-    <span className={`absolute flex -translate-x-1/2 -translate-y-1/2 items-center gap-1.5 ${className}`}>
+    <span
+      className={`absolute flex -translate-x-1/2 -translate-y-1/2 items-center gap-1.5 ${className}`}
+    >
       <span className="relative flex h-2.5 w-2.5">
         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-violet-400 opacity-75" />
         <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 ring-2 ring-white" />
@@ -19,20 +21,20 @@ function Radar() {
       <div className="absolute inset-7 rounded-full border border-violet-200/70" />
       <div className="absolute inset-14 rounded-full border border-violet-200/50" />
       <div className="absolute inset-20 rounded-full border border-violet-200/40" />
-      <div className="absolute left-1/2 top-2 bottom-2 w-px bg-violet-200/40" />
-      <div className="absolute left-2 right-2 top-1/2 h-px bg-violet-200/40" />
+      <div className="absolute top-2 bottom-2 left-1/2 w-px bg-violet-200/40" />
+      <div className="absolute top-1/2 right-2 left-2 h-px bg-violet-200/40" />
       <div className="radar-sweep absolute inset-0 rounded-full bg-[conic-gradient(from_0deg,transparent_0deg,rgba(139,92,246,0.30)_46deg,transparent_85deg)]" />
 
-      <span className="absolute left-1/2 top-1/2 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-500 text-white shadow-lg shadow-violet-400">
+      <span className="absolute top-1/2 left-1/2 flex h-14 w-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-500 text-white shadow-lg shadow-violet-400">
         <span className="ai-ring absolute inset-0 rounded-full border-2 border-violet-400" />
         <svg viewBox="0 0 20 20" fill="currentColor" className="h-6 w-6">
           <path d="M10 1.5l1.8 4.7 4.7 1.8-4.7 1.8L10 14.5 8.2 9.8 3.5 8l4.7-1.8L10 1.5zM15.5 13l.9 2.3 2.3.9-2.3.9-.9 2.3-.9-2.3-2.3-.9 2.3-.9.9-2.3z" />
         </svg>
       </span>
 
-      <Blip className="left-[16%] top-[30%]" label="Adzuna" />
-      <Blip className="left-[80%] top-[22%]" label="LinkedIn" />
-      <Blip className="left-[30%] top-[80%]" label="Vector DB" />
+      <Blip className="top-[30%] left-[16%]" label="Adzuna" />
+      <Blip className="top-[22%] left-[80%]" label="LinkedIn" />
+      <Blip className="top-[80%] left-[30%]" label="Vector DB" />
     </div>
   );
 }
@@ -54,7 +56,7 @@ export function AiSearchShowcase() {
         </div>
 
         <div className="relative">
-          <p className="inline-flex items-center gap-2 rounded-full bg-violet-100 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-violet-700">
+          <p className="inline-flex items-center gap-2 rounded-full bg-violet-100 px-3 py-1 text-[10px] font-bold tracking-wider text-violet-700 uppercase">
             <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className="h-3 w-3">
               <path d="M10 1.5l1.8 4.7 4.7 1.8-4.7 1.8L10 14.5 8.2 9.8 3.5 8l4.7-1.8L10 1.5z" />
             </svg>
@@ -66,7 +68,9 @@ export function AiSearchShowcase() {
               N
             </span>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-gray-900">Senior Android Developer</p>
+              <p className="truncate text-sm font-semibold text-gray-900">
+                Senior Android Developer
+              </p>
               <p className="truncate text-xs text-gray-500">Nova Labs · Remote</p>
             </div>
             <span className="bg-gradient-to-r from-violet-600 to-fuchsia-600 bg-clip-text text-lg font-bold text-transparent">
@@ -74,7 +78,7 @@ export function AiSearchShowcase() {
             </span>
           </div>
 
-          <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-gray-500">
+          <p className="mt-4 text-xs font-semibold tracking-wider text-gray-500 uppercase">
             Why this fits — written by AI for you
           </p>
           <ul className="mt-2 flex flex-col gap-2">
@@ -84,7 +88,12 @@ export function AiSearchShowcase() {
                 className="why-reveal flex items-start gap-2 text-sm text-gray-700 opacity-0"
               >
                 <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500 text-white">
-                  <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true" className="h-2.5 w-2.5">
+                  <svg
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                    aria-hidden="true"
+                    className="h-2.5 w-2.5"
+                  >
                     <path
                       fillRule="evenodd"
                       d="M16.7 5.3a1 1 0 010 1.4l-7.5 7.5a1 1 0 01-1.4 0L3.3 9.7a1 1 0 011.4-1.4l3.8 3.8 6.8-6.8a1 1 0 011.4 0z"

@@ -1,16 +1,16 @@
 # 2 — Upload & Profile Review
 
 **Status: shipped** — resume upload + text extraction
-([issue #2](../plans/v1-issue-002-resume-upload.md)), LLM extraction to a reviewable draft
-([issue #3](../plans/v1-issue-003-llm-extraction.md)), the review/edit UI with the
-`profile_revision` audit trail ([issue #4](../plans/v1-issue-004-profile-persistence-review-ui.md)),
+([issue #2](../plans/v1/v1-issue-002-resume-upload.md)), LLM extraction to a reviewable draft
+([issue #3](../plans/v1/v1-issue-003-llm-extraction.md)), the review/edit UI with the
+`profile_revision` audit trail ([issue #4](../plans/v1/v1-issue-004-profile-persistence-review-ui.md)),
 multi-profile tracks with the resume list
-([issue #6](../plans/v1-issue-006-multi-profile-resume-list.md)), and conversational gap-fill
-([issue #5](../plans/v1-issue-005-gap-fill.md)) are live — and since the search-queries
+([issue #6](../plans/v1/v1-issue-006-multi-profile-resume-list.md)), and conversational gap-fill
+([issue #5](../plans/v1/v1-issue-005-gap-fill.md)) are live — and since the search-queries
 follow-up, extraction also drafts **per-source search queries** from the profile (a second
 small LLM call; a failure there never fails the extraction, and [Regenerate on the jobs
 page](03-job-discovery-and-matching.md) refills them anytime). This guide describes the
-finished v1 profile pipeline.
+profile pipeline (v1, extended through v4 with derived seniority and hash-cached queries).
 
 ## The idea
 
@@ -124,7 +124,7 @@ Nothing in the flow dead-ends — every failure has an explicit recovery path:
   backend becomes visible on its own; other views keep retry affordances and a global toast
   surfaces mutation failures from anywhere
 
-## Step-by-step (once the pipeline is live)
+## Step-by-step
 
 1. **Upload** *(live)* — pick a standard single-column PDF or DOCX (up to 10 MB).
    Multi-column or image-only resumes parse poorly or fail with a clear message. The AI
@@ -134,11 +134,24 @@ Nothing in the flow dead-ends — every failure has an explicit recovery path:
    with AI-extracted fields highlighted. You choose the destination: merge into an existing
    profile, or save as a new one (named — e.g. "Senior Android Developer" vs "Senior
    Software Engineer"). Every correction lands in that profile's `profile_revision` trail.
+   Years of experience are auto-estimated deterministically from the verbatim experience
+   date strings at extraction and on every save (issue #32) — shown read-only in the
+   review form. If seniority was never set by you, it is derived from those years and
+   marked with a "Derived from experience" badge; picking a value in the dropdown overrides
+   it and the server then treats it as user-set (never re-derived).
 3. **Fill the gaps** *(live)* — on the profile page, a short chat asks *only* about genuinely
-    missing fields (typically: target location, remote preference, salary band, seniority, work
-    authorization). Answers are pydantic-validated before anything is saved, each applied turn
+    missing fields (typically: country, target location, remote preference, salary band, seniority,
+    work authorization). Answers are pydantic-validated before anything is saved, each applied turn
     lands in `profile_revision` with source `gap_fill`, and the editor form stays in sync with
-    what the chat saved.
+    what the chat saved. A seniority the backend derived from experience does not count as
+    missing — it already fills the value via the badge-visible fallback (issue #32). The chat is only shown while something is genuinely missing: a
+    profile with no gaps never renders it at all (the profile response carries the
+    server-computed `missing_fields` list), so there's no dead-end "start the chat to hear
+    you're all set" flow. When a conversation *completes* your preferences, the backend
+    regenerates the stored search queries in the background (issue #31) — no action needed.
+    The manual-edit form carries the country too: the **Country code** field in the Contact
+    section (ISO 3166-1 alpha-2, e.g. `de`) round-trips with every save, so a country the
+    chat set survives later manual edits (fixed in v3 #30 — it used to be silently wiped).
 4. **Done** — each profile is an independent track for job discovery and matching.
    Re-uploading a newer resume opens a merge/diff review per profile; nothing is
    overwritten until you explicitly save the merge.

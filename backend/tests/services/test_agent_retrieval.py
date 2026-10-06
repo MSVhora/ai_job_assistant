@@ -28,9 +28,9 @@ def _settings(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "llm_retry_base_delay_s", 0.0)
 
 
-async def run(candidate_id: uuid.UUID, query: str, *, intro: bool = False) -> Retrieval:
+async def run(candidate_id: uuid.UUID, query: str) -> Retrieval:
     async with session_factory() as session:
-        return await retrieve(session, candidate_id, query, intro=intro)
+        return await retrieve(session, candidate_id, query)
 
 
 def titles(result: Retrieval) -> list[str]:
@@ -85,7 +85,8 @@ async def test_a_project_named_in_the_question_narrows_the_search(
         world["candidate"], "What did you build in pipeline-kit, the Streaming toolkit?"
     )
 
-    assert titles(result) == ["Streaming toolkit"]
+    assert titles(result)[0] == "Streaming toolkit"
+    assert len(result.achievement_ids) == 1
 
 
 async def test_an_employer_named_in_the_question_narrows_the_search(
@@ -96,8 +97,8 @@ async def test_an_employer_named_in_the_question_narrows_the_search(
 
     result = await run(world["candidate"], "Tell me about the Kubernetes rollout at Beta Inc")
 
-    assert set(titles(result)) <= {"Kubernetes rollout", "Docs generator"}
-    assert titles(result)
+    assert titles(result)[0] == "Kubernetes rollout"
+    assert len(result.achievement_ids) == 1
 
 
 async def test_an_empty_knowledge_base_returns_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -122,7 +123,7 @@ async def test_a_question_nothing_matches_falls_below_the_floor(
     result = await run(world["candidate"], "How do you feel about sailing?")
 
     assert result.approved == len(WORLD_ACHIEVEMENTS)
-    assert result.blocks == []
+    assert result.achievement_ids == []
     assert result.best_score < 0.6
 
 
@@ -136,16 +137,95 @@ async def test_the_floor_is_a_setting(monkeypatch: pytest.MonkeyPatch) -> None:
     assert len(titles(result)) == 5
 
 
-async def test_an_intro_takes_the_top_three_without_a_query_match(
+async def test_highlights_give_broad_questions_the_best_work_per_employer(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    calls = install_agent_embeddings(monkeypatch)
+    install_agent_embeddings(monkeypatch)
+    world = await seed_resume_world(embeddings=True)
+    monkeypatch.setattr(get_settings(), "agent_min_retrieval_score", 0.9)
+
+    result = await run(world["candidate"], "Tell me about yourself")
+
+    assert result.achievement_ids == []
+    assert titles(result) == ["Faster nightly import", "Kubernetes rollout", "Streaming toolkit"]
+    first = result.blocks[0]
+    assert "Action:" not in first.text
+    assert "Result:" in first.text or "Title:" in first.text
+
+
+async def test_highlights_never_repeat_a_relevant_achievement(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_agent_embeddings(monkeypatch)
     world = await seed_resume_world(embeddings=True)
 
-    result = await run(world["candidate"], "Tell me about yourself", intro=True)
+    result = await run(world["candidate"], "Tell me about Faster nightly import")
 
-    assert len(titles(result)) == 3
-    assert calls == []
+    assert len(titles(result)) == len(set(titles(result)))
+    assert titles(result)[0] == "Faster nightly import"
+    assert [block.marker for block in result.blocks if block.kind == "achievement"] == [
+        f"A{n}" for n in range(1, len(titles(result)) + 1)
+    ]
+
+
+async def test_citations_carry_readable_labels_and_cleaned_quotes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_agent_embeddings(monkeypatch)
+    candidate_id, _, item_ids = await seed_evidence_chunk(
+        bodies=[
+            (
+                "Speed up the nightly import\n\nBatch the writes.\n\n"
+                "Co-Authored-By: Claude <noreply@anthropic.com>"
+            )
+        ]
+    )
+    await seed_achievement(
+        candidate_id,
+        item_ids=item_ids,
+        status="approved",
+        title="Faster nightly import",
+        embedding=fake_vector("Faster nightly import"),
+    )
+
+    result = await run(candidate_id, "Faster nightly import")
+
+    achievement, evidence = result.blocks[0], result.blocks[1]
+    assert achievement.label == "Faster nightly import"
+    assert evidence.label.startswith("ada/engine: Speed up the nightly import")
+    assert evidence.quote == "Speed up the nightly import Batch the writes."
+
+
+async def test_user_written_notes_close_to_the_question_become_direct_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_agent_embeddings(monkeypatch)
+    candidate_id, _, item_ids = await seed_evidence_chunk(
+        bodies=["Faster nightly import: I mentored two interns while doing it"],
+        chunk_kind="note",
+        item_kind="note",
+        embedding=fake_vector("Faster nightly import"),
+    )
+
+    result = await run(candidate_id, "Tell me about Faster nightly import")
+
+    notes = [block for block in result.blocks if block.kind == "evidence"]
+    assert [block.evidence_item_id for block in notes] == item_ids
+    assert notes[0].achievement_id is None
+    assert "mentored two interns" in notes[0].text
+
+
+async def test_commit_chunks_are_not_offered_without_an_approved_achievement(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    install_agent_embeddings(monkeypatch)
+    candidate_id, _, _ = await seed_evidence_chunk(
+        bodies=["Tuned the loader"], embedding=fake_vector("Faster nightly import")
+    )
+
+    result = await run(candidate_id, "Tell me about Faster nightly import")
+
+    assert result.blocks == []
 
 
 async def test_evidence_snippets_and_drill_down_chunks_carry_markers(

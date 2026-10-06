@@ -3,7 +3,6 @@ import re
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import cast
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.adapters.llm import LLMError, LLMTask, UsageMeter, parse_structured, usage_meter
 from app.core.errors import AgentSessionNotFoundError, ProfileNotFoundError
 from app.core.pagination import DEFAULT_PAGE, Pagination
-from app.models import AgentMessage, AgentRole, AgentSession, Profile
+from app.models import AgentMessage, AgentRole, AgentSession, JobPosting, Match, Profile
 from app.schemas.agent import (
     AgentMessageResponse,
     AgentSessionCreate,
@@ -21,11 +20,11 @@ from app.schemas.agent import (
     AnswerDraft,
     Citation,
     Grounding,
-    QuestionType,
+    PinnedJob,
 )
 from app.services import agent_templates as templates
 from app.services.agent_context import job_block, profile_block
-from app.services.agent_grounding import Grounded, ground
+from app.services.agent_grounding import Grounded, ground, markers_in
 from app.services.agent_memory import (
     fold_summary,
     load_messages,
@@ -33,7 +32,6 @@ from app.services.agent_memory import (
     standalone_question,
 )
 from app.services.agent_retrieval import ContextBlock, retrieve
-from app.services.agent_router import asks_for_rationale, needs_rewrite, route_question
 from app.services.evidence_items import candidate_id_or_none
 from app.services.prompts.agent import (
     ANSWER_SYSTEM,
@@ -43,13 +41,15 @@ from app.services.prompts.agent import (
 
 logger = logging.getLogger(__name__)
 
-RATIONALE_CUES = re.compile(
-    r"\b(because|so that|in order to|instead of|rather than|trade-?off|to avoid|due to"
-    r"|reason|decided|chose|motivated|since)\b",
+DEFAULT_TITLE = "New chat"
+TITLE_CHARS = 200
+AUTO_TITLE_CHARS = 60
+FOLLOW_UP = re.compile(
+    r"\b(that|this|those|these|it|its|they|them|there|the (project|team|system|service|tool))\b"
+    r"|^(why|how|and|what about|so|then)\b",
     re.IGNORECASE,
 )
-DEFAULT_TITLE = "Interview practice"
-TITLE_CHARS = 200
+MAX_FOLLOW_UP_WORDS = 8
 
 
 @dataclass
@@ -57,7 +57,6 @@ class Reply:
     """What one turn produced, before it is stored."""
 
     content: str
-    kind: QuestionType | None
     citations: list[Citation] = field(default_factory=list[Citation])
     grounding: Grounding = field(default_factory=Grounding)
 
@@ -68,7 +67,6 @@ def _message_response(message: AgentMessage) -> AgentMessageResponse:
         session_id=message.session_id,
         role=message.role.value,
         content=message.content,
-        question_type=cast("QuestionType | None", message.question_type),
         citations=[Citation.model_validate(item) for item in message.citations],
         grounding=Grounding.model_validate(message.grounding),
         created_at=message.created_at,
@@ -125,7 +123,22 @@ async def get_session(session: AsyncSession, session_id: uuid.UUID) -> AgentSess
     messages = await load_messages(session, row.id)
     summary = AgentSessionSummary.model_validate(row)
     return AgentSessionResponse(
-        **summary.model_dump(), messages=[_message_response(m) for m in messages]
+        **summary.model_dump(),
+        summary=row.summary,
+        job=await _pinned_job(session, row),
+        messages=[_message_response(m) for m in messages],
+    )
+
+
+async def _pinned_job(session: AsyncSession, row: AgentSession) -> PinnedJob | None:
+    if row.match_id is None:
+        return None
+    match = await session.get(Match, row.match_id)
+    posting = await session.get(JobPosting, match.job_posting_id) if match else None
+    if match is None or posting is None:
+        return None
+    return PinnedJob(
+        title=posting.title, company=posting.company, url=posting.url, rationale=match.rationale
     )
 
 
@@ -140,6 +153,7 @@ def _citations(blocks: list[ContextBlock], markers: list[str]) -> list[Citation]
         Citation(
             marker=marker,
             kind=block.kind,
+            label=block.label,
             achievement_id=block.achievement_id,
             evidence_item_id=block.evidence_item_id,
             url=block.url,
@@ -155,35 +169,25 @@ def _plain_prompt_blocks(blocks: list[ContextBlock]) -> list[tuple[str, str]]:
     return [(block.marker, block.text) for block in blocks]
 
 
-def _rationale_missing(question: str, kind: QuestionType, blocks: list[ContextBlock]) -> bool:
-    if kind != "technical" or not asks_for_rationale(question):
+def _needs_rewrite(question: str, *, has_history: bool) -> bool:
+    """A follow-up refers back to the conversation ("why?", "that project")."""
+    if not has_history:
         return False
-    evidence = [block for block in blocks if block.kind in {"achievement", "evidence"}]
-    return not any(RATIONALE_CUES.search(part) for block in evidence for part in block.corpus)
-
-
-def _templated(content: str, kind: QuestionType, *, no_evidence: bool = False) -> Reply:
-    grounding = Grounding(status="not_applicable", no_evidence=no_evidence)
-    return Reply(content=content, kind=kind, grounding=grounding)
+    return FOLLOW_UP.search(question) is not None or len(question.split()) <= MAX_FOLLOW_UP_WORDS
 
 
 async def _write_answer(
     question: str,
-    kind: QuestionType,
     blocks: list[ContextBlock],
     agent_session: AgentSession,
     messages: list[AgentMessage],
-    *,
-    rationale_missing: bool,
 ) -> str:
     prompt = build_answer_prompt(
         question=question,
-        kind=kind,
         blocks=_plain_prompt_blocks(blocks),
         history=recent_turns(messages),
         summary=agent_session.summary or "",
         style_notes=agent_session.style_notes,
-        rationale_missing=rationale_missing,
     )
     result = await parse_structured(
         prompt, schema=AnswerDraft, system=ANSWER_SYSTEM, temperature=0.0, task=LLMTask.write
@@ -202,22 +206,19 @@ async def _repair(answer: str, problems: list[str], blocks: list[ContextBlock]) 
     return result.data.answer
 
 
-def _finish(
-    grounded: Grounded, blocks: list[ContextBlock], kind: QuestionType, *, offer_note: bool
-) -> Reply:
-    if grounded.status == "refused":
+def _finish(grounded: Grounded, blocks: list[ContextBlock]) -> Reply:
+    citations = _citations(blocks, grounded.markers)
+    if grounded.status == "refused" or not citations:
         grounding = Grounding(
-            status="refused",
+            status="refused" if grounded.status == "refused" else "not_applicable",
             flagged_sentences=grounded.flagged_sentences,
             repaired=grounded.repaired,
             judge_unavailable=grounded.judge_unavailable,
             no_evidence=True,
         )
-        return Reply(content=templates.UNGROUNDED, kind=kind, grounding=grounding)
-    citations = _citations(blocks, grounded.markers)
-    content = grounded.text
-    if offer_note:
-        content = f"{content} {templates.NOTE_OFFER}"
+        cited_claims = any(markers_in(sentence) for sentence in grounded.flagged_sentences)
+        content = templates.UNGROUNDED if cited_claims else templates.NO_EVIDENCE
+        return Reply(content=content, grounding=grounding)
     gaps = (
         ["Part of the answer could not be confirmed from your evidence and was left out."]
         if grounded.status == "partial"
@@ -230,9 +231,8 @@ def _finish(
         repaired=grounded.repaired,
         used_private=any(citation.private for citation in citations),
         judge_unavailable=grounded.judge_unavailable,
-        suggest_note=offer_note,
     )
-    return Reply(content=content, kind=kind, citations=citations, grounding=grounding)
+    return Reply(content=grounded.text, citations=citations, grounding=grounding)
 
 
 async def _respond(
@@ -241,21 +241,11 @@ async def _respond(
     question: str,
     messages: list[AgentMessage],
 ) -> Reply:
-    routed = await route_question(question)
-    kind = routed.kind
-    if kind == "out_of_scope":
-        return _templated(templates.OUT_OF_SCOPE, kind)
-    if kind == "motivation" and agent_session.match_id is None:
-        return _templated(templates.NEEDS_JOB, kind)
     history = recent_turns(messages)
     query = question
-    if needs_rewrite(question, has_history=bool(history)):
+    if _needs_rewrite(question, has_history=bool(history)):
         query = await standalone_question(question, history, agent_session.summary or "")
-    retrieval = await retrieve(session, agent_session.candidate_id, query, intro=kind == "intro")
-    if retrieval.approved == 0:
-        return _templated(templates.NO_APPROVED, kind, no_evidence=True)
-    if not retrieval.blocks:
-        return _templated(templates.NO_EVIDENCE, kind, no_evidence=True)
+    retrieval = await retrieve(session, agent_session.candidate_id, query)
     profile = await session.get(Profile, agent_session.profile_id)
     if profile is None:
         raise ProfileNotFoundError
@@ -265,16 +255,19 @@ async def _respond(
         if job is not None:
             blocks.append(job)
     blocks.extend(retrieval.blocks)
-    missing = _rationale_missing(query, kind, retrieval.blocks)
-    answer = await _write_answer(
-        question, kind, blocks, agent_session, messages, rationale_missing=missing
-    )
+    answer = await _write_answer(question, blocks, agent_session, messages)
 
     async def repair(previous: str, problems: list[str]) -> str:
         return await _repair(previous, problems, blocks)
 
-    grounded = await ground(answer, blocks, kind=kind, repair=repair)
-    return _finish(grounded, blocks, kind, offer_note=missing and grounded.status != "refused")
+    return _finish(await ground(answer, blocks, repair=repair), blocks)
+
+
+def _title_from(question: str) -> str:
+    text = " ".join(question.split())
+    if len(text) <= AUTO_TITLE_CHARS:
+        return text
+    return text[:AUTO_TITLE_CHARS].rsplit(" ", 1)[0].rstrip(".,;:?!") + "…"
 
 
 def _usage(meter: UsageMeter) -> dict[str, object]:
@@ -302,16 +295,15 @@ async def answer(session: AsyncSession, session_id: uuid.UUID, question: str) ->
             logger.warning("agent.answer failed session_id=%s error=%s", agent_session.id, exc)
             reply = Reply(
                 content=templates.UNAVAILABLE,
-                kind=None,
                 grounding=Grounding(status="refused", error=True),
             )
-    user_row.question_type = reply.kind
     agent_session.updated_at = datetime.now(UTC)
+    if agent_session.title == DEFAULT_TITLE:
+        agent_session.title = _title_from(question)
     assistant_row = AgentMessage(
         session_id=agent_session.id,
         role=AgentRole.assistant,
         content=reply.content,
-        question_type=reply.kind,
         citations=[citation.model_dump(mode="json") for citation in reply.citations],
         grounding=reply.grounding.model_dump(mode="json"),
         usage=_usage(meter),
@@ -320,9 +312,8 @@ async def answer(session: AsyncSession, session_id: uuid.UUID, question: str) ->
     await session.flush()
     await fold_summary(agent_session, [*earlier, user_row, assistant_row])
     logger.info(
-        "agent.answer session_id=%s type=%s status=%s citations=%d",
+        "agent.answer session_id=%s status=%s citations=%d",
         agent_session.id,
-        reply.kind,
         reply.grounding.status,
         len(reply.citations),
     )

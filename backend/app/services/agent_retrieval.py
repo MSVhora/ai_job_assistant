@@ -16,6 +16,7 @@ from app.models import (
     EvidenceChunk,
     EvidenceChunkItem,
     EvidenceItem,
+    EvidenceItemStatus,
 )
 from app.schemas.agent import CitationKind
 from app.services.embedding import embed_texts
@@ -31,13 +32,22 @@ from app.services.resume_terms import canon, skill_keys
 logger = logging.getLogger(__name__)
 
 TOP_ACHIEVEMENTS = 6
-INTRO_ACHIEVEMENTS = 3
+HIGHLIGHTS = 4
+USER_CHUNKS = 3
+USER_CHUNK_KINDS = ("resume_entry", "note")
+USER_CHUNK_MIN_COSINE = 0.55
 CHUNKS_PER_ACHIEVEMENT = 2
 ITEMS_PER_ACHIEVEMENT = 3
 ITEM_CHARS = 500
 CHUNK_CHARS = 900
+QUOTE_CHARS = 240
+LABEL_CHARS = 90
 MIN_NAME_CHARS = 3
-INTRO_IMPACT_SHARE = 0.6
+HIGHLIGHT_IMPACT_SHARE = 0.6
+TRAILER = re.compile(
+    r"^\s*(?:co-authored-by|signed-off-by|reviewed-by)\s*:.*$", re.IGNORECASE | re.MULTILINE
+)
+LINK = re.compile(r"\(?https?://\S+\)?")
 
 
 @dataclass(frozen=True)
@@ -48,6 +58,7 @@ class ContextBlock:
     kind: CitationKind
     text: str
     corpus: tuple[str, ...]
+    label: str = ""
     skills: tuple[str, ...] = ()
     achievement_id: uuid.UUID | None = None
     evidence_item_id: uuid.UUID | None = None
@@ -62,6 +73,19 @@ class Retrieval:
     best_score: float = 0.0
     blocks: list[ContextBlock] = field(default_factory=list[ContextBlock])
     achievement_ids: list[uuid.UUID] = field(default_factory=list[uuid.UUID])
+
+
+def clean_excerpt(text: str, limit: int = QUOTE_CHARS) -> str:
+    """A readable excerpt for the UI: no commit trailers or bare links, whitespace collapsed."""
+    cleaned = " ".join(LINK.sub(" ", TRAILER.sub(" ", text)).split())
+    if len(cleaned) <= limit:
+        return cleaned
+    return cleaned[:limit].rsplit(" ", 1)[0].rstrip(".,;:") + "…"
+
+
+def short_label(text: str | None, fallback: str) -> str:
+    first = clean_excerpt((text or "").split("\n", 1)[0], LABEL_CHARS)
+    return first or fallback
 
 
 def impact_score(achievement: Achievement) -> float:
@@ -92,35 +116,39 @@ def hybrid_score(
 def _mentions(question: str, name: str | None) -> bool:
     if name is None or len(name) < MIN_NAME_CHARS:
         return False
-    return (
-        re.search(rf"(?<![A-Za-z0-9]){re.escape(name)}(?![A-Za-z0-9])", question, re.IGNORECASE)
-        is not None
-    )
+    pattern = rf"(?<![A-Za-z0-9]){re.escape(name)}(?![A-Za-z0-9])"
+    return re.search(pattern, question, re.IGNORECASE) is not None
+
+
+def _company(achievement: Achievement) -> str | None:
+    company = (achievement.employer_ref or {}).get("company")
+    return company if isinstance(company, str) and company else None
 
 
 def filter_by_mention(question: str, rows: list[Achievement]) -> list[Achievement]:
     """Narrow to the project or employer the question names; keep all when none matches."""
-    matched: list[Achievement] = []
-    for achievement in rows:
-        project = (achievement.project_key or "").rsplit("/", 1)[-1] or None
-        company = (achievement.employer_ref or {}).get("company")
-        if _mentions(question, project) or (
-            isinstance(company, str) and _mentions(question, company)
-        ):
-            matched.append(achievement)
+    matched = [
+        achievement
+        for achievement in rows
+        if _mentions(question, (achievement.project_key or "").rsplit("/", 1)[-1] or None)
+        or _mentions(question, _company(achievement))
+    ]
     return matched or rows
 
 
-def _achievement_text(achievement: Achievement) -> str:
+def _achievement_text(achievement: Achievement, *, compact: bool = False) -> str:
     lines = [f"Title: {achievement.title}"]
-    for label, value in (
-        ("Situation", achievement.situation),
-        ("Task", achievement.task),
-        ("Action", achievement.action),
-        ("Result", achievement.result),
-    ):
-        if value:
-            lines.append(f"{label}: {value}")
+    fields = (
+        (("Result", achievement.result),)
+        if compact
+        else (
+            ("Situation", achievement.situation),
+            ("Task", achievement.task),
+            ("Action", achievement.action),
+            ("Result", achievement.result),
+        )
+    )
+    lines.extend(f"{label}: {value}" for label, value in fields if value)
     confirmed = [
         str(metric.get("text") or "")
         for metric in achievement.metrics
@@ -132,8 +160,7 @@ def _achievement_text(achievement: Achievement) -> str:
         lines.append("Skills: " + ", ".join(achievement.skills))
     if achievement.project_key:
         lines.append(f"Project: {achievement.project_key}")
-    company = (achievement.employer_ref or {}).get("company")
-    if isinstance(company, str) and company:
+    if company := _company(achievement):
         lines.append(f"Employer: {company}")
     if achievement.time_start:
         end = achievement.time_end.isoformat() if achievement.time_end else "present"
@@ -141,9 +168,23 @@ def _achievement_text(achievement: Achievement) -> str:
     return redact("\n".join(lines)).text
 
 
+def _item_text(item: EvidenceItem) -> str:
+    """Title and body, without repeating the title when the body already starts with it."""
+    title = (item.title or "").strip()
+    return (
+        item.body if not title or item.body.lstrip().startswith(title) else f"{title}\n{item.body}"
+    )
+
+
 def _snippet(item: EvidenceItem, limit: int) -> str:
-    text = " ".join(f"{item.title or ''} {item.body}".split())
-    return redact(text).text[:limit]
+    return redact(" ".join(_item_text(item).split())).text[:limit]
+
+
+def _item_label(item: EvidenceItem) -> str:
+    title = short_label(item.title or item.body, item.kind.value.replace("_", " "))
+    if not item.project_key or title.startswith(item.project_key):
+        return title
+    return f"{item.project_key}: {title}"
 
 
 async def _query_vector(query: str) -> list[float] | None:
@@ -173,26 +214,9 @@ async def _ranked(
 
 
 def select_hits(
-    ranked: list[tuple[Achievement, float]],
-    query: str,
-    *,
-    intro: bool,
-    today: date,
-    settings: Settings,
+    ranked: list[tuple[Achievement, float]], query: str, *, today: date, settings: Settings
 ) -> tuple[list[tuple[Achievement, float]], float]:
-    """Top achievements with their score, and the best score seen (before the floor)."""
-    if intro:
-        scored = [
-            (
-                achievement,
-                INTRO_IMPACT_SHARE * impact_score(achievement)
-                + (1 - INTRO_IMPACT_SHARE)
-                * recency_factor(achievement.time_end, achievement.time_start, today),
-            )
-            for achievement, _ in ranked
-        ]
-        scored.sort(key=lambda pair: (-pair[1], str(pair[0].id)))
-        return scored[:INTRO_ACHIEVEMENTS], scored[0][1] if scored else 0.0
+    """Achievements relevant to the question, and the best score seen (before the floor)."""
     allowed = {a.id for a in filter_by_mention(query, [a for a, _ in ranked])}
     query_keys = skill_keys(query)
     scored = [
@@ -213,6 +237,24 @@ def select_hits(
     best = scored[0][1] if scored else 0.0
     kept = [pair for pair in scored if pair[1] >= settings.agent_min_retrieval_score]
     return kept[:TOP_ACHIEVEMENTS], best
+
+
+def select_highlights(
+    ranked: list[tuple[Achievement, float]], exclude: set[uuid.UUID], *, today: date
+) -> list[Achievement]:
+    """The best approved achievement per employer or project, so broad questions have material."""
+    best: dict[str, tuple[float, Achievement]] = {}
+    for achievement, _ in ranked:
+        if achievement.id in exclude:
+            continue
+        group = _company(achievement) or achievement.project_key or "other"
+        score = HIGHLIGHT_IMPACT_SHARE * impact_score(achievement) + (
+            1 - HIGHLIGHT_IMPACT_SHARE
+        ) * recency_factor(achievement.time_end, achievement.time_start, today)
+        if group not in best or score > best[group][0]:
+            best[group] = (score, achievement)
+    ordered = sorted(best.values(), key=lambda pair: (-pair[0], str(pair[1].id)))
+    return [achievement for _, achievement in ordered[:HIGHLIGHTS]]
 
 
 async def _linked_items(
@@ -238,7 +280,7 @@ async def _drill_down(
 ) -> list[tuple[EvidenceChunk, uuid.UUID]]:
     """Top chunks containing the items, with the first of the given items each contains."""
     order = (
-        EvidenceChunk.embedding.cosine_distance(vector)
+        EvidenceChunk.embedding.cosine_distance(vector).nulls_last()
         if vector is not None
         else EvidenceChunk.time_end.desc()
     )
@@ -247,7 +289,7 @@ async def _drill_down(
             select(EvidenceChunk, EvidenceChunkItem.item_id)
             .join(EvidenceChunkItem, EvidenceChunkItem.chunk_id == EvidenceChunk.id)
             .where(EvidenceChunkItem.item_id.in_(item_ids))
-            .order_by(order.nulls_last() if vector is not None else order, EvidenceChunk.id)
+            .order_by(order, EvidenceChunk.id)
         )
     ).all()
     seen: set[uuid.UUID] = set()
@@ -274,8 +316,7 @@ def _evidence_blocks(
     blocks: list[ContextBlock] = []
     for item in items[:ITEMS_PER_ACHIEVEMENT]:
         counter += 1
-        snippet = _snippet(item, ITEM_CHARS)
-        texts = [snippet]
+        texts = [_snippet(item, ITEM_CHARS)]
         private = item.is_private
         for chunk in extra.get(item.id, []):
             if chunk.text.strip() == item.body.strip():
@@ -288,56 +329,107 @@ def _evidence_blocks(
                 kind="evidence",
                 text=f"{item.kind.value}: " + "\n".join(texts),
                 corpus=tuple(texts),
+                label=_item_label(item),
                 achievement_id=achievement.id,
                 evidence_item_id=item.id,
                 url=item.url,
-                quote=snippet,
+                quote=clean_excerpt(_item_text(item)),
                 private=private,
             )
         )
     return blocks
 
 
-async def retrieve(
-    session: AsyncSession, candidate_id: uuid.UUID, query: str, *, intro: bool = False
-) -> Retrieval:
-    """Approved achievements for `query`, each with its evidence and the best drill-down chunks."""
+async def _user_chunks(
+    session: AsyncSession, candidate_id: uuid.UUID, vector: list[float], counter: int
+) -> list[ContextBlock]:
+    """Resume entries and notes the user wrote, close to the question, as direct evidence."""
+    distance = EvidenceChunk.embedding.cosine_distance(vector)
+    rows = (
+        await session.execute(
+            select(EvidenceChunk, EvidenceItem, distance.label("distance"))
+            .join(EvidenceChunkItem, EvidenceChunkItem.chunk_id == EvidenceChunk.id)
+            .join(EvidenceItem, EvidenceItem.id == EvidenceChunkItem.item_id)
+            .where(
+                EvidenceChunk.candidate_id == candidate_id,
+                EvidenceChunk.kind.in_(USER_CHUNK_KINDS),
+                EvidenceChunk.embedding.is_not(None),
+                EvidenceItem.status == EvidenceItemStatus.kept,
+            )
+            .order_by(distance, EvidenceChunk.id)
+            .limit(USER_CHUNKS * 3)
+        )
+    ).all()
+    blocks: list[ContextBlock] = []
+    seen: set[uuid.UUID] = set()
+    for chunk, item, chunk_distance in rows:
+        if chunk.id in seen or 1.0 - float(chunk_distance) < USER_CHUNK_MIN_COSINE:
+            continue
+        seen.add(chunk.id)
+        counter += 1
+        text = redact(chunk.text).text[:CHUNK_CHARS]
+        blocks.append(
+            ContextBlock(
+                marker=f"E{counter}",
+                kind="evidence",
+                text=f"{item.kind.value}: {text}",
+                corpus=(text,),
+                label=short_label(chunk.title or item.title, item.kind.value.replace("_", " ")),
+                evidence_item_id=item.id,
+                url=item.url,
+                quote=clean_excerpt(chunk.text),
+                private=chunk.contains_private or item.is_private,
+            )
+        )
+        if len(blocks) == USER_CHUNKS:
+            break
+    return blocks
+
+
+async def retrieve(session: AsyncSession, candidate_id: uuid.UUID, query: str) -> Retrieval:
+    """Context for any question: relevant achievements and evidence, highlights, user writing."""
     settings = get_settings()
-    vector = None if intro else await _query_vector(query)
+    today = datetime.now(UTC).date()
+    vector = await _query_vector(query)
     ranked = await _ranked(session, candidate_id, vector)
     result = Retrieval(approved=len(ranked))
-    if not ranked:
-        return result
-    hits, result.best_score = select_hits(
-        ranked, query, intro=intro, today=datetime.now(UTC).date(), settings=settings
-    )
-    if not hits:
-        return result
-    linked = await _linked_items(session, [achievement.id for achievement, _ in hits])
+    hits, result.best_score = select_hits(ranked, query, today=today, settings=settings)
+    linked = await _linked_items(session, [a.id for a, _ in hits]) if hits else {}
     evidence_counter = 0
     for number, (achievement, _) in enumerate(hits, start=1):
         items = linked.get(achievement.id, [])
         chunks = (
-            []
-            if intro or not items
-            else await _drill_down(
-                session, [item.id for item in items[:ITEMS_PER_ACHIEVEMENT]], vector
-            )
+            await _drill_down(session, [i.id for i in items[:ITEMS_PER_ACHIEVEMENT]], vector)
+            if items
+            else []
         )
         evidence = _evidence_blocks(achievement, items, chunks, evidence_counter)
         evidence_counter += len(evidence)
         text = _achievement_text(achievement)
         result.achievement_ids.append(achievement.id)
-        result.blocks.append(
-            ContextBlock(
-                marker=f"A{number}",
-                kind="achievement",
-                text=text,
-                corpus=(text, *(part for block in evidence for part in block.corpus)),
-                skills=tuple(achievement.skills),
-                achievement_id=achievement.id,
-                private=achievement.derived_from_private,
-            )
-        )
+        result.blocks.append(_achievement_block(f"A{number}", achievement, text, evidence))
         result.blocks.extend(evidence)
+    marker = len(hits)
+    for achievement in select_highlights(ranked, set(result.achievement_ids), today=today):
+        marker += 1
+        text = _achievement_text(achievement, compact=True)
+        result.blocks.append(_achievement_block(f"A{marker}", achievement, text, []))
+    if vector is not None:
+        result.blocks.extend(await _user_chunks(session, candidate_id, vector, evidence_counter))
     return result
+
+
+def _achievement_block(
+    marker: str, achievement: Achievement, text: str, evidence: list[ContextBlock]
+) -> ContextBlock:
+    return ContextBlock(
+        marker=marker,
+        kind="achievement",
+        text=text,
+        corpus=(text, *(part for block in evidence for part in block.corpus)),
+        label=short_label(achievement.title, "Achievement"),
+        quote=clean_excerpt(achievement.result or achievement.action or achievement.title),
+        skills=tuple(achievement.skills),
+        achievement_id=achievement.id,
+        private=achievement.derived_from_private,
+    )

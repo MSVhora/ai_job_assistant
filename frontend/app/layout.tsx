@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { ChatLauncher } from "@/components/features/chat/ChatLauncher";
+import { ChatProvider } from "@/components/features/chat/ChatProvider";
 import { SiteHeader } from "@/components/features/SiteHeader";
 import { Toaster } from "@/components/ui/toast";
 import { Providers } from "./providers";
@@ -58,7 +60,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="flex min-h-full flex-col" suppressHydrationWarning>
         <SiteHeader />
-        <Providers>{children}</Providers>
+        <Providers>
+          <ChatProvider>
+            {children}
+            <ChatLauncher />
+          </ChatProvider>
+        </Providers>
         <Toaster />
       </body>
     </html>

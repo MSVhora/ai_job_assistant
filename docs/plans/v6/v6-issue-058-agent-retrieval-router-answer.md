@@ -1,6 +1,6 @@
 # Issue #58 — Interview agent backend: router, retrieval, answers, citations, guardrails (Week 4)
 
-**Status:** Implemented (2026-10-05) — see *Implementation notes* for deviations
+**Status:** Implemented (2026-10-05), superseded in part by #62 — see *Implementation notes* for deviations
 **Tracks:** GitHub issue #58 (milestone `v6`, branch `v6/58-agent-retrieval-router-answer`)
 **Plan of record:** [v6-implementation-plan.md](v6-implementation-plan.md) §7, §9 (migration `0027`), §12
 **Depends on:** #49, #52, #53 (approved achievements), #55's verifier utilities
@@ -97,3 +97,10 @@ Streaming, voice, mock-interview scoring, tools/web access, multi-session analyt
 - **Memory.** `agent_session.summarized_through` (an added column) records how many messages the summary already covers; a summary that adds a figure or tool absent from what it folds is replaced by a plain list of the questions asked.
 - **Migration** is `0031`; `agent_message.created_at` defaults to `clock_timestamp()` so the question and its answer, written in one transaction, keep their order.
 - **Verification:** backend gate and the new tests pass against a scratch database; nothing was run against a live model.
+
+## Superseded in part (2026-10-06)
+
+The interview-specific behaviour described above (question types and templates, the rules router, the
+"motivation needs a job" and out-of-scope replies, the decision-rationale note offer) is replaced by a
+general evidence chat in [issue #62](v6-issue-062-evidence-chat.md). Sessions and messages, hybrid retrieval,
+the grounding validator with one repair, memory and the migration (`0031`) are kept.

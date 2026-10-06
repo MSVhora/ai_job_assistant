@@ -71,18 +71,20 @@ async def test_a_session_round_trips_with_its_messages(
     assert body["messages"][1]["content"] == turn["assistant_message"]["content"]
 
 
-async def test_templated_replies_are_persisted_too(
+async def test_no_evidence_replies_are_persisted_too(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    install_acompletion(monkeypatch, FakeAgentLLM())
+    install_acompletion(monkeypatch, FakeAgentLLM(answer=lambda *_: "Nothing in my evidence."))
+    install_agent_embeddings(monkeypatch)
     world = await seed_resume_world(embeddings=True)
     session_id = await create(client, world["profile"])
 
     response = await client.post(
-        f"{BASE}/{session_id}/messages", json={"content": "Tell me a joke"}
+        f"{BASE}/{session_id}/messages", json={"content": "What is the capital of France?"}
     )
 
-    assert response.json()["assistant_message"]["question_type"] == "out_of_scope"
+    reply = response.json()["assistant_message"]
+    assert reply["grounding"]["no_evidence"] is True
     assert [m.role.value for m in await messages_in_db()] == ["user", "assistant"]
 
 
@@ -126,6 +128,10 @@ async def test_a_pinned_match_must_belong_to_the_profile(client: AsyncClient) ->
     assert refused.status_code == 404
     assert accepted.status_code == 201
     assert accepted.json()["match_id"] == str(own_match)
+    detail = (await client.get(f"{BASE}/{accepted.json()['id']}")).json()
+    assert detail["job"]["title"] == "Data Engineer"
+    assert detail["job"]["company"] == "Initech"
+    assert detail["job"]["rationale"]
 
 
 async def test_unknown_ids_are_404(client: AsyncClient) -> None:

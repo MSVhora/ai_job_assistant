@@ -25,16 +25,19 @@ MARKER_PATTERN = r"\[(?:A\d+|E\d+|P|J)\]"
 MARKER = re.compile(r"\[(A\d+|E\d+|P|J)\]")
 SENTENCE = re.compile(rf"\s*((?:[^.!?]|[.!?](?=\w))+[.!?]*(?:\s*{MARKER_PATTERN})*)", re.DOTALL)
 FIRST_PERSON_PAST = re.compile(
-    r"\b(?:i|we)\s+([a-z]+)\b|\bmy (?:team|manager|colleagues)\b", re.IGNORECASE
+    r"\b(?:i|we|you)\s+([a-z]+)\b|\b(?:my|your) (?:team|manager|colleagues)\b", re.IGNORECASE
 )
 SAFE_UNCITED = re.compile(
     r"^(?:the evidence|i (?:can|can't|cannot|don't|do not|could not|couldn't|have no)|if you"
-    r"|would you|let me know|happy to|i'd (?:be glad|suggest|like to)|my evidence|there is no)",
+    r"|would you|let me know|happy to|i'd (?:be glad|suggest|like to)|my evidence|there is no"
+    r"|that (?:is|isn't|is not)|this (?:is|isn't|is not)|nothing in|none of"
+    r"|your (?:approved )?(?:evidence|profile|sources|notes) (?:does|do|doesn't|don't|did)"
+    r"|the (?:sources|blocks|evidence))",
     re.IGNORECASE,
 )
 SHORT_SENTENCE_WORDS = 5
 JUDGE_BATCH = 12
-EVIDENCE_LINE_CHARS = 700
+EVIDENCE_LINE_CHARS = 6000
 UNCITED = "states something about the candidate without citing evidence"
 
 
@@ -96,15 +99,13 @@ def _claims_experience(plain: str) -> bool:
     return False
 
 
-def is_factual(plain: str, *, kind: str) -> bool:
+def is_factual(plain: str) -> bool:
     """Whether an uncited sentence needs a citation (questions, offers and hedges do not)."""
     if plain.endswith("?") or len(plain.split()) <= SHORT_SENTENCE_WORDS:
         return False
     if numbers_in(plain) or scan_skills(plain) or _claims_experience(plain):
         return True
-    if SAFE_UNCITED.match(plain):
-        return False
-    return kind != "hypothetical"
+    return not SAFE_UNCITED.match(plain)
 
 
 def _source_for(blocks: Sequence[ContextBlock]) -> Source:
@@ -122,7 +123,7 @@ def _ownership_violations(plain: str, corpus: str) -> list[str]:
 
 
 def _flag_sentence(
-    index: int, sentence: str, by_marker: dict[str, ContextBlock], kind: str
+    index: int, sentence: str, by_marker: dict[str, ContextBlock]
 ) -> tuple[Flag | None, list[ContextBlock]]:
     cited = markers_in(sentence)
     plain = strip_markers(sentence)
@@ -130,7 +131,7 @@ def _flag_sentence(
     if unknown:
         return Flag(index, sentence, f"cites {unknown[0]}, which is not a source"), []
     if not cited:
-        reason = UNCITED if is_factual(plain, kind=kind) else None
+        reason = UNCITED if is_factual(plain) else None
         return (Flag(index, sentence, reason) if reason else None), []
     blocks = [by_marker[marker] for marker in cited]
     if all(block.kind == "job" for block in blocks) and _claims_experience(plain):
@@ -169,13 +170,13 @@ async def _judge(pending: list[tuple[int, str, list[ContextBlock]]], checked: Ch
                 checked.flags.append(Flag(verdict.index, checked.sentences[verdict.index], reason))
 
 
-async def check_answer(answer: str, blocks: Sequence[ContextBlock], *, kind: str) -> Checked:
+async def check_answer(answer: str, blocks: Sequence[ContextBlock]) -> Checked:
     """Deterministic checks on every sentence, then the entailment judge on the cited ones."""
     by_marker = {block.marker: block for block in blocks}
     checked = Checked(sentences=split_sentences(answer))
     pending: list[tuple[int, str, list[ContextBlock]]] = []
     for index, sentence in enumerate(checked.sentences):
-        flag, cited = _flag_sentence(index, sentence, by_marker, kind)
+        flag, cited = _flag_sentence(index, sentence, by_marker)
         if flag is not None:
             checked.flags.append(flag)
         elif cited:
@@ -213,11 +214,9 @@ def _grounded(checked: Checked, *, repaired: bool) -> Grounded:
     )
 
 
-async def ground(
-    answer: str, blocks: Sequence[ContextBlock], *, kind: str, repair: Repair
-) -> Grounded:
+async def ground(answer: str, blocks: Sequence[ContextBlock], *, repair: Repair) -> Grounded:
     """Validate; on failure one repair round-trip; what still fails is dropped, not shown."""
-    first = await check_answer(answer, blocks, kind=kind)
+    first = await check_answer(answer, blocks)
     if not first.flags:
         return _grounded(first, repaired=False)
     problems = [f"'{flag.sentence}': {flag.reason}" for flag in first.flags]
@@ -226,5 +225,5 @@ async def ground(
     except LLMError as exc:
         logger.warning("agent.grounding repair failed error=%s", exc)
         return _grounded(first, repaired=False)
-    second = await check_answer(rewritten, blocks, kind=kind)
+    second = await check_answer(rewritten, blocks)
     return _grounded(second, repaired=True)

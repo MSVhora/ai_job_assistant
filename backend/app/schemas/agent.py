@@ -4,9 +4,6 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-QuestionType = Literal[
-    "intro", "behavioral", "technical", "motivation", "hypothetical", "out_of_scope"
-]
 GroundingStatus = Literal["grounded", "partial", "refused", "not_applicable"]
 CitationKind = Literal["achievement", "evidence", "profile", "job"]
 MessageRole = Literal["user", "assistant"]
@@ -29,6 +26,7 @@ class AgentMessageCreate(BaseModel):
 class Citation(BaseModel):
     marker: str
     kind: CitationKind
+    label: str
     achievement_id: uuid.UUID | None = None
     evidence_item_id: uuid.UUID | None = None
     url: str | None = None
@@ -38,13 +36,12 @@ class Citation(BaseModel):
 
 class Grounding(BaseModel):
     status: GroundingStatus = "not_applicable"
-    flagged_sentences: list[str] = Field(default_factory=list[str])
-    gaps: list[str] = Field(default_factory=list[str])
+    flagged_sentences: list[str] = []
+    gaps: list[str] = []
     repaired: bool = False
     used_private: bool = False
     judge_unavailable: bool = False
     no_evidence: bool = False
-    suggest_note: bool = False
     error: bool = False
 
 
@@ -55,9 +52,8 @@ class AgentMessageResponse(BaseModel):
     session_id: uuid.UUID
     role: MessageRole
     content: str
-    question_type: QuestionType | None = None
-    citations: list[Citation] = Field(default_factory=list[Citation])
-    grounding: Grounding = Field(default_factory=Grounding)
+    citations: list[Citation]
+    grounding: Grounding
     created_at: datetime
 
 
@@ -73,19 +69,22 @@ class AgentSessionSummary(BaseModel):
     updated_at: datetime
 
 
+class PinnedJob(BaseModel):
+    title: str
+    company: str | None = None
+    url: str | None = None
+    rationale: str | None = None
+
+
 class AgentSessionResponse(AgentSessionSummary):
-    messages: list[AgentMessageResponse] = Field(default_factory=list[AgentMessageResponse])
+    summary: str | None
+    job: PinnedJob | None = None
+    messages: list[AgentMessageResponse]
 
 
 class AgentTurnResponse(BaseModel):
     user_message: AgentMessageResponse
     assistant_message: AgentMessageResponse
-
-
-class QuestionClass(BaseModel):
-    """Output of the fallback classifier."""
-
-    type: QuestionType
 
 
 class AnswerDraft(BaseModel):

@@ -1583,6 +1583,59 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/agent/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Agent Sessions */
+        get: operations["list_agent_sessions_api_agent_sessions_get"];
+        put?: never;
+        /** Create Agent Session */
+        post: operations["create_agent_session_api_agent_sessions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/agent/sessions/{session_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Agent Session */
+        get: operations["get_agent_session_api_agent_sessions__session_id__get"];
+        put?: never;
+        post?: never;
+        /** Delete Agent Session */
+        delete: operations["delete_agent_session_api_agent_sessions__session_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/agent/sessions/{session_id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send Agent Message */
+        post: operations["send_agent_message_api_agent_sessions__session_id__messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1695,6 +1748,121 @@ export interface components {
         AddImpactRequest: {
             /** Text */
             text: string;
+        };
+        /** AgentMessageCreate */
+        AgentMessageCreate: {
+            /** Content */
+            content: string;
+        };
+        /** AgentMessageResponse */
+        AgentMessageResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Session Id
+             * Format: uuid
+             */
+            session_id: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            role: "user" | "assistant";
+            /** Content */
+            content: string;
+            /** Citations */
+            citations: components["schemas"]["Citation"][];
+            grounding: components["schemas"]["Grounding"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /** AgentSessionCreate */
+        AgentSessionCreate: {
+            /**
+             * Profile Id
+             * Format: uuid
+             */
+            profile_id: string;
+            /** Match Id */
+            match_id?: string | null;
+            /** Style Notes */
+            style_notes?: string | null;
+            /** Title */
+            title?: string | null;
+        };
+        /** AgentSessionResponse */
+        AgentSessionResponse: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Profile Id
+             * Format: uuid
+             */
+            profile_id: string;
+            /** Match Id */
+            match_id: string | null;
+            /** Title */
+            title: string;
+            /** Style Notes */
+            style_notes: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Summary */
+            summary: string | null;
+            job?: components["schemas"]["PinnedJob"] | null;
+            /** Messages */
+            messages: components["schemas"]["AgentMessageResponse"][];
+        };
+        /** AgentSessionSummary */
+        AgentSessionSummary: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Profile Id
+             * Format: uuid
+             */
+            profile_id: string;
+            /** Match Id */
+            match_id: string | null;
+            /** Title */
+            title: string;
+            /** Style Notes */
+            style_notes: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** AgentTurnResponse */
+        AgentTurnResponse: {
+            user_message: components["schemas"]["AgentMessageResponse"];
+            assistant_message: components["schemas"]["AgentMessageResponse"];
         };
         /** AwardEntry */
         AwardEntry: {
@@ -1897,6 +2065,31 @@ export interface components {
             by_kind: {
                 [key: string]: number;
             };
+        };
+        /** Citation */
+        Citation: {
+            /** Marker */
+            marker: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "achievement" | "evidence" | "profile" | "job";
+            /** Label */
+            label: string;
+            /** Achievement Id */
+            achievement_id?: string | null;
+            /** Evidence Item Id */
+            evidence_item_id?: string | null;
+            /** Url */
+            url?: string | null;
+            /** Quote */
+            quote?: string | null;
+            /**
+             * Private
+             * @default false
+             */
+            private: boolean;
         };
         /** CommentCreate */
         CommentCreate: {
@@ -2507,6 +2700,50 @@ export interface components {
              */
             cache_misses: number;
         };
+        /** Grounding */
+        Grounding: {
+            /**
+             * Status
+             * @default not_applicable
+             * @enum {string}
+             */
+            status: "grounded" | "partial" | "refused" | "not_applicable";
+            /**
+             * Flagged Sentences
+             * @default []
+             */
+            flagged_sentences: string[];
+            /**
+             * Gaps
+             * @default []
+             */
+            gaps: string[];
+            /**
+             * Repaired
+             * @default false
+             */
+            repaired: boolean;
+            /**
+             * Used Private
+             * @default false
+             */
+            used_private: boolean;
+            /**
+             * Judge Unavailable
+             * @default false
+             */
+            judge_unavailable: boolean;
+            /**
+             * No Evidence
+             * @default false
+             */
+            no_evidence: boolean;
+            /**
+             * Error
+             * @default false
+             */
+            error: boolean;
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -3052,6 +3289,17 @@ export interface components {
             } | null;
             /** Personal Account */
             personal_account: boolean;
+        };
+        /** PinnedJob */
+        PinnedJob: {
+            /** Title */
+            title: string;
+            /** Company */
+            company?: string | null;
+            /** Url */
+            url?: string | null;
+            /** Rationale */
+            rationale?: string | null;
         };
         /** PoolEntry */
         PoolEntry: {
@@ -7283,6 +7531,167 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ResumeDocumentResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_agent_sessions_api_agent_sessions_get: {
+        parameters: {
+            query?: {
+                profile_id?: string | null;
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentSessionSummary"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_agent_session_api_agent_sessions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentSessionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentSessionSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_agent_session_api_agent_sessions__session_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentSessionResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_agent_session_api_agent_sessions__session_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    send_agent_message_api_agent_sessions__session_id__messages_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                session_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentMessageCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentTurnResponse"];
                 };
             };
             /** @description Validation Error */

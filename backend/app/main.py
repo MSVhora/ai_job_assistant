@@ -13,7 +13,7 @@ from app.core.errors import (
     request_validation_error_handler,
 )
 from app.core.pagination import TOTAL_COUNT_HEADER
-from app.routers import health, jobs, matches, profile, resume, setup
+from app.routers import ats, health, jobs, matches, profile, resume, setup
 
 if TYPE_CHECKING:
     from starlette.types import ExceptionHandler
@@ -36,6 +36,7 @@ def create_app() -> FastAPI:
     application.include_router(setup.router)
     application.include_router(resume.router)
     application.include_router(profile.router)
+    application.include_router(ats.router)
     application.include_router(jobs.router)
     application.include_router(matches.router)
     application.add_exception_handler(DomainError, cast("ExceptionHandler", domain_error_handler))

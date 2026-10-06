@@ -208,6 +208,17 @@ specs (`{title, skills, exclude}` per enabled source) into `resume.search_querie
 profile copies them; `POST /api/profiles/{id}/search-queries` regenerates from the current
 content (temperature 0.8 + anti-repeat instruction, so Regenerate observably changes the
 result). Generated specs are stamped `prompt_version` (`search_query_v3` since #31).
+## ATS score (`POST /api/ats/score`)
+
+Score-and-fix takes either a freshly uploaded **resume** (`resume_id`) or a saved
+**profile** (`profile_id`, rendered to text deterministically — never an extra LLM
+extraction) plus a `job_description` (50–15,000 chars). One synchronous Gemini call in
+`services/ats_scoring.py` produces a structured report (`schemas/ats.py`): weighted
+category scores, matched/missing keywords (with critical/important/nice-to-have
+priority), strengths, gaps and prioritized rewrite suggestions. The backend recomputes
+`overall_score` as the weighted mean of the category scores so the LLM cannot drift from
+its own breakdown, and the user-facing report page (`frontend/app/ats`) is stateless —
+nothing is persisted and each run lives only in the browser.
 
 Since #31, generation consumes the **full profile** (skills, preferences, country,
 summary — a shared digest builder also feeds the embedding, kept byte-identical) and is
@@ -270,6 +281,7 @@ never a run failure. With no salary floor set the connector also sends
 `salary_include_unknown=1`.
 
 ## Database schema (ER diagram)
+
 
 Source of truth: `backend/app/models/` + Alembic migrations. See
 [plan §4](plans/v1/v1-implementation-plan.md#4-data-model) for the data model narrative.

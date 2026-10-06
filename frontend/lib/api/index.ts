@@ -35,6 +35,11 @@ export type MatchResponse = components["schemas"]["MatchResponse"];
 export type CostEstimate = components["schemas"]["CostEstimateResponse"];
 export type MatchingOutcome = components["schemas"]["MatchingOutcome"];
 export type StoredPreferences = components["schemas"]["StoredPreferences"];
+export type AtsScoreRequest = components["schemas"]["AtsScoreRequest"];
+export type AtsScoreResponse = components["schemas"]["AtsScoreResponse"];
+export type AtsCategoryScore = components["schemas"]["AtsCategoryScore"];
+export type AtsKeywordHit = components["schemas"]["AtsKeywordHit"];
+export type AtsSuggestion = components["schemas"]["AtsSuggestion"];
 export type MatchListParams = operations["list_matches_api_matches_get"]["parameters"]["query"];
 export type MatchRebuildStatus = components["schemas"]["MatchRebuildStatusResponse"];
 
@@ -212,6 +217,14 @@ export async function getMatchRebuildStatus(profileId: string): Promise<MatchReb
   return apiFetch<MatchRebuildStatus>(
     `/api/profiles/${encodeURIComponent(profileId)}/rebuild-matches`,
   );
+}
+
+export async function scoreAts(payload: AtsScoreRequest): Promise<AtsScoreResponse> {
+  return apiFetch<AtsScoreResponse>("/api/ats/score", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    timeoutMs: 180_000,
+  });
 }
 
 export async function listMatches(params: MatchListParams): Promise<MatchResponse[]> {

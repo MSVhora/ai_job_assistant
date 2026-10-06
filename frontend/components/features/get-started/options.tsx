@@ -4,6 +4,7 @@ import {
   UploadPreview,
   ProfilePreview,
   SetupPreview,
+  AtsPreview,
   BarsPreview,
 } from "./previews";
 
@@ -51,8 +52,8 @@ export const OPTIONS: GetStartedOption[] = [
     title: "Score & fix your resume",
     description: "Score your resume against applicant tracking systems and get fixes.",
     Icon: AtsIcon,
-    Preview: BarsPreview,
-    disabled: true,
+    Preview: AtsPreview,
+    href: "/ats",
   },
   {
     eyebrow: "AI RESUME BUILDER",

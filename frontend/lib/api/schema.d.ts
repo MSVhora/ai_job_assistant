@@ -178,6 +178,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/ats/score": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Score Ats */
+        post: operations["score_ats_api_ats_score_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/profiles/{profile_id}/search-queries/estimate": {
         parameters: {
             query?: never;
@@ -421,6 +438,101 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AtsCategoryScore
+         * @description One scored ATS category (format, keyword alignment, ...).
+         */
+        AtsCategoryScore: {
+            /** Name */
+            name: string;
+            /**
+             * Score
+             * @description 0-100 for this category
+             */
+            score: number;
+            /**
+             * Weight
+             * @description contribution weight of this category
+             */
+            weight: number;
+            /** Analysis */
+            analysis: string;
+            /**
+             * Issues
+             * @default []
+             */
+            issues: string[];
+        };
+        /** AtsKeywordHit */
+        AtsKeywordHit: {
+            /** Keyword */
+            keyword: string;
+            /**
+             * Priority
+             * @enum {string}
+             */
+            priority: "critical" | "important" | "nice_to_have";
+        };
+        /** AtsScoreRequest */
+        AtsScoreRequest: {
+            /** Resume Id */
+            resume_id?: string | null;
+            /** Profile Id */
+            profile_id?: string | null;
+            /** Job Description */
+            job_description: string;
+        };
+        /** AtsScoreResponse */
+        AtsScoreResponse: {
+            /** Source Resume Id */
+            source_resume_id: string | null;
+            /** Source Profile Id */
+            source_profile_id: string | null;
+            /** Overall Score */
+            overall_score: number;
+            /** Verdict */
+            verdict: string;
+            /** Summary */
+            summary: string;
+            /** Categories */
+            categories: components["schemas"]["AtsCategoryScore"][];
+            /** Matched Keywords */
+            matched_keywords: components["schemas"]["AtsKeywordHit"][];
+            /** Missing Keywords */
+            missing_keywords: components["schemas"]["AtsKeywordHit"][];
+            /** Strengths */
+            strengths: string[];
+            /** Gaps */
+            gaps: string[];
+            /** Suggestions */
+            suggestions: components["schemas"]["AtsSuggestion"][];
+            /** Prompt Version */
+            prompt_version: string;
+            /**
+             * Generated At
+             * Format: date-time
+             */
+            generated_at: string;
+        };
+        /** AtsSuggestion */
+        AtsSuggestion: {
+            /** Title */
+            title: string;
+            /**
+             * Area
+             * @enum {string}
+             */
+            area: "keywords" | "format" | "summary" | "skills" | "experience" | "other";
+            /** Detail */
+            detail: string;
+            /** Rewrite Example */
+            rewrite_example?: string | null;
+            /**
+             * Priority
+             * @enum {string}
+             */
+            priority: "high" | "medium" | "low";
+        };
         /** AwardItem */
         AwardItem: {
             /** Title */
@@ -1801,6 +1913,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SearchQueriesResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    score_ats_api_ats_score_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AtsScoreRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AtsScoreResponse"];
                 };
             };
             /** @description Validation Error */

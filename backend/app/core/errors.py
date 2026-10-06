@@ -72,6 +72,11 @@ class LLMQueryGenerationError(DomainError):
     default_detail = "search query generation failed"
 
 
+class LLMScoringError(DomainError):
+    status_code = 502
+    default_detail = "ATS scoring failed"
+
+
 class MissingSearchQueryError(DomainError):
     status_code = 400
     default_detail = "no search query provided for a selected source"

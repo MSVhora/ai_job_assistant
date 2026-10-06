@@ -59,8 +59,9 @@ function JobsIcon() {
 function AtsIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="h-5 w-5">
-      <circle cx="12" cy="12" r="9" />
-      <path d="M12 7v5l3 3" />
+      <path d="M3 17L8 11L12 14L17 7" />
+      <circle cx="17" cy="7" r="2" />
+      <path d="M3 21h18" />
     </svg>
   );
 }
@@ -163,6 +164,32 @@ function SetupPreview() {
   );
 }
 
+function AtsPreview() {
+  return (
+    <div className="mt-5 flex flex-col gap-2 rounded-2xl border border-gray-100 bg-gray-50/80 p-3">
+      <div className="flex items-center gap-3 rounded-xl border border-violet-100 bg-white p-2.5 shadow-sm">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-[3px] border-emerald-400 bg-emerald-50 text-[11px] font-extrabold text-emerald-700">
+          82
+        </span>
+        <span className="min-w-0 flex-1 space-y-1.5">
+          <span className="block truncate text-xs font-semibold text-gray-900">Senior TPM role</span>
+          <span className="block h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
+            <span className="block h-full w-[82%] rounded-full bg-emerald-400" />
+          </span>
+          <span className="block h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
+            <span className="block h-full w-[64%] rounded-full bg-violet-400" />
+          </span>
+        </span>
+      </div>
+      <div className="flex flex-wrap gap-1.5 pl-1">
+        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700">SQL ✓</span>
+        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700">Roadmaps ✓</span>
+        <span className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-700">Kafka ✕</span>
+      </div>
+    </div>
+  );
+}
+
 function BarsPreview() {
   return (
     <div className="mt-5 rounded-2xl border border-gray-100 bg-white/60 p-3">
@@ -227,8 +254,8 @@ const OPTIONS: GetStartedOption[] = [
     title: "Score & fix your resume",
     description: "Score your resume against applicant tracking systems and get fixes.",
     Icon: AtsIcon,
-    Preview: BarsPreview,
-    disabled: true,
+    Preview: AtsPreview,
+    href: "/ats",
   },
   {
     eyebrow: "AI RESUME BUILDER",

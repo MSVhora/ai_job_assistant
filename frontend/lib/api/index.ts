@@ -25,6 +25,11 @@ export type JobPostingDetail = components["schemas"]["JobPostingDetail"];
 export type MatchResponse = components["schemas"]["MatchResponse"];
 export type MatchingOutcome = components["schemas"]["MatchingOutcome"];
 export type StoredPreferences = components["schemas"]["StoredPreferences"];
+export type AtsScoreRequest = components["schemas"]["AtsScoreRequest"];
+export type AtsScoreResponse = components["schemas"]["AtsScoreResponse"];
+export type AtsCategoryScore = components["schemas"]["AtsCategoryScore"];
+export type AtsKeywordHit = components["schemas"]["AtsKeywordHit"];
+export type AtsSuggestion = components["schemas"]["AtsSuggestion"];
 export type MatchListParams = operations["list_matches_api_matches_get"]["parameters"]["query"];
 
 export { ApiError, ExtractionFailedError, apiFetch, apiFetchWithTotal } from "./client";
@@ -152,6 +157,14 @@ export async function getSearchPostings(searchId: string): Promise<JobPostingSum
   return apiFetch<JobPostingSummary[]>(
     `/api/jobs/searches/${encodeURIComponent(searchId)}/postings`,
   );
+}
+
+export async function scoreAts(payload: AtsScoreRequest): Promise<AtsScoreResponse> {
+  return apiFetch<AtsScoreResponse>("/api/ats/score", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    timeoutMs: 180_000,
+  });
 }
 
 export async function listMatches(params: MatchListParams): Promise<MatchResponse[]> {

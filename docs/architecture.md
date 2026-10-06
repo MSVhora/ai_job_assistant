@@ -155,6 +155,18 @@ LinkedIn gets a natural-language keywords line (+ salary mention; it has no excl
 salary filter). `job_search.query` stores exactly what was sent, and the run status echoes
 it.
 
+## ATS score (`POST /api/ats/score`)
+
+Score-and-fix takes either a freshly uploaded **resume** (`resume_id`) or a saved
+**profile** (`profile_id`, rendered to text deterministically — never an extra LLM
+extraction) plus a `job_description` (50–15,000 chars). One synchronous Gemini call in
+`services/ats_scoring.py` produces a structured report (`schemas/ats.py`): weighted
+category scores, matched/missing keywords (with critical/important/nice-to-have
+priority), strengths, gaps and prioritized rewrite suggestions. The backend recomputes
+`overall_score` as the weighted mean of the category scores so the LLM cannot drift from
+its own breakdown, and the user-facing report page (`frontend/app/ats`) is stateless —
+nothing is persisted and each run lives only in the browser.
+
 ## Database schema (v1, ER diagram)
 
 Source of truth: `backend/app/models/` + Alembic migrations. See

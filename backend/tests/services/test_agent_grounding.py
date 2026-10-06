@@ -73,7 +73,7 @@ async def test_a_supported_cited_sentence_passes(monkeypatch: pytest.MonkeyPatch
     install_acompletion(monkeypatch, llm)
     answer = "I cut the nightly import from 42 minutes to 9 minutes by batching writes [A1][E1]."
 
-    checked = await check_answer(answer, blocks(), kind="behavioral")
+    checked = await check_answer(answer, blocks())
 
     assert checked.flags == []
     assert llm.count("judge") == 1
@@ -93,7 +93,7 @@ async def test_an_unsupported_number_tool_version_or_year_is_caught(
 ) -> None:
     install_acompletion(monkeypatch, FakeAgentLLM())
 
-    checked = await check_answer(sentence, blocks(), kind="behavioral")
+    checked = await check_answer(sentence, blocks())
 
     assert len(checked.flags) == 1
     assert fragment in checked.flags[0].reason
@@ -102,9 +102,7 @@ async def test_an_unsupported_number_tool_version_or_year_is_caught(
 async def test_an_ownership_upgrade_is_caught(monkeypatch: pytest.MonkeyPatch) -> None:
     install_acompletion(monkeypatch, FakeAgentLLM())
 
-    checked = await check_answer(
-        "I led the nightly import work in Python [A1].", blocks(), kind="behavioral"
-    )
+    checked = await check_answer("I led the nightly import work in Python [A1].", blocks())
 
     assert "more ownership" in checked.flags[0].reason
 
@@ -114,9 +112,7 @@ async def test_a_factual_sentence_without_a_marker_is_flagged(
 ) -> None:
     install_acompletion(monkeypatch, FakeAgentLLM())
 
-    checked = await check_answer(
-        "I led the platform team for several years.", blocks(), kind="behavioral"
-    )
+    checked = await check_answer("I led the platform team for several years.", blocks())
 
     assert [flag.reason for flag in checked.flags] == [
         "states something about the candidate without citing evidence"
@@ -126,7 +122,7 @@ async def test_a_factual_sentence_without_a_marker_is_flagged(
 async def test_a_marker_that_is_not_a_source_is_flagged(monkeypatch: pytest.MonkeyPatch) -> None:
     install_acompletion(monkeypatch, FakeAgentLLM())
 
-    checked = await check_answer("I batched the writes [A9].", blocks(), kind="behavioral")
+    checked = await check_answer("I batched the writes [A9].", blocks())
 
     assert "A9" in checked.flags[0].reason
 
@@ -136,7 +132,7 @@ async def test_the_job_description_cannot_back_a_claim_about_the_candidate(
 ) -> None:
     install_acompletion(monkeypatch, FakeAgentLLM())
 
-    checked = await check_answer("I built the Kafka pipeline [J].", blocks(), kind="motivation")
+    checked = await check_answer("I built the Kafka pipeline [J].", blocks())
 
     assert "job description alone" in checked.flags[0].reason
 
@@ -146,9 +142,7 @@ async def test_the_judge_can_reject_a_sentence_the_rules_accept(
 ) -> None:
     install_acompletion(monkeypatch, FakeAgentLLM(judge_fail={"mentored"}))
 
-    checked = await check_answer(
-        "I mentored two engineers on the import work [A1].", blocks(), kind="behavioral"
-    )
+    checked = await check_answer("I mentored two engineers on the import work [A1].", blocks())
 
     assert checked.flags[0].reason == "unsupported claim"
 
@@ -158,9 +152,7 @@ async def test_an_unavailable_judge_keeps_the_rule_checked_answer(
 ) -> None:
     install_acompletion(monkeypatch, FakeAgentLLM(judge_error=True))
 
-    checked = await check_answer(
-        "I batched the writes in Python [A1].", blocks(), kind="behavioral"
-    )
+    checked = await check_answer("I batched the writes in Python [A1].", blocks())
 
     assert checked.flags == []
     assert checked.judge_unavailable is True
@@ -172,23 +164,21 @@ async def test_questions_and_offers_need_no_marker(monkeypatch: pytest.MonkeyPat
     checked = await check_answer(
         "Would you like me to go deeper? If you tell me why, I can make a note.",
         blocks(),
-        kind="technical",
     )
 
     assert checked.flags == []
 
 
-async def test_a_hypothetical_may_describe_an_approach_without_markers(
+async def test_a_second_person_experience_claim_needs_a_marker(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     install_acompletion(monkeypatch, FakeAgentLLM())
-    answer = "My approach would be to start with the slowest query and measure before changing it."
 
-    hypothetical = await check_answer(answer, blocks(), kind="hypothetical")
-    behavioral = await check_answer(answer, blocks(), kind="behavioral")
+    checked = await check_answer("You mentored two interns during the migration.", blocks())
 
-    assert hypothetical.flags == []
-    assert len(behavioral.flags) == 1
+    assert [flag.reason for flag in checked.flags] == [
+        "states something about the candidate without citing evidence"
+    ]
 
 
 async def test_one_repair_fixes_a_bad_sentence(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -200,9 +190,7 @@ async def test_one_repair_fixes_a_bad_sentence(monkeypatch: pytest.MonkeyPatch) 
         repaired.append(problems)
         return "I batched the writes in Python [A1]."
 
-    grounded = await ground(
-        "I batched the writes in Rust [A1].", blocks(), kind="behavioral", repair=repair
-    )
+    grounded = await ground("I batched the writes in Rust [A1].", blocks(), repair=repair)
 
     assert grounded.status == "grounded"
     assert grounded.repaired is True
@@ -219,9 +207,7 @@ async def test_a_still_failing_answer_keeps_only_the_grounded_subset(
     async def repair(_answer: str, _problems: list[str]) -> str:
         return "I batched the writes in Python [A1]. I also rewrote it in Rust [A1]."
 
-    grounded = await ground(
-        "I rewrote it in Rust [A1].", blocks(), kind="behavioral", repair=repair
-    )
+    grounded = await ground("I rewrote it in Rust [A1].", blocks(), repair=repair)
 
     assert grounded.status == "partial"
     assert grounded.text == "I batched the writes in Python [A1]."
@@ -234,9 +220,7 @@ async def test_an_answer_with_nothing_grounded_is_refused(monkeypatch: pytest.Mo
     async def repair(_answer: str, _problems: list[str]) -> str:
         return "I rewrote it in Rust [A1]."
 
-    grounded = await ground(
-        "I rewrote it in Rust [A1].", blocks(), kind="behavioral", repair=repair
-    )
+    grounded = await ground("I rewrote it in Rust [A1].", blocks(), repair=repair)
 
     assert grounded.status == "refused"
     assert grounded.text == ""
@@ -245,9 +229,7 @@ async def test_an_answer_with_nothing_grounded_is_refused(monkeypatch: pytest.Mo
 async def test_a_valid_answer_is_not_repaired(monkeypatch: pytest.MonkeyPatch) -> None:
     install_acompletion(monkeypatch, FakeAgentLLM())
 
-    grounded = await ground(
-        "I batched the writes in Python [A1].", blocks(), kind="behavioral", repair=no_repair
-    )
+    grounded = await ground("I batched the writes in Python [A1].", blocks(), repair=no_repair)
 
     assert grounded.status == "grounded"
     assert grounded.repaired is False

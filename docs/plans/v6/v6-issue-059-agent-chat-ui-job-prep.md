@@ -1,7 +1,7 @@
 # Issue #59 — Interview agent UI: chat, citations, job prep, memory (Week 4)
 
-**Status:** Proposed — for owner review
-**Tracks:** GitHub issue #59 (milestone `v6`, branch `v6/51-agent-chat-ui-job-prep`)
+**Status:** Not shipped — superseded by #62 — see *Implementation notes* for deviations
+**Tracks:** GitHub issue #59 (milestone `v6`, branch `v6/59-agent-chat-ui-job-prep`)
 **Plan of record:** [v6-implementation-plan.md](v6-implementation-plan.md) §2.5, §7, §10.2
 **Depends on:** #58
 **Blocks:** #61 (acceptance run)
@@ -68,3 +68,21 @@ Gates green; `docs/guide/05-interview-agent.md` completed with screenshots; READ
 ## Out of scope
 
 Streaming tokens, voice input/output, mock-interview scoring and feedback, saving answers as reusable "talking points" (v7).
+
+## Implementation notes — deviations from the plan above
+
+- **Routes:** `/interview` (new conversation form and list) and `/interview/[sessionId]`. The match card and `?profile=&match=` prefill the form; there is no `/interview/new`.
+- **Loading, error and not-found states live inside the `*PageClient` components**, as in every other screen of this repo.
+- **Small backend additions** (with tests): the session detail response carries `job` (title, company, URL, match rationale) and `summary`, so the header and the summary disclosure need no extra lookups; response models now mark `citations`, `grounding`, `messages` etc. as required so the generated types are not optional.
+- **Flagged sentences are not underlined in the answer.** The backend removes sentences that fail grounding, so the card lists them under *Left out because it could not be confirmed* instead.
+- **Model failure** arrives as a stored reply with `grounding.error`, shown as an alert card with **Try again** (see issue #58 notes); the optimistic question is rolled back only when the HTTP request itself fails, and stays in the input either way.
+- **Citation panel** is a side drawer: the achievement's STAR text (fetched by id), the evidence quote and an external link. A `[P]` or `[J]` chip opens the profile or job quote.
+- **Not done:** screenshots for the guide, and the manual script against a live model (the flow was exercised by component tests with mocked API calls only).
+- **Verification:** `npm run lint`, `format:check`, `typecheck`, `test` (338 tests) and `build` pass.
+
+## Superseded (2026-10-06)
+
+The interview UI described here (`/interview`, "Prep interview", the match picker, interview starters) was
+not shipped. It is replaced by the floating evidence chat and `/chat` page of
+[issue #62](v6-issue-062-evidence-chat.md); the answer card, citation chips and panel, no-evidence card and
+optimistic-send hook built for it carry over.

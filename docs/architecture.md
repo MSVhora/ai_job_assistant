@@ -265,42 +265,41 @@ the included / not-included lists in `resume_document.layout`. If nothing fits, 
 the layout is empty with a warning. `POST …/fit` re-fits on demand (layout only) and `POST …/render`
 fits again and returns the PDF, which is never stored.
 
-### Interview agent (sequence)
+### Evidence chat (sequence)
 
-See [guide 05](guide/05-interview-agent.md). A turn is one synchronous request — no streaming, no
-tools — in `services/agent.py`. Only `approved` achievements and the evidence linked to them are
-ever read; a question the evidence cannot answer gets a fixed reply instead of a model call.
+See [guide 05](guide/05-evidence-chat.md). A turn is one synchronous request — no streaming, no tools —
+in `services/agent.py` (the module keeps its `agent` name; the product is a general chat, not interview
+practice, since issue #62). Only the profile, `approved` achievements and the evidence linked to them, and
+user-authored evidence (resume lines, notes) are read; a question none of them touches gets a fixed reply
+instead of a model call.
 
-<!-- diagram: interview-agent-sequence -->
+<!-- diagram: evidence-chat-sequence -->
 ```mermaid
 sequenceDiagram
-    participant B as Browser
+    participant B as Browser (floating chat)
     participant A as FastAPI
     participant G as LLM (LiteLLM)
     participant D as Postgres
 
     B->>A: POST /api/agent/sessions/{id}/messages
-    A->>D: persist the user message
-    A->>A: route by rules (intro, behavioral, technical, motivation, hypothetical, out_of_scope)
-    opt no rule fires
-        A->>G: classify task (cheap model)
-    end
+    A->>D: persist the user message (title the chat from its first question)
     opt follow-up with history
         A->>G: rewrite to a standalone question (classify task)
     end
-    A->>D: approved achievements, hybrid score (cosine, skills, recency, impact), top 6
+    A->>D: approved achievements - hybrid score, top 6, plus per-employer highlights
     A->>D: linked evidence items and top-2 chunks per achievement (drill-down)
-    alt nothing above AGENT_MIN_RETRIEVAL_SCORE, or a motivation question with no job
+    A->>D: user-authored resume lines and notes by similarity
+    alt nothing relevant to the question
         A-->>B: fixed no-evidence reply (no model call)
     else
-        A->>G: write task - fenced blocks [P] [J] [A#] [E#], answer with inline markers
+        A->>G: write task - fenced blocks [P] [A#] [E#], natural answer with inline markers
         A->>A: validate - markers resolve, numbers/versions/tools/ownership in cited text
         A->>G: judge task - entailment of each cited sentence
         opt a sentence fails
             A->>G: write task - one repair round-trip
             A->>A: re-validate, drop what still fails
         end
-        A->>D: persist the answer, citations, grounding report, usage
+        A->>D: persist the answer, labelled citations, grounding report, usage
         opt turns fell out of the window
             A->>G: classify task - fold into the rolling summary
         end
@@ -308,27 +307,28 @@ sequenceDiagram
     end
 ```
 
-![interview-agent-sequence diagram](./assets/interview-agent-sequence.svg)
+![evidence-chat-sequence diagram](./assets/evidence-chat-sequence.svg)
 
 Retrieval (`services/agent_retrieval.py`) scores each approved achievement as
-`0.55·cosine + 0.25·skill overlap + 0.10·recency + 0.10·impact` (weights in `Settings`, summing to
-1), narrows to the project or employer the question names, and keeps the top six above the floor.
-An intro skips the query and takes the three highest impact/recency achievements. Context blocks
-get short markers: `[A#]` achievement, `[E#]` evidence item (with its best chunk text appended),
-`[P]` the profile's identity facts (built in code from `structured_profile`, never generated), and
-`[J]` the pinned match's posting and rationale, which can describe the job but never back a claim
-about the candidate. Evidence is redacted before it reaches a prompt and fenced as untrusted data.
+`0.55·cosine + 0.25·skill overlap + 0.10·recency + 0.10·impact` (weights in `Settings`, summing to 1),
+narrows to the project or employer the question names, and keeps the top six above the floor. Because
+there is no question router, a small set of **highlights** (the best approved achievement per employer or
+project, compact) is always added so broad questions ("tell me about yourself") have material without
+dragging in commit-level detail. Context blocks get short markers: `[A#]` achievement, `[E#]` evidence
+item (with its best chunk text appended), `[P]` the profile facts (built in code from
+`structured_profile`, never generated) and `[J]` an optional pinned match's posting and rationale, which
+can describe a job but never back a claim about the candidate. Evidence is redacted before it reaches a
+prompt and fenced as untrusted data; citations returned to the UI carry a readable label and a cleaned
+quote instead.
 
-`services/agent_grounding.py` is the guardrail. An uncited sentence that states a fact (a number, a
-tool, a first-person past-tense claim, or any statement outside a short list of hedges and offers)
-is flagged; so is a cited sentence whose number, version, year, tool or ownership verb (led, owned,
-architected…) is absent from the cited text (the same checks the resume writer uses), and one the
-`judge` model finds unsupported. One repair call rewrites the answer; what still fails is dropped,
-and an answer with nothing left becomes the fixed refusal. The grounding report
-(`grounded | partial | refused | not_applicable`, the dropped sentences, `used_private`) is stored
-on the message, as are the citations and token usage. `agent_memory.py` keeps the last
-`AGENT_HISTORY_TURNS` turns verbatim and folds older ones into `agent_session.summary`; a summary
-that adds a number or tool absent from what it folds is replaced by a plain list of the questions.
+`services/agent_grounding.py` is the guardrail. An uncited sentence that states a fact is flagged; so is
+a cited sentence whose number, version, year, tool or ownership verb is absent from the cited text, and
+one the `judge` model finds unsupported. One repair call rewrites the answer; what still fails is
+dropped, and an answer with nothing left becomes the fixed refusal. The grounding report
+(`grounded | partial | refused | not_applicable`, the dropped sentences, `used_private`) is stored on the
+message with the citations and token usage. `agent_memory.py` keeps the last `AGENT_HISTORY_TURNS` turns
+verbatim and folds older ones into `agent_session.summary`; a summary that adds a number or tool absent
+from what it folds is replaced by a plain list of the questions.
 
 Search runs start **only** from an explicit `POST /api/jobs/search` — never automatically —
 and are tracked in `job_search` (status + per-source `{source, status, count, warning}`

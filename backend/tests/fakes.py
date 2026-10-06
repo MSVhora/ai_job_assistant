@@ -285,6 +285,9 @@ async def seed_evidence_chunk(
     candidate_id: "uuid.UUID | None" = None,
     when: Any = None,
     scope_employer: dict[str, Any] | None = None,
+    chunk_kind: str = "commit_cluster",
+    item_kind: str = "commit",
+    embedding: "list[float] | None" = None,
 ) -> tuple["uuid.UUID", "uuid.UUID", list["uuid.UUID"]]:
     """Seed one candidate-owned chunk with one commit item per body; returns the ids."""
     from datetime import UTC, datetime
@@ -321,9 +324,10 @@ async def seed_evidence_chunk(
             scope_id = scope.id
         chunk = EvidenceChunk(
             candidate_id=candidate_id,
-            kind="commit_cluster",
+            kind=chunk_kind,
             project_key=project_key,
             title=f"{project_key}: {len(bodies)} commits",
+            embedding=embedding,
             text=chunk_text,
             token_count=len(chunk_text) // 4,
             content_hash=hashlib.sha256(chunk_text.encode()).hexdigest(),
@@ -339,7 +343,7 @@ async def seed_evidence_chunk(
             item = EvidenceItem(
                 candidate_id=candidate_id,
                 scope_id=scope_id,
-                kind=EvidenceKind.commit,
+                kind=EvidenceKind(item_kind),
                 external_id=f"{index:02d}-{hashlib.sha256(f'{chunk.id}:{index}'.encode()).hexdigest()}",
                 project_key=project_key,
                 title=body[:60],
@@ -787,7 +791,6 @@ class FakeAgentLLM:
     def __init__(
         self,
         *,
-        classify: str = "behavioral",
         answer: "Callable[[str, dict[str, str]], str] | None" = None,
         repair: "Callable[[str, dict[str, str]], str] | None" = None,
         judge_fail: "set[str] | None" = None,
@@ -795,7 +798,6 @@ class FakeAgentLLM:
         summary: str = "The candidate practised a behavioural question.",
         rewrite: "Callable[[str], str] | None" = None,
     ) -> None:
-        self.classify = classify
         self.answer = answer
         self.repair = repair
         self.judge_fail = judge_fail or set()
@@ -822,21 +824,18 @@ class FakeAgentLLM:
     def __call__(self, **kwargs: Any) -> object:
         system = kwargs["messages"][0]["content"]
         prompt = kwargs["messages"][-1]["content"]
-        if "classify one interview question" in system:
-            self.calls.append({"kind": "classify", "prompt": prompt})
-            return llm_response(json.dumps({"type": self.classify}))
-        if "rewrite an interview follow-up" in system:
+        if "rewrite a follow-up question" in system:
             self.calls.append({"kind": "rewrite", "prompt": prompt})
             question = prompt.rsplit("Follow-up question: ", 1)[1].split("\n")[0]
             return llm_response(self.rewrite(question) if self.rewrite else question)
-        if "answer interview questions for a candidate" in system:
+        if "talks about the user's own professional work" in system:
             return llm_response(json.dumps(self._answer(prompt)))
-        if "check sentences of an interview answer" in system:
+        if "check sentences of an answer" in system:
             if self.judge_error:
                 self.calls.append({"kind": "judge", "prompt": prompt})
                 return ProviderError(400)
             return llm_response(json.dumps(self._judge(prompt)))
-        if "running summary" in system:
+        if "running summary of a conversation" in system:
             self.calls.append({"kind": "summary", "prompt": prompt})
             return llm_response(self.summary)
         msg = "unexpected prompt"

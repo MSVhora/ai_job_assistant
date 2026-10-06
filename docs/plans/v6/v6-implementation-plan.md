@@ -421,6 +421,8 @@ The JD changes **which true achievements are chosen and how they are ordered and
 
 ## 7. Interview agent
 
+> **Revised 2026-10-06 (issue #62):** the product is a general evidence chat (ask anything, floating panel, `/chat`), not interview practice. §7.2's question types and templates and the "Prep interview" entry points are dropped; retrieval, citations, grounding and memory below still apply. See [v6-issue-062-evidence-chat.md](v6-issue-062-evidence-chat.md).
+
 ### 7.1 Flow (per user message)
 
 ```
@@ -716,6 +718,7 @@ Sizing note: 14 issues in 4 weeks is aggressive for one developer; each is delib
 | 58 | `agent-retrieval-router-answer` | Router (rules + LLM fallback), query rewrite, hybrid retrieval, templates, citation format, grounding validator + repair, refusal path, models + `0027`, endpoints | Labeled router set 100 % on rules path; unanswerable questions refuse; citations resolve to real evidence ids; validator catches injected claim | `architecture.md` sequence diagram, guide 05 |
 | 59 | `agent-chat-ui-job-prep` | `/interview` routes, citation chips, "prep for match" (posting + rationale pinned), rolling summary memory, MatchCard "Prep interview" | Session survives reload; summary kicks in after N turns; no streaming; build/lint green | guide 05 |
 | 60 | `eval-golden-recorded-live` | Golden dataset, `RecordedLLM`, record mode, `live_llm` marker suite, thresholds, CI wiring | `pytest` green offline; `EVAL_LIVE=1 pytest -m live_llm` prints metric table; retrieval recall@5 ≥ 0.8 on goldens | `docs/instructions` testing note |
+| 62 | `evidence-chat` | Replaces #59: general chat over profile, approved achievements and user evidence; floating panel + `/chat`; conversations list; readable citations | "Tell me about yourself" reads naturally with citations; no interview wording or links remain | guide 05 (evidence chat), `architecture.md` |
 | 61 | `privacy-docs-milestone-close` | Disclosure modal wired, redaction on all LLM entry points verified by test, `.env.example`, README, guides 04/05, `architecture.md` (header refresh, ER, sequences, system overview), `node scripts/render-diagrams.mjs`, full DoD run, milestone acceptance script | Every v6 LLM call site shown to go through redaction (test enumerates call sites); all DoD gates; diagrams re-rendered | all |
 
 ### 13.5 Cut line if the schedule slips

@@ -17,7 +17,7 @@ from sqlalchemy import select
 
 from app.core.config import get_settings
 from app.core.db import session_factory
-from app.models import AgentMessage, EvidenceItem
+from app.models import AgentMessage, AgentSession, EvidenceItem
 from app.schemas.agent import AgentTurnResponse
 from app.services import agent
 from app.services import agent_templates as templates
@@ -59,7 +59,7 @@ def cite_import(_prompt: str, _blocks: dict[str, str]) -> str:
     )
 
 
-async def test_an_intro_uses_the_profile_and_the_top_achievements(
+async def test_a_broad_question_gets_the_whole_profile_and_the_best_work_per_employer(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     llm = FakeAgentLLM()
@@ -67,12 +67,89 @@ async def test_an_intro_uses_the_profile_and_the_top_achievements(
 
     turn = await ask(session_id, "Tell me about yourself")
 
-    prompt = llm.prompts("answer")[0]
-    blocks = llm.blocks(prompt)
+    blocks = llm.blocks(llm.prompts("answer")[0])
     assert "Data platform engineer" in blocks["P"]
-    assert len([marker for marker in blocks if marker.startswith("A")]) == 3
-    assert turn.assistant_message.question_type == "intro"
+    assert "Senior Engineer at Acme Corp (Jan 2019 to Dec 2021)" in blocks["P"]
+    assert "Built reports" in blocks["P"]
+    assert 2 <= len([marker for marker in blocks if marker.startswith("A")]) <= 5
     assert turn.assistant_message.grounding.status == "grounded"
+    assert turn.assistant_message.citations[0].label
+
+
+async def test_the_profile_alone_can_answer_a_question_about_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    llm = FakeAgentLLM(answer=lambda *_: "You are a data platform engineer at Beta Inc [P].")
+    install_agent_embeddings(monkeypatch)
+    install_acompletion(monkeypatch, llm)
+    candidate_id, _, _ = await seed_evidence_chunk(bodies=["x"])
+    session_id = await new_agent_session(await seed_profile_for(candidate_id))
+
+    turn = await ask(session_id, "What is my current role?")
+
+    reply = turn.assistant_message
+    assert [citation.kind for citation in reply.citations] == ["profile"]
+    assert reply.citations[0].label == "Your profile"
+    assert reply.grounding.status == "grounded"
+
+
+async def test_a_question_the_sources_cannot_answer_gets_the_no_evidence_card(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    llm = FakeAgentLLM(answer=lambda *_: "That is not something my evidence covers.")
+    session_id, _ = await world_session(monkeypatch, llm)
+
+    turn = await ask(session_id, "What is the capital of France?")
+
+    reply = turn.assistant_message
+    assert reply.content == templates.NO_EVIDENCE
+    assert reply.citations == []
+    assert reply.grounding.no_evidence is True
+
+
+async def test_the_first_question_titles_the_conversation(monkeypatch: pytest.MonkeyPatch) -> None:
+    session_id, _ = await world_session(monkeypatch, FakeAgentLLM())
+
+    await ask(session_id, "Tell me about yourself")
+    await ask(session_id, "And what about the importer?")
+
+    async with session_factory() as session:
+        row = (
+            await session.execute(select(AgentSession).where(AgentSession.id == session_id))
+        ).scalar_one()
+    assert row.title == "Tell me about yourself"
+
+
+async def test_a_long_first_question_gives_a_short_title(monkeypatch: pytest.MonkeyPatch) -> None:
+    session_id, _ = await world_session(monkeypatch, FakeAgentLLM())
+
+    await ask(session_id, "Tell me everything you know about " + "the importer rewrite " * 10)
+
+    async with session_factory() as session:
+        row = (
+            await session.execute(select(AgentSession).where(AgentSession.id == session_id))
+        ).scalar_one()
+    assert len(row.title) <= 61
+    assert row.title.endswith("…")
+
+
+async def test_a_second_person_claim_that_the_sources_do_not_support_is_removed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def invent(_prompt: str, _blocks: dict[str, str]) -> str:
+        return (
+            "You cut the import from 42 minutes to 9 minutes [A1]."
+            " You also led the platform team [A1]."
+        )
+
+    llm = FakeAgentLLM(answer=invent, repair=invent)
+    session_id, _ = await world_session(monkeypatch, llm)
+
+    turn = await ask(session_id, IMPORT_Q)
+
+    reply = turn.assistant_message
+    assert reply.grounding.status == "partial"
+    assert "platform team" not in reply.content
 
 
 async def test_a_behavioral_answer_cites_a_real_achievement_and_evidence_item(
@@ -163,106 +240,6 @@ async def seed_profile_for(candidate_id: uuid.UUID) -> uuid.UUID:
         return profile_id
 
 
-async def test_why_x_over_y_without_rationale_says_so_and_offers_a_note(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    llm = FakeAgentLLM(answer=cite_import)
-    session_id, _ = await world_session(monkeypatch, llm)
-
-    turn = await ask(session_id, "Why did you choose Python over Go for the Faster nightly import?")
-
-    reply = turn.assistant_message
-    assert reply.question_type == "technical"
-    assert "does not state why" in llm.prompts("answer")[0]
-    assert reply.content.endswith(templates.NOTE_OFFER)
-    assert reply.grounding.suggest_note is True
-
-
-async def test_a_technical_answer_with_a_stated_reason_needs_no_note_offer(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    llm = FakeAgentLLM(
-        answer=lambda *_: (
-            "I moved the loader to Kafka because the batch job could not keep up [E1]."
-        )
-    )
-    install_agent_embeddings(monkeypatch)
-    install_acompletion(monkeypatch, llm)
-    candidate_id, _, item_ids = await seed_evidence_chunk(
-        bodies=["Moved the loader to Kafka because the batch job could not keep up"]
-    )
-    await seed_achievement(
-        candidate_id,
-        item_ids=item_ids,
-        status="approved",
-        title="Faster nightly import",
-        embedding=fake_vector("Faster nightly import"),
-        skills=["Kafka"],
-    )
-    session_id = await new_agent_session(await seed_profile_for(candidate_id))
-
-    turn = await ask(session_id, "Why did you choose Kafka for the Faster nightly import?")
-
-    assert "does not state why" not in llm.prompts("answer")[0]
-    assert templates.NOTE_OFFER not in turn.assistant_message.content
-    assert turn.assistant_message.grounding.suggest_note is False
-
-
-async def test_an_unanswerable_question_is_refused_without_calling_the_writer(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    llm = FakeAgentLLM(classify="behavioral")
-    session_id, _ = await world_session(monkeypatch, llm)
-
-    turn = await ask(session_id, "What drives you when sailing in rough weather conditions?")
-
-    reply = turn.assistant_message
-    assert reply.content in {templates.NO_EVIDENCE, templates.OUT_OF_SCOPE}
-    assert llm.count("answer") == 0
-
-
-async def test_no_approved_achievements_gets_the_setup_message(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    llm = FakeAgentLLM()
-    install_agent_embeddings(monkeypatch)
-    install_acompletion(monkeypatch, llm)
-    candidate_id, _, _ = await seed_evidence_chunk(bodies=["x"])
-    session_id = await new_agent_session(await seed_profile_for(candidate_id))
-
-    turn = await ask(session_id, "Tell me about a time you led a project")
-
-    assert turn.assistant_message.content == templates.NO_APPROVED
-    assert turn.assistant_message.grounding.no_evidence is True
-    assert llm.count("answer") == 0
-
-
-async def test_a_hypothetical_is_labelled_as_an_approach(monkeypatch: pytest.MonkeyPatch) -> None:
-    llm = FakeAgentLLM(
-        answer=lambda *_: (
-            "My approach would be to measure first. I did something similar when I batched the"
-            " nightly import writes [A1]."
-        )
-    )
-    session_id, _ = await world_session(monkeypatch, llm)
-
-    turn = await ask(session_id, "How would you speed up a slow Faster nightly import?")
-
-    assert turn.assistant_message.question_type == "hypothetical"
-    assert "labelled clearly as an approach" in llm.prompts("answer")[0]
-    assert turn.assistant_message.grounding.status == "grounded"
-
-
-async def test_a_motivation_question_needs_a_job_context(monkeypatch: pytest.MonkeyPatch) -> None:
-    llm = FakeAgentLLM()
-    session_id, _ = await world_session(monkeypatch, llm)
-
-    turn = await ask(session_id, "Why do you want to work here?")
-
-    assert turn.assistant_message.content == templates.NEEDS_JOB
-    assert llm.count("answer") == 0
-
-
 async def test_a_motivation_answer_uses_the_pinned_match(monkeypatch: pytest.MonkeyPatch) -> None:
     llm = FakeAgentLLM(
         answer=lambda *_: (
@@ -320,7 +297,6 @@ async def test_a_failing_model_is_stored_as_a_retryable_reply(
 
     assert turn.assistant_message.content == templates.UNAVAILABLE
     assert turn.assistant_message.grounding.error is True
-    assert turn.assistant_message.question_type is None
     async with session_factory() as session:
         rows = (await session.execute(select(AgentMessage))).scalars().all()
     assert sorted(row.role.value for row in rows) == ["assistant", "user"]
